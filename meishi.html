@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>名刺プレビュー – 阿部接骨院</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700;900&family=Noto+Sans+JP:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#1a1a2e;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  gap:48px;
+  padding:40px 20px;
+  font-family:'Noto Sans JP', sans-serif;
+}
+h2 {
+  color:rgba(255,255,255,0.4);
+  font-size:11px;
+  letter-spacing:0.3em;
+  text-transform:uppercase;
+  font-weight:300;
+}
+
+/* ── 名刺サイズ: 91mm × 55mm (364px × 220px @4px/mm) ── */
+.card {
+  width: 364px;
+  height: 220px;
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+
+/* ══ 表面 ══ */
+.card-front {
+  background: #07111F;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 22px 24px 18px;
+}
+/* ゴールドライン – 上 */
+.card-front::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+  background: linear-gradient(90deg, #C8A558 0%, #E2C98A 50%, transparent 100%);
+}
+/* ゴールドライン – 左 */
+.card-front::after {
+  content:'';
+  position:absolute;
+  top:0; left:0; bottom:0;
+  width:2px;
+  background: linear-gradient(180deg, #C8A558 0%, transparent 100%);
+}
+
+.front-top {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.clinic-en {
+  font-family:'Bebas Neue', sans-serif;
+  font-size:9px;
+  letter-spacing:0.35em;
+  color:#C8A558;
+  opacity:0.8;
+}
+.clinic-ja {
+  font-family:'Noto Serif JP', serif;
+  font-size:18px;
+  font-weight:700;
+  color:#F5F7FA;
+  letter-spacing:0.12em;
+}
+.tagline {
+  font-size:8px;
+  color:rgba(200,165,88,0.7);
+  letter-spacing:0.18em;
+  font-weight:300;
+  margin-top:2px;
+}
+
+.front-mid {
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.name-title {
+  font-size:8px;
+  color:#C8A558;
+  letter-spacing:0.2em;
+  font-weight:300;
+}
+.name-ja {
+  font-family:'Noto Serif JP', serif;
+  font-size:20px;
+  font-weight:700;
+  color:#F5F7FA;
+  letter-spacing:0.1em;
+}
+.name-en {
+  font-size:9px;
+  color:rgba(245,247,250,0.45);
+  letter-spacing:0.16em;
+  font-weight:300;
+}
+
+.front-bottom {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+}
+.contact-item {
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.contact-label {
+  font-size:7px;
+  letter-spacing:0.16em;
+  color:rgba(200,165,88,0.6);
+  font-weight:300;
+}
+.contact-val {
+  font-size:9px;
+  color:rgba(245,247,250,0.75);
+  letter-spacing:0.06em;
+  font-weight:300;
+}
+.qr-placeholder {
+  width:36px;
+  height:36px;
+  border:1px solid rgba(200,165,88,0.3);
+  border-radius:2px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:2px;
+}
+.qr-placeholder span {
+  font-size:5px;
+  color:rgba(200,165,88,0.5);
+  letter-spacing:0.08em;
+}
+
+/* ══ 裏面 ══ */
+.card-back {
+  background: #07111F;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 24px 18px;
+}
+.card-back::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+  background: linear-gradient(90deg, transparent 0%, #C8A558 50%, transparent 100%);
+}
+
+.back-logo {
+  text-align:center;
+}
+.back-logo .logo-ja {
+  font-family:'Noto Serif JP', serif;
+  font-size:15px;
+  font-weight:700;
+  color:#F5F7FA;
+  letter-spacing:0.18em;
+  display:block;
+}
+.back-logo .logo-en {
+  font-size:7px;
+  letter-spacing:0.3em;
+  color:#C8A558;
+  font-weight:300;
+  display:block;
+  margin-top:3px;
+}
+
+.back-info {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px 16px;
+}
+.info-row {
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.info-label {
+  font-size:7px;
+  letter-spacing:0.16em;
+  color:rgba(200,165,88,0.6);
+  font-weight:300;
+}
+.info-val {
+  font-size:8.5px;
+  color:rgba(245,247,250,0.8);
+  letter-spacing:0.04em;
+  font-weight:300;
+  line-height:1.5;
+}
+
+.back-divider {
+  width:100%;
+  height:1px;
+  background:linear-gradient(90deg, transparent, rgba(200,165,88,0.2), transparent);
+}
+
+.back-web {
+  text-align:center;
+  font-size:8px;
+  letter-spacing:0.14em;
+  color:rgba(200,165,88,0.6);
+  font-weight:300;
+}
+
+/* ── print ── */
+@media print {
+  body { background:white; gap:0; padding:0; }
+  h2 { display:none; }
+  .card {
+    page-break-inside:avoid;
+    box-shadow:none;
+    border:0.5pt solid #ccc;
+    margin:10mm auto;
+  }
+}
+</style>
+</head>
+<body>
+
+<h2>表面 — Front</h2>
+
+<div class="card">
+  <div class="card-front">
+    <div class="front-top">
+      <span class="clinic-en">ABE SEKKOTSUIN</span>
+      <span class="clinic-ja">阿部接骨院</span>
+      <span class="tagline">スポーツの痛みに、本気で向き合う。</span>
+    </div>
+
+    <div class="front-mid">
+      <span class="name-title">DIRECTOR · 柔道整復師</span>
+      <span class="name-ja">阿部 皓哉</span>
+      <span class="name-en">Terutoshi Abe</span>
+    </div>
+
+    <div class="front-bottom">
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div class="contact-item">
+          <span class="contact-label">TEL</span>
+          <span class="contact-val">072-665-8724</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">WEB</span>
+          <span class="contact-val">abesekkotsuin.com</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">Instagram</span>
+          <span class="contact-val">@abesekkotsuin_ibaraki</span>
+        </div>
+      </div>
+      <div class="qr-placeholder">
+        <span>LINE</span>
+        <span>予約</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>裏面 — Back</h2>
+
+<div class="card">
+  <div class="card-back">
+    <div class="back-logo">
+      <span class="logo-ja">阿部接骨院</span>
+      <span class="logo-en">TOTAL RECOVERYTATION ABE · SPORTS OSTEOPATHIC CLINIC</span>
+    </div>
+
+    <div class="back-divider"></div>
+
+    <div class="back-info">
+      <div class="info-row">
+        <span class="info-label">茨木本院</span>
+        <span class="info-val">大阪府茨木市真砂2−13−10</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">川西整体院</span>
+        <span class="info-val">兵庫県川西市鼓ヶ滝1−3−3<br>シンリョーステイツ桜木304</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">診療時間</span>
+        <span class="info-val">10:00〜13:00<br>16:00〜20:30</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">予約</span>
+        <span class="info-val">完全予約制<br>LINE / 24時間受付</span>
+      </div>
+    </div>
+
+    <div class="back-divider"></div>
+
+    <div class="back-web">abesekkotsuin.com</div>
+  </div>
+</div>
+
+</body>
+</html>
