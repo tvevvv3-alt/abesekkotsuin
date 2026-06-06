@@ -1,35 +1,46 @@
 import Header from "@/components/Header";
-import Hero from "@/components/Hero";
-import Problem from "@/components/Problem";
-import Philosophy from "@/components/Philosophy";
-import Approach from "@/components/Approach";
-import Voice from "@/components/Voice";
-import Technology from "@/components/Technology";
-import Athletes from "@/components/Athletes";
-import Staff from "@/components/Staff";
-import MenuSection from "@/components/MenuSection";
-import Access from "@/components/Access";
-import FinalCTA from "@/components/FinalCTA";
+import HeroSection from "@/components/HeroSection";
+import ProblemCards from "@/components/sections/ProblemCards";
+import PhilosophyCards from "@/components/sections/PhilosophyCards";
+import TechCards from "@/components/sections/TechCards";
+import TrainerSection from "@/components/sections/TrainerSection";
+import StaffCards from "@/components/sections/StaffCards";
+import MenuCards from "@/components/sections/MenuCards";
+import AccessSection from "@/components/sections/AccessSection";
+import FixedLine from "@/components/FixedLine";
 import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
     <>
       <Header />
-      <main>
-        <Hero />
-        <Problem />
-        <Philosophy />
-        <Approach />
-        <Voice />
-        <Technology />
-        <Athletes />
-        <Staff />
-        <MenuSection />
-        <Access />
-        <FinalCTA />
+      <main className="pb-24 bg-navy-dark">
+        <HeroSection />
+
+        <div className="divider-gold mx-5 my-2" />
+        <ProblemCards />
+
+        <div className="divider-gold mx-5 my-2" />
+        <PhilosophyCards />
+
+        <div className="divider-gold mx-5 my-2" />
+        <TechCards />
+
+        <div className="divider-gold mx-5 my-2" />
+        <TrainerSection />
+
+        <div className="divider-gold mx-5 my-2" />
+        <StaffCards />
+
+        <div className="divider-gold mx-5 my-2" />
+        <MenuCards />
+
+        <div className="divider-gold mx-5 my-2" />
+        <AccessSection />
+
+        <Footer />
       </main>
-      <Footer />
+      <FixedLine />
     </>
   );
 }
