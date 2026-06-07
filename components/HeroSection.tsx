@@ -6,77 +6,74 @@ import { motion } from "framer-motion";
 export default function HeroSection() {
   return (
     <section className="relative h-[100svh] flex flex-col justify-end overflow-hidden bg-navy-dark">
-      {/* Background */}
+      {/* Background photo */}
       <div className="absolute inset-0 z-0">
         <Image
           src="/hero-bg.jpg"
           alt=""
           fill
-          className="object-cover object-center opacity-25"
+          className="object-cover object-center opacity-35"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#050D18]/30 via-transparent to-[#050D18]" />
-      </div>
-
-      {/* Ambient rings */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[380px] h-[380px] rounded-full border border-gold/6" />
-        <div className="absolute w-[260px] h-[260px] rounded-full border border-gold/10" />
+        {/* Cinematic gradient - strong at bottom */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#050D18]/50 via-transparent to-[#050D18]" />
+        <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-[#050D18] via-[#050D18]/60 to-transparent" />
       </div>
 
       {/* Content — bottom aligned */}
-      <div className="relative z-10 px-6 pb-10 pt-24">
+      <div className="relative z-10 px-7 pb-12 pt-24">
         <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="font-bebas text-[10px] tracking-[0.3em] text-gold/70 mb-5"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 0.5, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="font-bebas text-[10px] tracking-[0.35em] text-gold mb-6"
         >
           SPORTS OSTEOPATHIC CLINIC · IBARAKI · KAWANISHI
         </motion.p>
 
         <motion.h1
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.5 }}
-          className="font-serif font-black text-ink leading-[1.25] mb-5"
-          style={{ fontSize: "clamp(28px, 8vw, 40px)" }}
+          transition={{ duration: 1, delay: 0.65, ease: [0.22, 1, 0.36, 1] }}
+          className="font-serif font-bold text-ink leading-[1.2] mb-6"
+          style={{ fontSize: "clamp(30px, 9vw, 44px)" }}
         >
-          もう無理かもしれない。
+          ここに来てよかった。
           <br />
-          <span className="font-light text-ink/75" style={{ fontSize: "clamp(18px, 5vw, 24px)" }}>
-            そう思ったときに、思い出してもらえる
-            <br />
-            場所でありたい。
-          </span>
+          その瞬間のために。
         </motion.h1>
 
-        <div className="h-px w-12 bg-gradient-to-r from-gold/50 to-transparent mb-5" />
+        <motion.div
+          initial={{ scaleX: 0, originX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.6, delay: 1.2 }}
+          className="h-px w-10 bg-gold/50 mb-6"
+        />
 
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.9 }}
-          className="text-ink/50 text-xs leading-[2] tracking-wide"
+          transition={{ duration: 0.8, delay: 1.35 }}
+          className="text-ink/45 text-[13px] leading-[2] tracking-wide"
         >
           スポーツのケガ。長引く痛み。術後のリハビリ。<br />
-          症状の背景にある原因まで、丁寧に評価します。
+          症状だけでなく、その背景にある原因まで<br />
+          丁寧に評価します。
         </motion.p>
 
-        {/* Scroll hint */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 2 }}
-          className="flex items-center gap-2 mt-8"
+          transition={{ delay: 2.2 }}
+          className="mt-10 flex items-center gap-2"
         >
-          <motion.div
+          <motion.span
             animate={{ x: [0, 6, 0] }}
-            transition={{ repeat: Infinity, duration: 1.4, ease: "easeInOut" }}
-            className="text-gold/40 text-xs tracking-widest"
+            transition={{ repeat: Infinity, duration: 1.6, ease: "easeInOut" }}
+            className="text-gold/40 text-[11px] tracking-[0.2em] font-bebas"
           >
-            スワイプして見る →
-          </motion.div>
+            SWIPE TO EXPLORE →
+          </motion.span>
         </motion.div>
       </div>
     </section>

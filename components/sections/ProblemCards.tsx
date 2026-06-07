@@ -3,52 +3,65 @@ import CardCarousel from "../CardCarousel";
 const problems = [
   {
     id: "p1",
-    icon: "?",
-    title: "何が原因か\nわからない",
-    sub: "どこへ行っても改善しない。その理由を一緒に探します。",
+    num: "01",
+    title: "原因が\nわからない",
+    sub: "レントゲンでは\n異常なしと言われた",
   },
   {
     id: "p2",
-    icon: "⏱",
+    num: "02",
     title: "試合まで\n時間がない",
-    sub: "スポーツの現場を知っているから、焦りも理解できます。",
+    sub: "あと2週間で\n大会がある",
   },
   {
     id: "p3",
-    icon: "🏥",
-    title: "病院では\n様子を見てと言われた",
-    sub: "「異常なし」でも痛みは続く。その痛みに向き合います。",
+    num: "03",
+    title: "様子を見てと\n言われた",
+    sub: "病院では様子を見てと\n言われた",
   },
   {
     id: "p4",
-    icon: "🦵",
+    num: "04",
     title: "術後の\nリハビリが不安",
-    sub: "手術後の回復を、段階に合わせてサポートします。",
+    sub: "リハビリがうまく\n進むか心配",
   },
   {
     id: "p5",
-    icon: "🔁",
+    num: "05",
     title: "同じ痛みを\n繰り返している",
-    sub: "繰り返す痛みには、繰り返す理由があります。",
+    sub: "一度良くなっても\nまた痛くなる",
   },
 ];
 
 export default function ProblemCards() {
   return (
     <CardCarousel
-      sectionLabel="PROBLEM"
+      sectionLabel="02 · PROBLEM"
       sectionTitle="こんなお悩みは？"
       cards={problems.map((p) => ({
         id: p.id,
         content: (
-          <div className="h-full min-h-[52vw] bg-[#0B1A30] border border-gold/15 rounded-2xl p-7 flex flex-col justify-between">
-            <span className="text-3xl">{p.icon}</span>
-            <div>
-              <h3 className="font-serif text-xl font-bold text-ink leading-tight mb-3 whitespace-pre-line">
-                {p.title}
-              </h3>
-              <p className="text-ink/50 text-xs leading-relaxed">{p.sub}</p>
-            </div>
+          <div className="relative h-[68vw] bg-[#0A1828] border border-gold/8 rounded-2xl overflow-hidden flex flex-col justify-end p-7">
+            {/* Background number */}
+            <span
+              className="absolute top-5 right-5 font-bebas leading-none select-none text-gold/6"
+              style={{ fontSize: "clamp(80px, 22vw, 110px)" }}
+            >
+              {p.num}
+            </span>
+            {/* Gold accent line */}
+            <div className="h-px w-8 bg-gold/50 mb-5" />
+            {/* Headline */}
+            <h3
+              className="font-serif font-bold text-ink leading-[1.2] mb-3 whitespace-pre-line"
+              style={{ fontSize: "clamp(22px, 6vw, 28px)" }}
+            >
+              {p.title}
+            </h3>
+            {/* Sub */}
+            <p className="text-ink/35 text-[11px] leading-relaxed tracking-wide whitespace-pre-line">
+              {p.sub}
+            </p>
           </div>
         ),
       }))}

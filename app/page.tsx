@@ -10,33 +10,58 @@ import AccessSection from "@/components/sections/AccessSection";
 import FixedLine from "@/components/FixedLine";
 import Footer from "@/components/Footer";
 
+function Divider() {
+  return <div className="mx-5 my-1 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent" />;
+}
+
 export default function Home() {
   return (
     <>
       <Header />
-      <main className="pb-24 bg-navy-dark">
-        <HeroSection />
+      <main className="pb-28 bg-navy-dark">
+        <section id="hero">
+          <HeroSection />
+        </section>
 
-        <div className="divider-gold mx-5 my-2" />
-        <ProblemCards />
+        <Divider />
+        <section id="problem">
+          <ProblemCards />
+        </section>
 
-        <div className="divider-gold mx-5 my-2" />
-        <PhilosophyCards />
+        <Divider />
+        <section id="philosophy">
+          <PhilosophyCards />
+        </section>
 
-        <div className="divider-gold mx-5 my-2" />
-        <TechCards />
+        <Divider />
+        <section id="approach">
+          <TechCards />
+        </section>
 
-        <div className="divider-gold mx-5 my-2" />
+        <Divider />
         <TrainerSection />
 
-        <div className="divider-gold mx-5 my-2" />
-        <StaffCards />
+        <Divider />
+        <section id="staff">
+          <StaffCards />
+        </section>
 
-        <div className="divider-gold mx-5 my-2" />
-        <MenuCards />
+        <Divider />
+        <section id="menu">
+          <MenuCards />
+        </section>
 
-        <div className="divider-gold mx-5 my-2" />
-        <AccessSection />
+        <Divider />
+        <section id="access">
+          <AccessSection />
+        </section>
+
+        {/* Final CTA */}
+        <div className="px-7 pt-12 pb-6 text-center">
+          <p className="font-serif text-ink/30 text-xs tracking-widest mb-2">
+            完全予約制 · LINE 24時間受付
+          </p>
+        </div>
 
         <Footer />
       </main>

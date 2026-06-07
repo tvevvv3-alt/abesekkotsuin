@@ -44,14 +44,14 @@ export default function CardCarousel({ cards, sectionLabel, sectionTitle, classN
     <section className={`flex flex-col ${className}`}>
       {/* Section header */}
       {(sectionLabel || sectionTitle) && (
-        <div className="px-6 pt-6 pb-3 flex-shrink-0">
+        <div className="px-6 pt-7 pb-4 flex-shrink-0">
           {sectionLabel && (
-            <p className="font-bebas text-[10px] tracking-[0.3em] text-gold/60 mb-1">
+            <p className="font-bebas text-[9px] tracking-[0.35em] text-gold/50 mb-2">
               {sectionLabel}
             </p>
           )}
           {sectionTitle && (
-            <h2 className="font-serif text-lg font-bold text-ink">{sectionTitle}</h2>
+            <h2 className="font-serif text-xl font-bold text-ink">{sectionTitle}</h2>
           )}
         </div>
       )}

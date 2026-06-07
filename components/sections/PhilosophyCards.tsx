@@ -3,7 +3,7 @@ import CardCarousel from "../CardCarousel";
 const cards = [
   {
     id: "ph0",
-    num: "—",
+    num: null,
     title: "痛みには、\n理由がある。",
     sub: "症状のある場所が原因とは限らない。身体全体を評価することで、本当の原因が見えてきます。",
     accent: true,
@@ -25,7 +25,7 @@ const cards = [
   {
     id: "ph3",
     num: "03",
-    title: "再び動ける\n身体へ",
+    title: "再び\n動ける身体へ",
     sub: "痛みが取れたあとも、再発しない身体へ。動作の再教育まで伴走します。",
     accent: false,
   },
@@ -34,24 +34,41 @@ const cards = [
 export default function PhilosophyCards() {
   return (
     <CardCarousel
-      sectionLabel="PHILOSOPHY"
+      sectionLabel="03 · PHILOSOPHY"
       sectionTitle="阿部接骨院の考え方"
       cards={cards.map((c) => ({
         id: c.id,
-        content: (
-          <div
-            className={`h-full min-h-[52vw] rounded-2xl p-7 flex flex-col justify-between ${
-              c.accent
-                ? "bg-gradient-to-br from-[#0F2240] to-[#0B1A30] border border-gold/30"
-                : "bg-[#0B1A30] border border-gold/12"
-            }`}
-          >
-            <p className="font-bebas text-4xl text-gold/20 leading-none">{c.num}</p>
+        content: c.accent ? (
+          // Concept card — centered, statement-driven
+          <div className="relative h-[68vw] bg-gradient-to-br from-[#0D2040] to-[#070E1B] border border-gold/20 rounded-2xl overflow-hidden flex flex-col justify-center px-8 py-7">
+            <div className="h-px w-10 bg-gold/50 mb-7" />
+            <h3
+              className="font-serif font-bold text-ink leading-[1.25] mb-5 whitespace-pre-line"
+              style={{ fontSize: "clamp(24px, 7vw, 32px)" }}
+            >
+              {c.title}
+            </h3>
+            <p className="text-ink/40 text-[11px] leading-relaxed">{c.sub}</p>
+          </div>
+        ) : (
+          // Step card — number dominates, content at bottom
+          <div className="relative h-[68vw] bg-[#0A1828] border border-gold/8 rounded-2xl overflow-hidden flex flex-col justify-between p-7">
+            {/* Giant faded number */}
+            <span
+              className="font-bebas leading-none text-gold/7 select-none self-start"
+              style={{ fontSize: "clamp(90px, 25vw, 120px)" }}
+            >
+              {c.num}
+            </span>
+            {/* Bottom content */}
             <div>
-              <h3 className="font-serif text-xl font-bold text-ink leading-tight mb-3 whitespace-pre-line">
+              <h3
+                className="font-serif font-bold text-ink leading-[1.2] mb-3 whitespace-pre-line"
+                style={{ fontSize: "clamp(20px, 6vw, 26px)" }}
+              >
                 {c.title}
               </h3>
-              <p className="text-ink/50 text-xs leading-relaxed">{c.sub}</p>
+              <p className="text-ink/40 text-[11px] leading-relaxed">{c.sub}</p>
             </div>
           </div>
         ),
