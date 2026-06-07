@@ -1,93 +1,112 @@
-import Image from "next/image";
+// Photos needed in public/photos/:
+//   treatment-echo.jpg      — エコー説明・評価風景
+//   treatment-acuscope.jpg  — アキュスコープ施術
+//   treatment-manual.jpg    — 手技施術
+//   treatment-hc.jpg        — ハイチャージNEO
+//   treatment-eresus.jpg    — エレサス
+
 import CardCarousel from "../CardCarousel";
 
-const techs = [
+const sections = [
+  // Section intro
+  {
+    id: "intro",
+    type: "intro" as const,
+    photo: "/photos/treatment-echo.jpg",
+    en: "EVALUATION",
+    title: "まず、原因を探す。",
+    desc: "機器ありきの施術ではありません。評価で見えた原因に対して、最適な方法を組み合わせます。",
+  },
+  // Individual treatments
   {
     id: "t1",
-    name: "エコー観察装置",
-    en: "ULTRASOUND ECHO",
+    type: "item" as const,
+    photo: "/photos/treatment-echo.jpg",
+    en: "ECHO · EVALUATION",
+    title: "エコー観察装置",
     result: "痛みの原因を、目で見て確かめる。",
   },
   {
     id: "t2",
-    name: "アキュスコープ",
+    type: "item" as const,
+    photo: "/photos/treatment-acuscope.jpg",
     en: "ACUSCOPE",
+    title: "アキュスコープ",
     result: "細胞レベルから、回復を後押しする。",
   },
   {
     id: "t3",
-    name: "マイオパルス",
-    en: "MYOPULSE",
-    result: "硬くなった組織を、ほぐしていく。",
+    type: "item" as const,
+    photo: "/photos/treatment-manual.jpg",
+    en: "MANUAL THERAPY",
+    title: "手技施術",
+    result: "硬くなった組織を、丁寧にほぐす。",
   },
   {
     id: "t4",
-    name: "エレサス",
-    en: "ELESUS",
-    result: "深部の痛みに、直接届かせる。",
+    type: "item" as const,
+    photo: "/photos/treatment-hc.jpg",
+    en: "HIGH CHARGE NEO",
+    title: "ハイチャージNEO",
+    result: "全身の電気的バランスを整える。",
   },
   {
     id: "t5",
-    name: "ハイチャージNEO",
-    en: "HIGH CHARGE NEO",
-    result: "全身の電気的バランスを、整える。",
+    type: "item" as const,
+    photo: "/photos/treatment-eresus.jpg",
+    en: "ELESUS",
+    title: "エレサス",
+    result: "深部の痛みに、直接届かせる。",
   },
 ];
 
 export default function TechCards() {
   return (
     <CardCarousel
-      sectionLabel="04 · TECHNOLOGY"
+      sectionLabel="04 · TREATMENT"
       sectionTitle="その考え方を支える技術"
-      cards={[
-        // First card: equipment photo with overlay
-        {
-          id: "t0",
-          content: (
-            <div className="relative h-[68vw] rounded-2xl overflow-hidden">
-              <Image
-                src="/equipment.jpg"
-                alt="機器"
-                fill
-                className="object-cover object-center"
+      cards={sections.map((s) => ({
+        id: s.id,
+        content:
+          s.type === "intro" ? (
+            <div className="relative h-[68vw] rounded-2xl overflow-hidden flex flex-col justify-end">
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url('${s.photo}')` }}
               />
-              <div className="absolute inset-0 bg-gradient-to-br from-[#050D18]/70 via-[#050D18]/40 to-[#050D18]/80" />
-              <div className="absolute inset-0 flex flex-col justify-end p-7">
-                <div className="h-px w-8 bg-gold/50 mb-5" />
-                <p
-                  className="font-serif font-bold text-ink leading-[1.25] mb-2"
-                  style={{ fontSize: "clamp(18px, 5vw, 22px)" }}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#050D18]/95 via-[#050D18]/55 to-[#050D18]/25" />
+              <div className="relative z-10 p-7">
+                <p className="font-bebas text-[9px] tracking-[0.3em] text-gold/50 mb-3">{s.en}</p>
+                <div className="h-px w-8 bg-gold/50 mb-4" />
+                <h3
+                  className="font-serif font-bold text-ink leading-[1.2] mb-3"
+                  style={{ fontSize: "clamp(20px, 5.5vw, 26px)" }}
                 >
-                  機器は、手段です。
-                </p>
-                <p className="text-ink/45 text-[11px] leading-relaxed">
-                  最新機器を揃えているから良いのではなく、
-                  <br />
-                  あなたの回復に必要なものを選んで使います。
-                </p>
+                  {s.title}
+                </h3>
+                <p className="text-ink/40 text-[11px] leading-relaxed">{s.desc}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="relative h-[68vw] rounded-2xl overflow-hidden flex flex-col justify-end">
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url('${s.photo}')` }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#050D18]/96 via-[#050D18]/60 to-[#0A1828]/30" />
+              <div className="relative z-10 p-7">
+                <p className="font-bebas text-[9px] tracking-[0.3em] text-gold/45 mb-3">{s.en}</p>
+                <h3
+                  className="font-serif font-bold text-ink leading-tight mb-2"
+                  style={{ fontSize: "clamp(19px, 5vw, 24px)" }}
+                >
+                  {s.title}
+                </h3>
+                <p className="text-ink/40 text-[11px] leading-relaxed">{s.result}</p>
               </div>
             </div>
           ),
-        },
-        ...techs.map((t) => ({
-          id: t.id,
-          content: (
-            <div className="relative h-[68vw] bg-[#0A1828] border border-gold/8 rounded-2xl overflow-hidden flex flex-col justify-end p-7">
-              <div className="absolute top-6 left-7">
-                <p className="font-bebas text-[9px] tracking-[0.3em] text-gold/40">{t.en}</p>
-              </div>
-              <div className="h-px w-8 bg-gold/40 mb-5" />
-              <h3
-                className="font-serif font-bold text-ink leading-tight mb-3"
-                style={{ fontSize: "clamp(19px, 5.5vw, 24px)" }}
-              >
-                {t.name}
-              </h3>
-              <p className="text-ink/40 text-[11px] leading-relaxed">{t.result}</p>
-            </div>
-          ),
-        })),
-      ]}
+      }))}
     />
   );
 }
