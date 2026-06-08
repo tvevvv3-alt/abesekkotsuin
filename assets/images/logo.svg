@@ -1,6 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" role="img" aria-label="阿部接骨院 ロゴ">
-  <rect x="6" y="18" width="84" height="84" rx="14" fill="#123a6b"/>
-  <text x="48" y="74" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" font-size="46" fill="#ffffff" text-anchor="middle">阿</text>
-  <text x="112" y="62" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" font-size="40" fill="#123a6b" letter-spacing="6">阿部接骨院</text>
-  <text x="114" y="94" font-family="'Hiragino Sans',sans-serif" font-size="17" fill="#8a9099" letter-spacing="5">ABE SPORTS OFFICE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 120" role="img" aria-label="阿部接骨院 Abe Sports Office">
+  <circle cx="58" cy="60" r="48" fill="none" stroke="#1a4f9c" stroke-width="4"/>
+  <g transform="translate(58,68)">
+    <path d="M0,0 C-12,-16 -9,-40 0,-52 C9,-40 12,-16 0,0 Z" transform="rotate(-15)" fill="#1a4f9c"/>
+    <path d="M0,0 C-12,-16 -9,-40 0,-52 C9,-40 12,-16 0,0 Z" transform="rotate(15)" fill="#1a4f9c" opacity="0.8"/>
+    <circle cx="0" cy="-7" r="3.6" fill="#f3c41a"/>
+  </g>
+  <text x="120" y="60" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" font-size="46" font-weight="600">
+    <tspan fill="#1a4f9c">阿</tspan><tspan fill="#f3c41a">部</tspan><tspan fill="#1a4f9c">接骨院</tspan>
+  </text>
+  <text x="123" y="92" font-family="'Hiragino Sans',sans-serif" font-size="18" fill="#5a6675" letter-spacing="3">Abe Sports Office</text>
 </svg>

@@ -1,5 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#14406e"/>
-  <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle"
-    font-family="'Hiragino Mincho ProN','Yu Mincho',serif" font-size="38" fill="#ffffff">阿</text>
+  <rect width="64" height="64" rx="12" fill="#1a4f9c"/>
+  <circle cx="32" cy="32" r="20" fill="none" stroke="#ffffff" stroke-width="3"/>
+  <g transform="translate(32,38)">
+    <path d="M0,0 C-6,-8 -4,-20 0,-26 C4,-20 6,-8 0,0 Z" transform="rotate(-15)" fill="#ffffff"/>
+    <path d="M0,0 C-6,-8 -4,-20 0,-26 C4,-20 6,-8 0,0 Z" transform="rotate(15)" fill="#ffffff" opacity="0.8"/>
+    <circle cx="0" cy="-4" r="2.4" fill="#f3c41a"/>
+  </g>
 </svg>

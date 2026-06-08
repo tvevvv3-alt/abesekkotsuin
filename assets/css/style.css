@@ -13,9 +13,10 @@
   --ink-soft:   #46535f;   /* secondary text */
   --ink-mute:   #8a9099;   /* tertiary / captions */
   --line:       #dbe0e6;   /* hairlines */
-  --field:      #123a6b;   /* brand deep blue — trust accent */
-  --field-2:    #0e2744;   /* darker blue for dark sections */
-  --gold:       #c8a34e;   /* restrained gold accent (from logo) */
+  --field:      #1a4f9c;   /* brand royal blue (logo / sign) — trust accent */
+  --field-2:    #0e2744;   /* darker navy for dark sections */
+  --accent:     #f3c41a;   /* brand yellow (the "部" accent) — use sparingly */
+  --gold:       #c8a34e;   /* restrained gold (legacy) */
   --line-green: #06c755;   /* LINE brand */
   --line-green-d:#05a648;
 
@@ -208,12 +209,19 @@ p { margin: 0; }
 /* ---------- Section heads ---------- */
 .section__head { margin-block-end: clamp(40px, 7vw, 72px); }
 .section__index {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   font-family: var(--serif);
   font-size: 0.95rem;
   letter-spacing: 0.3em;
   color: var(--ink-mute);
   margin-block-end: 1em;
+}
+.section__index::before {
+  content: "";
+  width: 20px; height: 2px;
+  background: var(--accent);
+  margin-inline-end: 0.9em;
 }
 .section__title {
   font-family: var(--serif);
