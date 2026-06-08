@@ -6,15 +6,16 @@
 
 /* ---------- Design tokens ---------- */
 :root {
-  /* Warm, honest, grounded palette — not luxury, not futuristic */
-  --paper:      #f6f4ef;   /* base background (warm off-white) */
-  --paper-2:    #efece5;   /* alt section background */
-  --ink:        #1c2127;   /* primary text (near-black, slightly warm) */
-  --ink-soft:   #4a525b;   /* secondary text */
-  --ink-mute:   #8a8f94;   /* tertiary / captions */
-  --line:       #d8d3c8;   /* hairlines */
-  --field:      #2c3a45;   /* deep "field" slate — trust accent */
-  --field-2:    #1a242c;   /* darker slate for dark sections */
+  /* Brand blue — matches the real cobalt sign & blue training mat. Clean, honest. */
+  --paper:      #f4f6f8;   /* base background (clean cool off-white) */
+  --paper-2:    #e9edf1;   /* alt section background */
+  --ink:        #14202c;   /* primary text (cool near-black) */
+  --ink-soft:   #46535f;   /* secondary text */
+  --ink-mute:   #8a9099;   /* tertiary / captions */
+  --line:       #dbe0e6;   /* hairlines */
+  --field:      #123a6b;   /* brand deep blue — trust accent */
+  --field-2:    #0e2744;   /* darker blue for dark sections */
+  --gold:       #c8a34e;   /* restrained gold accent (from logo) */
   --line-green: #06c755;   /* LINE brand */
   --line-green-d:#05a648;
 
@@ -538,6 +539,39 @@ p { margin: 0; }
 .fab-line:hover { background: var(--line-green-d); }
 .fab-line .btn__icon { width: 1.25em; height: 1.25em; }
 
+/* ---------- Logo images (swap white/blue with header state) ---------- */
+.logo-img { height: 30px; width: auto; display: block; }
+.logo-img--blue { display: none; }
+.site-header.is-solid .logo-img--white { display: none; }
+.site-header.is-solid .logo-img--blue { display: block; }
+.footer__logo { height: 54px; width: auto; margin-inline: auto; }
+
+/* ---------- Device lineup media (S7) ---------- */
+.devices-media { max-width: var(--maxw); margin: 0 auto clamp(34px, 6vw, 56px); padding-inline: var(--gut); }
+.devices-media img { width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 18px; }
+
+/* ---------- Full-bleed 現場感 band ---------- */
+.band { position: relative; min-height: clamp(320px, 62vw, 540px); display: grid; }
+.band__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.band__overlay {
+  position: relative; display: grid; place-items: center;
+  padding: var(--gut);
+  background: linear-gradient(rgba(14,39,68,0.5), rgba(14,39,68,0.62));
+}
+.band__text {
+  font-family: var(--serif); color: #fff; text-align: center;
+  font-size: clamp(1.6rem, 7vw, 3rem); letter-spacing: 0.06em;
+  text-shadow: 0 2px 24px rgba(0,0,0,0.35);
+}
+
+/* ---------- Access exterior photo ---------- */
+.access__exterior { margin: 0 0 clamp(36px, 6vw, 56px); }
+.access__exterior img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 18px; }
+.access__exterior figcaption {
+  margin-block-start: 0.8em; text-align: center;
+  font-size: 0.85rem; letter-spacing: 0.16em; color: var(--ink-mute);
+}
+
 /* =================================================================
    Tablet / Desktop
    ================================================================= */
@@ -551,6 +585,7 @@ p { margin: 0; }
   .staff { grid-template-columns: repeat(4, 1fr); }
   .access { grid-template-columns: 1fr 1fr; }
   .fab-line { inset-inline-end: 24px; }
+  .logo-img { height: 34px; }
 }
 
 @media (min-width: 1024px) {
