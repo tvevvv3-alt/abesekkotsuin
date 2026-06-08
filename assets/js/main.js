@@ -14,8 +14,8 @@
 
   /* ---- Config: replace with real URLs ---- */
   var LINKS = {
-    line: "https://lin.ee/REPLACE_ME",          // ← LINE公式アカウントの予約URL
-    instagram: "https://www.instagram.com/REPLACE_ME" // ← Instagram URL
+    line: "https://lin.ee/qJUl87W",                              // LINE公式アカウントの予約URL
+    instagram: "https://www.instagram.com/abesekkotsuin_ibaraki" // Instagram URL
   };
 
   /* ---- Wire LINE / Instagram links ---- */
