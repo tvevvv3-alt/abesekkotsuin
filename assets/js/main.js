@@ -73,7 +73,7 @@
     ticking = false;
   }
 
-  var fab = document.querySelector(".fab-line");
+  var fab = document.querySelector(".fab-group");
   window.addEventListener("scroll", function () {
     if (!ticking) { window.requestAnimationFrame(onScroll); ticking = true; }
   }, { passive: true });
