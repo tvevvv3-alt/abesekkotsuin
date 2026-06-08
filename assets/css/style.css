@@ -712,9 +712,10 @@ p { margin: 0; }
 .footer::before {
   content: ""; position: absolute; inset: -25%;
   background:
-    radial-gradient(38% 48% at 18% 22%, rgba(70, 160, 240, 0.30), transparent 60%),
-    radial-gradient(44% 54% at 84% 78%, rgba(26, 79, 156, 0.34), transparent 66%);
-  filter: blur(18px);
+    radial-gradient(40% 50% at 16% 20%, rgba(86, 178, 255, 0.46), transparent 62%),
+    radial-gradient(46% 56% at 86% 80%, rgba(40, 110, 210, 0.50), transparent 66%),
+    radial-gradient(28% 34% at 60% 48%, rgba(130, 205, 255, 0.20), transparent 70%);
+  filter: blur(16px);
   animation: aurora 20s var(--ease) infinite alternate;
   pointer-events: none; z-index: 0;
 }
@@ -730,21 +731,23 @@ p { margin: 0; }
 .hero__scrim {
   background:
     radial-gradient(120% 78% at 50% 14%, rgba(10, 20, 34, 0) 0%, rgba(9, 17, 30, 0.30) 56%, rgba(8, 14, 26, 0.80) 100%),
-    linear-gradient(to top, rgba(47, 116, 214, 0.22), rgba(10, 18, 30, 0) 34%);
+    linear-gradient(to top, rgba(52, 132, 228, 0.34), rgba(10, 18, 30, 0) 36%);
 }
 
 /* --- 機器カードをブランドのグラデに（平面 → 奥行き） --- */
 .dcard {
   background: var(--grad-brand);
-  box-shadow: 0 22px 54px -26px rgba(26, 79, 156, 0.65);
+  box-shadow:
+    0 20px 48px -18px rgba(52, 132, 228, 0.85),
+    0 0 1px rgba(255, 255, 255, 0.5) inset;
 }
 
 /* --- 現場感バンド：オーバーレイをブランドグラデ＋光に --- */
 .band { overflow: hidden; }
 .band__overlay {
   background:
-    radial-gradient(60% 70% at 30% 25%, rgba(47, 116, 214, 0.34), transparent 60%),
-    linear-gradient(150deg, rgba(10, 28, 52, 0.62), rgba(14, 39, 68, 0.66));
+    radial-gradient(60% 70% at 30% 25%, rgba(60, 145, 240, 0.46), transparent 60%),
+    linear-gradient(150deg, rgba(10, 28, 52, 0.58), rgba(14, 39, 68, 0.62));
 }
 
 /* --- セクション番号にグラデの差し色 --- */
