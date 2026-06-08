@@ -450,25 +450,63 @@ p { margin: 0; }
 }
 .taikan__note { margin-block-start: 2em; color: rgba(255,255,255,0.66); font-weight: 300; font-size: 0.95rem; }
 
-/* ---------- Section 10 — Staff ---------- */
+/* ---------- Section 10 — Staff（詳細プロフィール） ---------- */
 .staff {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: clamp(24px, 5vw, 48px);
+  grid-template-columns: 1fr;
+  gap: clamp(22px, 4.5vw, 36px);
 }
-.staff__photo { margin: 0; overflow: hidden; border-radius: 16px; }
+.staff__item {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: clamp(24px, 5.5vw, 38px);
+  box-shadow: 0 18px 44px -30px rgba(20, 32, 44, 0.4);
+}
+.staff__head {
+  display: flex; align-items: center; gap: clamp(16px, 4vw, 24px);
+  margin-block-end: clamp(18px, 4vw, 26px);
+  padding-block-end: clamp(18px, 4vw, 26px);
+  border-block-end: 1px solid var(--line);
+}
+.staff__photo {
+  flex: none; margin: 0;
+  width: clamp(88px, 24vw, 116px); aspect-ratio: 1;
+  border-radius: 50%; overflow: hidden;
+  box-shadow: 0 12px 30px -12px rgba(20, 32, 44, 0.55);
+}
 .staff__photo img {
-  width: 100%; aspect-ratio: 4/5; object-fit: cover;
+  width: 100%; height: 100%; aspect-ratio: 1; object-fit: cover;
   transition: transform 0.8s var(--ease);
 }
-.staff__item:hover .staff__photo img { transform: scale(1.04); }
-.staff__name {
-  font-family: var(--serif);
-  font-size: clamp(1.25rem, 5vw, 1.6rem);
-  margin-block: 0.7em 0.2em; letter-spacing: 0.08em;
+.staff__item:hover .staff__photo img { transform: scale(1.05); }
+.staff__role {
+  font-size: 0.76rem; letter-spacing: 0.18em; color: var(--field);
+  margin-block-end: 0.5em;
 }
-.staff__role { font-size: 0.82rem; letter-spacing: 0.18em; color: var(--field); }
-.staff__bio { margin-block-start: 0.8em; font-size: 0.9rem; color: var(--ink-soft); font-weight: 300; line-height: 1.85; }
+.staff__name {
+  font-family: var(--serif); font-weight: 500;
+  font-size: clamp(1.4rem, 6vw, 1.9rem); letter-spacing: 0.07em;
+  display: flex; flex-direction: column; gap: 0.25em; line-height: 1.25;
+}
+.staff__name-en {
+  font-family: var(--sans); font-weight: 300;
+  font-size: 0.72rem; letter-spacing: 0.2em; color: var(--ink-mute);
+}
+.staff__detail { display: flex; flex-direction: column; gap: clamp(15px, 3.4vw, 20px); }
+.staff__block dt {
+  position: relative; padding-inline-start: 1.4em;
+  font-size: 0.85rem; letter-spacing: 0.1em; font-weight: 500;
+  color: var(--field); margin-block-end: 0.45em;
+}
+.staff__block dt::before {
+  content: "◆"; position: absolute; inset-inline-start: 0; inset-block-start: 0.1em;
+  font-size: 0.66em; color: var(--accent);
+}
+.staff__block dd {
+  margin: 0; color: var(--ink-soft); font-weight: 300;
+  font-size: 0.92rem; line-height: 1.95; letter-spacing: 0.03em;
+}
 
 /* ---------- Section 11 — Menu ---------- */
 .menu__list { border-block-start: 1px solid var(--line); }
@@ -590,7 +628,7 @@ p { margin: 0; }
   .split--reverse .split__media { order: 1; }
   .taikan { grid-template-columns: 1.1fr 1fr; }
   .taikan__media img { height: 100%; min-height: 520px; }
-  .staff { grid-template-columns: repeat(4, 1fr); }
+  .staff { grid-template-columns: repeat(2, 1fr); }
   .access { grid-template-columns: 1fr 1fr; }
   .fab-line { inset-inline-end: 24px; }
   .logo-img { height: 34px; }
