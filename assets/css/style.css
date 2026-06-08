@@ -606,3 +606,70 @@ p { margin: 0; }
 @media (hover: hover) and (pointer: fine) {
   .hscroll__hint { opacity: 0.7; }
 }
+
+/* =================================================================
+   Refinement pass
+   ① 日本語を文節単位で改行（読みやすく）
+   ② 余白のリズムを締めて "間延び" を解消
+   ③ タイポ・写真の仕上げを上品に
+   ================================================================= */
+
+/* ① 文節区切りでの自然な改行＋行頭行末そろえ */
+.hero__title, .hero__list,
+.section__title, .section__sub,
+.statement__kicker, .statement__line, .statement__foot,
+.taikan__title, .taikan__lead, .taikan__list li,
+.footer__statement,
+.approach li, .feature__title,
+.hcard__text, .dcard__name, .ccard__name,
+.band__text, .access__name, .menu__name, .staff__name {
+  word-break: auto-phrase;        /* 文節で折る（対応ブラウザ） */
+  line-break: strict;
+  text-wrap: balance;             /* 各行の長さをそろえる */
+}
+.feature__desc, .approach__note, .taikan__note,
+.menu__note, .staff__bio, .dcard__desc {
+  text-wrap: pretty;              /* 段落の最終行の孤立文字を防ぐ */
+}
+
+/* ② 余白のリズムを締める（間延び解消・意図的な静けさへ） */
+.section { padding-block: clamp(72px, 9.5vh, 124px); }
+.section--statement { padding-block: clamp(88px, 12vh, 148px); }
+.statement__foot { margin-block-start: clamp(30px, 5.5vw, 56px); }
+.section__head { margin-block-end: clamp(34px, 5.5vw, 60px); }
+
+/* ③-a 大きな明朝のタイポを上品に */
+.hero__title  { font-size: clamp(2.35rem, 9.6vw, 5rem); line-height: 1.4; letter-spacing: 0.06em; }
+.statement__line { line-height: 1.62; letter-spacing: 0.08em; }
+.statement__lines { gap: clamp(24px, 5vw, 44px); }
+.section__title { line-height: 1.5; letter-spacing: 0.06em; }
+.statement__kicker { letter-spacing: 0.18em; }
+
+/* ③-b セクション番号を細く端正に */
+.section__index { font-size: 0.78rem; letter-spacing: 0.36em; }
+.section__index::before { width: 30px; height: 1px; background: var(--field); opacity: 0.45; }
+
+/* ③-c 写真に統一した角丸・極細枠・やわらかい影で奥行きを */
+.split__media img,
+.devices-media img,
+.access__exterior img,
+.staff__photo,
+.access__map {
+  border-radius: 14px;
+  box-shadow: 0 22px 48px -26px rgba(14, 32, 44, 0.5);
+}
+.split__media img,
+.devices-media img,
+.access__exterior img { outline: 1px solid rgba(14, 32, 44, 0.05); outline-offset: -1px; }
+
+/* ③-d ヒーローの諧調を少し深めて文字を読みやすく */
+.hero__scrim {
+  background:
+    linear-gradient(to bottom,
+      rgba(12, 18, 26, 0.55) 0%,
+      rgba(12, 18, 26, 0.30) 38%,
+      rgba(12, 18, 26, 0.62) 100%);
+}
+
+/* ③-e カード/ボタンの影をひと段やわらかく */
+.hcard { box-shadow: 0 18px 44px -28px rgba(20, 32, 44, 0.4); }
