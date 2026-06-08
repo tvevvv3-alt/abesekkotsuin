@@ -848,9 +848,9 @@ p { margin: 0; }
 /* 文字側（左）を暗く落として白文字をくっきり読ませる */
 .hero__scrim {
   background:
-    linear-gradient(100deg, rgba(7,12,22,0.84) 0%, rgba(7,12,22,0.52) 40%, rgba(7,12,22,0.12) 66%, rgba(7,12,22,0) 100%),
-    linear-gradient(to top, rgba(7,12,22,0.62) 0%, rgba(7,12,22,0) 44%),
-    radial-gradient(130% 70% at 50% 8%, rgba(7,12,22,0) 30%, rgba(7,12,22,0.42) 100%);
+    linear-gradient(100deg, rgba(6,11,20,0.82) 0%, rgba(6,11,20,0.56) 40%, rgba(6,11,20,0.34) 70%, rgba(6,11,20,0.30) 100%),
+    linear-gradient(to top, rgba(6,11,20,0.66) 0%, rgba(6,11,20,0.10) 50%),
+    linear-gradient(rgba(6,11,20,0.20), rgba(6,11,20,0.20));
 }
 /* 冒頭のひとことを主役に */
 .hero__lead {
