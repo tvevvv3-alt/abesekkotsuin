@@ -113,6 +113,52 @@
     }, true);
   });
 
+  /* ---- Premium: scroll progress bar + subtle parallax ---- */
+  (function () {
+    var bar = document.createElement("div");
+    bar.className = "scroll-progress";
+    document.body.appendChild(bar);
+
+    var items = [];
+    function register(selector, strength, base) {
+      document.querySelectorAll(selector).forEach(function (el) {
+        items.push({ el: el, k: strength, base: base });
+        el.style.transform = "translateY(0) scale(" + base + ")";
+      });
+    }
+    if (!reduceMotion) {
+      register(".band__img", 0.10, 1.16);
+      register(".split__media img", 0.045, 1.14);
+      register(".taikan__media img", 0.05, 1.12);
+      register(".access__exterior img", 0.045, 1.14);
+    }
+
+    var vh = window.innerHeight;
+    var pTicking = false;
+
+    function update() {
+      var de = document.documentElement;
+      var max = de.scrollHeight - vh;
+      bar.style.transform = "scaleX(" + (max > 0 ? Math.min(window.scrollY / max, 1) : 0) + ")";
+
+      for (var i = 0; i < items.length; i++) {
+        var p = items[i];
+        var r = p.el.getBoundingClientRect();
+        if (r.bottom < -120 || r.top > vh + 120) continue;
+        var off = (r.top + r.height / 2 - vh / 2) / vh; /* ~ -0.5..0.5 */
+        var ty = (-off * p.k * vh).toFixed(1);
+        p.el.style.transform = "translateY(" + ty + "px) scale(" + p.base + ")";
+      }
+      pTicking = false;
+    }
+
+    window.addEventListener("scroll", function () {
+      if (!pTicking) { window.requestAnimationFrame(update); pTicking = true; }
+    }, { passive: true });
+    window.addEventListener("resize", function () { vh = window.innerHeight; update(); });
+    update();
+  })();
+
   /* ---- Smooth anchor offset for fixed header (in-page links) ---- */
   document.querySelectorAll('a[href^="#"]').forEach(function (a) {
     a.addEventListener("click", function (e) {
