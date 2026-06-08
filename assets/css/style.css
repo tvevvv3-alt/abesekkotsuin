@@ -450,17 +450,15 @@ p { margin: 0; }
 }
 .taikan__note { margin-block-start: 2em; color: rgba(255,255,255,0.66); font-weight: 300; font-size: 0.95rem; }
 
-/* ---------- Section 10 — Staff（詳細プロフィール） ---------- */
-.staff {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(22px, 4.5vw, 36px);
-}
+/* ---------- Section 10 — Staff（横スクロール・詳細プロフィール） ---------- */
 .staff__item {
+  scroll-snap-align: center;
+  flex: 0 0 auto;
+  width: clamp(272px, 82vw, 344px);
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 18px;
-  padding: clamp(24px, 5.5vw, 38px);
+  padding: clamp(24px, 6vw, 34px);
   box-shadow: 0 18px 44px -30px rgba(20, 32, 44, 0.4);
 }
 .staff__head {
@@ -628,7 +626,7 @@ p { margin: 0; }
   .split--reverse .split__media { order: 1; }
   .taikan { grid-template-columns: 1.1fr 1fr; }
   .taikan__media img { height: 100%; min-height: 520px; }
-  .staff { grid-template-columns: repeat(2, 1fr); }
+  .staff__item { width: 360px; }
   .access { grid-template-columns: 1fr 1fr; }
   .fab-line { inset-inline-end: 24px; }
   .logo-img { height: 34px; }
@@ -908,12 +906,14 @@ p { margin: 0; }
 .menu__intro strong { color: var(--field); font-weight: 500; }
 .menu__hint { margin-block-start: 0.7em; font-size: 0.85rem; color: var(--ink-mute); letter-spacing: 0.03em; }
 
-.price-cards { display: grid; gap: clamp(16px, 3vw, 22px); margin-block-start: clamp(28px, 6vw, 44px); }
 .price-card {
+  scroll-snap-align: center;
+  flex: 0 0 auto;
+  width: clamp(260px, 80vw, 320px);
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 18px;
-  padding: clamp(24px, 5.5vw, 34px);
+  padding: clamp(24px, 5.5vw, 32px);
   box-shadow: 0 18px 44px -30px rgba(20, 32, 44, 0.4);
 }
 .price-card__head { display: flex; align-items: center; gap: 0.7em; margin-block-end: 0.7em; }
@@ -947,3 +947,6 @@ p { margin: 0; }
 .price-card__small { color: var(--ink-mute); font-size: 0.82rem; letter-spacing: 0.02em; }
 .price-card--sub { background: var(--paper); }
 .menu__note { margin-block-start: clamp(22px, 5vw, 34px); font-size: 0.85rem; color: var(--ink-mute); text-align: center; letter-spacing: 0.03em; }
+
+/* メニュー横スクロールの上アキ */
+.section--menu .hscroll { margin-block-start: clamp(22px, 5vw, 34px); }
