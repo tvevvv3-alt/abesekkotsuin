@@ -269,29 +269,41 @@ p { margin: 0; }
 .hcard {
   scroll-snap-align: center;
   flex: 0 0 auto;
-  width: clamp(220px, 64vw, 300px);
-  min-height: clamp(240px, 46vw, 300px);
+  width: clamp(238px, 70vw, 286px);
+  min-height: clamp(272px, 80vw, 300px);
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 30px 28px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  border-radius: 20px;
+  padding: clamp(24px, 6vw, 32px);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(14px, 3.2vw, 20px);
   box-shadow: 0 14px 40px rgba(28,33,39,0.05);
 }
 .hcard__no {
   font-family: var(--serif);
   color: var(--field);
-  font-size: 1.05rem;
-  letter-spacing: 0.2em;
-  opacity: 0.7;
+  font-size: 1.35rem;
+  letter-spacing: 0.12em;
+  line-height: 1;
 }
+.hcard__no::after {
+  content: "";
+  display: block;
+  width: 26px; height: 2px;
+  margin-block-start: 0.6em;
+  background: var(--gold);
+  border-radius: 2px;
+}
+.hcard__icon { display: grid; place-items: center; color: var(--field-2); }
+.hcard__icon svg { width: clamp(60px, 17vw, 78px); height: auto; }
 .hcard__text {
   font-family: var(--serif);
-  font-size: clamp(1.3rem, 5.4vw, 1.7rem);
-  line-height: 1.7;
+  font-size: clamp(1.1rem, 4.6vw, 1.34rem);
+  line-height: 1.65;
   letter-spacing: 0.04em;
+  color: var(--ink);
+  text-align: center;
 }
 
 /* Device cards (S7) */
