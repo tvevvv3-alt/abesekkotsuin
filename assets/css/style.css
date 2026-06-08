@@ -718,7 +718,7 @@ p { margin: 0; }
    ================================================================= */
 :root {
   --grad-brand:  linear-gradient(120deg, #1a4f9c 0%, #2f74d6 52%, #46c2ff 100%);
-  --grad-deep:   linear-gradient(158deg, #0c2540 0%, #0a1a32 46%, #123c72 100%);
+  --grad-deep:   linear-gradient(158deg, #091a30 0%, #07142a 50%, #0e2b52 100%);
 }
 
 /* --- スクロール進捗バー（最上部・グラデ） --- */
@@ -750,10 +750,10 @@ p { margin: 0; }
 .footer::before {
   content: ""; position: absolute; inset: -25%;
   background:
-    radial-gradient(40% 50% at 16% 20%, rgba(86, 178, 255, 0.46), transparent 62%),
-    radial-gradient(46% 56% at 86% 80%, rgba(40, 110, 210, 0.50), transparent 66%),
-    radial-gradient(28% 34% at 60% 48%, rgba(130, 205, 255, 0.20), transparent 70%);
-  filter: blur(16px);
+    radial-gradient(40% 50% at 14% 16%, rgba(70, 150, 230, 0.28), transparent 60%),
+    radial-gradient(46% 56% at 88% 84%, rgba(34, 92, 180, 0.30), transparent 64%),
+    radial-gradient(26% 32% at 62% 44%, rgba(110, 185, 245, 0.12), transparent 70%);
+  filter: blur(18px);
   animation: aurora 20s var(--ease) infinite alternate;
   pointer-events: none; z-index: 0;
 }
@@ -811,6 +811,26 @@ p { margin: 0; }
 .btn--line { background: linear-gradient(135deg, #08cf5b, #04ad49); }
 .btn--line:hover { background: linear-gradient(135deg, #06c755, #03963f); }
 .fab-line { background: linear-gradient(135deg, #08cf5b, #04ad49); }
+
+/* --- ダーク背景の白文字を読みやすく（影で浮かせる） --- */
+.section--dark .statement__kicker,
+.section--dark .statement__line,
+.section--dark .statement__foot,
+.taikan__title,
+.taikan__lead,
+.taikan__list li,
+.taikan__note,
+.band__text,
+.footer__statement {
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+}
+/* 体幹セクションの本文側はさらに暗い土台で文字を確実に読ませる */
+.taikan__body { position: relative; }
+.taikan__body::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(160deg, rgba(5, 12, 24, 0.35), rgba(5, 12, 24, 0.55));
+  pointer-events: none;
+}
 
 /* --- reduced-motion 配慮 --- */
 @media (prefers-reduced-motion: reduce) {
