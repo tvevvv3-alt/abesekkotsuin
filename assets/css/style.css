@@ -454,7 +454,7 @@ p { margin: 0; }
 .staff__item {
   scroll-snap-align: center;
   flex: 0 0 auto;
-  width: clamp(248px, 72vw, 320px);
+  width: clamp(258px, 78vw, 340px);
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -909,7 +909,7 @@ p { margin: 0; }
 .price-card {
   scroll-snap-align: center;
   flex: 0 0 auto;
-  width: clamp(232px, 68vw, 300px);
+  width: clamp(244px, 74vw, 320px);
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -950,3 +950,6 @@ p { margin: 0; }
 
 /* メニュー横スクロールの上アキ */
 .section--menu .hscroll { margin-block-start: clamp(22px, 5vw, 34px); }
+
+/* 横スクロール案内をカード上に置く版 */
+.hscroll__hint--top { margin-block: 0 16px; }
