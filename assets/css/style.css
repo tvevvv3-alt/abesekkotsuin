@@ -1031,42 +1031,45 @@ p { margin: 0; }
 .section--s7 .hscroll { margin-block-start: clamp(40px, 8vw, 72px); }
 
 /* =================================================================
-   HERO — 写真にテキストを重ねるオーバーレイ（全画面共通）
-   文字は下寄せ＋暗がりを下に強く。顔（上部）は明るめにして隠さない。
+   HERO — スマホ:写真バンド＋文字を少し重ねる / PC:写真にオーバーレイ
+   2人が必ず見える構成。
    ================================================================= */
 .hero {
-  justify-content: flex-end;
-  background: var(--field-2);
+  flex-direction: column;
+  justify-content: flex-start;
+  background: var(--grad-deep);
+  padding-block-start: calc(env(safe-area-inset-top) + 52px);
 }
 .hero__scroll { display: none; }
-.hero__media { position: absolute; inset: 0; z-index: -1; }
+.hero__media { position: relative; inset: auto; width: 100%; z-index: 0; }
 .hero__media img {
-  width: 100%; height: 100%;
-  object-fit: cover;
-  object-position: 64% 22%;
-  transform: none;
-  animation: none;
+  position: relative;
+  width: 100%; height: auto;
+  object-fit: contain;
+  transform: none; animation: none;
 }
 .hero__scrim {
-  background:
-    linear-gradient(to top,
-      rgba(5,10,20,0.92) 0%, rgba(5,10,20,0.70) 26%, rgba(5,10,20,0.34) 52%,
-      rgba(5,10,20,0.12) 74%, rgba(5,10,20,0.22) 100%),
-    linear-gradient(95deg, rgba(5,10,20,0.55) 0%, rgba(5,10,20,0.12) 55%, rgba(5,10,20,0) 100%);
+  background: linear-gradient(to bottom,
+    rgba(8,18,34,0) 40%, rgba(9,20,38,0.5) 66%, rgba(10,26,48,0.9) 88%, #0a1c38 100%);
 }
 .hero__inner {
-  padding-block: clamp(86px, 18vh, 130px) clamp(40px, 9vw, 88px);
+  position: relative; z-index: 1; width: 100%; color: #fff;
+  margin-block-start: clamp(-128px, -24vw, -78px);
+  padding-block-end: clamp(40px, 11vw, 84px);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.45);
 }
 
 @media (min-width: 768px) {
-  .hero__media img { object-position: 50% 26%; }
+  .hero { flex-direction: column; justify-content: flex-end; padding-block-start: 0; }
+  .hero__media { position: absolute; inset: 0; z-index: -1; }
+  .hero__media img { height: 100%; object-fit: cover; object-position: 50% 26%; }
   .hero__scrim {
     background:
       linear-gradient(to top,
-        rgba(5,10,20,0.86) 0%, rgba(5,10,20,0.5) 34%, rgba(5,10,20,0.22) 60%, rgba(5,10,20,0.12) 100%),
-      linear-gradient(95deg, rgba(5,10,20,0.68) 0%, rgba(5,10,20,0.24) 46%, rgba(5,10,20,0) 80%);
+        rgba(5,10,20,0.84) 0%, rgba(5,10,20,0.5) 32%, rgba(5,10,20,0.22) 58%, rgba(5,10,20,0.1) 100%),
+      linear-gradient(95deg, rgba(5,10,20,0.66) 0%, rgba(5,10,20,0.24) 46%, rgba(5,10,20,0) 80%);
   }
-  .hero__inner { padding-block: clamp(56px, 10vh, 110px); }
+  .hero__inner { margin-block-start: 0; padding-block: clamp(56px, 10vh, 110px); }
 }
 
 /* =================================================================
@@ -1176,3 +1179,13 @@ p { margin: 0; }
   max-height: 64vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 .case__subtitle { color: var(--ink-mute); font-size: 0.82rem; margin-block: -0.1em 0.5em; letter-spacing: 0.02em; }
+
+/* 文の改行を整える（語中で割れないように）＋エコー縦長＋フッターロゴ＋ドット */
+.statement__line { word-break: keep-all; line-break: strict; text-wrap: normal; font-size: clamp(1.6rem, 6.6vw, 3rem); }
+.footer__statement { word-break: keep-all; line-break: strict; text-wrap: normal; }
+.split__media--echo img { aspect-ratio: 4 / 5; }
+.footer__logo { border-radius: 6px; }
+
+.hscroll__dots { display: flex; justify-content: center; align-items: center; gap: 7px; margin-block-start: 14px; padding-inline: var(--gut); }
+.hscroll__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--line); transition: width 0.3s var(--ease), background-color 0.3s var(--ease); flex: none; }
+.hscroll__dot.is-active { width: 22px; background: var(--field); }

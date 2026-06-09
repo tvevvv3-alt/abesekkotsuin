@@ -113,6 +113,46 @@
     }, true);
   });
 
+  /* ---- Carousel position indicator (dots) ---- */
+  document.querySelectorAll("[data-hscroll]").forEach(function (rail) {
+    var track = rail.querySelector(".hscroll__track");
+    if (!track) return;
+    var cards = track.children;
+    if (cards.length < 2) return;
+
+    var dots = document.createElement("div");
+    dots.className = "hscroll__dots";
+    dots.setAttribute("aria-hidden", "true");
+    for (var i = 0; i < cards.length; i++) {
+      var d = document.createElement("span");
+      d.className = "hscroll__dot";
+      dots.appendChild(d);
+    }
+    rail.parentNode.insertBefore(dots, rail.nextSibling);
+    var dotEls = dots.children;
+    var ticking = false;
+
+    function refresh() {
+      var rc = rail.getBoundingClientRect();
+      var center = rc.left + rc.width / 2;
+      var best = 0, bestDist = Infinity;
+      for (var i = 0; i < cards.length; i++) {
+        var b = cards[i].getBoundingClientRect();
+        var dist = Math.abs((b.left + b.width / 2) - center);
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      }
+      for (var j = 0; j < dotEls.length; j++) {
+        dotEls[j].classList.toggle("is-active", j === best);
+      }
+      ticking = false;
+    }
+    rail.addEventListener("scroll", function () {
+      if (!ticking) { window.requestAnimationFrame(refresh); ticking = true; }
+    }, { passive: true });
+    window.addEventListener("resize", refresh);
+    refresh();
+  });
+
   /* ---- Premium: scroll progress bar + subtle parallax ---- */
   (function () {
     var bar = document.createElement("div");
