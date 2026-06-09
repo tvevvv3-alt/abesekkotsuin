@@ -1054,9 +1054,9 @@ p { margin: 0; }
 }
 .hero__inner {
   position: relative; z-index: 1; width: 100%; color: #fff;
-  margin-block-start: clamp(-128px, -24vw, -78px);
+  margin-block-start: clamp(-168px, -34vw, -104px);
   padding-block-end: clamp(40px, 11vw, 84px);
-  text-shadow: 0 2px 14px rgba(0,0,0,0.45);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.5);
 }
 
 @media (min-width: 768px) {
@@ -1183,7 +1183,7 @@ p { margin: 0; }
 /* 文の改行を整える（語中で割れないように）＋エコー縦長＋フッターロゴ＋ドット */
 .statement__line { word-break: keep-all; line-break: strict; text-wrap: normal; font-size: clamp(1.6rem, 6.6vw, 3rem); }
 .footer__statement { word-break: keep-all; line-break: strict; text-wrap: normal; }
-.split__media--echo img { aspect-ratio: 3 / 4; }
+.split__media--echo img { aspect-ratio: 16 / 9; }
 .footer__logo { border-radius: 6px; }
 
 .hscroll__dots { display: flex; justify-content: center; align-items: center; gap: 7px; margin-block-start: 14px; padding-inline: var(--gut); }
@@ -1199,21 +1199,26 @@ p { margin: 0; }
 /* 川西整体院メニュー（料金の下に独立したネイビーカード） */
 .kw-menu {
   margin-block-start: clamp(28px, 6vw, 44px);
+  background: #0c2540;                 /* fallback */
   background: var(--grad-deep);
   color: #fff;
   border-radius: 18px;
   padding: clamp(26px, 6vw, 38px);
   box-shadow: 0 22px 54px -26px rgba(14,39,68,0.6);
 }
-.kw-menu__head { display: flex; align-items: baseline; gap: 0.9em; flex-wrap: wrap; margin-block-end: 1.3em; }
-.kw-menu__badge { font-family: var(--serif); font-weight: 500; font-size: clamp(1.3rem, 5.6vw, 1.7rem); letter-spacing: 0.08em; }
+.kw-menu__head {
+  display: flex; align-items: baseline; gap: 0.8em; flex-wrap: wrap;
+  margin-block-end: 1.1em; padding-block-end: 1em;
+  border-block-end: 1px solid rgba(255,255,255,0.16);
+}
+.kw-menu__badge { font-family: var(--serif); font-weight: 500; font-size: clamp(1.35rem, 5.6vw, 1.7rem); letter-spacing: 0.08em; }
 .kw-menu__sub { color: #e6cf8e; letter-spacing: 0.14em; font-size: 0.95rem; }
-.kw-menu__rows { display: flex; flex-direction: column; }
+.kw-menu__rows { display: flex; flex-direction: column; gap: 0.2em; }
 .kw-menu__rows li {
-  display: flex; flex-wrap: wrap; gap: 0.2em 1em; justify-content: space-between; align-items: baseline;
-  padding-block: 0.85em; border-block-start: 1px solid rgba(255,255,255,0.14);
+  display: flex; flex-direction: column; gap: 0.3em;
+  padding-block: 0.85em; border-block-start: 1px solid rgba(255,255,255,0.12);
 }
 .kw-menu__rows li:first-child { border-block-start: none; }
-.kw-menu__rows .k { color: rgba(255,255,255,0.72); letter-spacing: 0.1em; font-size: 0.9rem; white-space: nowrap; }
-.kw-menu__rows .v { font-family: var(--serif); color: #fff; letter-spacing: 0.04em; text-align: right; line-height: 1.75; }
+.kw-menu__rows .k { color: #e6cf8e; letter-spacing: 0.14em; font-size: 0.8rem; }
+.kw-menu__rows .v { font-family: var(--serif); color: #fff; letter-spacing: 0.04em; font-size: 1.08rem; line-height: 1.7; }
 .kw-menu__note { margin-block-start: 1.3em; color: rgba(255,255,255,0.7); font-size: 0.82rem; font-weight: 300; letter-spacing: 0.04em; line-height: 1.8; }
