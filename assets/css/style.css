@@ -1183,9 +1183,37 @@ p { margin: 0; }
 /* 文の改行を整える（語中で割れないように）＋エコー縦長＋フッターロゴ＋ドット */
 .statement__line { word-break: keep-all; line-break: strict; text-wrap: normal; font-size: clamp(1.6rem, 6.6vw, 3rem); }
 .footer__statement { word-break: keep-all; line-break: strict; text-wrap: normal; }
-.split__media--echo img { aspect-ratio: 4 / 5; }
+.split__media--echo img { aspect-ratio: 3 / 4; }
 .footer__logo { border-radius: 6px; }
 
 .hscroll__dots { display: flex; justify-content: center; align-items: center; gap: 7px; margin-block-start: 14px; padding-inline: var(--gut); }
 .hscroll__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--line); transition: width 0.3s var(--ease), background-color 0.3s var(--ease); flex: none; }
 .hscroll__dot.is-active { width: 22px; background: var(--field); }
+
+/* HERO: スマホは「写真＋私たちが…＋引用」で1画面、続きの2文は次画面へ */
+.hero__message { margin-block-start: clamp(40px, 14vh, 150px); }
+@media (min-width: 768px) {
+  .hero__message { margin-block-start: clamp(1.9em, 6vw, 2.8em); }
+}
+
+/* 川西整体院メニュー（料金の下に独立したネイビーカード） */
+.kw-menu {
+  margin-block-start: clamp(28px, 6vw, 44px);
+  background: var(--grad-deep);
+  color: #fff;
+  border-radius: 18px;
+  padding: clamp(26px, 6vw, 38px);
+  box-shadow: 0 22px 54px -26px rgba(14,39,68,0.6);
+}
+.kw-menu__head { display: flex; align-items: baseline; gap: 0.9em; flex-wrap: wrap; margin-block-end: 1.3em; }
+.kw-menu__badge { font-family: var(--serif); font-weight: 500; font-size: clamp(1.3rem, 5.6vw, 1.7rem); letter-spacing: 0.08em; }
+.kw-menu__sub { color: #e6cf8e; letter-spacing: 0.14em; font-size: 0.95rem; }
+.kw-menu__rows { display: flex; flex-direction: column; }
+.kw-menu__rows li {
+  display: flex; flex-wrap: wrap; gap: 0.2em 1em; justify-content: space-between; align-items: baseline;
+  padding-block: 0.85em; border-block-start: 1px solid rgba(255,255,255,0.14);
+}
+.kw-menu__rows li:first-child { border-block-start: none; }
+.kw-menu__rows .k { color: rgba(255,255,255,0.72); letter-spacing: 0.1em; font-size: 0.9rem; white-space: nowrap; }
+.kw-menu__rows .v { font-family: var(--serif); color: #fff; letter-spacing: 0.04em; text-align: right; line-height: 1.75; }
+.kw-menu__note { margin-block-start: 1.3em; color: rgba(255,255,255,0.7); font-size: 0.82rem; font-weight: 300; letter-spacing: 0.04em; line-height: 1.8; }
