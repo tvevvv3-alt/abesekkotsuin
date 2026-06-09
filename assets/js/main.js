@@ -153,6 +153,30 @@
     refresh();
   });
 
+  /* ---- Hero motion: zoom image + drift text on scroll ---- */
+  (function () {
+    var hero = document.querySelector(".hero");
+    var img = document.querySelector(".hero__media img");
+    var inner = document.querySelector(".hero__inner");
+    if (reduceMotion || !hero || !img) return;
+    var baseMargin = inner ? getComputedStyle(inner).marginTop : "0px";
+    var hTicking = false;
+    function heroUpdate() {
+      var h = hero.offsetHeight || window.innerHeight;
+      var p = Math.min(Math.max(window.scrollY / h, 0), 1);
+      img.style.transform = "scale(" + (1 + p * 0.16).toFixed(3) + ")";
+      if (inner) {
+        inner.style.transform = "translateY(" + (p * -26).toFixed(1) + "px)";
+        inner.style.opacity = (1 - p * 0.7).toFixed(2);
+      }
+      hTicking = false;
+    }
+    window.addEventListener("scroll", function () {
+      if (!hTicking) { window.requestAnimationFrame(heroUpdate); hTicking = true; }
+    }, { passive: true });
+    heroUpdate();
+  })();
+
   /* ---- Premium: scroll progress bar + subtle parallax ---- */
   (function () {
     var bar = document.createElement("div");
