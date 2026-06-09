@@ -1277,3 +1277,16 @@ p { margin: 0; }
   .evaluate__cols { grid-template-columns: repeat(3, 1fr); gap: clamp(28px, 4vw, 48px); }
   .evaluate__col + .evaluate__col { border-block-start: none; border-inline-start: 1px solid var(--line); padding-block-start: 0; padding-inline-start: clamp(24px, 3vw, 40px); }
 }
+
+/* 見極める：エコー注記（①の下） */
+.evaluate__echo {
+  margin-block-start: 0.9em; font-size: 0.82rem; color: var(--field);
+  letter-spacing: 0.04em; line-height: 1.7;
+}
+/* 施術する：ネイビー×ゴールドの差し色 */
+.treat__col .evaluate__h { padding-block-start: 0.7em; }
+.treat__col .evaluate__h::before {
+  content: ""; display: block; width: 30px; height: 2px; border-radius: 2px;
+  background: var(--gold); margin: 0 auto 0.7em;
+}
+.treat__note { color: var(--field); }
