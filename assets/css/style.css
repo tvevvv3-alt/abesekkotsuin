@@ -1166,3 +1166,12 @@ p { margin: 0; }
   .cases { grid-template-columns: repeat(3, 1fr); align-items: start; }
   .case--soon { display: block; }
 }
+
+/* 症例：強調語と「阿部接骨院の視点」パネル */
+.case__block strong { color: var(--field); font-weight: 600; }
+.case__block--view {
+  background: linear-gradient(160deg, rgba(26,79,156,0.06), rgba(14,39,68,0.05));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: clamp(16px, 4vw, 22px);
+}
