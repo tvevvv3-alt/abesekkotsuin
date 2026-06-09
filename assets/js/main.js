@@ -166,8 +166,8 @@
       var p = Math.min(Math.max(window.scrollY / h, 0), 1);
       img.style.transform = "scale(" + (1 + p * 0.16).toFixed(3) + ")";
       if (inner) {
-        inner.style.transform = "translateY(" + (p * -26).toFixed(1) + "px)";
-        inner.style.opacity = (1 - p * 0.7).toFixed(2);
+        inner.style.transform = "translateY(" + (p * -18).toFixed(1) + "px)";
+        inner.style.opacity = (1 - p * 0.38).toFixed(2);
       }
       hTicking = false;
     }
