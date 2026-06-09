@@ -1082,3 +1082,87 @@ p { margin: 0; }
   }
   .hero__inner { padding-block: clamp(40px, 12vh, 96px); }
 }
+
+/* =================================================================
+   Section 8 — 症例紹介（ネイビー×ホワイト・タップで詳細展開）
+   ================================================================= */
+.cases { display: grid; grid-template-columns: 1fr; gap: clamp(16px, 3vw, 24px); }
+.case {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 18px 44px -30px rgba(20, 32, 44, 0.4);
+  overflow: hidden;
+}
+.case__summary {
+  list-style: none; cursor: pointer; display: block;
+  padding: clamp(24px, 5.5vw, 30px);
+}
+.case__summary::-webkit-details-marker { display: none; }
+.case__cat {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  background: var(--field-2); color: #fff;
+  font-size: 0.8rem; letter-spacing: 0.08em;
+  padding: 0.42em 0.95em; border-radius: 999px;
+}
+.case__icon { font-size: 1.05em; }
+.case__cat--soon { background: var(--ink-mute); }
+.case__title {
+  font-family: var(--serif); font-weight: 500; color: var(--ink);
+  font-size: clamp(1.3rem, 5.4vw, 1.55rem); letter-spacing: 0.04em;
+  margin-block: 0.7em 0.4em;
+}
+.case__lead { color: var(--ink-soft); font-weight: 300; font-size: 0.94rem; line-height: 1.85; }
+.case__more {
+  display: inline-flex; align-items: center; gap: 0.5em;
+  margin-block-start: 1.3em;
+  color: var(--field); font-weight: 500; font-size: 0.9rem; letter-spacing: 0.06em;
+}
+.case__more-close { display: none; }
+.case[open] .case__more-open { display: none; }
+.case[open] .case__more-close { display: inline; }
+.case__chev {
+  width: 0.58em; height: 0.58em;
+  border-right: 2px solid var(--field); border-bottom: 2px solid var(--field);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.3s var(--ease);
+}
+.case[open] .case__chev { transform: translateY(1px) rotate(-135deg); }
+.case__detail {
+  padding: clamp(20px, 5vw, 26px) clamp(24px, 5.5vw, 30px) clamp(26px, 6vw, 32px);
+  margin-inline: clamp(24px, 5.5vw, 30px);
+  padding-inline: 0;
+  border-block-start: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: clamp(16px, 4vw, 22px);
+}
+.case__h {
+  font-family: var(--serif); color: var(--field); font-size: 1rem; letter-spacing: 0.08em;
+  margin-block-end: 0.55em; padding-inline-start: 0.7em;
+  border-inline-start: 3px solid var(--gold);
+}
+.case__block p { color: var(--ink-soft); font-weight: 300; line-height: 1.9; font-size: 0.93rem; }
+.case__list { display: flex; flex-direction: column; gap: 0.3em; margin-block: 0.5em; }
+.case__list li {
+  position: relative; padding-inline-start: 1.2em;
+  color: var(--ink); font-size: 0.93rem; line-height: 1.8;
+}
+.case__list li::before {
+  content: ""; position: absolute; inset-inline-start: 0.1em; inset-block-start: 0.85em;
+  width: 0.55em; height: 1px; background: var(--field);
+}
+.case__voice {
+  margin: 0.2em 0; padding: 1em 1.2em; border-radius: 12px;
+  background: var(--paper-2); border-inline-start: 3px solid var(--field);
+  font-family: var(--serif); color: var(--ink); line-height: 1.95; font-size: 0.95rem;
+}
+.case__disc { color: var(--ink-mute); font-size: 0.78rem; line-height: 1.85; letter-spacing: 0.02em; }
+.case--soon {
+  display: none;                 /* スマホは実例のみ表示 */
+  padding: clamp(24px, 5.5vw, 30px);
+  border-style: dashed; opacity: 0.78;
+}
+.case--soon .case__title { color: var(--ink-mute); }
+@media (min-width: 768px) {
+  .cases { grid-template-columns: repeat(3, 1fr); align-items: start; }
+  .case--soon { display: block; }
+}
