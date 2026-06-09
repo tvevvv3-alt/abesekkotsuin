@@ -1257,3 +1257,23 @@ p { margin: 0; }
   font-size: 0.86rem; line-height: 1.85; letter-spacing: 0.02em;
   color: var(--ink-soft); text-align: center;
 }
+
+/* 見極める：評価イラスト＋3項目（ネイビー×ホワイト） */
+.evaluate__illust { margin: 0 0 clamp(26px, 5vw, 44px); }
+.evaluate__illust img { width: 100%; height: auto; display: block; }
+.evaluate__cols { display: grid; grid-template-columns: 1fr; gap: clamp(22px, 4.5vw, 34px); }
+.evaluate__col { text-align: center; padding-block-start: clamp(16px, 3vw, 0px); position: relative; }
+.evaluate__col + .evaluate__col { border-block-start: 1px solid var(--line); padding-block-start: clamp(20px, 4vw, 0px); }
+.evaluate__h {
+  font-family: var(--serif); font-weight: 500; color: var(--field);
+  font-size: clamp(1.12rem, 4.6vw, 1.35rem); letter-spacing: 0.05em; margin-block-end: 0.55em;
+}
+.evaluate__d { color: var(--ink-soft); font-weight: 300; font-size: 0.92rem; line-height: 1.9; letter-spacing: 0.02em; }
+.evaluate__note {
+  margin-block-start: clamp(26px, 5vw, 40px); text-align: center;
+  color: var(--field); font-size: clamp(0.95rem, 3.6vw, 1.05rem); letter-spacing: 0.08em;
+}
+@media (min-width: 768px) {
+  .evaluate__cols { grid-template-columns: repeat(3, 1fr); gap: clamp(28px, 4vw, 48px); }
+  .evaluate__col + .evaluate__col { border-block-start: none; border-inline-start: 1px solid var(--line); padding-block-start: 0; padding-inline-start: clamp(24px, 3vw, 40px); }
+}
