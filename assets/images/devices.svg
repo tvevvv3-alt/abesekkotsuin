@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" role="img" aria-label="施術機器のラインナップ写真">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e2744"/><stop offset="1" stop-color="#13335c"/></linearGradient></defs>
-  <rect width="1600" height="1000" fill="url(#g)"/>
-  <text x="50%" y="46%" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" font-size="70" fill="#ffffff" text-anchor="middle" opacity="0.95">本気で治すために、揃えています。</text>
-  <text x="50%" y="56%" font-family="'Hiragino Sans',sans-serif" font-size="34" fill="#c8a34e" text-anchor="middle" letter-spacing="6" opacity="0.85">PHOTO / DEVICES LINEUP</text>
-</svg>
