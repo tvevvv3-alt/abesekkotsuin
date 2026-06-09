@@ -966,7 +966,7 @@ p { margin: 0; }
 /* =================================================================
    HERO コピー（静かで上品・余白大きめ・1行ごとに意味）
    ================================================================= */
-.hero__media img { object-position: 58% 34%; }
+.hero__media img { object-position: 62% 32%; }
 .hero__inner { padding-block: clamp(40px, 12vh, 96px); }
 .hero__title {
   font-size: clamp(2.1rem, 8.4vw, 3.9rem);
