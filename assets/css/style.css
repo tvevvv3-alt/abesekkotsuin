@@ -1003,17 +1003,18 @@ p { margin: 0; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   padding: clamp(56px, 13vw, 120px) var(--gut);
   background:
-    radial-gradient(120% 85% at 50% 50%, rgba(8,18,34,0.68), rgba(7,15,30,0.90)),
-    linear-gradient(160deg, rgba(8,18,34,0.82), rgba(7,15,30,0.84));
+    radial-gradient(78% 56% at 50% 46%, rgba(6,12,24,0.52), rgba(6,12,24,0) 72%),
+    linear-gradient(rgba(8,16,30,0.28), rgba(8,16,30,0.30));
 }
 .devbanner__index {
   font-family: var(--serif); color: var(--gold);
   letter-spacing: 0.34em; font-size: 0.85rem; margin-block-end: 1.6em;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.7);
 }
 .devbanner__title {
   font-family: var(--serif); font-weight: 500; color: #fff;
   font-size: clamp(1.75rem, 7.4vw, 3.3rem); line-height: 1.6; letter-spacing: 0.09em;
-  text-shadow: 0 2px 24px rgba(0,0,0,0.55);
+  text-shadow: 0 2px 6px rgba(0,0,0,0.85), 0 4px 26px rgba(0,0,0,0.6);
   word-break: auto-phrase; text-wrap: balance;
 }
 .devbanner__rule {
@@ -1023,8 +1024,8 @@ p { margin: 0; }
   box-shadow: 0 0 14px rgba(200,163,78,0.6);
 }
 .devbanner__sub {
-  font-family: var(--serif); color: #dcc07e;
+  font-family: var(--serif); color: #e6cf8e;
   letter-spacing: 0.2em; font-size: clamp(1rem, 4.4vw, 1.3rem);
-  text-shadow: 0 2px 16px rgba(0,0,0,0.45);
+  text-shadow: 0 2px 6px rgba(0,0,0,0.85), 0 2px 16px rgba(0,0,0,0.55);
 }
 .section--s7 .hscroll { margin-block-start: clamp(40px, 8vw, 72px); }
