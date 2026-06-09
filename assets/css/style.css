@@ -1175,3 +1175,15 @@ p { margin: 0; }
   border-radius: 12px;
   padding: clamp(16px, 4vw, 22px);
 }
+
+/* 症例を横スクロールカードに */
+.cases-track { align-items: flex-start; }
+.cases-track .case {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+  width: clamp(272px, 84vw, 334px);
+}
+.case[open] .case__detail {
+  max-height: 64vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+.case__subtitle { color: var(--ink-mute); font-size: 0.82rem; margin-block: -0.1em 0.5em; letter-spacing: 0.02em; }
