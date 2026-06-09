@@ -1086,13 +1086,16 @@ p { margin: 0; }
 }
 .case__summary::-webkit-details-marker { display: none; }
 .case__cat {
-  display: inline-flex; align-items: center; gap: 0.45em;
-  background: var(--field-2); color: #fff;
-  font-size: 0.8rem; letter-spacing: 0.08em;
-  padding: 0.42em 0.95em; border-radius: 999px;
+  display: inline-block;
+  color: var(--field); font-weight: 500;
+  font-size: 0.82rem; letter-spacing: 0.12em;
+  margin-block-end: 0.2em;
 }
-.case__icon { font-size: 1.05em; }
-.case__cat--soon { background: var(--ink-mute); }
+.case__pic {
+  display: block; margin: 0 0 0.7em;
+  width: clamp(76px, 20vw, 96px);
+}
+.case__pic img { width: 100%; height: auto; display: block; }
 .case__title {
   font-family: var(--serif); font-weight: 500; color: var(--ink);
   font-size: clamp(1.3rem, 5.4vw, 1.55rem); letter-spacing: 0.04em;
