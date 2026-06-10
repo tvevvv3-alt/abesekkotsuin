@@ -1356,3 +1356,10 @@ p { margin: 0; }
 .taikan__list li { line-height: 1.7; }
 .taikan__meta { margin-block: clamp(2em, 5.5vw, 2.6em) 0; gap: 0.85em; }
 .taikan__note { margin-block-start: clamp(2.2em, 6vw, 3em); line-height: 1.85; }
+
+/* 機器カード：アイコン版（中央配置） */
+.dcard { padding: clamp(26px, 5.5vw, 34px); align-items: center; text-align: center; }
+.dcard__icon { display: block; width: clamp(104px, 30vw, 140px); margin: 0 auto 0.5em; }
+.dcard__icon img { width: 100%; height: auto; display: block; }
+.dcard__name { padding: 0; }
+.dcard__desc { padding: 0.5em 0 0; }
