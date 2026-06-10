@@ -128,6 +128,12 @@
       d.className = "hscroll__dot";
       dots.appendChild(d);
     }
+    // カード下にあるスクロール案内は上へ移動して、ドットと並べる
+    var trailingHint = rail.nextElementSibling;
+    if (trailingHint && trailingHint.classList && trailingHint.classList.contains("hscroll__hint")) {
+      trailingHint.classList.add("hscroll__hint--top");
+      rail.parentNode.insertBefore(trailingHint, rail);
+    }
     rail.parentNode.insertBefore(dots, rail);
     var dotEls = dots.children;
     var ticking = false;
