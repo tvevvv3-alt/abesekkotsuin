@@ -1347,3 +1347,12 @@ p { margin: 0; }
 .taikan__meta > div { display: flex; gap: 1.1em; align-items: baseline; }
 .taikan__meta dt { color: rgba(255,255,255,0.6); font-size: 0.78rem; letter-spacing: 0.16em; min-width: 3.2em; }
 .taikan__meta dd { margin: 0; color: #fff; font-family: var(--serif); letter-spacing: 0.05em; font-size: clamp(1rem, 4vw, 1.15rem); }
+
+/* 体幹教室：余白を広げて見やすく */
+.taikan__body { padding-block: clamp(64px, 14vw, 120px); }
+.taikan__label { margin-block-end: 1.5em; }
+.taikan__title { line-height: 1.55; margin-block-end: 0.2em; }
+.taikan__list { gap: clamp(1.1em, 4vw, 1.5em); margin-block-start: clamp(1.6em, 5vw, 2.2em); }
+.taikan__list li { line-height: 1.7; }
+.taikan__meta { margin-block: clamp(2em, 5.5vw, 2.6em) 0; gap: 0.85em; }
+.taikan__note { margin-block-start: clamp(2.2em, 6vw, 3em); line-height: 1.85; }
