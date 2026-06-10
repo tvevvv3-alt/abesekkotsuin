@@ -1327,3 +1327,9 @@ p { margin: 0; }
   letter-spacing: 0.04em; line-height: 1.7;
   padding: 0.45em clamp(18px,4.5vw,22px) clamp(18px,4.5vw,22px);
 }
+
+/* 施術アイコン（ネイビー円形）。アイコン使用時は金線を非表示 */
+.treat__icon { display: block; width: clamp(74px, 19vw, 96px); margin: 0 auto 0.5em; }
+.treat__icon img { width: 100%; height: auto; display: block; }
+.treat__col .evaluate__h::before { content: none; }
+.treat__col .evaluate__h { padding-block-start: 0; }
