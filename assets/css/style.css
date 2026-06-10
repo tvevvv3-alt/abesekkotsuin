@@ -1337,3 +1337,13 @@ p { margin: 0; }
 /* 機器カード：画像準備中のプレースホルダー（ネイビー×ゴールド） */
 .dcard__img--ph { display: grid; place-items: center; background: var(--grad-deep); }
 .dcard__img--ph span { color: #e6cf8e; font-family: var(--serif); letter-spacing: 0.12em; font-size: 0.95rem; }
+
+/* 体幹教室：ラベル＆対象/定員 */
+.taikan__label {
+  color: #e6cf8e; letter-spacing: 0.18em;
+  font-size: clamp(0.9rem, 3.6vw, 1.05rem); margin-block-end: 1em;
+}
+.taikan__meta { display: flex; flex-direction: column; gap: 0.55em; margin-block: clamp(1.4em, 4vw, 1.9em) 0; }
+.taikan__meta > div { display: flex; gap: 1.1em; align-items: baseline; }
+.taikan__meta dt { color: rgba(255,255,255,0.6); font-size: 0.78rem; letter-spacing: 0.16em; min-width: 3.2em; }
+.taikan__meta dd { margin: 0; color: #fff; font-family: var(--serif); letter-spacing: 0.05em; font-size: clamp(1rem, 4vw, 1.15rem); }
