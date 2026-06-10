@@ -128,7 +128,7 @@
       d.className = "hscroll__dot";
       dots.appendChild(d);
     }
-    rail.parentNode.insertBefore(dots, rail.nextSibling);
+    rail.parentNode.insertBefore(dots, rail);
     var dotEls = dots.children;
     var ticking = false;
 

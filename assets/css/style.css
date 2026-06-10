@@ -1290,3 +1290,17 @@ p { margin: 0; }
   background: var(--gold); margin: 0 auto 0.7em;
 }
 .treat__note { color: var(--field); }
+
+/* 施術：箇条書き（ゴールドのダッシュ） */
+.treat__list { display: inline-flex; flex-direction: column; gap: 0.35em; margin-block-start: 0.9em; text-align: left; }
+.treat__list li { position: relative; padding-inline-start: 1.1em; color: var(--ink-soft); font-weight: 300; font-size: 0.9rem; line-height: 1.7; }
+.treat__list li::before { content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.7em; width: 0.55em; height: 1px; background: var(--gold); }
+
+/* 機器バナー：背景写真なしのソリッド版 */
+.devbanner--solid { min-height: clamp(300px, 56vw, 440px); background: var(--grad-deep); }
+.devbanner--solid .devbanner__overlay {
+  background: radial-gradient(62% 72% at 50% 42%, rgba(47,116,214,0.20), transparent 70%);
+}
+
+/* ドットの余白（カード上に置くため下アキ多め） */
+.hscroll__dots { margin-block: 2px 14px; }
