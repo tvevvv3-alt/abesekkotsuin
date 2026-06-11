@@ -886,7 +886,8 @@
         <article class="media-card reveal">
           <div class="media-card__top"><span class="media-card__tag">書籍</span><span class="media-card__pub">朝日新聞出版</span></div>
           <h3 class="media-card__name">『逆境に屈しない接骨院経営の教科書』</h3>
-          <p class="media-card__desc">書籍内にて、当院の取り組みや姿勢をご紹介いただいています。</p>
+          <p class="media-card__desc">書籍内にて、当院の治療理念や微弱電流治療への取り組みをご紹介いただきました。</p>
+          <a class="media-card__link" href="#bookModal" data-book-open role="button">誌面を読む →</a>
         </article>
       </div>
       <p class="media-note">※ 掲載媒体・内容・外部リンクは確認のうえ順次更新します。</p>
@@ -1234,6 +1235,46 @@
       <small class="footer__copy">© <span data-year>2026</span> TOTAL RECOVERYTATION ABE</small>
     </div>
   </footer>
+
+  <!-- 書籍ポップアップ（見開きデザイン） -->
+  <div class="bookmodal" id="bookModal" hidden>
+    <div class="bookmodal__backdrop" data-book-close></div>
+    <div class="bookmodal__spread" role="dialog" aria-modal="true" aria-labelledby="bookTitle">
+      <button class="bookmodal__close" type="button" data-book-close aria-label="閉じる">×</button>
+      <div class="book">
+        <div class="book__page book__page--left">
+          <p class="book__pub">朝日新聞出版</p>
+          <h3 class="book__title" id="bookTitle">『逆境に屈しない<br />接骨院経営の教科書』</h3>
+          <hr class="book__rule" />
+          <div class="book__body">
+            <p class="book__lead">阿部接骨院（大阪府茨木市）</p>
+            <p>当院の治療理念や微弱電流治療への取り組みについて取材いただき、書籍内でご紹介いただきました。</p>
+            <p>幼少期から野球に取り組み、自身のケガの経験をきっかけに施術家の道へ。</p>
+            <p>現在は微弱電流治療やエコー検査を活用しながら、痛みの改善だけでなく、その先にある「やりたいことができる身体づくり」を目指して施術を行っています。</p>
+          </div>
+        </div>
+        <div class="book__page book__page--right">
+          <div class="book__sec">
+            <h4 class="book__h">治療への考え方</h4>
+            <p class="book__quote">「痛みの原因を見つけ、その人に合った治療への道しるべを示す」</p>
+            <p>私たちは痛みだけを見るのではなく、身体全体のつながりや動きを評価し、患者さま一人ひとりに合わせた施術を大切にしています。</p>
+          </div>
+          <hr class="book__rule book__rule--soft" />
+          <div class="book__sec">
+            <h4 class="book__h">掲載テーマ</h4>
+            <ul class="book__list">
+              <li>施術家を目指したきっかけ</li>
+              <li>微弱電流治療との出会い</li>
+              <li>原因に対するアプローチ</li>
+              <li>患者さまとの向き合い方</li>
+              <li>これからの治療への想い</li>
+            </ul>
+          </div>
+          <p class="book__foot">※『逆境に屈しない接骨院経営の教科書』（朝日新聞出版）掲載</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Floating action buttons (mobile-first) -->
   <div class="fab-group">

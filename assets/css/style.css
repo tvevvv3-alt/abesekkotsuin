@@ -1265,6 +1265,73 @@ p { margin: 0; }
 .media-note { margin-block-start: clamp(20px, 5vw, 32px); font-size: 0.82rem; color: var(--ink-mute); text-align: center; letter-spacing: 0.03em; }
 @media (min-width: 768px) { .media-grid { grid-template-columns: 1fr 1fr; } }
 
+/* =================================================================
+   書籍ポップアップ — 本を開いたような見開きデザイン
+   ================================================================= */
+.bookmodal[hidden] { display: none; }
+.bookmodal {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: clamp(10px, 4vw, 40px);
+}
+.bookmodal__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(10, 18, 32, 0.55);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  animation: bookFade 0.3s var(--ease);
+}
+.bookmodal__spread {
+  position: relative; z-index: 1;
+  width: min(940px, 100%); max-height: 90vh; overflow: auto;
+  background: #fff; border-radius: 4px;
+  box-shadow: 0 50px 120px -30px rgba(0, 0, 0, 0.55);
+  animation: bookRise 0.42s var(--ease);
+}
+.bookmodal__close {
+  position: absolute; top: 8px; right: 12px; z-index: 3;
+  border: none; background: transparent;
+  font-size: 1.7rem; line-height: 1; color: var(--ink-mute);
+  width: 1.5em; height: 1.5em; cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+.bookmodal__close:hover { color: var(--ink); }
+.book {
+  display: grid; grid-template-columns: 1fr;
+  font-family: var(--serif); color: var(--ink); line-height: 1.95;
+}
+.book__page { padding: clamp(34px, 7vw, 56px) clamp(28px, 8vw, 64px); }
+.book__pub { font-size: 0.8rem; letter-spacing: 0.16em; color: var(--ink-mute); margin: 0 0 0.7em; }
+.book__title {
+  font-family: var(--serif); font-weight: 500;
+  font-size: clamp(1.3rem, 5.6vw, 1.8rem); letter-spacing: 0.05em; line-height: 1.55; margin: 0;
+}
+.book__rule { border: none; border-top: 1px solid var(--line); margin: clamp(22px, 5vw, 32px) 0; }
+.book__rule--soft { margin: clamp(20px, 4.5vw, 28px) 0; opacity: 0.7; }
+.book__body p, .book__sec p { font-size: 0.95rem; font-weight: 300; color: var(--ink-soft); margin: 0 0 1.25em; }
+.book__lead { font-weight: 500; color: var(--ink); }
+.book__h { font-size: 1.02rem; font-weight: 500; letter-spacing: 0.1em; color: var(--ink); margin: 0 0 0.9em; }
+.book__quote { font-size: 1.04rem; font-weight: 400; color: var(--ink); line-height: 1.9; margin: 0 0 1em; }
+.book__sec { margin-block-end: clamp(8px, 2vw, 14px); }
+.book__list { list-style: none; padding: 0; margin: 0; }
+.book__list li {
+  position: relative; padding-inline-start: 1.1em;
+  font-size: 0.95rem; font-weight: 300; color: var(--ink-soft); margin-block: 0.55em;
+}
+.book__list li::before {
+  content: ""; position: absolute; inset-inline-start: 0; top: 0.78em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--field);
+}
+.book__foot { font-size: 0.8rem; color: var(--ink-mute); letter-spacing: 0.02em; margin: clamp(20px, 4vw, 28px) 0 0; }
+@media (min-width: 768px) {
+  .book { grid-template-columns: 1fr 1fr; }
+  /* 中央の綴じ（ノド）を表現 */
+  .book__page--left { box-shadow: inset -1px 0 0 rgba(20, 32, 44, 0.07); }
+  .book__page--right { box-shadow: inset 14px 0 28px -24px rgba(20, 32, 44, 0.4); }
+}
+body.is-modal-open { overflow: hidden; }
+@keyframes bookFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bookRise { from { opacity: 0; transform: translateY(18px) scale(0.985); } to { opacity: 1; transform: none; } }
+
 /* HEROの動き：スクロールでズーム＋文字ドリフトのため、写真をクリップ */
 .hero__media { overflow: hidden; }
 

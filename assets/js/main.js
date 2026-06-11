@@ -229,9 +229,35 @@
     update();
   })();
 
+  /* ---- 書籍ポップアップ（見開き） ---- */
+  (function () {
+    var modal = document.getElementById("bookModal");
+    if (!modal) return;
+    function open() {
+      modal.hidden = false;
+      document.body.classList.add("is-modal-open");
+      var c = modal.querySelector(".bookmodal__close");
+      if (c) c.focus();
+    }
+    function close() {
+      modal.hidden = true;
+      document.body.classList.remove("is-modal-open");
+    }
+    document.querySelectorAll("[data-book-open]").forEach(function (el) {
+      el.addEventListener("click", function (e) { e.preventDefault(); open(); });
+    });
+    modal.querySelectorAll("[data-book-close]").forEach(function (el) {
+      el.addEventListener("click", close);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) close();
+    });
+  })();
+
   /* ---- Smooth anchor offset for fixed header (in-page links) ---- */
   document.querySelectorAll('a[href^="#"]').forEach(function (a) {
     a.addEventListener("click", function (e) {
+      if (a.hasAttribute("data-book-open")) return;
       var id = a.getAttribute("href");
       if (id.length < 2) return;
       var target = document.querySelector(id);
