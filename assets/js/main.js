@@ -159,6 +159,121 @@
     refresh();
   });
 
+  /* ---- 機器：3D カバーフロー ---- */
+  (function () {
+    var root = document.getElementById("deviceFlow");
+    if (!root) return;
+    var stage = root.querySelector(".coverflow__stage");
+    var cards = Array.prototype.slice.call(root.querySelectorAll(".cf-card"));
+    var nameEl = root.querySelector(".coverflow__name");
+    var descEl = root.querySelector(".coverflow__desc");
+    var caption = root.querySelector(".coverflow__caption");
+    var dotsWrap = root.querySelector(".coverflow__dots");
+    var prevBtn = root.querySelector(".coverflow__btn--prev");
+    var nextBtn = root.querySelector(".coverflow__btn--next");
+    var n = cards.length;
+    if (!n) return;
+    var active = 0;
+
+    // dots
+    var dots = [];
+    for (var d = 0; d < n; d++) {
+      var dot = document.createElement("button");
+      dot.type = "button";
+      dot.className = "coverflow__dot";
+      dot.setAttribute("aria-label", (d + 1) + "番目へ");
+      (function (idx) { dot.addEventListener("click", function () { go(idx); }); })(d);
+      dotsWrap.appendChild(dot);
+      dots.push(dot);
+    }
+
+    function layout() {
+      var cardW = cards[0].offsetWidth || 180;
+      var spacing = cardW * 0.56;
+      for (var i = 0; i < n; i++) {
+        var off = i - active;
+        if (off > n / 2) off -= n;
+        if (off < -n / 2) off += n;
+        var abs = Math.abs(off);
+        var sign = off < 0 ? -1 : 1;
+        var x, z, rotate, scale, opacity;
+        if (off === 0) {
+          x = 0; z = 0; rotate = 0; scale = 1; opacity = 1;
+        } else {
+          x = sign * (spacing + (abs - 1) * spacing * 0.62);
+          z = -150 - (abs - 1) * 70;
+          rotate = -sign * 44;
+          scale = abs === 1 ? 0.84 : 0.72;
+          opacity = abs >= 3 ? 0 : (abs === 1 ? 0.96 : 0.5);
+        }
+        var card = cards[i];
+        card.style.transform =
+          "translate(-50%, -50%) translateX(" + x.toFixed(1) + "px) translateZ(" + z + "px) rotateY(" + rotate + "deg) scale(" + scale.toFixed(3) + ")";
+        card.style.opacity = opacity;
+        card.style.zIndex = String(100 - abs);
+        card.style.pointerEvents = abs >= 3 ? "none" : "auto";
+        card.classList.toggle("is-active", off === 0);
+      }
+      for (var k = 0; k < n; k++) dots[k].classList.toggle("is-active", k === active);
+      // caption fade
+      caption.classList.add("is-changing");
+      window.setTimeout(function () {
+        nameEl.textContent = cards[active].getAttribute("data-name") || "";
+        descEl.textContent = cards[active].getAttribute("data-desc") || "";
+        caption.classList.remove("is-changing");
+      }, 160);
+    }
+
+    function go(idx) {
+      active = ((idx % n) + n) % n;
+      layout();
+    }
+    function next() { go(active + 1); }
+    function prev() { go(active - 1); }
+
+    nextBtn.addEventListener("click", next);
+    prevBtn.addEventListener("click", prev);
+
+    // クリックで中央へ
+    cards.forEach(function (card, i) {
+      card.addEventListener("click", function () {
+        if (!card.classList.contains("is-active") && !dragged) go(i);
+      });
+    });
+
+    // スワイプ（左右）
+    var startX = 0, downX = 0, isDown = false, dragged = false;
+    stage.addEventListener("pointerdown", function (e) {
+      isDown = true; dragged = false; startX = downX = e.clientX;
+    });
+    stage.addEventListener("pointermove", function (e) {
+      if (!isDown) return;
+      if (Math.abs(e.clientX - startX) > 8) dragged = true;
+      downX = e.clientX;
+    });
+    function release() {
+      if (!isDown) return;
+      isDown = false;
+      var dx = downX - startX;
+      if (dx <= -40) next();
+      else if (dx >= 40) prev();
+    }
+    stage.addEventListener("pointerup", release);
+    stage.addEventListener("pointercancel", function () { isDown = false; });
+    stage.addEventListener("pointerleave", release);
+
+    // キーボード
+    stage.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") { e.preventDefault(); next(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
+    });
+
+    window.addEventListener("resize", layout);
+    // 画像読み込み後に幅が確定するので再レイアウト
+    window.addEventListener("load", layout);
+    layout();
+  })();
+
   /* ---- Hero motion: zoom image + drift text on scroll ---- */
   (function () {
     var hero = document.querySelector(".hero");
