@@ -1248,20 +1248,27 @@ p { margin: 0; }
 }
 .media-card__desc { color: var(--ink-soft); font-weight: 300; font-size: 0.94rem; line-height: 1.9; }
 .media-card__link { display: inline-block; margin-block-start: 1em; color: var(--field); font-weight: 500; font-size: 0.9rem; letter-spacing: 0.06em; }
-/* 写真を薄く敷くインタビューカード */
-.media-card--photo { position: relative; overflow: hidden; }
+/* 写真を敷くインタビューカード（顔が見えるよう上を空け、文字は下に） */
+.media-card--photo {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  min-height: clamp(240px, 64vw, 300px);
+}
 .media-card__bg {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: center;
-  opacity: 0.4; filter: saturate(1.05);
+  object-fit: cover; object-position: 50% 22%;
+  opacity: 0.55; filter: saturate(1.06);
   pointer-events: none;
 }
 .media-card--photo::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0.6));
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.08) 0%,
+    rgba(255,255,255,0.30) 42%,
+    rgba(255,255,255,0.74) 100%);
   pointer-events: none;
 }
-.media-card__body { position: relative; z-index: 1; }
+.media-card__body { position: relative; z-index: 1; margin-block-start: auto; }
 .media-note { margin-block-start: clamp(20px, 5vw, 32px); font-size: 0.82rem; color: var(--ink-mute); text-align: center; letter-spacing: 0.03em; }
 @media (min-width: 768px) { .media-grid { grid-template-columns: 1fr 1fr; } }
 
