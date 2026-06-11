@@ -1297,9 +1297,16 @@ p { margin: 0; }
 .treat__list li::before { content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.7em; width: 0.55em; height: 1px; background: var(--gold); }
 
 /* 機器バナー：背景写真なしのソリッド版 */
-.devbanner--solid { min-height: clamp(300px, 56vw, 440px); background: var(--grad-deep); }
-.devbanner--solid .devbanner__overlay {
-  background: radial-gradient(62% 72% at 50% 42%, rgba(47,116,214,0.20), transparent 70%);
+/* 機器バナー：全機器が必ず入る背景写真（contain で切り取らない） */
+.devbanner--photo { min-height: clamp(340px, 64vw, 500px); background: var(--grad-deep); }
+.devbanner--photo .devbanner__img {
+  object-fit: contain; object-position: center;
+  filter: saturate(1.02) contrast(1.02);
+}
+.devbanner--photo .devbanner__overlay {
+  background:
+    radial-gradient(72% 60% at 50% 50%, rgba(6,12,24,0.30), rgba(6,12,24,0) 72%),
+    linear-gradient(rgba(8,16,30,0.22), rgba(8,16,30,0.30));
 }
 
 /* ドットの余白（カード上に置くため下アキ多め） */
