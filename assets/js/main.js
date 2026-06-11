@@ -188,27 +188,28 @@
     }
 
     function layout() {
-      var cardW = cards[0].offsetWidth || 180;
-      var spacing = cardW * 0.56;
+      var cardW = cards[0].offsetWidth || 170;
+      var spacing = cardW * 0.62;
       for (var i = 0; i < n; i++) {
         var off = i - active;
         if (off > n / 2) off -= n;
         if (off < -n / 2) off += n;
         var abs = Math.abs(off);
         var sign = off < 0 ? -1 : 1;
-        var x, z, rotate, scale, opacity;
+        var x, y, z, rotate, scale, opacity;
         if (off === 0) {
-          x = 0; z = 0; rotate = 0; scale = 1; opacity = 1;
+          x = 0; y = -8; z = 60; rotate = 0; scale = 1.24; opacity = 1;
         } else {
-          x = sign * (spacing + (abs - 1) * spacing * 0.62);
-          z = -150 - (abs - 1) * 70;
-          rotate = -sign * 44;
-          scale = abs === 1 ? 0.84 : 0.72;
-          opacity = abs >= 3 ? 0 : (abs === 1 ? 0.96 : 0.5);
+          x = sign * (spacing + (abs - 1) * spacing * 0.6);
+          y = 0;
+          z = -170 - (abs - 1) * 85;
+          rotate = -sign * 46;
+          scale = abs === 1 ? 0.74 : 0.6;
+          opacity = abs >= 3 ? 0 : (abs === 1 ? 0.8 : 0.4);
         }
         var card = cards[i];
         card.style.transform =
-          "translate(-50%, -50%) translateX(" + x.toFixed(1) + "px) translateZ(" + z + "px) rotateY(" + rotate + "deg) scale(" + scale.toFixed(3) + ")";
+          "translate(-50%, -50%) translateX(" + x.toFixed(1) + "px) translateY(" + y + "px) translateZ(" + z + "px) rotateY(" + rotate + "deg) scale(" + scale.toFixed(3) + ")";
         card.style.opacity = opacity;
         card.style.zIndex = String(100 - abs);
         card.style.pointerEvents = abs >= 3 ? "none" : "auto";
