@@ -1170,6 +1170,49 @@ p { margin: 0; }
 .coverflow__dot.is-active { width: 22px; background: var(--field); }
 
 /* =================================================================
+   よく読まれている記事
+   ================================================================= */
+.articles {
+  list-style: none; margin: clamp(34px, 7vw, 56px) 0 0; padding: 0;
+  display: grid; grid-template-columns: 1fr; gap: clamp(16px, 3vw, 24px);
+}
+.article-card { display: flex; }
+.article-card__link {
+  display: flex; flex-direction: column; width: 100%;
+  background: #fff; border: 1px solid var(--line); border-radius: 18px;
+  padding: clamp(24px, 5.5vw, 32px);
+  box-shadow: 0 18px 44px -30px rgba(20, 32, 44, 0.4);
+  transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+.article-card__link:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 28px 56px -28px rgba(20, 32, 44, 0.5);
+  border-color: rgba(47, 116, 214, 0.3);
+}
+.article-card__cat {
+  align-self: flex-start;
+  color: var(--field); font-weight: 500; font-size: 0.76rem; letter-spacing: 0.12em;
+  padding: 0.34em 0.95em; border: 1px solid var(--line); border-radius: 999px;
+  margin-block-end: 1.1em;
+}
+.article-card__title {
+  font-family: var(--serif); font-weight: 500; color: var(--ink);
+  font-size: clamp(1.15rem, 4.8vw, 1.34rem); line-height: 1.5; letter-spacing: 0.03em;
+  margin: 0 0 0.6em;
+}
+.article-card__desc {
+  color: var(--ink-soft); font-weight: 300; font-size: 0.92rem; line-height: 1.85;
+  margin: 0 0 1.3em;
+}
+.article-card__more {
+  margin-block-start: auto;
+  color: var(--field); font-weight: 500; font-size: 0.9rem; letter-spacing: 0.06em;
+}
+@media (min-width: 768px) {
+  .articles { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* =================================================================
    HERO — スマホ:写真バンド＋文字を少し重ねる / PC:写真にオーバーレイ
    2人が必ず見える構成。
    ================================================================= */
