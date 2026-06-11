@@ -1253,12 +1253,12 @@ p { margin: 0; }
 .media-card__bg {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: center;
-  opacity: 0.16; filter: saturate(1.05);
+  opacity: 0.4; filter: saturate(1.05);
   pointer-events: none;
 }
 .media-card--photo::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.78));
+  background: linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0.6));
   pointer-events: none;
 }
 .media-card__body { position: relative; z-index: 1; }
