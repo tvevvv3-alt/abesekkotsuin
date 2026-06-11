@@ -306,6 +306,17 @@ p { margin: 0; }
   text-align: center;
 }
 
+/* お悩みカードは「2枚ずつ＋3枚目チラ見せ」 */
+.section--worry .hscroll { scroll-padding-inline: var(--gut); }
+.section--worry .hcard {
+  width: clamp(150px, 41vw, 220px);
+  min-height: clamp(220px, 60vw, 270px);
+  padding: clamp(18px, 4.6vw, 28px);
+  scroll-snap-align: start;
+}
+.section--worry .hcard__text { font-size: clamp(1rem, 4.2vw, 1.28rem); }
+.section--worry .hcard__icon svg { width: clamp(52px, 15vw, 72px); }
+
 /* Device cards (S7) */
 .dcard {
   scroll-snap-align: center;
