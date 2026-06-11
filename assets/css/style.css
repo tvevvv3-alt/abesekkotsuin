@@ -1394,6 +1394,11 @@ p { margin: 0; }
   pointer-events: none;
 }
 .media-card__body { position: relative; z-index: 1; margin-block-start: auto; }
+/* 書籍カードは表紙（縦長・明るい）を背景に */
+.media-card--book .media-card__bg { object-position: 50% 14%; opacity: 0.5; }
+.media-card--book::after {
+  background: linear-gradient(180deg, rgba(255,255,255,0.40) 0%, rgba(255,255,255,0.66) 100%);
+}
 .media-note { margin-block-start: clamp(20px, 5vw, 32px); font-size: 0.82rem; color: var(--ink-mute); text-align: center; letter-spacing: 0.03em; }
 @media (min-width: 768px) { .media-grid { grid-template-columns: 1fr 1fr; } }
 
