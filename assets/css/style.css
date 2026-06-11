@@ -621,12 +621,8 @@ p { margin: 0; }
 }
 
 /* ---------- Access exterior photo ---------- */
-.access__exterior { margin: 0 0 clamp(36px, 6vw, 56px); }
+.access__exterior { margin: 0 0 clamp(20px, 4vw, 30px); }
 .access__exterior img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 18px; }
-.access__exterior figcaption {
-  margin-block-start: 0.8em; text-align: center;
-  font-size: 0.85rem; letter-spacing: 0.16em; color: var(--ink-mute);
-}
 
 /* =================================================================
    Tablet / Desktop
