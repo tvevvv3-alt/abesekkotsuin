@@ -1305,7 +1305,7 @@ p { margin: 0; }
   background: var(--field-2); color: #fff; border-radius: 20px;
   padding: clamp(32px, 7vw, 52px) clamp(24px, 6vw, 48px); text-align: center;
 }
-.post-cta__lead { font-family: var(--serif); font-weight: 400; color: #fff;
+.post-cta .post-cta__lead { font-family: var(--serif); font-weight: 400; color: #fff;
   font-size: clamp(1.04rem, 4.4vw, 1.24rem); line-height: 1.9; margin: 0 0 1.6em; }
 .post-cta__btns { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
 .btn--web { background: #fff; color: var(--field-2); box-shadow: 0 8px 24px rgba(0,0,0,0.22); }
