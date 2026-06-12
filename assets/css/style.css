@@ -1219,6 +1219,73 @@ p { margin: 0; }
 }
 
 /* =================================================================
+   ブログ記事ページ
+   ================================================================= */
+.post-hero {
+  background: var(--field-2);
+  color: #fff;
+  padding: calc(72px + clamp(40px, 9vw, 88px)) 0 clamp(36px, 7vw, 60px);
+}
+.post-hero__crumb { font-size: 0.8rem; letter-spacing: 0.06em; color: rgba(255,255,255,0.6); margin-block-end: 1.6em; }
+.post-hero__crumb a { color: rgba(255,255,255,0.85); }
+.post-hero__crumb span { margin-inline: 0.6em; }
+.post-hero__cat {
+  display: inline-block; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.12em;
+  color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px;
+  padding: 0.34em 1em; margin-block-end: 1.2em;
+}
+.post-hero__title {
+  font-family: var(--serif); font-weight: 500; line-height: 1.55; letter-spacing: 0.02em;
+  font-size: clamp(1.4rem, 5.6vw, 2.1rem); margin: 0;
+}
+.post-hero__meta { margin: 1.4em 0 0; font-size: 0.86rem; color: rgba(255,255,255,0.7); letter-spacing: 0.04em; }
+
+.post { padding: clamp(40px, 8vw, 72px) 0 clamp(56px, 11vw, 96px); }
+.post__lead {
+  font-size: clamp(1rem, 4.2vw, 1.12rem); line-height: 2.1; color: var(--ink);
+  font-weight: 400; margin: 0 0 clamp(36px, 7vw, 56px);
+  padding-inline-start: 1em; border-inline-start: 3px solid var(--field);
+}
+.post__sec { margin-block-end: clamp(36px, 7vw, 56px); }
+.post__h2 {
+  font-family: var(--serif); font-weight: 500; color: var(--ink);
+  font-size: clamp(1.2rem, 4.8vw, 1.5rem); line-height: 1.5; letter-spacing: 0.02em;
+  margin: 0 0 0.9em; padding-block-end: 0.5em; border-block-end: 1px solid var(--line);
+}
+.post p { color: var(--ink-soft); font-weight: 300; line-height: 2.05; margin: 0 0 1.2em; }
+.post strong { color: var(--ink); font-weight: 500; }
+.post__list, .post__check { list-style: none; margin: 0 0 1.2em; padding: 0; }
+.post__list li, .post__check li {
+  position: relative; color: var(--ink-soft); font-weight: 300; line-height: 1.8;
+  padding-inline-start: 1.5em; margin-block-end: 0.5em;
+}
+.post__list li::before { content: ""; position: absolute; inset-inline-start: 0.2em; inset-block-start: 0.7em; width: 6px; height: 6px; border-radius: 50%; background: var(--field); }
+.post__check li::before { content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.15em; width: 1.1em; height: 1.1em; background: var(--field); border-radius: 4px;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E") center/0.8em no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E") center/0.8em no-repeat; }
+.post__check li { padding-inline-start: 1.8em; margin-block-end: 0.7em; }
+.post__quote {
+  font-family: var(--serif); font-weight: 500; color: var(--ink);
+  font-size: clamp(1.08rem, 4.4vw, 1.3rem); line-height: 1.85; letter-spacing: 0.02em;
+  margin: 1.6em 0; padding: clamp(20px, 5vw, 30px); text-align: center;
+  background: var(--paper-2); border-radius: 16px;
+}
+.post__note { font-size: 0.84rem; color: var(--ink-mute); font-weight: 300; }
+.post__back { margin-block-start: clamp(36px, 7vw, 52px); }
+.post__back a { color: var(--field); font-weight: 500; font-size: 0.92rem; }
+
+.post-cta {
+  margin-block-start: clamp(48px, 9vw, 72px);
+  background: var(--field-2); color: #fff; border-radius: 20px;
+  padding: clamp(32px, 7vw, 52px) clamp(24px, 6vw, 48px); text-align: center;
+}
+.post-cta__lead { font-family: var(--serif); font-weight: 400; color: #fff;
+  font-size: clamp(1.04rem, 4.4vw, 1.24rem); line-height: 1.9; margin: 0 0 1.6em; }
+.post-cta__btns { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+.btn--web { background: #fff; color: var(--field-2); box-shadow: 0 8px 24px rgba(0,0,0,0.22); }
+.btn--web:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.28); }
+
+/* =================================================================
    HERO — スマホ:写真バンド＋文字を少し重ねる / PC:写真にオーバーレイ
    2人が必ず見える構成。
    ================================================================= */

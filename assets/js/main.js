@@ -15,10 +15,11 @@
   /* ---- Config: replace with real URLs ---- */
   var LINKS = {
     line: "https://lin.ee/qJUl87W",                              // LINE公式アカウントの予約URL
-    instagram: "https://www.instagram.com/abesekkotsuin_ibaraki" // Instagram URL
+    instagram: "https://www.instagram.com/abesekkotsuin_ibaraki", // Instagram URL
+    web: ""                                                       // WEB予約システムのURL（未設定時はLINEにフォールバック）
   };
 
-  /* ---- Wire LINE / Instagram links ---- */
+  /* ---- Wire LINE / Instagram / WEB links ---- */
   document.querySelectorAll("[data-line]").forEach(function (el) {
     el.setAttribute("href", LINKS.line);
     el.setAttribute("target", "_blank");
@@ -26,6 +27,11 @@
   });
   document.querySelectorAll("[data-instagram]").forEach(function (el) {
     el.setAttribute("href", LINKS.instagram);
+  });
+  document.querySelectorAll("[data-web]").forEach(function (el) {
+    el.setAttribute("href", LINKS.web || LINKS.line);
+    el.setAttribute("target", "_blank");
+    el.setAttribute("rel", "noopener");
   });
 
   /* ---- Current year ---- */
