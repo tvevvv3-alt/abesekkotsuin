@@ -1296,6 +1296,12 @@ p { margin: 0; }
   margin: 1.6em 0; padding: clamp(20px, 5vw, 30px); text-align: center;
   background: var(--paper-2); border-radius: 16px;
 }
+.post__case {
+  background: var(--paper-2); border-inline-start: 3px solid var(--field);
+  border-radius: 12px; padding: clamp(14px, 3.6vw, 18px) clamp(16px, 4vw, 22px);
+  margin: 0 0 0.9em;
+}
+.post__case strong { color: var(--ink); }
 .post__note { font-size: 0.84rem; color: var(--ink-mute); font-weight: 300; }
 .post__back { margin-block-start: clamp(36px, 7vw, 52px); }
 .post__back a { color: var(--field); font-weight: 500; font-size: 0.92rem; }
