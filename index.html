@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="assets/css/style.css?v=20260617a" />
+  <link rel="stylesheet" href="assets/css/style.css?v=20260617b" />
   <noscript>
     <style>.reveal{opacity:1 !important;transform:none !important;filter:none !important;}</style>
   </noscript>
@@ -36,10 +36,28 @@
       <img class="logo-img" src="assets/images/logo-blue.jpg" alt="阿部接骨院 Abe Sports Office" />
       <span class="site-header__loc">大阪府茨木市</span>
     </a>
-    <a class="btn btn--line btn--sm" href="#" data-line aria-label="LINEで予約する">
-      <span class="btn__icon" aria-hidden="true"></span>
-      LINE予約
-    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="サイト内メニュー">
+      <a class="site-nav__link" href="#s-worry">お悩み</a>
+      <a class="site-nav__link" href="#s4">施術</a>
+      <a class="site-nav__link" href="#s8">症例</a>
+      <a class="site-nav__link" href="#s-articles">ブログ</a>
+      <a class="site-nav__link" href="#s11">料金</a>
+      <a class="site-nav__link" href="#s12">アクセス</a>
+      <a class="site-nav__cta btn btn--line btn--sm" href="#" data-line>
+        <span class="btn__icon" aria-hidden="true"></span>LINE予約
+      </a>
+    </nav>
+
+    <div class="site-header__right">
+      <a class="btn btn--line btn--sm site-header__line" href="#" data-line aria-label="LINEで予約する">
+        <span class="btn__icon" aria-hidden="true"></span>
+        LINE予約
+      </a>
+      <button class="nav-toggle" id="navToggle" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="siteNav">
+        <span class="nav-toggle__bars" aria-hidden="true"><span></span><span></span><span></span></span>
+      </button>
+    </div>
   </header>
 
   <!-- ========================= HERO ========================= -->
@@ -1339,6 +1357,6 @@
     </a>
   </div>
 
-  <script src="assets/js/main.js" defer></script>
+  <script src="assets/js/main.js?v=20260617b" defer></script>
 </body>
 </html>
