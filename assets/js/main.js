@@ -85,6 +85,38 @@
   }, { passive: true });
   onScroll();
 
+  /* ---- サイト内メニュー（ハンバーガー） ---- */
+  (function () {
+    var toggle = document.getElementById("navToggle");
+    var nav = document.getElementById("siteNav");
+    if (!toggle || !nav) return;
+
+    function openMenu() {
+      nav.classList.add("is-open");
+      toggle.classList.add("is-open");
+      toggle.setAttribute("aria-expanded", "true");
+      if (header) { header.classList.add("is-solid"); header.classList.remove("is-hidden"); }
+    }
+    function closeMenu() {
+      nav.classList.remove("is-open");
+      toggle.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+      if (header && window.scrollY <= 60) header.classList.remove("is-solid");
+    }
+    toggle.addEventListener("click", function () {
+      if (nav.classList.contains("is-open")) closeMenu(); else openMenu();
+    });
+    nav.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", closeMenu);
+    });
+    window.addEventListener("scroll", function () {
+      if (nav.classList.contains("is-open")) closeMenu();
+    }, { passive: true });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && nav.classList.contains("is-open")) closeMenu();
+    });
+  })();
+
   /* ---- Drag-to-scroll for horizontal card rails (pointer/mouse) ---- */
   document.querySelectorAll("[data-hscroll]").forEach(function (rail) {
     var isDown = false, startX = 0, startScroll = 0, moved = 0;

@@ -55,6 +55,7 @@ p { margin: 0; }
 .container { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: var(--gut); }
 .container--narrow { max-width: 760px; }
 .section { padding-block: clamp(80px, 14vh, 160px); position: relative; }
+.section, .hero { scroll-margin-top: 68px; }
 .section--alt { background: var(--paper-2); }
 .sp-only { display: none; }
 
@@ -142,6 +143,72 @@ p { margin: 0; }
 /* Header text color over hero (transparent state) */
 .site-header:not(.is-solid) .logo-text { color: #fff; }
 .site-header:not(.is-solid) .logo-mark { background: rgba(255,255,255,0.18); }
+
+/* ===================== サイト内メニュー（ナビ） ===================== */
+.site-header__right { display: inline-flex; align-items: center; gap: 8px; }
+.site-nav { display: flex; align-items: center; gap: clamp(15px, 1.9vw, 28px); }
+.site-nav__link {
+  position: relative; color: var(--ink); font-size: 0.9rem; font-weight: 500;
+  letter-spacing: 0.05em; white-space: nowrap; padding: 0.25em 0;
+  transition: color 0.25s var(--ease);
+}
+.site-nav__link::after {
+  content: ""; position: absolute; inset-inline-start: 0; inset-block-end: -2px;
+  width: 100%; height: 1.5px; background: var(--field);
+  transform: scaleX(0); transform-origin: left; transition: transform 0.3s var(--ease);
+}
+.site-nav__link:hover { color: var(--field); }
+.site-nav__link:hover::after { transform: scaleX(1); }
+.site-nav__cta { display: none; }
+.site-header:not(.is-solid) .site-nav__link { color: rgba(255,255,255,0.92); }
+.site-header:not(.is-solid) .site-nav__link:hover { color: #fff; }
+
+/* ハンバーガー */
+.nav-toggle {
+  display: none; width: 42px; height: 42px; padding: 0; border: 0;
+  background: transparent; cursor: pointer; align-items: center; justify-content: center;
+}
+.nav-toggle__bars { position: relative; display: block; width: 22px; height: 15px; }
+.nav-toggle__bars span {
+  position: absolute; inset-inline-start: 0; width: 100%; height: 2px; border-radius: 2px;
+  background: var(--ink);
+  transition: transform 0.32s var(--ease), opacity 0.2s var(--ease), top 0.32s var(--ease), background-color 0.3s var(--ease);
+}
+.nav-toggle__bars span:nth-child(1) { top: 0; }
+.nav-toggle__bars span:nth-child(2) { top: 6.5px; }
+.nav-toggle__bars span:nth-child(3) { top: 13px; }
+.site-header:not(.is-solid) .nav-toggle__bars span { background: #fff; }
+
+@media (max-width: 860px) {
+  .nav-toggle { display: inline-flex; }
+  .site-header__line { display: none; }
+  .site-nav {
+    position: fixed; inset-block-start: 0; inset-inline: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    padding: calc(env(safe-area-inset-top) + 66px) var(--gut) 26px;
+    background: rgba(246,244,239,0.72);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border-block-end: 1px solid rgba(255,255,255,0.5);
+    box-shadow: 0 26px 50px -26px rgba(20,32,44,0.55);
+    transform: translateY(-100%); opacity: 0; pointer-events: none;
+    transition: transform 0.42s var(--ease), opacity 0.42s var(--ease);
+    z-index: 95;
+  }
+  .site-nav.is-open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  .site-nav__link {
+    color: var(--ink) !important; font-size: 1.04rem;
+    padding: 0.95em 0.1em; border-block-end: 1px solid rgba(20,32,44,0.08);
+  }
+  .site-nav__link::after { display: none; }
+  .site-nav__cta { display: inline-flex; align-self: flex-start; margin-block-start: 1.2em; }
+}
+
+/* メニュー開時：ハンバーガーを×に＆濃色に */
+.nav-toggle.is-open .nav-toggle__bars span { background: var(--ink); }
+.nav-toggle.is-open .nav-toggle__bars span:nth-child(1) { top: 6.5px; transform: rotate(45deg); }
+.nav-toggle.is-open .nav-toggle__bars span:nth-child(2) { opacity: 0; }
+.nav-toggle.is-open .nav-toggle__bars span:nth-child(3) { top: 6.5px; transform: rotate(-45deg); }
 
 /* ---------- HERO ---------- */
 .hero {
