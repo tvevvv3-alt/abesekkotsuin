@@ -1061,14 +1061,22 @@ p { margin: 0; }
 .dockbar__icon--tel  { -webkit-mask-image: var(--tel-icon);  mask-image: var(--tel-icon); }
 .dockbar__icon--map  { -webkit-mask-image: var(--map-icon);  mask-image: var(--map-icon); }
 .dockbar__icon--ig   { -webkit-mask-image: var(--ig-icon);   mask-image: var(--ig-icon); }
-.dockbar__icon--line { -webkit-mask-image: var(--line-icon); mask-image: var(--line-icon); background: var(--line-green); }
-.dockbar__label { font-size: 0.62rem; font-weight: 500; letter-spacing: 0.02em; line-height: 1; }
-.dockbar__item--line .dockbar__label { color: var(--line-green-d); }
+.dockbar__label { font-size: 0.64rem; font-weight: 500; letter-spacing: 0.02em; line-height: 1; }
+
+/* ボトムバー右上の強調LINEボタン */
+.dock-line { display: none; }
 
 @media (max-width: 860px) {
   .dockbar { display: flex; }
   .has-dockbar .fab-group { display: none; }
-  .has-dockbar .footer { padding-block-end: calc(88px + env(safe-area-inset-bottom)); }
+  .has-dockbar .footer { padding-block-end: calc(132px + env(safe-area-inset-bottom)); }
+  .has-dockbar .dock-line {
+    display: inline-flex; position: fixed; z-index: 96;
+    inset-inline-end: 14px;
+    inset-block-end: calc(max(12px, env(safe-area-inset-bottom)) + 72px);
+    padding: 0.72em 1.5em; font-size: 0.92rem;
+    box-shadow: 0 12px 30px rgba(6,199,85,0.5);
+  }
 }
 
 /* =================================================================
@@ -1085,13 +1093,13 @@ p { margin: 0; }
   scroll-snap-align: center;
   flex: 0 0 auto;
   width: clamp(244px, 74vw, 320px);
-  background: rgba(255, 255, 255, 0.55);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  backdrop-filter: blur(16px) saturate(160%);
+  background: linear-gradient(140deg, rgba(255,255,255,0.52), rgba(255,255,255,0.24));
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  backdrop-filter: blur(24px) saturate(165%);
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 18px;
   padding: clamp(22px, 5vw, 30px);
-  box-shadow: 0 18px 44px -28px rgba(20, 32, 44, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 0 18px 44px -26px rgba(20, 32, 44, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 .price-card__head { display: flex; align-items: center; gap: 0.7em; margin-block-end: 0.7em; }
 .price-card__no {
@@ -1305,12 +1313,12 @@ p { margin: 0; }
 .article-card { display: flex; }
 .article-card__link {
   display: flex; flex-direction: column; width: 100%;
-  background: rgba(255, 255, 255, 0.55);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  backdrop-filter: blur(16px) saturate(160%);
+  background: linear-gradient(140deg, rgba(255,255,255,0.52), rgba(255,255,255,0.24));
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  backdrop-filter: blur(24px) saturate(165%);
   border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 18px;
   padding: clamp(24px, 5.5vw, 32px);
-  box-shadow: 0 18px 44px -28px rgba(20, 32, 44, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 0 18px 44px -26px rgba(20, 32, 44, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
 }
 .article-card__link:hover {
