@@ -1036,10 +1036,10 @@ p { margin: 0; }
 }
 .dockbar {
   position: fixed; z-index: 95;
-  inset-block-end: max(12px, env(safe-area-inset-bottom));
-  inset-inline: 14px;
-  display: none; align-items: stretch; gap: 4px;
-  padding: 7px 8px; border-radius: 22px;
+  inset-block-end: max(10px, env(safe-area-inset-bottom));
+  inset-inline: 12px;
+  display: none; align-items: stretch; gap: 6px;
+  padding: 7px; border-radius: 22px;
   background: rgba(247,245,240,0.72);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
@@ -1047,13 +1047,14 @@ p { margin: 0; }
   box-shadow: 0 16px 40px -16px rgba(20,32,44,0.5), inset 0 1px 0 rgba(255,255,255,0.75);
 }
 .dockbar__item {
-  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 5px 2px; border-radius: 14px; color: var(--ink-soft);
-  transition: background-color 0.25s var(--ease), transform 0.18s var(--ease);
+  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 9px 3px; border-radius: 15px; color: var(--ink-soft);
+  background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.7);
+  transition: transform 0.18s var(--ease), background-color 0.25s var(--ease);
 }
-.dockbar__item:active { transform: scale(0.93); background: rgba(255,255,255,0.5); }
+.dockbar__item:active { transform: scale(0.94); }
 .dockbar__icon {
-  width: 22px; height: 22px; background: var(--field);
+  width: 23px; height: 23px; background: var(--field);
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   -webkit-mask-position: center; mask-position: center;
   -webkit-mask-size: contain; mask-size: contain;
@@ -1061,22 +1062,21 @@ p { margin: 0; }
 .dockbar__icon--tel  { -webkit-mask-image: var(--tel-icon);  mask-image: var(--tel-icon); }
 .dockbar__icon--map  { -webkit-mask-image: var(--map-icon);  mask-image: var(--map-icon); }
 .dockbar__icon--ig   { -webkit-mask-image: var(--ig-icon);   mask-image: var(--ig-icon); }
-.dockbar__label { font-size: 0.64rem; font-weight: 500; letter-spacing: 0.02em; line-height: 1; }
-
-/* ボトムバー右上の強調LINEボタン */
-.dock-line { display: none; }
+.dockbar__icon--line { -webkit-mask-image: var(--line-icon); mask-image: var(--line-icon); }
+.dockbar__label { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.02em; line-height: 1; }
+/* LINE予約を緑で強調 */
+.dockbar__item--line {
+  background: linear-gradient(135deg, #08cf5b, #04ad49);
+  border-color: rgba(255,255,255,0.4);
+  box-shadow: 0 8px 18px -6px rgba(6,199,85,0.6);
+}
+.dockbar__item--line .dockbar__icon { background: #fff; }
+.dockbar__item--line .dockbar__label { color: #fff; }
 
 @media (max-width: 860px) {
   .dockbar { display: flex; }
   .has-dockbar .fab-group { display: none; }
-  .has-dockbar .footer { padding-block-end: calc(132px + env(safe-area-inset-bottom)); }
-  .has-dockbar .dock-line {
-    display: inline-flex; position: fixed; z-index: 96;
-    inset-inline-end: 14px;
-    inset-block-end: calc(max(12px, env(safe-area-inset-bottom)) + 72px);
-    padding: 0.72em 1.5em; font-size: 0.92rem;
-    box-shadow: 0 12px 30px rgba(6,199,85,0.5);
-  }
+  .has-dockbar .footer { padding-block-end: calc(96px + env(safe-area-inset-bottom)); }
 }
 
 /* =================================================================
