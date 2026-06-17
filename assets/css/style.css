@@ -1539,7 +1539,7 @@ p { margin: 0; }
   flex: 0 0 auto;
   display: block; margin: 0;
   width: clamp(60px, 16vw, 76px); aspect-ratio: 1;
-  border-radius: 26%;
+  border-radius: 26%; overflow: hidden;
   background: linear-gradient(160deg, #ffffff, #e8eff9);
   border: 1px solid rgba(28,58,94,0.1);
   box-shadow: 0 8px 18px -10px rgba(20,32,44,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
@@ -1893,7 +1893,7 @@ body.is-modal-open { overflow: hidden; }
 /* 施術アイコン（ネイビー円形）。アイコン使用時は金線を非表示 */
 .treat__icon {
   display: block; width: clamp(84px, 21vw, 108px); aspect-ratio: 1; margin: 0 auto 0.7em;
-  border-radius: 26%;
+  border-radius: 26%; overflow: hidden;
   background: linear-gradient(160deg, #ffffff, #e8eff9);
   border: 1px solid rgba(28,58,94,0.1);
   box-shadow: 0 10px 24px -12px rgba(20,32,44,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
