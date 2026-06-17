@@ -1039,8 +1039,8 @@ p { margin: 0; }
   position: fixed; z-index: 95;
   inset-block-end: max(10px, env(safe-area-inset-bottom));
   inset-inline: 12px;
-  display: none; align-items: center; gap: 6px;
-  padding: 6px 8px; border-radius: 20px;
+  display: none; align-items: center; gap: 7px;
+  padding: 5px 7px; border-radius: 20px;
   background: rgba(255,255,255,0.16);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
@@ -1048,37 +1048,42 @@ p { margin: 0; }
   box-shadow: 0 16px 40px -18px rgba(20,32,44,0.42), inset 0 1px 0 rgba(255,255,255,0.55);
 }
 .dockbar__item {
-  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 4px 2px; color: #1c3a5e; transition: transform 0.18s var(--ease);
+  flex: 1 1 0; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.18s var(--ease);
 }
-.dockbar__item:active { transform: scale(0.92); }
+.dockbar__item:active { transform: scale(0.9); }
+/* アプリ風ボタン（角丸四角タイル＋ネイビー線アイコン） */
 .dockbar__app {
-  width: 25px; height: 25px;
-  background-repeat: no-repeat; background-position: center; background-size: contain;
+  width: clamp(38px, 11vw, 44px); aspect-ratio: 1; border-radius: 27%;
+  background-color: rgba(255,255,255,0.55);
+  background-repeat: no-repeat; background-position: center; background-size: 54%;
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 6px 14px -5px rgba(20,32,44,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 .dockbar__app--tel { background-image: var(--tel-line); }
 .dockbar__app--map { background-image: var(--map-line); }
 .dockbar__app--ig  { background-image: var(--ig-line); }
-.dockbar__label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.01em; line-height: 1; }
+.dockbar__label { display: none; }
 
 /* LINE：緑で横長に強調 */
 .dockbar__item--line {
-  flex: 2 1 0; flex-direction: row; justify-content: center; align-self: stretch; gap: 0.45em;
-  padding: 0 0.7em; border-radius: 14px;
+  flex: 1.7 1 0; align-self: stretch; gap: 0.45em;
+  padding: 0 0.7em; border-radius: 16px;
   background: linear-gradient(135deg, #08cf5b, #04ad49);
   box-shadow: 0 8px 18px -6px rgba(6,199,85,0.6), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 .dockbar__item--line .dockbar__app {
-  width: 20px; height: 20px; background: #fff;
+  width: 20px; height: 20px; border: 0; border-radius: 0; box-shadow: none;
+  background: #fff;
   -webkit-mask: var(--line-icon) center/contain no-repeat;
   mask: var(--line-icon) center/contain no-repeat;
 }
-.dockbar__item--line .dockbar__label { font-size: 0.86rem; font-weight: 600; color: #fff; }
+.dockbar__item--line .dockbar__label { display: inline; font-size: 0.86rem; font-weight: 600; color: #fff; }
 
 @media (max-width: 860px) {
   .dockbar { display: flex; }
   .has-dockbar .fab-group { display: none; }
-  .has-dockbar .footer { padding-block-end: calc(86px + env(safe-area-inset-bottom)); }
+  .has-dockbar .footer { padding-block-end: calc(88px + env(safe-area-inset-bottom)); }
 }
 
 /* =================================================================
