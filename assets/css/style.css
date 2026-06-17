@@ -1851,6 +1851,37 @@ body.is-modal-open { overflow: hidden; }
 .treat__list li { position: relative; padding-inline-start: 1.1em; color: var(--ink-soft); font-weight: 300; font-size: 0.9rem; line-height: 1.7; }
 .treat__list li::before { content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.7em; width: 0.55em; height: 1px; background: var(--gold); }
 
+/* モバイル：見極め／施術を横長グラスカードに（アイコン左＋テキスト右） */
+@media (max-width: 767px) {
+  .evaluate__cols { gap: clamp(13px, 3.4vw, 18px); }
+  .evaluate__col {
+    display: grid; grid-template-columns: auto 1fr; column-gap: clamp(13px, 3.6vw, 18px);
+    align-items: center; text-align: left;
+    padding: clamp(15px, 4vw, 20px);
+    background: linear-gradient(140deg, rgba(255,255,255,0.6), rgba(255,255,255,0.24));
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    backdrop-filter: blur(22px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.7); border-radius: 18px;
+    box-shadow: 0 16px 38px -26px rgba(20,32,44,0.42), inset 0 1px 0 rgba(255,255,255,0.85);
+    transition: transform 0.2s var(--ease);
+  }
+  .evaluate__col:active { transform: scale(0.99); }
+  .evaluate__col + .evaluate__col { border-block-start: none; padding-block-start: clamp(15px, 4vw, 20px); }
+  .evaluate__col > .treat__icon {
+    grid-column: 1; grid-row: 1 / span 6; align-self: center;
+    margin: 0; width: clamp(58px, 17vw, 74px);
+  }
+  .evaluate__col > .evaluate__h,
+  .evaluate__col > .evaluate__d,
+  .evaluate__col > .treat__list,
+  .evaluate__col > .evaluate__echo { grid-column: 2; }
+  .evaluate__h { margin-block-end: 0.3em; }
+  .treat__col .evaluate__h { padding-block-start: 0; }
+  .treat__col .evaluate__h::before { margin: 0 0 0.45em; }
+  .treat__list { margin-block-start: 0.5em; }
+  .evaluate__echo { margin-block-start: 0.5em; }
+}
+
 /* 機器バナー：背景写真なしのソリッド版 */
 /* 機器バナー：全機器が必ず入る背景写真（contain で切り取らない） */
 .devbanner--photo { min-height: clamp(340px, 64vw, 500px); background: var(--grad-deep); }
