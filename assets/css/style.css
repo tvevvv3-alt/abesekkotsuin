@@ -1031,49 +1031,54 @@ p { margin: 0; }
 
 /* ===================== ガラス製ボトムバー（ドック） ===================== */
 :root {
-  --tel-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.24 1.02l-2.21 2.2z'/%3E%3C/svg%3E");
-  --map-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z'/%3E%3C/svg%3E");
+  --tel-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.8 3.5h2.7l1.4 3.8-1.9 1.2a11.5 11.5 0 0 0 5.3 5.3l1.2-1.9 3.8 1.4v2.7a2 2 0 0 1-2.2 2A16.3 16.3 0 0 1 4.8 5.7 2 2 0 0 1 6.8 3.5z'/%3E%3C/svg%3E");
+  --map-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z'/%3E%3Ccircle cx='12' cy='11' r='2.3'/%3E%3C/svg%3E");
+  --ig-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='3.5' width='17' height='17' rx='5'/%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Ccircle cx='16.9' cy='7.1' r='1.1' fill='%231c3a5e' stroke='none'/%3E%3C/svg%3E");
 }
 .dockbar {
   position: fixed; z-index: 95;
   inset-block-end: max(10px, env(safe-area-inset-bottom));
   inset-inline: 12px;
-  display: none; align-items: flex-start; justify-content: space-around; gap: 4px;
-  padding: 10px 8px 9px; border-radius: 28px;
+  display: none; align-items: center; gap: 6px;
+  padding: 6px 8px; border-radius: 20px;
   background: rgba(255,255,255,0.16);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid rgba(255,255,255,0.5);
-  box-shadow: 0 18px 44px -18px rgba(20,32,44,0.45), inset 0 1px 0 rgba(255,255,255,0.55);
+  box-shadow: 0 16px 40px -18px rgba(20,32,44,0.42), inset 0 1px 0 rgba(255,255,255,0.55);
 }
 .dockbar__item {
-  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 5px;
-  color: var(--ink-soft); transition: transform 0.18s var(--ease);
+  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 4px 2px; color: #1c3a5e; transition: transform 0.18s var(--ease);
 }
 .dockbar__item:active { transform: scale(0.92); }
 .dockbar__app {
-  position: relative; width: clamp(44px, 13vw, 52px); aspect-ratio: 1; border-radius: 27%;
-  box-shadow: 0 7px 16px -6px rgba(20,32,44,0.5), inset 0 1px 0 rgba(255,255,255,0.4);
+  width: 25px; height: 25px;
+  background-repeat: no-repeat; background-position: center; background-size: contain;
 }
-.dockbar__app::before {
-  content: ""; position: absolute; inset: 0; margin: auto;
-  width: 54%; height: 54%; background: #fff;
-  -webkit-mask: var(--app-icon) center/contain no-repeat;
-  mask: var(--app-icon) center/contain no-repeat;
+.dockbar__app--tel { background-image: var(--tel-line); }
+.dockbar__app--map { background-image: var(--map-line); }
+.dockbar__app--ig  { background-image: var(--ig-line); }
+.dockbar__label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.01em; line-height: 1; }
+
+/* LINE：緑で横長に強調 */
+.dockbar__item--line {
+  flex: 2 1 0; flex-direction: row; justify-content: center; align-self: stretch; gap: 0.45em;
+  padding: 0 0.7em; border-radius: 14px;
+  background: linear-gradient(135deg, #08cf5b, #04ad49);
+  box-shadow: 0 8px 18px -6px rgba(6,199,85,0.6), inset 0 1px 0 rgba(255,255,255,0.35);
 }
-.dockbar__app--tel  { --app-icon: var(--tel-icon);  background: linear-gradient(160deg, #36c75a, #1faf49); }
-.dockbar__app--map  { --app-icon: var(--map-icon);  background: linear-gradient(160deg, #ff6f64, #ef4a55); }
-.dockbar__app--ig   { --app-icon: var(--ig-icon);   background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
-.dockbar__app--line { --app-icon: var(--line-icon); background: linear-gradient(160deg, #08cf5b, #04ad49); }
-.dockbar__label {
-  font-size: 0.62rem; font-weight: 600; letter-spacing: 0.01em; line-height: 1;
-  text-shadow: 0 1px 2px rgba(255,255,255,0.6);
+.dockbar__item--line .dockbar__app {
+  width: 20px; height: 20px; background: #fff;
+  -webkit-mask: var(--line-icon) center/contain no-repeat;
+  mask: var(--line-icon) center/contain no-repeat;
 }
+.dockbar__item--line .dockbar__label { font-size: 0.86rem; font-weight: 600; color: #fff; }
 
 @media (max-width: 860px) {
   .dockbar { display: flex; }
   .has-dockbar .fab-group { display: none; }
-  .has-dockbar .footer { padding-block-end: calc(110px + env(safe-area-inset-bottom)); }
+  .has-dockbar .footer { padding-block-end: calc(86px + env(safe-area-inset-bottom)); }
 }
 
 /* =================================================================
