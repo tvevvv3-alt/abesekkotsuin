@@ -1466,6 +1466,48 @@ p { margin: 0; }
 .btn--web { background: #fff; color: var(--field-2); box-shadow: 0 8px 24px rgba(0,0,0,0.22); }
 .btn--web:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.28); }
 
+/* ブログ：睡眠＝充電 フロー図解 */
+.charge-flow {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: clamp(8px, 2.6vw, 18px); margin: 1.7em 0 0.6em;
+}
+.charge-flow__step { display: flex; flex-direction: column; align-items: center; gap: 0.5em; }
+.charge-flow__icon {
+  width: clamp(54px, 16vw, 66px); aspect-ratio: 1; border-radius: 25%;
+  display: grid; place-items: center; color: var(--field);
+  background: linear-gradient(160deg, #ffffff, #e8eff9);
+  border: 1px solid rgba(28,58,94,0.1);
+  box-shadow: 0 9px 20px -9px rgba(20,32,44,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.charge-flow__icon svg { width: 54%; height: 54%; display: block; }
+.charge-flow__label { font-weight: 600; font-size: 0.9rem; color: var(--field); letter-spacing: 0.06em; }
+.charge-flow__arrow { color: var(--field); font-size: 1.5rem; opacity: 0.45; line-height: 1; }
+.charge-flow__cap { text-align: center; color: var(--ink-soft); font-size: 0.86rem; margin: 0 0 1.4em; }
+
+/* ブログ：2カラムカード（大人／学生） */
+.duo-cards { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 1.3em 0 0.4em; }
+@media (min-width: 540px) { .duo-cards { grid-template-columns: 1fr 1fr; } }
+.duo-card {
+  background: linear-gradient(140deg, rgba(255,255,255,0.62), rgba(255,255,255,0.3));
+  -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.72); border-radius: 16px;
+  padding: clamp(16px, 4.5vw, 22px);
+  box-shadow: 0 14px 34px -24px rgba(20,32,44,0.4), inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.duo-card__h {
+  font-family: var(--serif); font-weight: 600; color: var(--field); font-size: 1.02rem;
+  margin: 0 0 0.6em; padding-block-end: 0.5em; border-block-end: 1px solid rgba(28,58,94,0.12);
+}
+.duo-card ul { list-style: none; margin: 0; padding: 0; }
+.duo-card li {
+  position: relative; padding-inline-start: 1em; color: #2c3742;
+  font-size: 0.92rem; line-height: 1.9;
+}
+.duo-card li::before {
+  content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.82em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--field);
+}
+
 /* =================================================================
    HERO — スマホ:写真バンド＋文字を少し重ねる / PC:写真にオーバーレイ
    2人が必ず見える構成。
