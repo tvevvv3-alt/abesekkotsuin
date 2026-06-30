@@ -1889,9 +1889,13 @@ body.is-modal-open { overflow: hidden; }
 .treat__note { color: var(--field); }
 
 /* 施術：箇条書き（ゴールドのダッシュ） */
-.treat__list { display: inline-flex; flex-direction: column; gap: 0.35em; margin-block-start: 0.9em; text-align: left; }
-.treat__list li { position: relative; padding-inline-start: 1.1em; color: var(--ink-soft); font-weight: 300; font-size: 0.9rem; line-height: 1.7; }
-.treat__list li::before { content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.7em; width: 0.55em; height: 1px; background: var(--gold); }
+.treat__list { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45em; margin-block-start: 0.95em; }
+.treat__list li {
+  list-style: none; padding: 0.36em 0.95em; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 500; letter-spacing: 0.02em; line-height: 1.5;
+  color: #94702a; background: rgba(200,163,78,0.12); border: 1px solid rgba(200,163,78,0.36);
+}
+.treat__list li::before { content: none; }
 
 /* モバイル：見極め／施術を横長グラスカードに（アイコン左＋テキスト右） */
 @media (max-width: 767px) {
@@ -1920,7 +1924,7 @@ body.is-modal-open { overflow: hidden; }
   .evaluate__h { margin-block-end: 0.3em; }
   .treat__col .evaluate__h { padding-block-start: 0; }
   .treat__col .evaluate__h::before { margin: 0 0 0.45em; }
-  .treat__list { margin-block-start: 0.5em; }
+  .treat__list { margin-block-start: 0.6em; justify-content: flex-start; }
   .evaluate__echo { margin-block-start: 0.5em; }
 }
 
