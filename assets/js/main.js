@@ -16,6 +16,7 @@
   var LINKS = {
     line: "https://lin.ee/qJUl87W",                              // LINE公式アカウントの予約URL
     instagram: "https://www.instagram.com/abesekkotsuin_ibaraki", // Instagram URL
+    google: "https://maps.app.goo.gl/PioHVjFgLue3LwWH8",          // Googleマップ（クチコミ）
     web: ""                                                       // WEB予約システムのURL（未設定時はLINEにフォールバック）
   };
 
@@ -27,6 +28,11 @@
   });
   document.querySelectorAll("[data-instagram]").forEach(function (el) {
     el.setAttribute("href", LINKS.instagram);
+  });
+  document.querySelectorAll("[data-google]").forEach(function (el) {
+    el.setAttribute("href", LINKS.google);
+    el.setAttribute("target", "_blank");
+    el.setAttribute("rel", "noopener");
   });
   document.querySelectorAll("[data-web]").forEach(function (el) {
     el.setAttribute("href", LINKS.web || LINKS.line);
