@@ -462,6 +462,32 @@ p { margin: 0; }
 }
 .section--dark { background: var(--field-2); color: #fff; }
 .section--dark .statement__kicker { color: rgba(255,255,255,0.7); }
+.section--dark .statement__foot { color: rgba(255,255,255,0.82); }
+
+/* ===== 見極める／施術する：1枚カード（✓リスト） ===== */
+.assess {
+  list-style: none; margin: clamp(26px, 5.5vw, 40px) 0 0; padding: clamp(6px, 1.6vw, 14px) clamp(22px, 5.5vw, 40px);
+  background: linear-gradient(140deg, rgba(255,255,255,0.62), rgba(255,255,255,0.3));
+  -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.72); border-radius: 22px;
+  box-shadow: 0 24px 54px -32px rgba(20,32,44,0.42), inset 0 1px 0 rgba(255,255,255,0.85);
+}
+.assess__item { padding-block: clamp(16px, 4vw, 22px); }
+.assess__item + .assess__item { border-block-start: 1px solid rgba(28,58,94,0.1); }
+.assess__label {
+  position: relative; font-family: var(--serif); font-weight: 600; color: var(--field);
+  font-size: clamp(1.08rem, 4.6vw, 1.3rem); letter-spacing: 0.05em;
+  margin: 0 0 0.35em; padding-inline-start: 1.6em; line-height: 1.4;
+}
+.assess__label::before {
+  content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.18em;
+  width: 1.15em; height: 1.15em; background: var(--field);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.assess__desc { margin: 0; padding-inline-start: 1.6em; color: var(--ink-soft); font-weight: 300; font-size: 0.95rem; line-height: 1.75; letter-spacing: 0.02em; }
+.assess__more { text-align: center; margin-block-start: clamp(18px, 4vw, 26px); }
+.assess__more a { color: var(--field); font-weight: 500; font-size: 0.92rem; letter-spacing: 0.04em; }
 
 /* ---------- Split sections (S3, S4) ---------- */
 .split {

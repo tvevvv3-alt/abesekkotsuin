@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="assets/css/style.css?v=20260617q" />
+  <link rel="stylesheet" href="assets/css/style.css?v=20260617r" />
   <noscript>
     <style>.reveal{opacity:1 !important;transform:none !important;filter:none !important;}</style>
   </noscript>
@@ -294,25 +294,21 @@
       </header>
     </div>
 
-    <div class="container">
-      <div class="evaluate__cols">
-        <div class="evaluate__col reveal">
-          <span class="treat__icon"><img src="assets/images/eval-foot.png?v=2" alt="" loading="lazy" /></span>
-          <h3 class="evaluate__h">構造的破綻があるか</h3>
-          <p class="evaluate__d">筋損傷・靭帯損傷・骨折 など</p>
-          <p class="evaluate__echo">必要に応じて、エコー観察も行います。</p>
-        </div>
-        <div class="evaluate__col reveal" data-delay="1">
-          <span class="treat__icon"><img src="assets/images/eval-skeleton.png?v=2" alt="" loading="lazy" /></span>
-          <h3 class="evaluate__h">正しい位置に骨格があるか</h3>
-          <p class="evaluate__d">解剖学的肢位・重心線・骨盤や肩の左右差</p>
-        </div>
-        <div class="evaluate__col reveal" data-delay="2">
-          <span class="treat__icon"><img src="assets/images/eval-baby.png?v=2" alt="" loading="lazy" /></span>
-          <h3 class="evaluate__h">身体の使い方をみる</h3>
-          <p class="evaluate__d">姿勢・動作・呼吸・感覚入力</p>
-        </div>
-      </div>
+    <div class="container container--narrow">
+      <ul class="assess reveal">
+        <li class="assess__item">
+          <h3 class="assess__label">構造的破綻</h3>
+          <p class="assess__desc">骨折・靱帯・筋損傷（必要に応じてエコー）</p>
+        </li>
+        <li class="assess__item">
+          <h3 class="assess__label">骨格評価</h3>
+          <p class="assess__desc">姿勢・骨格・重心バランス</p>
+        </li>
+        <li class="assess__item">
+          <h3 class="assess__label">動作評価</h3>
+          <p class="assess__desc">姿勢・呼吸・身体の使い方</p>
+        </li>
+      </ul>
     </div>
   </section>
 
@@ -322,41 +318,26 @@
       <header class="section__head reveal">
         <span class="section__index">03</span>
         <h2 class="section__title section__title--xl">施術する。</h2>
-        <p class="section__sub">見極めた原因に対して、組み合わせる。</p>
+        <p class="section__sub">見極めた原因に合わせて、組み合わせます。</p>
       </header>
     </div>
 
-    <div class="container">
-      <div class="evaluate__cols treat__cols">
-        <div class="evaluate__col treat__col reveal">
-          <span class="treat__icon"><img src="assets/images/treat-microcurrent.png?v=2" alt="" loading="lazy" /></span>
-          <h3 class="evaluate__h">微弱電流</h3>
-          <p class="evaluate__d">生体電流を整え、身体が本来もつ“治る力”を引き出します。</p>
-          <ul class="treat__list">
-            <li>痛みをやわらげる</li>
-            <li>腫れを抑える</li>
-            <li>組織の修復を促す</li>
-          </ul>
-        </div>
-        <div class="evaluate__col treat__col reveal" data-delay="1">
-          <span class="treat__icon"><img src="assets/images/treat-tegi.png?v=2" alt="" loading="lazy" /></span>
-          <h3 class="evaluate__h">手技療法</h3>
-          <p class="evaluate__d">骨格や関節を、本来の位置へ整えます。</p>
-          <ul class="treat__list">
-            <li>関節・骨格のバランス調整</li>
-            <li>筋膜へのアプローチ</li>
-          </ul>
-        </div>
-        <div class="evaluate__col treat__col reveal" data-delay="2">
-          <span class="treat__icon"><img src="assets/images/treat-undou.png?v=2" alt="" loading="lazy" /></span>
-          <h3 class="evaluate__h">運動療法</h3>
-          <p class="evaluate__d">正しい身体の使い方を再学習するエクササイズ。</p>
-          <ul class="treat__list">
-            <li>DNS（動的神経筋安定化）を活用</li>
-          </ul>
-        </div>
-      </div>
-      <p class="evaluate__note treat__note reveal">これらを、その人の状態に合わせて組み合わせます。</p>
+    <div class="container container--narrow">
+      <ul class="assess reveal">
+        <li class="assess__item">
+          <h3 class="assess__label">微弱電流</h3>
+          <p class="assess__desc">痛み・炎症・組織修復</p>
+        </li>
+        <li class="assess__item">
+          <h3 class="assess__label">手技療法</h3>
+          <p class="assess__desc">骨格・関節・筋膜</p>
+        </li>
+        <li class="assess__item">
+          <h3 class="assess__label">運動療法</h3>
+          <p class="assess__desc">DNS・動作改善</p>
+        </li>
+      </ul>
+      <p class="assess__more reveal"><a href="#s7">使用する医療機器を見る →</a></p>
     </div>
   </section>
 
@@ -369,6 +350,7 @@
         <p class="statement__line reveal">痛みが、違う。</p>
         <p class="statement__line reveal">身体が、軽い。</p>
       </div>
+      <p class="statement__foot reveal">その場で変化を、一緒に確認します。</p>
     </div>
   </section>
 
@@ -377,11 +359,11 @@
     <div class="container container--narrow">
       <p class="statement__kicker reveal">納得する。</p>
       <div class="statement__lines statement__lines--sm">
-        <p class="statement__line reveal">なぜ、痛かったのか。</p>
-        <p class="statement__line reveal">なぜ、変化したのか。</p>
-        <p class="statement__line reveal">これから、<br />何をすればいいのか。</p>
+        <p class="statement__line reveal">痛みの原因。</p>
+        <p class="statement__line reveal">変化した理由。</p>
+        <p class="statement__line reveal">これから必要なこと。</p>
       </div>
-      <p class="statement__foot reveal">説明を受けて、理解できる。</p>
+      <p class="statement__foot reveal">すべて分かるから、<br />安心して続けられる。</p>
     </div>
   </section>
 
