@@ -609,6 +609,20 @@ p { margin: 0; }
   font-size: 0.72rem; letter-spacing: 0.2em; color: var(--ink-mute);
 }
 .staff__detail { display: flex; flex-direction: column; gap: clamp(15px, 3.4vw, 20px); }
+.staff__more { display: flex; flex-direction: column; gap: clamp(15px, 3.4vw, 20px); }
+.staff__more-toggle {
+  list-style: none; cursor: pointer; width: max-content;
+  display: inline-flex; align-items: center; gap: 0.35em;
+  color: var(--field); font-size: 0.82rem; font-weight: 500; letter-spacing: 0.06em;
+  padding: 0.15em 0;
+}
+.staff__more-toggle::-webkit-details-marker { display: none; }
+.staff__more-toggle::marker { content: ""; }
+.staff__more-chev { font-size: 0.85em; transition: transform 0.25s var(--ease); }
+.staff__more[open] .staff__more-chev { transform: rotate(180deg); }
+.staff__more-close { display: none; }
+.staff__more[open] .staff__more-open { display: none; }
+.staff__more[open] .staff__more-close { display: inline; }
 .staff__block dt {
   position: relative; padding-inline-start: 1.4em;
   font-size: 0.85rem; letter-spacing: 0.1em; font-weight: 500;
