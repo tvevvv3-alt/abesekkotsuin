@@ -1,0 +1,132 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentStaff } from "@/lib/auth";
+import { CHART_TYPE_LABELS, canWriteChart } from "@/lib/constants";
+import type { Chart, ChartData, Staff } from "@/lib/types";
+
+const LABELS: Partial<Record<keyof ChartData, string>> = {
+  chief_complaint: "主訴",
+  injury_date: "受傷日",
+  injury_mechanism: "受傷機転",
+  hospital_history: "病院受診歴",
+  diagnosis: "診断名",
+  imaging_history: "画像検査歴",
+  tenderness: "圧痛",
+  swelling: "腫脹",
+  heat: "熱感",
+  bruising: "内出血",
+  rom: "ROM",
+  muscle_strength: "筋力",
+  special_test: "スペシャルテスト",
+  echo_finding: "エコー所見",
+  assessment: "評価",
+  treatment_plan: "施術計画",
+  return_estimate: "競技復帰目安",
+  change_from_last: "前回からの変化",
+  practice_status: "練習参加状況",
+  post_treatment_change: "施術後の変化",
+  self_care: "セルフケア",
+  next_check: "次回確認事項",
+};
+
+export default async function ChartDetailPage({
+  params,
+}: {
+  params: { id: string; chartId: string };
+}) {
+  const staff = (await getCurrentStaff())!;
+  const supabase = createClient();
+
+  const { data: chart } = await supabase
+    .from("charts")
+    .select("*")
+    .eq("id", params.chartId)
+    .maybeSingle<Chart>();
+
+  if (!chart) notFound();
+
+  let author = "";
+  if (chart.author_id) {
+    const { data } = await supabase
+      .from("staff")
+      .select("name")
+      .eq("id", chart.author_id)
+      .maybeSingle<Pick<Staff, "name">>();
+    author = data?.name ?? "";
+  }
+
+  const entries = Object.entries(chart.data ?? {}).filter(
+    ([, v]) => v && String(v).trim()
+  ) as [keyof ChartData, string][];
+
+  const t = chart.treatments ?? { machines: [], methods: [], other: "" };
+  const chips = [...t.machines, ...t.methods, ...(t.other ? [t.other] : [])];
+
+  return (
+    <div className="space-y-5">
+      <Link href={`/patients/${params.id}`} className="text-sm text-gray-400">
+        ‹ 患者詳細
+      </Link>
+
+      <div className="flex items-start justify-between">
+        <div>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              chart.chart_type === "initial"
+                ? "bg-brand/10 text-brand"
+                : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            {CHART_TYPE_LABELS[chart.chart_type]}
+          </span>
+          <h1 className="mt-1 text-xl font-bold">{chart.visit_date}</h1>
+          <p className="text-xs text-gray-500">
+            担当: {author || "―"}
+            {chart.pain_score != null && ` ・ 疼痛 ${chart.pain_score}/10`}
+          </p>
+        </div>
+        {canWriteChart(staff.role) && (
+          <Link
+            href={`/patients/${params.id}/charts/${chart.id}/edit`}
+            className="btn-ghost text-sm"
+          >
+            編集
+          </Link>
+        )}
+      </div>
+
+      {chips.length > 0 && (
+        <section className="card">
+          <h2 className="mb-2 text-sm font-bold text-gray-500">施術内容</h2>
+          <div className="flex flex-wrap gap-2">
+            {chips.map((c) => (
+              <span
+                key={c}
+                className="rounded-full bg-brand/10 px-3 py-1 text-sm text-brand"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="card">
+        <h2 className="mb-3 text-sm font-bold text-gray-500">所見・評価</h2>
+        {entries.length === 0 ? (
+          <p className="text-sm text-gray-400">記入なし</p>
+        ) : (
+          <dl className="space-y-3">
+            {entries.map(([k, v]) => (
+              <div key={k}>
+                <dt className="text-xs text-gray-500">{LABELS[k] ?? k}</dt>
+                <dd className="whitespace-pre-wrap text-sm">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </section>
+    </div>
+  );
+}
