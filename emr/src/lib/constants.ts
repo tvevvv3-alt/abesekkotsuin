@@ -1,7 +1,7 @@
 import type { StaffRole, SexType, ChartType, ImageType } from "./types";
 
 // 症例分類（1つ選択）
-export const CASE_TYPES = ["外傷", "慢性", "疲労系", "その他"] as const;
+export const CASE_TYPES = ["外傷", "慢性", "オーバーユース", "その他"] as const;
 
 // 施術：機器・手技ごとの詳細入力項目の定義
 export type ModalityFieldKey = "site" | "protocol" | "content" | "finding";
@@ -32,13 +32,6 @@ export const MODALITIES: ModalityDef[] = [
     ],
   },
   {
-    name: "ブラックアキュマイオ",
-    fields: [
-      { key: "site", label: "部位" },
-      { key: "protocol", label: "設定・プロトコル" },
-    ],
-  },
-  {
     name: "エレサス",
     fields: [
       { key: "site", label: "部位" },
@@ -54,7 +47,6 @@ export const MODALITIES: ModalityDef[] = [
     ],
   },
   { name: "手技", fields: [{ key: "content", label: "内容", area: true }] },
-  { name: "運動療法", fields: [{ key: "content", label: "内容", area: true }] },
   { name: "DNS", fields: [{ key: "content", label: "内容", area: true }] },
   { name: "テーピング", fields: [{ key: "content", label: "部位・種類" }] },
 ];
