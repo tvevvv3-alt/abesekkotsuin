@@ -3,15 +3,6 @@ import type { StaffRole, SexType, ChartType, ImageType } from "./types";
 // 症例分類（1つ選択）
 export const CASE_TYPES = ["外傷", "慢性", "疲労系", "その他"] as const;
 
-// 施術チップ：施術（「その他」は自由入力欄で対応）
-export const METHODS = [
-  "KYT",
-  "DNS",
-  "運動療法",
-  "ストレッチ",
-  "テーピング",
-] as const;
-
 export const ROLE_LABELS: Record<StaffRole, string> = {
   director: "院長",
   therapist: "施術者",

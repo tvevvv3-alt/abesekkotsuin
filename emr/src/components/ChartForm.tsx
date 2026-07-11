@@ -3,23 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import ChipGroup from "@/components/ChipGroup";
-import { METHODS, CASE_TYPES, CHART_TYPE_LABELS } from "@/lib/constants";
+import { CASE_TYPES, CHART_TYPE_LABELS } from "@/lib/constants";
 import type { Chart, ChartData, ChartType, Site, Treatments } from "@/lib/types";
 
 // カルテ種別ごとの記述項目（jsonb data のキー）
 const INITIAL_FIELDS: { key: keyof ChartData; label: string; area?: boolean }[] = [
   { key: "chief_complaint", label: "主訴", area: true },
+  { key: "main_symptoms", label: "主な症状", area: true },
   { key: "injury_date", label: "受傷日" },
   { key: "injury_mechanism", label: "受傷機転", area: true },
   { key: "hospital_history", label: "病院受診歴" },
   { key: "diagnosis", label: "診断名" },
   { key: "imaging_history", label: "画像検査歴" },
-  { key: "tenderness", label: "圧痛" },
-  { key: "swelling", label: "腫脹" },
   { key: "heat", label: "熱感" },
   { key: "bruising", label: "内出血" },
-  { key: "rom", label: "ROM" },
   { key: "muscle_strength", label: "筋力" },
   { key: "special_test", label: "スペシャルテスト", area: true },
   { key: "echo_finding", label: "エコー所見", area: true },
@@ -30,11 +27,8 @@ const INITIAL_FIELDS: { key: keyof ChartData; label: string; area?: boolean }[] 
 ];
 
 const FOLLOWUP_FIELDS: { key: keyof ChartData; label: string; area?: boolean }[] = [
+  { key: "main_symptoms", label: "主な症状", area: true },
   { key: "change_from_last", label: "前回からの変化", area: true },
-  { key: "tenderness", label: "圧痛" },
-  { key: "swelling", label: "腫脹" },
-  { key: "rom", label: "ROM" },
-  { key: "practice_status", label: "練習参加状況" },
   { key: "post_treatment_change", label: "施術後の変化", area: true },
   { key: "self_care", label: "セルフケア", area: true },
   { key: "next_check", label: "次回確認事項", area: true },
@@ -87,7 +81,7 @@ export default function ChartForm({
     initial?.sites && initial.sites.length > 0 ? initial.sites : [emptySite()]
   );
   const [treatments, setTreatments] = useState<Treatments>(
-    initial?.treatments ?? { methods: [], approach: "", other: "" }
+    initial?.treatments ?? { approach: "" }
   );
   const [data, setData] = useState<ChartData>(initial?.data ?? {});
   const [saving, setSaving] = useState(false);
@@ -253,35 +247,17 @@ export default function ChartForm({
         </button>
       </div>
 
-      {/* 施術内容 */}
-      <div className="card space-y-4">
-        <div>
-          <label className="label">施術</label>
-          <ChipGroup
-            options={METHODS}
-            selected={treatments.methods}
-            onChange={(methods) => setTreatments((t) => ({ ...t, methods }))}
-          />
-          <input
-            className="field mt-2"
-            placeholder="その他の施術（自由入力）"
-            value={treatments.other}
-            onChange={(e) =>
-              setTreatments((t) => ({ ...t, other: e.target.value }))
-            }
-          />
-        </div>
-        <div>
-          <label className="label">効果的だったアプローチ</label>
-          <textarea
-            className="field min-h-20"
-            placeholder="例: アキュにて帯脈8Hz、○○が奏効 など"
-            value={treatments.approach}
-            onChange={(e) =>
-              setTreatments((t) => ({ ...t, approach: e.target.value }))
-            }
-          />
-        </div>
+      {/* 効果的だったアプローチ */}
+      <div className="card">
+        <label className="label">効果的だったアプローチ</label>
+        <textarea
+          className="field min-h-20"
+          placeholder="例: アキュにて帯脈8Hz、○○が奏効 など"
+          value={treatments.approach}
+          onChange={(e) =>
+            setTreatments({ approach: e.target.value })
+          }
+        />
       </div>
 
       {/* 所見・評価 */}

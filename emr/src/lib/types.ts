@@ -39,9 +39,7 @@ export interface Patient {
 
 // 施術内容
 export interface Treatments {
-  methods: string[]; // 施術チップ
   approach: string; // 効果的だったアプローチ（自由入力。例: アキュにて帯脈8Hz）
-  other: string; // その他の施術（自由入力）
 }
 
 // 部位ごとの疼痛スコア（施術前→施術後）。複数部位に対応。
@@ -54,6 +52,7 @@ export interface Site {
 // 初診／再診カルテの可変項目（jsonb data）
 export interface ChartData {
   case_type?: string; // 症例分類（外傷/慢性/疲労系）
+  main_symptoms?: string; // 主な症状
   // 初診
   chief_complaint?: string; // 主訴
   injury_date?: string; // 受傷日
