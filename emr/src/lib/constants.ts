@@ -12,6 +12,9 @@ export const MACHINES = [
   "エコー",
 ] as const;
 
+// 症例分類（1つ選択）
+export const CASE_TYPES = ["外傷", "慢性", "疲労系"] as const;
+
 // 施術チップ：施術（「その他」は自由入力欄で対応）
 export const METHODS = [
   "手技療法",

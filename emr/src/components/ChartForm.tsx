@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ChipGroup from "@/components/ChipGroup";
-import { MACHINES, METHODS, CHART_TYPE_LABELS } from "@/lib/constants";
+import { MACHINES, METHODS, CASE_TYPES, CHART_TYPE_LABELS } from "@/lib/constants";
 import type { Chart, ChartData, ChartType, Site, Treatments } from "@/lib/types";
 
 // カルテ種別ごとの記述項目（jsonb data のキー）
@@ -159,6 +159,35 @@ export default function ChartForm({
             onChange={(e) => setVisitDate(e.target.value)}
             required
           />
+        </div>
+      </div>
+
+      {/* 症例分類（1つ選択） */}
+      <div className="card">
+        <label className="label">分類</label>
+        <div className="flex flex-wrap gap-2">
+          {CASE_TYPES.map((ct) => {
+            const active = data.case_type === ct;
+            return (
+              <button
+                key={ct}
+                type="button"
+                onClick={() =>
+                  setData((prev) => ({
+                    ...prev,
+                    case_type: active ? undefined : ct,
+                  }))
+                }
+                className={`rounded-full border px-5 py-2 text-sm font-medium transition active:scale-95 ${
+                  active
+                    ? "border-brand bg-brand text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-700"
+                }`}
+              >
+                {ct}
+              </button>
+            );
+          })}
         </div>
       </div>
 

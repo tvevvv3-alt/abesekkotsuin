@@ -56,8 +56,9 @@ export default async function ChartDetailPage({
     author = data?.name ?? "";
   }
 
+  const caseType = chart.data?.case_type;
   const entries = Object.entries(chart.data ?? {}).filter(
-    ([, v]) => v && String(v).trim()
+    ([k, v]) => k !== "case_type" && v && String(v).trim()
   ) as [keyof ChartData, string][];
 
   const t = chart.treatments ?? { machines: [], methods: [], other: "" };
@@ -81,6 +82,11 @@ export default async function ChartDetailPage({
           >
             {CHART_TYPE_LABELS[chart.chart_type]}
           </span>
+          {caseType && (
+            <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+              {caseType}
+            </span>
+          )}
           <h1 className="mt-1 text-xl font-bold">{chart.visit_date}</h1>
           <p className="text-xs text-gray-500">担当: {author || "―"}</p>
         </div>
