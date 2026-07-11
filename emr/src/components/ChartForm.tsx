@@ -261,6 +261,7 @@ export default function ChartForm({
             options={MACHINES}
             selected={treatments.machines}
             onChange={(machines) => setTreatments((t) => ({ ...t, machines }))}
+            compact
           />
         </div>
         <div>

@@ -17,13 +17,11 @@ export const CASE_TYPES = ["外傷", "慢性", "疲労系"] as const;
 
 // 施術チップ：施術（「その他」は自由入力欄で対応）
 export const METHODS = [
-  "手技療法",
+  "KYT",
   "DNS",
   "運動療法",
   "ストレッチ",
   "テーピング",
-  "アイシング",
-  "温熱療法",
 ] as const;
 
 export const ROLE_LABELS: Record<StaffRole, string> = {
