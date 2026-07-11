@@ -61,7 +61,7 @@ export interface Site {
 
 // 初診／再診カルテの可変項目（jsonb data）
 export interface ChartData {
-  case_type?: string; // 症例分類（外傷/慢性/疲労系）
+  case_type?: string; // 症例分類（外傷/慢性/オーバーユース/その他）
   main_symptoms?: string; // 主な症状
   // 初診
   chief_complaint?: string; // 主訴
