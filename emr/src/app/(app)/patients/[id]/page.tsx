@@ -138,9 +138,11 @@ export default async function PatientDetailPage({
                         {CHART_TYPE_LABELS[c.chart_type]}
                       </span>
                       <span className="font-medium">{c.visit_date}</span>
-                      {c.pain_score != null && (
+                      {c.sites?.[0] && (
                         <span className="ml-2 text-xs text-gray-500">
-                          疼痛 {c.pain_score}/10
+                          {c.sites[0].name || "疼痛"} {c.sites[0].pain_pre ?? "―"}→
+                          {c.sites[0].pain_post ?? "―"}
+                          {c.sites.length > 1 && ` 他${c.sites.length - 1}部位`}
                         </span>
                       )}
                     </div>

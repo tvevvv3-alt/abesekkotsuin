@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ChipGroup from "@/components/ChipGroup";
 import { MACHINES, METHODS, CHART_TYPE_LABELS } from "@/lib/constants";
-import type { Chart, ChartData, ChartType, Treatments } from "@/lib/types";
+import type { Chart, ChartData, ChartType, Site, Treatments } from "@/lib/types";
 
 // カルテ種別ごとの記述項目（jsonb data のキー）
 const INITIAL_FIELDS: { key: keyof ChartData; label: string; area?: boolean }[] = [
@@ -40,6 +40,34 @@ const FOLLOWUP_FIELDS: { key: keyof ChartData; label: string; area?: boolean }[]
   { key: "next_check", label: "次回確認事項", area: true },
 ];
 
+const emptySite = (): Site => ({ name: "", pain_pre: null, pain_post: null });
+
+// 0〜10 のタップ式スコア
+function PainScale({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (n: number | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {Array.from({ length: 11 }).map((_, n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(value === n ? null : n)}
+          className={`h-9 w-9 rounded-full text-sm font-semibold transition active:scale-95 ${
+            value === n ? "bg-brand text-white" : "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ChartForm({
   patientId,
   chartType,
@@ -55,7 +83,9 @@ export default function ChartForm({
   const [visitDate, setVisitDate] = useState(
     initial?.visit_date ?? new Date().toISOString().slice(0, 10)
   );
-  const [pain, setPain] = useState<number | null>(initial?.pain_score ?? null);
+  const [sites, setSites] = useState<Site[]>(
+    initial?.sites && initial.sites.length > 0 ? initial.sites : [emptySite()]
+  );
   const [treatments, setTreatments] = useState<Treatments>(
     initial?.treatments ?? { machines: [], methods: [], other: "" }
   );
@@ -65,6 +95,17 @@ export default function ChartForm({
 
   function setField(key: keyof ChartData, value: string) {
     setData((prev) => ({ ...prev, [key]: value }));
+  }
+  function updateSite(i: number, patch: Partial<Site>) {
+    setSites((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  }
+  function addSite() {
+    setSites((prev) => [...prev, emptySite()]);
+  }
+  function removeSite(i: number) {
+    setSites((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)
+    );
   }
 
   async function submit(e: React.FormEvent) {
@@ -76,11 +117,17 @@ export default function ChartForm({
       data: { user },
     } = await supabase.auth.getUser();
 
+    // 部位名・スコアが何も入っていない行は除外
+    const cleanSites = sites.filter(
+      (s) => s.name.trim() || s.pain_pre != null || s.pain_post != null
+    );
+
     const payload = {
       patient_id: patientId,
       chart_type: chartType,
       visit_date: visitDate,
-      pain_score: pain,
+      pain_score: cleanSites[0]?.pain_pre ?? null, // 後方互換
+      sites: cleanSites,
       treatments,
       data,
       author_id: user?.id,
@@ -115,25 +162,66 @@ export default function ChartForm({
         </div>
       </div>
 
-      {/* 疼痛スコア */}
-      <div className="card">
-        <label className="label">疼痛スコア（0〜10）</label>
-        <div className="flex flex-wrap gap-1.5">
-          {Array.from({ length: 11 }).map((_, n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setPain(pain === n ? null : n)}
-              className={`h-10 w-10 rounded-full text-sm font-semibold transition active:scale-95 ${
-                pain === n
-                  ? "bg-brand text-white"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
+      {/* 部位別 疼痛スコア（施術前→施術後） */}
+      <div className="card space-y-4">
+        <div className="flex items-center justify-between">
+          <label className="label mb-0">部位別 疼痛スコア（施術前 → 施術後）</label>
         </div>
+
+        {sites.map((s, i) => (
+          <div
+            key={i}
+            className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                className="field bg-white"
+                placeholder={`部位${i + 1}（例: 右足関節）`}
+                value={s.name}
+                onChange={(e) => updateSite(i, { name: e.target.value })}
+              />
+              {sites.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeSite(i)}
+                  className="shrink-0 px-2 text-sm text-red-500"
+                  aria-label="部位を削除"
+                >
+                  削除
+                </button>
+              )}
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-gray-500">施術前</div>
+              <PainScale
+                value={s.pain_pre}
+                onChange={(n) => updateSite(i, { pain_pre: n })}
+              />
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-brand">施術後</div>
+              <PainScale
+                value={s.pain_post}
+                onChange={(n) => updateSite(i, { pain_post: n })}
+              />
+            </div>
+            {s.pain_pre != null && s.pain_post != null && (
+              <p className="text-xs text-gray-500">
+                変化: {s.pain_pre} → {s.pain_post}（
+                {s.pain_post - s.pain_pre <= 0 ? "" : "+"}
+                {s.pain_post - s.pain_pre}）
+              </p>
+            )}
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={addSite}
+          className="btn-ghost w-full text-sm"
+        >
+          ＋部位を追加
+        </button>
       </div>
 
       {/* 施術内容チップ */}

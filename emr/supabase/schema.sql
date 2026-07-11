@@ -55,7 +55,8 @@ create table public.charts (
   chart_type  chart_type not null,
   visit_date  date not null default current_date,
   author_id   uuid references public.staff(id) on delete set null,
-  pain_score  smallint check (pain_score between 0 and 10),
+  pain_score  smallint check (pain_score between 0 and 10), -- 旧・単一スコア（後方互換）
+  sites       jsonb not null default '[]'::jsonb, -- 部位別 施術前後スコア [{name,pain_pre,pain_post}]
   treatments  jsonb not null default '{}'::jsonb,
   data        jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now(),
@@ -187,6 +188,12 @@ create policy "images upload" on storage.objects for insert to authenticated
 create policy "images delete" on storage.objects for delete to authenticated
   using (bucket_id = 'patient-images'
          and public.staff_role(auth.uid()) = 'director');
+
+-- =====================================================================
+--  既存インストールへの追加（schema.sql を過去に実行済みの場合のみ）
+--    alter table public.charts
+--      add column if not exists sites jsonb not null default '[]'::jsonb;
+-- =====================================================================
 
 -- =====================================================================
 --  初期セットアップ用メモ

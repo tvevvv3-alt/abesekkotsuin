@@ -44,6 +44,13 @@ export interface Treatments {
   other: string;
 }
 
+// 部位ごとの疼痛スコア（施術前→施術後）。複数部位に対応。
+export interface Site {
+  name: string; // 部位名（例: 右足関節）
+  pain_pre: number | null; // 施術前 0〜10
+  pain_post: number | null; // 施術後 0〜10
+}
+
 // 初診／再診カルテの可変項目（jsonb data）
 export interface ChartData {
   // 初診
@@ -78,7 +85,8 @@ export interface Chart {
   chart_type: ChartType;
   visit_date: string;
   author_id: string | null;
-  pain_score: number | null;
+  pain_score: number | null; // 旧・単一スコア（後方互換のため保持）
+  sites: Site[]; // 部位別 施術前後スコア
   treatments: Treatments;
   data: ChartData;
   created_at: string;

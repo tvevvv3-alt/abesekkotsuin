@@ -4,7 +4,8 @@ import type { StaffRole, SexType, ChartType, ImageType } from "./types";
 export const MACHINES = [
   "アキュスコープ",
   "マイオパルス",
-  "ブラックアキュマイオ",
+  "ブラックアキュスコープ",
+  "ブラックマイオパルス",
   "エレサス",
   "ハイチャージNEO",
   "ディープオシレーション",

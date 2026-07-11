@@ -62,6 +62,7 @@ export default async function ChartDetailPage({
 
   const t = chart.treatments ?? { machines: [], methods: [], other: "" };
   const chips = [...t.machines, ...t.methods, ...(t.other ? [t.other] : [])];
+  const sites = chart.sites ?? [];
 
   return (
     <div className="space-y-5">
@@ -81,10 +82,7 @@ export default async function ChartDetailPage({
             {CHART_TYPE_LABELS[chart.chart_type]}
           </span>
           <h1 className="mt-1 text-xl font-bold">{chart.visit_date}</h1>
-          <p className="text-xs text-gray-500">
-            担当: {author || "―"}
-            {chart.pain_score != null && ` ・ 疼痛 ${chart.pain_score}/10`}
-          </p>
+          <p className="text-xs text-gray-500">担当: {author || "―"}</p>
         </div>
         {canWriteChart(staff.role) && (
           <Link
@@ -95,6 +93,50 @@ export default async function ChartDetailPage({
           </Link>
         )}
       </div>
+
+      {sites.length > 0 && (
+        <section className="card">
+          <h2 className="mb-3 text-sm font-bold text-gray-500">
+            疼痛スコア（施術前 → 施術後）
+          </h2>
+          <ul className="space-y-2">
+            {sites.map((s, i) => {
+              const diff =
+                s.pain_pre != null && s.pain_post != null
+                  ? s.pain_post - s.pain_pre
+                  : null;
+              return (
+                <li
+                  key={i}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2 text-sm"
+                >
+                  <span className="font-medium">{s.name || `部位${i + 1}`}</span>
+                  <span className="flex items-center gap-2 tabular-nums">
+                    <span className="text-gray-500">
+                      前 {s.pain_pre ?? "―"}
+                    </span>
+                    <span className="text-gray-300">→</span>
+                    <span className="font-semibold text-brand">
+                      後 {s.pain_post ?? "―"}
+                    </span>
+                    {diff != null && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs ${
+                          diff <= 0
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-600"
+                        }`}
+                      >
+                        {diff > 0 ? `+${diff}` : diff}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {chips.length > 0 && (
         <section className="card">

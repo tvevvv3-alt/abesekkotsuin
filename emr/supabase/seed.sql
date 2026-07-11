@@ -40,25 +40,29 @@ begin
 
   -- ---------- カルテ（患者にカルテが未登録のときだけ投入）----------
   if not exists (select 1 from public.charts where patient_id = p1) then
-    insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, treatments, data) values
+    insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, sites, treatments, data) values
     (p1,'initial','2026-06-28',dir,6,
+     '[{"name":"右足関節","pain_pre":6,"pain_post":4}]',
      '{"machines":["アキュスコープ","エコー"],"methods":["アイシング","テーピング"],"other":""}',
      '{"chief_complaint":"右足首の外側の痛み","injury_date":"2026-06-27","injury_mechanism":"サッカーの試合中に着地でひねった","diagnosis":"右足関節外側靭帯損傷（前距腓靭帯）","tenderness":"外果前方に著明","swelling":"（＋）中等度","heat":"（＋）軽度","bruising":"（±）","rom":"背屈・底屈とも制限あり","echo_finding":"前距腓靭帯の肥厚・低エコー像","assessment":"Ⅱ度捻挫。競技復帰まで3〜4週の見込み","treatment_plan":"急性期はRICE＋アキュスコープ。段階的に可動域・荷重訓練","return_estimate":"約3〜4週","next_check":"腫脹の推移と荷重時痛"}'),
     (p1,'followup','2026-07-02',dir,3,
+     '[{"name":"右足関節","pain_pre":3,"pain_post":1}]',
      '{"machines":["アキュスコープ","マイオパルス"],"methods":["運動療法","ストレッチ"],"other":""}',
      '{"change_from_last":"腫脹が引き、歩行時痛が軽減","tenderness":"軽度残存","swelling":"（±）","rom":"背屈やや改善","practice_status":"軽い自主トレのみ","post_treatment_change":"可動域が拡大、歩行安定","self_care":"チューブでの底背屈運動を指導","next_check":"ジョグ開始の可否"}');
   end if;
 
   if not exists (select 1 from public.charts where patient_id = p2) then
-    insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, treatments, data) values
+    insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, sites, treatments, data) values
     (p2,'initial','2026-07-04',dir,5,
+     '[{"name":"左膝","pain_pre":5,"pain_post":3},{"name":"左足関節","pain_pre":2,"pain_post":1}]',
      '{"machines":["ハイチャージNEO","エコー"],"methods":["手技療法","温熱療法"],"other":"膝サポーター調整"}',
      '{"chief_complaint":"左膝前面の痛み","injury_mechanism":"ジャンプ着地の繰り返しで慢性的に","diagnosis":"膝蓋腱炎（ジャンパー膝）疑い","tenderness":"膝蓋腱付着部","swelling":"（−）","echo_finding":"膝蓋腱の軽度肥厚","assessment":"オーバーユース。負荷管理が必要","treatment_plan":"ハイチャージ＋大腿四頭筋ストレッチ","return_estimate":"練習量を調整しつつ継続可","next_check":"ジャンプ時痛の変化"}');
   end if;
 
   if not exists (select 1 from public.charts where patient_id = p3) then
-    insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, treatments, data) values
+    insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, sites, treatments, data) values
     (p3,'initial','2026-07-08',dir,4,
+     '[{"name":"右肘","pain_pre":4,"pain_post":2}]',
      '{"machines":["エコー","ディープオシレーション"],"methods":["手技療法","アイシング"],"other":""}',
      '{"chief_complaint":"投球時の右肘内側の痛み","injury_mechanism":"投げ込みの増加","diagnosis":"内側上顆炎（野球肘）疑い","tenderness":"内側上顆","swelling":"（−）","echo_finding":"骨端線に軽度の不整","assessment":"成長期の投球障害。投球中止が望ましい","treatment_plan":"投球休止＋前腕ストレッチ、フォーム確認","return_estimate":"2〜3週の投球休止後に再評価","next_check":"安静時痛の有無"}');
   end if;
