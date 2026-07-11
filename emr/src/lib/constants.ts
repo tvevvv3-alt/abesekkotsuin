@@ -1,19 +1,7 @@
 import type { StaffRole, SexType, ChartType, ImageType } from "./types";
 
-// 施術チップ：機器
-export const MACHINES = [
-  "アキュスコープ",
-  "マイオパルス",
-  "ブラックアキュスコープ",
-  "ブラックマイオパルス",
-  "エレサス",
-  "ハイチャージNEO",
-  "ディープオシレーション",
-  "エコー",
-] as const;
-
 // 症例分類（1つ選択）
-export const CASE_TYPES = ["外傷", "慢性", "疲労系"] as const;
+export const CASE_TYPES = ["外傷", "慢性", "疲労系", "その他"] as const;
 
 // 施術チップ：施術（「その他」は自由入力欄で対応）
 export const METHODS = [

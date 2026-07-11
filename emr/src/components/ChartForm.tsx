@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import ChipGroup from "@/components/ChipGroup";
-import { MACHINES, METHODS, CASE_TYPES, CHART_TYPE_LABELS } from "@/lib/constants";
+import { METHODS, CASE_TYPES, CHART_TYPE_LABELS } from "@/lib/constants";
 import type { Chart, ChartData, ChartType, Site, Treatments } from "@/lib/types";
 
 // カルテ種別ごとの記述項目（jsonb data のキー）
@@ -87,7 +87,7 @@ export default function ChartForm({
     initial?.sites && initial.sites.length > 0 ? initial.sites : [emptySite()]
   );
   const [treatments, setTreatments] = useState<Treatments>(
-    initial?.treatments ?? { machines: [], methods: [], other: "" }
+    initial?.treatments ?? { methods: [], approach: "", other: "" }
   );
   const [data, setData] = useState<ChartData>(initial?.data ?? {});
   const [saving, setSaving] = useState(false);
@@ -253,17 +253,8 @@ export default function ChartForm({
         </button>
       </div>
 
-      {/* 施術内容チップ */}
+      {/* 施術内容 */}
       <div className="card space-y-4">
-        <div>
-          <label className="label">機器</label>
-          <ChipGroup
-            options={MACHINES}
-            selected={treatments.machines}
-            onChange={(machines) => setTreatments((t) => ({ ...t, machines }))}
-            compact
-          />
-        </div>
         <div>
           <label className="label">施術</label>
           <ChipGroup
@@ -273,10 +264,21 @@ export default function ChartForm({
           />
           <input
             className="field mt-2"
-            placeholder="その他（自由入力）"
+            placeholder="その他の施術（自由入力）"
             value={treatments.other}
             onChange={(e) =>
               setTreatments((t) => ({ ...t, other: e.target.value }))
+            }
+          />
+        </div>
+        <div>
+          <label className="label">効果的だったアプローチ</label>
+          <textarea
+            className="field min-h-20"
+            placeholder="例: アキュにて帯脈8Hz、○○が奏効 など"
+            value={treatments.approach}
+            onChange={(e) =>
+              setTreatments((t) => ({ ...t, approach: e.target.value }))
             }
           />
         </div>

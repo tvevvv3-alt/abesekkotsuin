@@ -61,8 +61,8 @@ export default async function ChartDetailPage({
     ([k, v]) => k !== "case_type" && v && String(v).trim()
   ) as [keyof ChartData, string][];
 
-  const t = chart.treatments ?? { machines: [], methods: [], other: "" };
-  const chips = [...t.machines, ...t.methods, ...(t.other ? [t.other] : [])];
+  const t = chart.treatments ?? { methods: [], approach: "", other: "" };
+  const chips = [...t.methods, ...(t.other ? [t.other] : [])];
   const sites = chart.sites ?? [];
 
   return (
@@ -144,19 +144,27 @@ export default async function ChartDetailPage({
         </section>
       )}
 
-      {chips.length > 0 && (
-        <section className="card">
-          <h2 className="mb-2 text-sm font-bold text-gray-500">施術内容</h2>
-          <div className="flex flex-wrap gap-2">
-            {chips.map((c) => (
-              <span
-                key={c}
-                className="rounded-full bg-brand/10 px-3 py-1 text-sm text-brand"
-              >
-                {c}
-              </span>
-            ))}
-          </div>
+      {(chips.length > 0 || t.approach) && (
+        <section className="card space-y-3">
+          <h2 className="text-sm font-bold text-gray-500">施術内容</h2>
+          {chips.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {chips.map((c) => (
+                <span
+                  key={c}
+                  className="rounded-full bg-brand/10 px-3 py-1 text-sm text-brand"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
+          {t.approach && (
+            <div>
+              <div className="text-xs text-gray-500">効果的だったアプローチ</div>
+              <p className="whitespace-pre-wrap text-sm">{t.approach}</p>
+            </div>
+          )}
         </section>
       )}
 

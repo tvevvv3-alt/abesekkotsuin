@@ -37,11 +37,11 @@ export interface Patient {
   updated_at: string;
 }
 
-// 施術チップ選択内容
+// 施術内容
 export interface Treatments {
-  machines: string[];
-  methods: string[];
-  other: string;
+  methods: string[]; // 施術チップ
+  approach: string; // 効果的だったアプローチ（自由入力。例: アキュにて帯脈8Hz）
+  other: string; // その他の施術（自由入力）
 }
 
 // 部位ごとの疼痛スコア（施術前→施術後）。複数部位に対応。
