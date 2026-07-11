@@ -43,11 +43,11 @@ begin
     insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, sites, treatments, data) values
     (p1,'initial','2026-06-28',dir,6,
      '[{"name":"右足関節","pain_pre":6,"pain_post":4}]',
-     '{"approach":"アキュにて帯脈8Hz、圧痛部を重点"}',
+     '{"items":[{"modality":"アキュスコープ","site":"ATFL","protocol":"局所通電"},{"modality":"マイオパルス","site":"帯脈","protocol":"8Hz"},{"modality":"ディープオシレーション","site":"外果周囲"},{"modality":"エコー","finding":"ATFL低エコー域あり"}],"approach":"帯脈8Hzが奏効"}',
      '{"case_type":"外傷","main_symptoms":"右足関節外側の疼痛・荷重時痛","chief_complaint":"右足首の外側の痛み","injury_date":"2026-06-27","injury_mechanism":"サッカーの試合中に着地でひねった","diagnosis":"右足関節外側靭帯損傷（前距腓靭帯）","heat":"（＋）軽度","bruising":"（±）","echo_finding":"前距腓靭帯の肥厚・低エコー像","assessment":"Ⅱ度捻挫。競技復帰まで3〜4週の見込み","treatment_plan":"急性期はRICE＋アキュスコープ。段階的に可動域・荷重訓練","return_estimate":"約3〜4週","next_check":"腫脹の推移と荷重時痛"}'),
     (p1,'followup','2026-07-02',dir,3,
      '[{"name":"右足関節","pain_pre":3,"pain_post":1}]',
-     '{"approach":"アキュ＋マイオパルスで背屈可動域が改善"}',
+     '{"items":[{"modality":"アキュスコープ","site":"ATFL","protocol":"局所通電"},{"modality":"運動療法","content":"底背屈の自動運動"},{"modality":"テーピング","content":"足関節・キネシオ"}],"approach":"背屈可動域が改善"}',
      '{"case_type":"外傷","main_symptoms":"歩行時痛（軽減傾向）","change_from_last":"腫脹が引き、歩行時痛が軽減","post_treatment_change":"可動域が拡大、歩行安定","self_care":"チューブでの底背屈運動を指導","next_check":"ジョグ開始の可否"}');
   end if;
 
@@ -55,7 +55,7 @@ begin
     insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, sites, treatments, data) values
     (p2,'initial','2026-07-04',dir,5,
      '[{"name":"左膝","pain_pre":5,"pain_post":3},{"name":"左足関節","pain_pre":2,"pain_post":1}]',
-     '{"approach":"ハイチャージNEOで大腿四頭筋10分、荷重時痛が軽減"}',
+     '{"items":[{"modality":"ハイチャージNEO","content":"大腿四頭筋 10分"},{"modality":"手技","content":"大腿四頭筋リリース"}],"approach":"荷重時痛が軽減"}',
      '{"case_type":"慢性","main_symptoms":"左膝前面（膝蓋腱部）の運動時痛","chief_complaint":"左膝前面の痛み","injury_mechanism":"ジャンプ着地の繰り返しで慢性的に","diagnosis":"膝蓋腱炎（ジャンパー膝）疑い","echo_finding":"膝蓋腱の軽度肥厚","assessment":"オーバーユース。負荷管理が必要","treatment_plan":"ハイチャージ＋大腿四頭筋ストレッチ","return_estimate":"練習量を調整しつつ継続可","next_check":"ジャンプ時痛の変化"}');
   end if;
 
@@ -63,7 +63,7 @@ begin
     insert into public.charts (patient_id, chart_type, visit_date, author_id, pain_score, sites, treatments, data) values
     (p3,'initial','2026-07-08',dir,4,
      '[{"name":"右肘","pain_pre":4,"pain_post":2}]',
-     '{"approach":"エコー確認下でディープオシレーション、前腕伸筋群"}',
+     '{"items":[{"modality":"エコー","finding":"骨端線に軽度の不整"},{"modality":"ディープオシレーション","site":"前腕伸筋群","content":"低振動"},{"modality":"運動療法","content":"前腕ストレッチ指導"}],"approach":"前腕伸筋群への施術が有効"}',
      '{"case_type":"疲労系","main_symptoms":"投球時の右肘内側痛","chief_complaint":"投球時の右肘内側の痛み","injury_mechanism":"投げ込みの増加","diagnosis":"内側上顆炎（野球肘）疑い","echo_finding":"骨端線に軽度の不整","assessment":"成長期の投球障害。投球中止が望ましい","treatment_plan":"投球休止＋前腕ストレッチ、フォーム確認","return_estimate":"2〜3週の投球休止後に再評価","next_check":"安静時痛の有無"}');
   end if;
 

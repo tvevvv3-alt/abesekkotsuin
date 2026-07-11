@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentStaff } from "@/lib/auth";
-import { CHART_TYPE_LABELS, canWriteChart } from "@/lib/constants";
+import {
+  CHART_TYPE_LABELS,
+  canWriteChart,
+  MODALITY_MAP,
+  OTHER_MODALITY,
+} from "@/lib/constants";
 import type { Chart, ChartData, Staff } from "@/lib/types";
 
 const LABELS: Partial<Record<keyof ChartData, string>> = {
@@ -63,6 +68,7 @@ export default async function ChartDetailPage({
   ) as [keyof ChartData, string][];
 
   const approach = chart.treatments?.approach ?? "";
+  const treatItems = chart.treatments?.items ?? [];
   const sites = chart.sites ?? [];
 
   return (
@@ -137,6 +143,42 @@ export default async function ChartDetailPage({
                       </span>
                     )}
                   </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {treatItems.length > 0 && (
+        <section className="card space-y-3">
+          <h2 className="text-sm font-bold text-gray-500">施術内容</h2>
+          <ul className="space-y-2">
+            {treatItems.map((it, i) => {
+              const def = MODALITY_MAP[it.modality];
+              const name =
+                it.modality === OTHER_MODALITY
+                  ? it.label || "その他"
+                  : it.modality;
+              const parts: string[] = [];
+              const detailFields = def?.fields ?? [
+                { key: "content" as const, label: "内容" },
+              ];
+              for (const f of detailFields) {
+                const v = it[f.key];
+                if (v && String(v).trim()) parts.push(`${f.label}: ${v}`);
+              }
+              return (
+                <li
+                  key={i}
+                  className="rounded-xl bg-gray-50 px-3 py-2 text-sm"
+                >
+                  <span className="font-semibold text-brand">{name}</span>
+                  {parts.length > 0 && (
+                    <span className="ml-2 whitespace-pre-wrap text-gray-700">
+                      {parts.join(" ／ ")}
+                    </span>
+                  )}
                 </li>
               );
             })}

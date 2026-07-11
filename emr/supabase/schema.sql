@@ -63,6 +63,9 @@ create table public.charts (
   updated_at  timestamptz not null default now()
 );
 create index charts_patient_idx on public.charts (patient_id, visit_date desc);
+-- 将来の症例検索（機器・部位・設定・所見など）のための JSONB インデックス
+create index charts_treatments_gin on public.charts using gin (treatments jsonb_path_ops);
+create index charts_data_gin on public.charts using gin (data jsonb_path_ops);
 
 -- ---------- images（エコー／患部写真）------------------------------
 create table public.images (
@@ -193,6 +196,10 @@ create policy "images delete" on storage.objects for delete to authenticated
 --  既存インストールへの追加（schema.sql を過去に実行済みの場合のみ）
 --    alter table public.charts
 --      add column if not exists sites jsonb not null default '[]'::jsonb;
+--    create index if not exists charts_treatments_gin
+--      on public.charts using gin (treatments jsonb_path_ops);
+--    create index if not exists charts_data_gin
+--      on public.charts using gin (data jsonb_path_ops);
 -- =====================================================================
 
 -- =====================================================================

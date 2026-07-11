@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import TreatmentInput from "@/components/TreatmentInput";
 import { CASE_TYPES, CHART_TYPE_LABELS } from "@/lib/constants";
 import type { Chart, ChartData, ChartType, Site, Treatments } from "@/lib/types";
 
@@ -81,7 +82,9 @@ export default function ChartForm({
     initial?.sites && initial.sites.length > 0 ? initial.sites : [emptySite()]
   );
   const [treatments, setTreatments] = useState<Treatments>(
-    initial?.treatments ?? { approach: "" }
+    initial?.treatments
+      ? { items: initial.treatments.items ?? [], approach: initial.treatments.approach ?? "" }
+      : { items: [], approach: "" }
   );
   const [data, setData] = useState<ChartData>(initial?.data ?? {});
   const [saving, setSaving] = useState(false);
@@ -247,15 +250,24 @@ export default function ChartForm({
         </button>
       </div>
 
-      {/* 効果的だったアプローチ */}
+      {/* 施術内容（機器ごとに構造化） */}
+      <div className="card space-y-3">
+        <label className="label mb-0">施術内容（機器を選択して詳細を入力）</label>
+        <TreatmentInput
+          items={treatments.items}
+          onChange={(items) => setTreatments((t) => ({ ...t, items }))}
+        />
+      </div>
+
+      {/* 効果的だったアプローチ（任意メモ） */}
       <div className="card">
-        <label className="label">効果的だったアプローチ</label>
+        <label className="label">効果的だったアプローチ（任意）</label>
         <textarea
           className="field min-h-20"
-          placeholder="例: アキュにて帯脈8Hz、○○が奏効 など"
-          value={treatments.approach}
+          placeholder="特に奏効した点があれば記入"
+          value={treatments.approach ?? ""}
           onChange={(e) =>
-            setTreatments({ approach: e.target.value })
+            setTreatments((t) => ({ ...t, approach: e.target.value }))
           }
         />
       </div>

@@ -37,9 +37,19 @@ export interface Patient {
   updated_at: string;
 }
 
-// 施術内容
+// 施術：機器ごとの構造化エントリ（検索・分析用）
+export interface TreatmentItem {
+  modality: string; // 機器・手技名（その他の場合は "その他"）
+  label?: string; // 「その他」選択時の自由名称
+  site?: string; // 部位（例: ATFL, 帯脈, 外果周囲）
+  protocol?: string; // 設定・プロトコル（例: 局所通電, 8Hz）
+  content?: string; // 内容 / 部位・種類
+  finding?: string; // 所見（エコー）
+}
+
 export interface Treatments {
-  approach: string; // 効果的だったアプローチ（自由入力。例: アキュにて帯脈8Hz）
+  items: TreatmentItem[]; // 機器ごとの施術記録
+  approach?: string; // 効果的だったアプローチ（任意の補足メモ）
 }
 
 // 部位ごとの疼痛スコア（施術前→施術後）。複数部位に対応。
