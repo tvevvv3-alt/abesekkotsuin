@@ -22,11 +22,11 @@ update public.staff set color = '#16a34a', sort_order = 2 where name = '澁谷' 
 update public.staff set color = '#7c3aed', sort_order = 3 where name = '萩原' and color is null;
 update public.staff set color = '#ea580c', sort_order = 4 where name = '林'   and color is null;
 
--- フリガナ・表示名・在籍状態（未設定のみ）
-update public.staff set name_kana = 'アベ',    display_name = coalesce(display_name,'阿部') where name = '阿部' and name_kana is null;
-update public.staff set name_kana = 'シブヤ',  display_name = coalesce(display_name,'澁谷') where name = '澁谷' and name_kana is null;
-update public.staff set name_kana = 'ハギワラ',display_name = coalesce(display_name,'萩原') where name = '萩原' and name_kana is null;
-update public.staff set name_kana = 'ハヤシ',  display_name = coalesce(display_name,'林')   where name = '林'   and name_kana is null;
+-- フリガナ・表示名・役職・所属院（HP実データ。未設定のみ）
+update public.staff set name_kana = 'アベ コウヤ',   role = '院長／柔道整復師',   clinic = '茨木本院', display_name = coalesce(display_name,'阿部') where name = '阿部' and name_kana is null;
+update public.staff set name_kana = 'シブタニ ケイスケ', role = '副院長／鍼灸師', clinic = '茨木本院', display_name = coalesce(display_name,'澁谷') where name = '澁谷' and name_kana is null;
+update public.staff set name_kana = 'ハギワラ リョウタ', role = 'スタッフ／柔道整復師', clinic = '茨木本院', display_name = coalesce(display_name,'萩原') where name = '萩原' and name_kana is null;
+update public.staff set name_kana = 'ハヤシ トワ',    role = 'スタッフ／柔道整復師', clinic = '茨木本院', display_name = coalesce(display_name,'林')   where name = '林'   and name_kana is null;
 
 -- ---------- 機器（ハイチャージ 同時4名）----------------------------
 insert into public.equipment (name, capacity, sort_order)
@@ -112,11 +112,11 @@ begin
          patient_name = '体幹教室【新規受付停止中】'
    where name = '体幹教室';
 
-  -- 時間外予約（担当者のみ・施術30分）
+  -- 時間外予約（20:30以降・施術30分）
   if not exists (select 1 from public.services where name = '時間外予約') then
     insert into public.services (name, description, category, sort_order)
       values ('時間外予約',
-        '通常時間外に施術を希望する方向けです。通常枠が埋まっている場合や、施術30分＋全身通電20分・施術60分をご希望の場合は、電話またはLINEでご連絡ください。',
+        '通常時間外（20:30以降）に施術を希望する方向けです。急な怪我や通常枠が埋まっている場合にご利用ください（学生＋¥550／一般＋¥2,750）。施術30分＋全身通電20分・施術60分をご希望の場合は電話またはLINEでご連絡ください。',
         'その他', 6) returning id into s_id;
     insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
       (s_id, 1, '施術', 30, true, null, 1);
@@ -125,15 +125,20 @@ begin
   -- 川西整体院（担当者のみ・施術50分）
   if not exists (select 1 from public.services where name = '川西整体院') then
     insert into public.services (name, description, category, sort_order)
-      values ('川西整体院', '川西整体院での施術（50分）。予約可能日は管理画面から指定します。', '川西整体院', 7) returning id into s_id;
+      values ('川西整体院', '川西整体院での施術（50分）。開始時刻 10:00/11:00/12:00/16:00/17:00/18:00/19:00/20:00。予約可能日は管理画面から指定します（LINE受付・現金/PayPay）。', '川西整体院', 7) returning id into s_id;
     insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
       (s_id, 1, '施術', 50, true, null, 1);
   end if;
 end $$;
 
--- ---------- 勤務時間（全担当者 月〜土, 午前/午後の2枠）--------------
---  午前 09:00-13:00 (540-780) / 午後 14:30-19:00 (870-1140)
---  日曜(0)は休診（スケジュール無し）
+-- 体幹教室：HP実データ（17:00〜19:30・小3〜中学生・少人数4名）に説明を更新
+update public.services
+   set description = '体幹トレーニング指導（定員4名のグループレッスン・小3〜中学生対象）。月〜土 17:00〜19:30 開催。'
+ where name = '体幹教室';
+
+-- ---------- 勤務時間（HP実データ：茨木本院 月〜土, 午前/午後の2枠）------
+--  午前 10:00-13:00 (600-780) / 午後 16:00-20:30 (960-1230)
+--  日曜(0)は休診（スケジュール無し）／不定休（完全予約制）
 do $$
 declare
   st record;
@@ -143,8 +148,8 @@ begin
     for wd in 1..6 loop
       if not exists (select 1 from public.staff_schedules where staff_id = st.id and weekday = wd) then
         insert into public.staff_schedules (staff_id, weekday, start_min, end_min) values
-          (st.id, wd, 540, 780),   -- 09:00-13:00
-          (st.id, wd, 870, 1140);  -- 14:30-19:00
+          (st.id, wd, 600, 780),   -- 10:00-13:00
+          (st.id, wd, 960, 1230);  -- 16:00-20:30
       end if;
     end loop;
   end loop;
@@ -223,7 +228,7 @@ end $$;
 
 -- ---------- デモ用休診（今週の日曜は元々休、土曜午後を院全体休診に）--
 insert into public.closures (date, staff_id, start_min, end_min, reason)
-select (date_trunc('week', current_date)::date + 5), null, 870, 1140, '院内研修'
+select (date_trunc('week', current_date)::date + 5), null, 960, 1230, '院内研修'
 where not exists (
   select 1 from public.closures
   where date = (date_trunc('week', current_date)::date + 5) and reason = '院内研修'
