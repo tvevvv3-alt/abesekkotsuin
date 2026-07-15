@@ -2,10 +2,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AppointmentStep,
+  BookingWindow,
   Closure,
   Equipment,
   ServicePrice,
   ServiceWithSteps,
+  Settings,
   Staff,
   StaffSchedule,
 } from "./types";
@@ -73,6 +75,35 @@ export async function loadStaffServices(
 // 料金（スタッフ別・初診/再診）
 export async function loadServicePrices(sb: SupabaseClient): Promise<ServicePrice[]> {
   const { data, error } = await sb.from("service_prices").select("*");
+  if (error) throw error;
+  return data ?? [];
+}
+
+// 予約 基本設定（1行。無ければ既定値）
+export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
+  const { data } = await sb.from("settings").select("*").eq("id", 1).maybeSingle();
+  return (
+    data ?? {
+      id: 1,
+      slot_unit: 30,
+      same_day_ok: true,
+      last_accept_min: null,
+      cancel_deadline_hours: 0,
+      change_deadline_hours: 0,
+      autofill: true,
+      recheck_on_book: true,
+    }
+  );
+}
+
+// 予約公開設定（月別）
+export async function loadBookingWindows(
+  sb: SupabaseClient
+): Promise<BookingWindow[]> {
+  const { data, error } = await sb
+    .from("booking_windows")
+    .select("*")
+    .order("year_month");
   if (error) throw error;
   return data ?? [];
 }

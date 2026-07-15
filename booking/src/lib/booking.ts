@@ -13,11 +13,33 @@
 
 import type {
   AppointmentStep,
+  BookingWindow,
   Closure,
   Equipment,
   ServiceStep,
   StaffSchedule,
 } from "./types";
+
+// ---- 予約公開（月別）--------------------------------------------------
+
+/** "YYYY-MM-DD" → "YYYY-MM" */
+export const monthKey = (dateStr: string) => dateStr.slice(0, 7);
+
+/** その月が公開済みか（未設定の月は常に公開扱い） */
+export function isMonthOpen(w: BookingWindow | undefined, now = new Date()): boolean {
+  if (!w) return true;
+  if (w.published) return true;
+  if (w.open_at && new Date(w.open_at) <= now) return true;
+  return false;
+}
+
+/** その日付が受付期間内か */
+export function acceptsDate(w: BookingWindow | undefined, dateStr: string): boolean {
+  if (!w) return true;
+  if (w.accept_from && dateStr < w.accept_from) return false;
+  if (w.accept_to && dateStr > w.accept_to) return false;
+  return true;
+}
 
 // ---- 時刻ユーティリティ -------------------------------------------
 

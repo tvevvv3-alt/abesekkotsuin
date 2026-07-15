@@ -137,6 +137,28 @@ export interface AppointmentStep {
   headcount: number;
 }
 
+// 予約 基本設定（1行）
+export interface Settings {
+  id: number;
+  slot_unit: number; // 15 / 30
+  same_day_ok: boolean;
+  last_accept_min: number | null;
+  cancel_deadline_hours: number;
+  change_deadline_hours: number;
+  autofill: boolean;
+  recheck_on_book: boolean;
+}
+
+// 月別の予約公開設定
+export interface BookingWindow {
+  year_month: string; // 'YYYY-MM'
+  open_at: string | null;
+  accept_from: string | null;
+  accept_to: string | null;
+  published: boolean;
+  note: string | null;
+}
+
 // 患者情報の端末保存（2回目以降の自動入力）
 export interface SavedPatient {
   name: string;

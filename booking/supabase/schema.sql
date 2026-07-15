@@ -143,6 +143,37 @@ create table if not exists public.service_prices (
 );
 
 -- =====================================================================
+--  予約 基本設定（settings）: 院全体の1行設定。
+-- =====================================================================
+create table if not exists public.settings (
+  id                    int primary key default 1,
+  slot_unit             int  not null default 30,   -- 予約開始時刻の単位（15/30分）
+  same_day_ok           boolean not null default true, -- 当日予約の可否
+  last_accept_min       int,                         -- 患者が予約できる最終時刻（分, null=営業終了まで）
+  cancel_deadline_hours int  not null default 0,     -- キャンセル受付期限（何時間前まで）
+  change_deadline_hours int  not null default 0,     -- 予約変更受付期限
+  autofill              boolean not null default true, -- 患者情報の自動入力
+  recheck_on_book       boolean not null default true, -- 予約確定時の空き再確認（常に有効）
+  updated_at            timestamptz not null default now(),
+  check (id = 1)
+);
+insert into public.settings (id) values (1) on conflict (id) do nothing;
+
+-- =====================================================================
+--  予約公開設定（booking_windows）: 月ごとの公開スケジュール。
+--    公開前は患者に予約枠を出さず「◯月分は◯日◯時から受付開始」と表示。
+-- =====================================================================
+create table if not exists public.booking_windows (
+  year_month text primary key,          -- 'YYYY-MM'
+  open_at    timestamptz,               -- 公開日時（この時刻以降に公開）
+  accept_from date,                     -- 予約受付開始日
+  accept_to   date,                     -- 予約受付終了日
+  published  boolean not null default false, -- 今すぐ公開(true)/一時非公開(false)の手動指定
+  note       text,
+  updated_at timestamptz not null default now()
+);
+
+-- =====================================================================
 --  勤務時間（staff_schedules）: 曜日ごとの勤務時間帯
 --    weekday: 0=日 1=月 ... 6=土（Postgres の dow と同じ）
 --    時刻は「0時からの分」で保持（内部5分単位）
@@ -536,6 +567,8 @@ alter table public.services          enable row level security;
 alter table public.service_steps     enable row level security;
 alter table public.staff_services    enable row level security;
 alter table public.service_prices    enable row level security;
+alter table public.settings          enable row level security;
+alter table public.booking_windows   enable row level security;
 alter table public.staff_schedules   enable row level security;
 alter table public.closures          enable row level security;
 alter table public.appointments      enable row level security;
@@ -555,6 +588,10 @@ drop policy if exists staff_services_public_read on public.staff_services;
 create policy staff_services_public_read on public.staff_services for select using (true);
 drop policy if exists service_prices_public_read on public.service_prices;
 create policy service_prices_public_read on public.service_prices for select using (true);
+drop policy if exists settings_public_read on public.settings;
+create policy settings_public_read on public.settings for select using (true);
+drop policy if exists booking_windows_public_read on public.booking_windows;
+create policy booking_windows_public_read on public.booking_windows for select using (true);
 drop policy if exists schedules_public_read on public.staff_schedules;
 create policy schedules_public_read on public.staff_schedules for select using (true);
 drop policy if exists closures_public_read on public.closures;
@@ -572,7 +609,7 @@ declare t text;
 begin
   foreach t in array array[
     'staff','patients','equipment','services','service_steps','staff_services','service_prices',
-    'staff_schedules','closures','appointments','appointment_steps'
+    'settings','booking_windows','staff_schedules','closures','appointments','appointment_steps'
   ] loop
     execute format('drop policy if exists %I on public.%I', t||'_staff_all', t);
     execute format(

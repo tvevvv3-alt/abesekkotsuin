@@ -5,27 +5,33 @@ import { createClient } from "@/lib/supabase/client";
 import {
   loadAllStaff,
   loadAppointmentSteps,
+  loadBookingWindows,
   loadClosures,
   loadEquipment,
   loadSchedules,
   loadServicePrices,
   loadServices,
+  loadSettings,
   loadStaffServices,
 } from "@/lib/data";
 import type {
   AppointmentStep,
+  BookingWindow,
   Closure,
   Equipment,
   SavedPatient,
   ServicePrice,
   ServiceWithSteps,
+  Settings,
   Staff,
   StaffSchedule,
 } from "@/lib/types";
 import {
   addDays,
   fromDateStr,
+  isMonthOpen,
   minToLabel,
+  monthKey,
   startOfWeek,
   toDateStr,
   totalDuration,
@@ -46,6 +52,8 @@ export default function BookingWizard() {
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
   const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
   const [prices, setPrices] = useState<ServicePrice[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [windows, setWindows] = useState<BookingWindow[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [masterError, setMasterError] = useState<string | null>(null);
@@ -95,6 +103,22 @@ export default function BookingWizard() {
     return prices.find((p) => p.service_id === service.id && p.staff_id === staffId) || null;
   }, [service, isClass, prices, staffId]);
 
+  // 表示中の週に未公開の月があれば案内を出す
+  const publishNotice = useMemo(() => {
+    const now = new Date();
+    const byM = Object.fromEntries(windows.map((w) => [w.year_month, w]));
+    for (let i = 0; i < 7; i++) {
+      const ds = toDateStr(addDays(weekStart, i));
+      const w = byM[monthKey(ds)];
+      if (!isMonthOpen(w, now)) {
+        const m = parseInt(monthKey(ds).split("-")[1], 10);
+        const openAt = w?.open_at ? new Date(w.open_at) : null;
+        return { month: m, openAt };
+      }
+    }
+    return null;
+  }, [windows, weekStart]);
+
   // 患者に見せられるメニュー（公開中）。カテゴリーで絞り込み。
   const publicServices = useMemo(
     () => services.filter((s) => s.published),
@@ -136,17 +160,21 @@ export default function BookingWizard() {
   useEffect(() => {
     (async () => {
       try {
-        const [sv, st, ls, pr, eq] = await Promise.all([
+        const [sv, st, ls, pr, se, bw, eq] = await Promise.all([
           loadServices(supabase),
           loadAllStaff(supabase),
           loadStaffServices(supabase),
           loadServicePrices(supabase),
+          loadSettings(supabase),
+          loadBookingWindows(supabase),
           loadEquipment(supabase),
         ]);
         setServices(sv);
         setAllStaff(st);
         setLinks(ls);
         setPrices(pr);
+        setSettings(se);
+        setWindows(bw);
         setEquipment(eq);
       } catch (e) {
         setMasterError(e instanceof Error ? e.message : "読み込みに失敗しました");
@@ -419,6 +447,15 @@ export default function BookingWizard() {
             </button>
           </div>
 
+          {publishNotice && (
+            <div className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {publishNotice.openAt
+                ? `${publishNotice.month}月分の予約は ${publishNotice.openAt.getMonth() + 1}月${publishNotice.openAt.getDate()}日 ${String(
+                    publishNotice.openAt.getHours()
+                  ).padStart(2, "0")}:${String(publishNotice.openAt.getMinutes()).padStart(2, "0")} から受付開始予定です。`
+                : `${publishNotice.month}月分は現在受付停止中です。`}
+            </div>
+          )}
           {loadingWeek ? (
             <p className="py-8 text-center text-sm text-slate-500">読み込み中…</p>
           ) : (
@@ -433,6 +470,10 @@ export default function BookingWizard() {
               closures={closures}
               apptSteps={apptSteps}
               equipment={equipment}
+              slotUnit={settings?.slot_unit ?? 30}
+              sameDayOk={settings?.same_day_ok ?? true}
+              lastAcceptMin={settings?.last_accept_min ?? null}
+              windows={windows}
               selected={selected}
               onSelect={onSelectSlot}
             />

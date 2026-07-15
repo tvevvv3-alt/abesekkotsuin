@@ -3,17 +3,21 @@
 import { useMemo } from "react";
 import type {
   AppointmentStep,
+  BookingWindow,
   Closure,
   Equipment,
   ServiceStep,
   StaffSchedule,
 } from "@/lib/types";
 import {
+  acceptsDate,
   addDays,
   checkAvailability,
   classSlot,
   isClassService,
+  isMonthOpen,
   minToLabel,
+  monthKey,
   timeRows,
   toDateStr,
   WEEKDAY_LABELS,
@@ -31,6 +35,10 @@ interface Props {
   closures: Closure[];
   apptSteps: AppointmentStep[];
   equipment: Equipment[];
+  slotUnit?: number; // 表示単位 15/30
+  sameDayOk?: boolean; // 当日予約可否
+  lastAcceptMin?: number | null; // 最終受付時刻
+  windows?: BookingWindow[]; // 月別公開設定
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
 }
@@ -55,10 +63,18 @@ export default function WeekCalendar({
   closures,
   apptSteps,
   equipment,
+  slotUnit = 30,
+  sameDayOk = true,
+  lastAcceptMin = null,
+  windows = [],
   selected,
   onSelect,
 }: Props) {
   const isClass = isClassService(capacity);
+  const windowByMonth = useMemo(
+    () => Object.fromEntries(windows.map((w) => [w.year_month, w])) as Record<string, BookingWindow>,
+    [windows]
+  );
 
   const equipmentById = useMemo(
     () => Object.fromEntries(equipment.map((e) => [e.id, e])) as Record<string, Equipment>,
@@ -70,7 +86,7 @@ export default function WeekCalendar({
     [weekStart]
   );
 
-  const rows = useMemo(() => timeRows(schedules), [schedules]);
+  const rows = useMemo(() => timeRows(schedules, slotUnit), [schedules, slotUnit]);
 
   const grid = useMemo(() => {
     const now = new Date();
@@ -84,10 +100,18 @@ export default function WeekCalendar({
       const dayApptSteps = apptSteps.filter((a) => a.date === dateStr);
       const isPastDay = dateStr < todayStr;
       const isToday = dateStr === todayStr;
+      const win = windowByMonth[monthKey(dateStr)];
+      // 月が未公開 or 受付期間外 or 当日不可 → 予約枠を出さない
+      const dayBlocked =
+        !isMonthOpen(win, now) ||
+        !acceptsDate(win, dateStr) ||
+        (isToday && !sameDayOk);
 
       return rows.map((t): Cell => {
-        // 過去の日付・過ぎた時間は予約不可（表示しない）
+        // 過去の日付・過ぎた時間・最終受付超過・未公開などは予約不可
         if (isPastDay || (isToday && t <= nowMin)) return { kind: "off" };
+        if (dayBlocked) return { kind: "off" };
+        if (lastAcceptMin != null && t > lastAcceptMin) return { kind: "off" };
         const inAnyShift = daySchedules.some((s) => s.start_min <= t && s.end_min > t);
         if (!inAnyShift) return { kind: "off" };
 
@@ -141,6 +165,9 @@ export default function WeekCalendar({
     classStarts,
     isClass,
     equipmentById,
+    windowByMonth,
+    sameDayOk,
+    lastAcceptMin,
   ]);
 
   if (rows.length === 0) {
