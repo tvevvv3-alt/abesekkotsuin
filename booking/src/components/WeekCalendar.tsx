@@ -73,14 +73,21 @@ export default function WeekCalendar({
   const rows = useMemo(() => timeRows(schedules), [schedules]);
 
   const grid = useMemo(() => {
+    const now = new Date();
+    const todayStr = toDateStr(now);
+    const nowMin = now.getHours() * 60 + now.getMinutes();
     return days.map((d) => {
       const dateStr = toDateStr(d);
       const weekday = d.getDay();
       const daySchedules = schedules.filter((s) => s.weekday === weekday);
       const dayClosures = closures.filter((c) => c.date === dateStr);
       const dayApptSteps = apptSteps.filter((a) => a.date === dateStr);
+      const isPastDay = dateStr < todayStr;
+      const isToday = dateStr === todayStr;
 
       return rows.map((t): Cell => {
+        // 過去の日付・過ぎた時間は予約不可（表示しない）
+        if (isPastDay || (isToday && t <= nowMin)) return { kind: "off" };
         const inAnyShift = daySchedules.some((s) => s.start_min <= t && s.end_min > t);
         if (!inAnyShift) return { kind: "off" };
 
@@ -157,11 +164,12 @@ export default function WeekCalendar({
             {days.map((d) => {
               const ds = toDateStr(d);
               const isToday = ds === today;
+              const isPast = ds < today;
               return (
                 <th
                   key={ds}
                   className={`min-w-[42px] p-1 text-xs font-medium ${
-                    isToday ? "text-blue-600" : "text-slate-600"
+                    isPast ? "text-slate-300" : isToday ? "text-blue-600" : "text-slate-600"
                   }`}
                 >
                   <div>{WEEKDAY_LABELS[d.getDay()]}</div>

@@ -399,11 +399,12 @@ export default function BookingWizard() {
             </div>
           )}
 
-          {/* 週切替 */}
+          {/* 週切替（今週より前へは戻れない） */}
           <div className="mb-2 flex items-center justify-between">
             <button
               onClick={() => setWeekStart(addDays(weekStart, -7))}
-              className="rounded-md px-3 py-1 text-sm text-slate-600 active:bg-slate-100"
+              disabled={toDateStr(weekStart) <= toDateStr(startOfWeek(new Date()))}
+              className="rounded-md px-3 py-1 text-sm text-slate-600 active:bg-slate-100 disabled:opacity-30"
             >
               ‹ 前の週
             </button>
