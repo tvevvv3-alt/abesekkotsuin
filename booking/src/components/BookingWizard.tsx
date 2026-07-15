@@ -226,23 +226,28 @@ export default function BookingWizard() {
               <button
                 key={s.id}
                 onClick={() => pickService(s.id)}
-                className="flex w-full items-center justify-between rounded-xl border border-slate-200 p-4 text-left active:bg-slate-50"
+                className={`flex w-full items-center justify-between rounded-xl border p-4 text-left active:bg-slate-50 ${
+                  s.recommended
+                    ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200"
+                    : "border-slate-200"
+                }`}
               >
                 <div>
-                  <div className="font-bold text-slate-800">{s.name}</div>
-                  {s.description && (
-                    <div className="mt-0.5 text-xs text-slate-500">{s.description}</div>
-                  )}
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {s.steps.map((st) => (
-                      <span
-                        key={st.id}
-                        className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
-                      >
-                        {st.name}
-                        {st.duration_min}分
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">{s.name}</span>
+                    {s.recommended && (
+                      <span className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                        イチオシ
                       </span>
-                    ))}
+                    )}
+                  </div>
+                  {s.description && (
+                    <div className="mt-1 text-xs leading-relaxed text-slate-500">
+                      {s.description}
+                    </div>
+                  )}
+                  <div className="mt-1 text-[11px] text-slate-400">
+                    所要 約{totalDuration(s.steps)}分
                   </div>
                 </div>
                 <span className="ml-2 shrink-0 text-slate-300">›</span>
@@ -402,20 +407,15 @@ export default function BookingWizard() {
             <Row label="電話番号" value={phone} />
           </dl>
 
-          {/* 工程の内訳 */}
-          <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-            <div className="mb-1 font-bold">当日の流れ</div>
-            {buildTimeline(service, selected.startMin).map((t, i) => (
-              <div key={i} className="flex justify-between py-0.5">
-                <span>
-                  {minToLabel(t.start)}–{minToLabel(t.end)}
-                </span>
-                <span>
-                  {t.name}
-                  {t.usesStaff ? "（担当者）" : t.equipment ? "（機器）" : ""}
-                </span>
-              </div>
-            ))}
+          {/* 来院〜終了の目安（工程の内訳は患者には表示しない）*/}
+          <div className="mt-3 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <span className="font-bold">
+              ご来院 {minToLabel(selected.startMin)}
+            </span>
+            <span className="text-blue-700">
+              終了予定 {minToLabel(selected.startMin + totalDuration(service.steps))}
+              （約{totalDuration(service.steps)}分）
+            </span>
           </div>
 
           {submitError && (
@@ -475,21 +475,6 @@ function formatSelected(sel: { date: string; startMin: number }): string {
   return `${d.getMonth() + 1}/${d.getDate()}（${WEEKDAY_LABELS[d.getDay()]}）${minToLabel(
     sel.startMin
   )}`;
-}
-
-function buildTimeline(service: ServiceWithSteps, startMin: number) {
-  let cursor = startMin;
-  return service.steps.map((st) => {
-    const seg = {
-      name: st.name,
-      start: cursor,
-      end: cursor + st.duration_min,
-      usesStaff: st.uses_staff,
-      equipment: st.equipment_id,
-    };
-    cursor += st.duration_min;
-    return seg;
-  });
 }
 
 function StepBar({ step }: { step: Step }) {

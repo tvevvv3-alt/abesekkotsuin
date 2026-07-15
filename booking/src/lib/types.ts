@@ -23,6 +23,7 @@ export interface Service {
   name: string;
   description: string | null;
   active: boolean;
+  recommended: boolean; // イチオシ表示
   sort_order: number;
 }
 

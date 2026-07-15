@@ -50,12 +50,33 @@ begin
       (s_id, 2, '施術',     30, true,  null,  1);
   end if;
 
-  -- 施術30分 → 全身通電20分（担当者→機器）
-  if not exists (select 1 from public.services where name = '施術30分→全身通電20分') then
-    insert into public.services (name, description, sort_order) values ('施術30分→全身通電20分', '施術のあとに全身通電(ハイチャージ)20分', 3) returning id into s_id;
+  -- 施術30分＋全身通電20分（イチオシ）
+  --   患者への表示名は「施術30分＋全身通電20分」。
+  --   ただし内部の工程は必ず「全身通電20分（機器）→ 施術30分（担当者）」の順で管理する。
+  if not exists (select 1 from public.services where name = '施術30分＋全身通電20分') then
+    insert into public.services (name, description, recommended, sort_order)
+    values (
+      '施術30分＋全身通電20分',
+      'まず20分間の全身通電（ハイチャージ）で細胞を活性化し、その後30分間の施術で身体を整えます。身体を整えやすい状態を作ってから施術を行うことで、より効率的なコンディショニングと回復を目指す当院おすすめのメニューです。',
+      true, 0
+    ) returning id into s_id;
+    -- 内部工程：全身通電20分（機器・4名まで）→ 施術30分（担当者）
     insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
-      (s_id, 1, '施術',     30, true,  null,  1),
-      (s_id, 2, '全身通電', 20, false, eq_hc, 1);
+      (s_id, 1, '全身通電', 20, false, eq_hc, 1),
+      (s_id, 2, '施術',     30, true,  null,  1);
+  end if;
+  -- 旧メニュー（施術30分→全身通電20分）が残っていれば新仕様へ置き換える
+  if exists (select 1 from public.services where name = '施術30分→全身通電20分') then
+    update public.services
+       set name = '施術30分＋全身通電20分',
+           description = 'まず20分間の全身通電（ハイチャージ）で細胞を活性化し、その後30分間の施術で身体を整えます。身体を整えやすい状態を作ってから施術を行うことで、より効率的なコンディショニングと回復を目指す当院おすすめのメニューです。',
+           recommended = true, sort_order = 0
+     where name = '施術30分→全身通電20分'
+     returning id into s_id;
+    delete from public.service_steps where service_id = s_id;
+    insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
+      (s_id, 1, '全身通電', 20, false, eq_hc, 1),
+      (s_id, 2, '施術',     30, true,  null,  1);
   end if;
 
   -- 施術60分（担当者のみ）

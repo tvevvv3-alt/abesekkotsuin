@@ -67,9 +67,12 @@ create table if not exists public.services (
   name        text not null,
   description text,
   active      boolean not null default true,
+  recommended boolean not null default false, -- イチオシ表示
   sort_order  int  not null default 0,
   created_at  timestamptz not null default now()
 );
+-- 既存インストール向け（過去に schema.sql を実行済みの場合）
+alter table public.services add column if not exists recommended boolean not null default false;
 
 -- =====================================================================
 --  工程テンプレート（service_steps）: メニューを構成する工程

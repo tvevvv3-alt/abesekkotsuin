@@ -31,6 +31,7 @@ export default function ServicesAdmin() {
   const [editing, setEditing] = useState<ServiceWithSteps | "new" | null>(null);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
+  const [rec, setRec] = useState(false);
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep()]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +55,7 @@ export default function ServicesAdmin() {
     setEditing("new");
     setName("");
     setDesc("");
+    setRec(false);
     setSteps([emptyStep()]);
     setError(null);
   }
@@ -62,6 +64,7 @@ export default function ServicesAdmin() {
     setEditing(s);
     setName(s.name);
     setDesc(s.description || "");
+    setRec(s.recommended);
     setSteps(
       s.steps.map((st) => ({
         name: st.name,
@@ -101,7 +104,8 @@ export default function ServicesAdmin() {
           .insert({
             name: name.trim(),
             description: desc.trim() || null,
-            sort_order: services.length + 1,
+            recommended: rec,
+            sort_order: rec ? 0 : services.length + 1,
           })
           .select("id")
           .single();
@@ -111,7 +115,7 @@ export default function ServicesAdmin() {
         serviceId = editing.id;
         const { error } = await supabase
           .from("services")
-          .update({ name: name.trim(), description: desc.trim() || null })
+          .update({ name: name.trim(), description: desc.trim() || null, recommended: rec })
           .eq("id", serviceId);
         if (error) throw new Error(error.message);
         await supabase.from("service_steps").delete().eq("service_id", serviceId);
@@ -175,6 +179,11 @@ export default function ServicesAdmin() {
               <div>
                 <div className="font-bold text-slate-800">
                   {s.name}{" "}
+                  {s.recommended && (
+                    <span className="rounded-full bg-blue-600 px-2 py-0.5 align-middle text-[10px] font-bold text-white">
+                      イチオシ
+                    </span>
+                  )}{" "}
                   <span className="text-xs font-normal text-slate-400">
                     約{totalDuration(s.steps)}分
                   </span>
@@ -228,14 +237,25 @@ export default function ServicesAdmin() {
               placeholder="メニュー名（例: 全身通電30分→施術30分）"
               className="mb-2 w-full rounded-md border px-2 py-1.5 text-sm"
             />
-            <input
+            <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               placeholder="説明（任意）"
-              className="mb-3 w-full rounded-md border px-2 py-1.5 text-sm"
+              rows={3}
+              className="mb-2 w-full rounded-md border px-2 py-1.5 text-sm"
             />
+            <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={rec}
+                onChange={(e) => setRec(e.target.checked)}
+              />
+              イチオシとして表示（一覧で強調・先頭に表示）
+            </label>
 
-            <div className="mb-1 text-xs font-bold text-slate-600">工程</div>
+            <div className="mb-1 text-xs font-bold text-slate-600">
+              工程（患者には表示されません。予約判定はこの順番で行います）
+            </div>
             <div className="space-y-2">
               {steps.map((st, i) => (
                 <div key={i} className="rounded-lg border p-2">
