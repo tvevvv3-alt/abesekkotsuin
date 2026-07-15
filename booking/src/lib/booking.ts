@@ -246,7 +246,7 @@ export function classSlot(
 
   const closed = closures.some(
     (c) =>
-      c.staff_id === null &&
+      ((c.staff_id === null && c.service_id === null) || c.service_id === serviceId) &&
       (c.start_min === null ||
         overlap(c.start_min, c.end_min as number, startMin, endMin))
   );

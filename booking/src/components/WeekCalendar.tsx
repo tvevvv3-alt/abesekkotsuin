@@ -140,7 +140,8 @@ export default function WeekCalendar({
           weekday,
           schedules: daySchedules,
           closures: dayClosures.filter(
-            (c) => c.staff_id === null || c.staff_id === staffId
+            (c) =>
+              c.service_id === null && (c.staff_id === null || c.staff_id === staffId)
           ),
           staffSteps: dayApptSteps.filter(
             (a) => a.uses_staff && a.staff_id === staffId

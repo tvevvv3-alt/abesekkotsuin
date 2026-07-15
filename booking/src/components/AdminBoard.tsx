@@ -145,7 +145,9 @@ export default function AdminBoard() {
   // 当該担当者に効く休診（院全体 or 個別）をバンド化
   function closureBands(staffId: string): ClosureBand[] {
     return closures
-      .filter((c) => c.staff_id === null || c.staff_id === staffId)
+      .filter(
+        (c) => c.service_id === null && (c.staff_id === null || c.staff_id === staffId)
+      )
       .map((c) => ({
         id: c.id,
         start: c.start_min ?? minMin,
@@ -408,7 +410,11 @@ export default function AdminBoard() {
                 ticks={ticks}
                 offRanges={[]}
                 closureBands={closures
-                  .filter((c) => c.staff_id === null)
+                  .filter(
+                    (c) =>
+                      (c.staff_id === null && c.service_id === null) ||
+                      c.service_id === cls.id
+                  )
                   .map((c) => ({
                     id: c.id,
                     start: c.start_min ?? minMin,

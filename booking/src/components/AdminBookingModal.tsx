@@ -122,7 +122,9 @@ export default function AdminBookingModal({
           date: theDate,
           weekday,
           schedules: daySchedules,
-          closures: cl.filter((c) => c.staff_id === null || c.staff_id === staffId),
+          closures: cl.filter(
+            (c) => c.service_id === null && (c.staff_id === null || c.staff_id === staffId)
+          ),
           staffSteps: ap.filter((a) => a.uses_staff && a.staff_id === staffId),
           equipmentSteps: ap.filter((a) => a.equipment_id !== null),
           equipmentById: equipmentById as Record<string, Equipment>,

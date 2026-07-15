@@ -204,6 +204,8 @@ create table if not exists public.closures (
   created_at timestamptz not null default now()
 );
 create index if not exists closures_date_idx on public.closures (date);
+-- 特定メニュー（体幹教室など）だけの休み。NULL=メニュー限定でない
+alter table public.closures add column if not exists service_id uuid references public.services(id) on delete cascade;
 
 -- =====================================================================
 --  予約（appointments）: 患者から見た1件の予約
@@ -325,10 +327,11 @@ begin
     ) then
       return jsonb_build_object('ok', false, 'reason', '営業時間外');
     end if;
-    -- 院全体休診のみ考慮（個々の担当者の休みはクラスに影響しない）
+    -- 院全体休診 or このメニュー限定の休み（個々の担当者の休みはクラスに影響しない）
     if exists (
       select 1 from closures c
-       where c.date = p_date and c.staff_id is null
+       where c.date = p_date
+         and ((c.staff_id is null and c.service_id is null) or c.service_id = p_service_id)
          and (c.start_min is null or (c.start_min < v_end and c.end_min > p_start_min))
     ) then
       return jsonb_build_object('ok', false, 'reason', '休診');
@@ -357,9 +360,11 @@ begin
   end if;
 
   -- ④ 休診でない（院全体休診 / 当該担当者の休み。終日 or 時間帯）
+  --    メニュー限定の休み(service_id有り)は通常施術には影響しない
   if exists (
     select 1 from closures c
      where c.date = p_date
+       and c.service_id is null
        and (c.staff_id is null or c.staff_id = p_staff_id)
        and (
          (c.start_min is null)                       -- 終日

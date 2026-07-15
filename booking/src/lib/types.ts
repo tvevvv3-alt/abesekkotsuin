@@ -92,6 +92,7 @@ export interface Closure {
   id: string;
   date: string; // YYYY-MM-DD
   staff_id: string | null; // null=院全体
+  service_id: string | null; // メニュー限定の休み（体幹教室など）。null=限定なし
   start_min: number | null; // null=終日
   end_min: number | null;
   reason: string | null;
