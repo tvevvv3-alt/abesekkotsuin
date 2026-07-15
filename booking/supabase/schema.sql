@@ -95,6 +95,9 @@ alter table public.services add column if not exists published     boolean not n
 alter table public.services add column if not exists new_booking   boolean not null default true; -- 新規受付ON/OFF（体幹教室の新規停止など）
 alter table public.services add column if not exists image_path    text;    -- メニュー画像
 alter table public.services add column if not exists note          text;
+-- 定員制クラス等で開始時刻を固定する場合の候補（"分"のカンマ区切り。例 体幹=1020,1080,1170）
+-- 空なら受付時間内の30分刻みすべてを候補にする。曜日ごとの回数変更は休診設定で調整。
+alter table public.services add column if not exists class_starts  text;
 
 -- =====================================================================
 --  工程テンプレート（service_steps）: メニューを構成する工程
@@ -127,6 +130,17 @@ create table if not exists public.staff_services (
   primary key (staff_id, service_id)
 );
 create index if not exists staff_services_service_idx on public.staff_services (service_id);
+
+-- =====================================================================
+--  料金（service_prices）: スタッフ別・初診/再診。コードに固定せずDB管理。
+-- =====================================================================
+create table if not exists public.service_prices (
+  service_id    uuid not null references public.services(id) on delete cascade,
+  staff_id      uuid not null references public.staff(id) on delete cascade,
+  initial_price int,  -- 初診（円）
+  repeat_price  int,  -- 再診（円）
+  primary key (service_id, staff_id)
+);
 
 -- =====================================================================
 --  勤務時間（staff_schedules）: 曜日ごとの勤務時間帯
@@ -521,6 +535,7 @@ alter table public.equipment         enable row level security;
 alter table public.services          enable row level security;
 alter table public.service_steps     enable row level security;
 alter table public.staff_services    enable row level security;
+alter table public.service_prices    enable row level security;
 alter table public.staff_schedules   enable row level security;
 alter table public.closures          enable row level security;
 alter table public.appointments      enable row level security;
@@ -538,6 +553,8 @@ drop policy if exists service_steps_public_read on public.service_steps;
 create policy service_steps_public_read on public.service_steps for select using (true);
 drop policy if exists staff_services_public_read on public.staff_services;
 create policy staff_services_public_read on public.staff_services for select using (true);
+drop policy if exists service_prices_public_read on public.service_prices;
+create policy service_prices_public_read on public.service_prices for select using (true);
 drop policy if exists schedules_public_read on public.staff_schedules;
 create policy schedules_public_read on public.staff_schedules for select using (true);
 drop policy if exists closures_public_read on public.closures;
@@ -554,7 +571,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'staff','patients','equipment','services','service_steps','staff_services',
+    'staff','patients','equipment','services','service_steps','staff_services','service_prices',
     'staff_schedules','closures','appointments','appointment_steps'
   ] loop
     execute format('drop policy if exists %I on public.%I', t||'_staff_all', t);

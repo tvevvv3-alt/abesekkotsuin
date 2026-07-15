@@ -131,9 +131,11 @@ begin
   end if;
 end $$;
 
--- 体幹教室：HP実データ（17:00〜19:30・小3〜中学生・少人数4名）に説明を更新
+-- 体幹教室：HP実データ（開始 17:00/18:00/19:30 の3回・小3〜中学生・少人数4名）
+--   1020=17:00 / 1080=18:00 / 1170=19:30。曜日により2回/1回の日は休診設定で調整。
 update public.services
-   set description = '体幹トレーニング指導（定員4名のグループレッスン・小3〜中学生対象）。月〜土 17:00〜19:30 開催。'
+   set description = '体幹トレーニング指導（定員4名のグループレッスン・小3〜中学生対象）。開始 17:00／18:00／19:30（曜日により回数が変わります）。',
+       class_starts = '1020,1080,1170'
  where name = '体幹教室';
 
 -- ---------- 勤務時間（HP実データ：茨木本院 月〜土, 午前/午後の2枠）------
@@ -218,11 +220,41 @@ begin
   select id into m_kw   from public.services where name='川西整体院' limit 1;
 
   insert into public.staff_services (staff_id, service_id) values
-    (abe,m_ichi),(abe,m_s30),(abe,m_s60),(abe,m_out),
+    (abe,m_ichi),(abe,m_s30),(abe,m_s60),(abe,m_out),(abe,m_kw),
     (sby,m_ichi),(sby,m_s30),(sby,m_s60),(sby,m_out),
-    (hgw,m_ichi),(hgw,m_s30),(hgw,m_s60),
-    (hys,m_s30),(hys,m_tk),
-    (abe,m_kw)
+    (hgw,m_ichi),(hgw,m_s30),(hgw,m_s60),(hgw,m_tk),
+    (hys,m_ichi),(hys,m_s30),(hys,m_s60),(hys,m_tk)
+  on conflict do nothing;
+end $$;
+
+-- ---------- 料金（HP実データ。スタッフ別・初診/再診）------------------
+--  施術30分＋全身通電20分 は「施術30分＋一般¥3,300」で算出。
+--  林は萩原と同額。川西整体院は一律（初診¥12,000/再診¥10,000）。
+--  時間外予約(加算)・体幹教室(月額)は別体系のため未登録。
+do $$
+declare
+  abe uuid; sby uuid; hgw uuid; hys uuid;
+  m_ichi uuid; m_s30 uuid; m_s60 uuid; m_kw uuid;
+begin
+  if exists (select 1 from public.service_prices) then return; end if;
+  select id into abe from public.staff where name='阿部' limit 1;
+  select id into sby from public.staff where name='澁谷' limit 1;
+  select id into hgw from public.staff where name='萩原' limit 1;
+  select id into hys from public.staff where name='林'   limit 1;
+  select id into m_ichi from public.services where name='施術30分＋全身通電20分' limit 1;
+  select id into m_s30  from public.services where name='施術30分' limit 1;
+  select id into m_s60  from public.services where name='施術60分' limit 1;
+  select id into m_kw   from public.services where name='川西整体院' limit 1;
+
+  insert into public.service_prices (service_id, staff_id, initial_price, repeat_price) values
+    -- 施術30分
+    (m_s30, abe, 7700, 5500),(m_s30, sby, 7150, 4950),(m_s30, hgw, 6600, 4400),(m_s30, hys, 6600, 4400),
+    -- 施術60分
+    (m_s60, abe, 13200, 11000),(m_s60, sby, 12100, 10000),(m_s60, hgw, 11000, 8800),(m_s60, hys, 11000, 8800),
+    -- 施術30分＋全身通電20分（＝施術30分＋一般¥3,300）
+    (m_ichi, abe, 11000, 8800),(m_ichi, sby, 10450, 8250),(m_ichi, hgw, 9900, 7700),(m_ichi, hys, 9900, 7700),
+    -- 川西整体院（一律）
+    (m_kw, abe, 12000, 10000)
   on conflict do nothing;
 end $$;
 

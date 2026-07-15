@@ -24,6 +24,7 @@ interface Props {
   serviceId: string;
   serviceSteps: ServiceStep[];
   capacity: number; // 1=通常 / 2以上=定員制クラス
+  classStarts?: number[]; // クラスの開始時刻を固定する場合（分）
   staffId: string;
   weekStart: Date; // 月曜
   schedules: StaffSchedule[]; // 通常=当該担当者 / クラス=全担当者
@@ -47,6 +48,7 @@ export default function WeekCalendar({
   serviceId,
   serviceSteps,
   capacity,
+  classStarts,
   staffId,
   weekStart,
   schedules,
@@ -83,6 +85,10 @@ export default function WeekCalendar({
         if (!inAnyShift) return { kind: "off" };
 
         if (isClass) {
+          // 開始時刻が固定されているクラスは、その時刻以外は表示しない
+          if (classStarts && classStarts.length > 0 && !classStarts.includes(t)) {
+            return { kind: "off" };
+          }
           const r = classSlot(
             serviceId,
             capacity,
@@ -125,6 +131,7 @@ export default function WeekCalendar({
     serviceId,
     serviceSteps,
     capacity,
+    classStarts,
     isClass,
     equipmentById,
   ]);

@@ -6,9 +6,10 @@ import {
   loadAllServices,
   loadAllStaff,
   loadEquipment,
+  loadServicePrices,
   loadStaffServices,
 } from "@/lib/data";
-import type { Equipment, ServiceWithSteps, Staff } from "@/lib/types";
+import type { Equipment, ServicePrice, ServiceWithSteps, Staff } from "@/lib/types";
 import { totalDuration } from "@/lib/booking";
 
 const CATEGORIES = ["施術メニュー", "体幹教室", "川西整体院", "その他"];
@@ -37,6 +38,9 @@ export default function ServicesAdmin() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
+  const [prices, setPrices] = useState<ServicePrice[]>([]);
+  // 編集中メニューの料金 { staffId: {ini, rep} }
+  const [priceMap, setPriceMap] = useState<Record<string, { ini: string; rep: string }>>({});
   const [loading, setLoading] = useState(true);
 
   const [editing, setEditing] = useState<ServiceWithSteps | "new" | null>(null);
@@ -55,16 +59,18 @@ export default function ServicesAdmin() {
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [sv, eq, st, ls] = await Promise.all([
+    const [sv, eq, st, ls, pr] = await Promise.all([
       loadAllServices(supabase),
       loadEquipment(supabase),
       loadAllStaff(supabase),
       loadStaffServices(supabase),
+      loadServicePrices(supabase),
     ]);
     setServices(sv);
     setEquipment(eq);
     setStaff(st.filter((s) => s.status !== "retired"));
     setLinks(ls);
+    setPrices(pr);
     setLoading(false);
   }, [supabase]);
 
@@ -83,6 +89,7 @@ export default function ServicesAdmin() {
     setPublished(true);
     setNewBooking(true);
     setStaffIds(new Set());
+    setPriceMap({});
     setSteps([emptyStep()]);
     setError(null);
   }
@@ -98,6 +105,16 @@ export default function ServicesAdmin() {
     setPublished(s.published);
     setNewBooking(s.new_booking);
     setStaffIds(new Set(links.filter((l) => l.service_id === s.id).map((l) => l.staff_id)));
+    const pm: Record<string, { ini: string; rep: string }> = {};
+    prices
+      .filter((p) => p.service_id === s.id)
+      .forEach((p) => {
+        pm[p.staff_id] = {
+          ini: p.initial_price != null ? String(p.initial_price) : "",
+          rep: p.repeat_price != null ? String(p.repeat_price) : "",
+        };
+      });
+    setPriceMap(pm);
     setSteps(
       s.steps.map((st) => ({
         name: st.name,
@@ -185,6 +202,18 @@ export default function ServicesAdmin() {
       await supabase.from("staff_services").delete().eq("service_id", serviceId);
       const linkRows = [...staffIds].map((staff_id) => ({ staff_id, service_id: serviceId }));
       if (linkRows.length) await supabase.from("staff_services").insert(linkRows);
+
+      // 料金（対応スタッフのうち入力があるものだけ）を作り直し
+      await supabase.from("service_prices").delete().eq("service_id", serviceId);
+      const priceRows = [...staffIds]
+        .map((staff_id) => {
+          const p = priceMap[staff_id];
+          const ini = p && p.ini !== "" ? parseInt(p.ini, 10) : null;
+          const rep = p && p.rep !== "" ? parseInt(p.rep, 10) : null;
+          return { service_id: serviceId, staff_id, initial_price: ini, repeat_price: rep };
+        })
+        .filter((r) => r.initial_price != null || r.repeat_price != null);
+      if (priceRows.length) await supabase.from("service_prices").insert(priceRows);
 
       setEditing(null);
       await reload();
@@ -341,6 +370,34 @@ export default function ServicesAdmin() {
                 ))}
               </div>
             </div>
+            {/* 料金（スタッフ別・初診/再診）*/}
+            {capacity === 1 && staffIds.size > 0 && (
+              <div className="mb-2">
+                <span className="mb-1 block text-xs font-bold text-slate-600">料金（円・スタッフ別）</span>
+                <div className="space-y-1">
+                  {staff
+                    .filter((s) => staffIds.has(s.id))
+                    .map((s) => {
+                      const p = priceMap[s.id] || { ini: "", rep: "" };
+                      const set = (patch: Partial<{ ini: string; rep: string }>) =>
+                        setPriceMap((prev) => ({ ...prev, [s.id]: { ...p, ...patch } }));
+                      return (
+                        <div key={s.id} className="flex items-center gap-2 text-xs">
+                          <span className="w-12 shrink-0">{s.display_name || s.name}</span>
+                          <label className="flex items-center gap-1">初診
+                            <input type="number" value={p.ini} onChange={(e) => set({ ini: e.target.value })}
+                              className="w-20 rounded border px-1.5 py-1" />
+                          </label>
+                          <label className="flex items-center gap-1">再診
+                            <input type="number" value={p.rep} onChange={(e) => set({ rep: e.target.value })}
+                              className="w-20 rounded border px-1.5 py-1" />
+                          </label>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
             <label className="mb-2 flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"

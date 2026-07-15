@@ -4,6 +4,7 @@ import type {
   AppointmentStep,
   Closure,
   Equipment,
+  ServicePrice,
   ServiceWithSteps,
   Staff,
   StaffSchedule,
@@ -65,6 +66,13 @@ export async function loadStaffServices(
   sb: SupabaseClient
 ): Promise<{ staff_id: string; service_id: string }[]> {
   const { data, error } = await sb.from("staff_services").select("staff_id, service_id");
+  if (error) throw error;
+  return data ?? [];
+}
+
+// 料金（スタッフ別・初診/再診）
+export async function loadServicePrices(sb: SupabaseClient): Promise<ServicePrice[]> {
+  const { data, error } = await sb.from("service_prices").select("*");
   if (error) throw error;
   return data ?? [];
 }

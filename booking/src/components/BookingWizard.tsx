@@ -8,6 +8,7 @@ import {
   loadClosures,
   loadEquipment,
   loadSchedules,
+  loadServicePrices,
   loadServices,
   loadStaffServices,
 } from "@/lib/data";
@@ -16,6 +17,7 @@ import type {
   Closure,
   Equipment,
   SavedPatient,
+  ServicePrice,
   ServiceWithSteps,
   Staff,
   StaffSchedule,
@@ -43,6 +45,7 @@ export default function BookingWizard() {
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
   const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
+  const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [masterError, setMasterError] = useState<string | null>(null);
@@ -75,6 +78,22 @@ export default function BookingWizard() {
 
   const service = services.find((s) => s.id === serviceId) || null;
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
+
+  // クラスの開始時刻固定（体幹=17:00/18:00/19:30）
+  const classStarts = useMemo(() => {
+    if (!service?.class_starts) return undefined;
+    const arr = service.class_starts
+      .split(",")
+      .map((x) => parseInt(x.trim(), 10))
+      .filter((n) => !isNaN(n));
+    return arr.length ? arr : undefined;
+  }, [service]);
+
+  // 選択メニュー×担当者の料金（初診/再診）
+  const selectedPrice = useMemo(() => {
+    if (!service || isClass || !staffId) return null;
+    return prices.find((p) => p.service_id === service.id && p.staff_id === staffId) || null;
+  }, [service, isClass, prices, staffId]);
 
   // 患者に見せられるメニュー（公開中）。カテゴリーで絞り込み。
   const publicServices = useMemo(
@@ -117,15 +136,17 @@ export default function BookingWizard() {
   useEffect(() => {
     (async () => {
       try {
-        const [sv, st, ls, eq] = await Promise.all([
+        const [sv, st, ls, pr, eq] = await Promise.all([
           loadServices(supabase),
           loadAllStaff(supabase),
           loadStaffServices(supabase),
+          loadServicePrices(supabase),
           loadEquipment(supabase),
         ]);
         setServices(sv);
         setAllStaff(st);
         setLinks(ls);
+        setPrices(pr);
         setEquipment(eq);
       } catch (e) {
         setMasterError(e instanceof Error ? e.message : "読み込みに失敗しました");
@@ -404,6 +425,7 @@ export default function BookingWizard() {
               serviceId={service.id}
               serviceSteps={service.steps}
               capacity={service.capacity}
+              classStarts={classStarts}
               staffId={staffId}
               weekStart={weekStart}
               schedules={schedules}
@@ -506,6 +528,13 @@ export default function BookingWizard() {
             <Row label="フリガナ" value={kana || "—"} />
             <Row label="生年月日" value={birth || "—"} />
             <Row label="電話番号" value={phone} />
+            {selectedPrice &&
+              (selectedPrice.initial_price || selectedPrice.repeat_price) && (
+                <Row
+                  label="料金"
+                  value={`初診 ¥${(selectedPrice.initial_price ?? 0).toLocaleString()} / 再診 ¥${(selectedPrice.repeat_price ?? 0).toLocaleString()}`}
+                />
+              )}
           </dl>
 
           {/* 来院〜終了の目安（工程の内訳は患者には表示しない）*/}

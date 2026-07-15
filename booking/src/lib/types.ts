@@ -27,6 +27,14 @@ export interface StaffService {
   service_id: string;
 }
 
+// 料金（スタッフ別・初診/再診）
+export interface ServicePrice {
+  service_id: string;
+  staff_id: string;
+  initial_price: number | null;
+  repeat_price: number | null;
+}
+
 export interface Equipment {
   id: string;
   name: string;
@@ -51,6 +59,7 @@ export interface Service {
   new_booking: boolean; // 新規受付ON/OFF
   image_path: string | null;
   note: string | null;
+  class_starts: string | null; // 開始時刻を固定する場合（"分"カンマ区切り）
 }
 
 // メニューを構成する工程テンプレート
