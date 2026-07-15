@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
+  loadAllStaff,
   loadAppointmentSteps,
   loadClosures,
   loadEquipment,
   loadSchedules,
   loadServices,
-  loadStaff,
+  loadStaffServices,
 } from "@/lib/data";
 import type {
   AppointmentStep,
@@ -40,10 +41,14 @@ export default function BookingWizard() {
 
   // マスタ
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
-  const [staff, setStaff] = useState<Staff[]>([]);
+  const [allStaff, setAllStaff] = useState<Staff[]>([]);
+  const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [masterError, setMasterError] = useState<string | null>(null);
+
+  // カテゴリー絞り込み
+  const [category, setCategory] = useState<string>("all");
 
   // 選択
   const [serviceId, setServiceId] = useState<string>("");
@@ -69,22 +74,59 @@ export default function BookingWizard() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const service = services.find((s) => s.id === serviceId) || null;
-  const selectedStaff = staff.find((s) => s.id === staffId) || null;
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
+
+  // 患者に見せられるメニュー（公開中）。カテゴリーで絞り込み。
+  const publicServices = useMemo(
+    () => services.filter((s) => s.published),
+    [services]
+  );
+  const categories = useMemo(() => {
+    const set: string[] = [];
+    publicServices.forEach((s) => {
+      if (!set.includes(s.category)) set.push(s.category);
+    });
+    return set;
+  }, [publicServices]);
+  const shownServices = useMemo(
+    () =>
+      category === "all"
+        ? publicServices
+        : publicServices.filter((s) => s.category === category),
+    [publicServices, category]
+  );
+
+  // 選択メニューに対応できるスタッフ（患者表示・受付中・在籍中のみ）
+  const capableStaff = useMemo(() => {
+    if (!service) return [];
+    const ids = new Set(
+      links.filter((l) => l.service_id === service.id).map((l) => l.staff_id)
+    );
+    return allStaff.filter(
+      (s) =>
+        ids.has(s.id) &&
+        s.patient_visible &&
+        s.bookable &&
+        s.status === "active"
+    );
+  }, [service, links, allStaff]);
+
+  const selectedStaff = allStaff.find((s) => s.id === staffId) || null;
 
   // ---- マスタ読み込み ----
   useEffect(() => {
     (async () => {
       try {
-        const [sv, st, eq] = await Promise.all([
+        const [sv, st, ls, eq] = await Promise.all([
           loadServices(supabase),
-          loadStaff(supabase),
+          loadAllStaff(supabase),
+          loadStaffServices(supabase),
           loadEquipment(supabase),
         ]);
         setServices(sv);
-        setStaff(st);
+        setAllStaff(st);
+        setLinks(ls);
         setEquipment(eq);
-        if (st.length > 0) setStaffId(st[0].id);
       } catch (e) {
         setMasterError(e instanceof Error ? e.message : "読み込みに失敗しました");
       } finally {
@@ -144,8 +186,16 @@ export default function BookingWizard() {
   }
 
   function pickService(id: string) {
+    const svc = services.find((s) => s.id === id);
+    if (svc && !svc.new_booking) return; // 新規受付停止メニューは選択不可
     setServiceId(id);
     setSelected(null);
+    // 対応できるスタッフの先頭を初期選択（クラスは担当者を使わない）
+    const ids = new Set(links.filter((l) => l.service_id === id).map((l) => l.staff_id));
+    const first = allStaff.find(
+      (s) => ids.has(s.id) && s.patient_visible && s.bookable && s.status === "active"
+    );
+    setStaffId(first?.id || "");
     setStep(2);
   }
 
@@ -224,38 +274,64 @@ export default function BookingWizard() {
       {/* ① メニュー選択 */}
       {step === 1 && (
         <Section title="メニューを選ぶ">
+          {/* カテゴリー絞り込み */}
+          {categories.length > 1 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <CatBtn on={category === "all"} onClick={() => setCategory("all")}>
+                すべて
+              </CatBtn>
+              {categories.map((c) => (
+                <CatBtn key={c} on={category === c} onClick={() => setCategory(c)}>
+                  {c}
+                </CatBtn>
+              ))}
+            </div>
+          )}
           <div className="space-y-2">
-            {services.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => pickService(s.id)}
-                className={`flex w-full items-center justify-between rounded-xl border p-4 text-left active:bg-slate-50 ${
-                  s.recommended
-                    ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200"
-                    : "border-slate-200"
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-800">{s.name}</span>
-                    {s.recommended && (
-                      <span className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                        イチオシ
-                      </span>
-                    )}
-                  </div>
-                  {s.description && (
-                    <div className="mt-1 text-xs leading-relaxed text-slate-500">
-                      {s.description}
+            {shownServices.map((s) => {
+              const stopped = !s.new_booking;
+              const label = s.patient_name || s.name;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => pickService(s.id)}
+                  disabled={stopped}
+                  className={`flex w-full items-center justify-between rounded-xl border p-4 text-left ${
+                    stopped
+                      ? "cursor-not-allowed border-slate-200 opacity-60"
+                      : s.recommended
+                        ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200 active:bg-slate-50"
+                        : "border-slate-200 active:bg-slate-50"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-800">{label}</span>
+                      {s.recommended && (
+                        <span className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                          イチオシ
+                        </span>
+                      )}
+                      {stopped && (
+                        <span className="shrink-0 rounded-full bg-slate-400 px-2 py-0.5 text-[10px] font-bold text-white">
+                          新規受付停止中
+                        </span>
+                      )}
                     </div>
-                  )}
-                  <div className="mt-1 text-[11px] text-slate-400">
-                    所要 約{totalDuration(s.steps)}分
+                    {s.description && (
+                      <div className="mt-1 text-xs leading-relaxed text-slate-500">
+                        {s.description}
+                      </div>
+                    )}
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      所要 約{totalDuration(s.steps)}分
+                      {s.capacity > 1 && `・定員${s.capacity}名`}
+                    </div>
                   </div>
-                </div>
-                <span className="ml-2 shrink-0 text-slate-300">›</span>
-              </button>
-            ))}
+                  {!stopped && <span className="ml-2 shrink-0 text-slate-300">›</span>}
+                </button>
+              );
+            })}
           </div>
         </Section>
       )}
@@ -267,19 +343,24 @@ export default function BookingWizard() {
           onBack={() => setStep(1)}
         >
           <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            {service.name}（所要 約{totalDuration(service.steps)}分）
+            {service.patient_name || service.name}（所要 約{totalDuration(service.steps)}分）
             {isClass && `・定員${service.capacity}名`}
           </div>
 
           {/* 担当者ボタン：押しても画面遷移せずカレンダーだけ切替。
+              このメニューに対応できるスタッフのみ表示。
               定員制クラス（体幹教室）は担当者を選ばない。 */}
           {isClass ? (
             <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
               定員{service.capacity}名のグループレッスンです。空いている時間を選んでください（残り人数を表示）。
             </div>
+          ) : capableStaff.length === 0 ? (
+            <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              このメニューに対応できる担当者が現在いません。お手数ですがお電話ください。
+            </div>
           ) : (
             <div className="mb-3 grid grid-cols-4 gap-2">
-              {staff.map((s) => {
+              {capableStaff.map((s) => {
                 const active = s.id === staffId;
                 return (
                   <button
@@ -290,7 +371,7 @@ export default function BookingWizard() {
                       backgroundColor: active ? s.color || "#334155" : "#cbd5e1",
                     }}
                   >
-                    {s.name}
+                    {s.display_name || s.name}
                   </button>
                 );
               })}
@@ -344,7 +425,9 @@ export default function BookingWizard() {
             <div className="mt-4">
               <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
                 {formatSelected(selected)}
-                {!isClass && selectedStaff ? ` / ${selectedStaff.name}` : ""}
+                {!isClass && selectedStaff
+                  ? ` / ${selectedStaff.display_name || selectedStaff.name}`
+                  : ""}
               </div>
               <button
                 onClick={() => setStep(3)}
@@ -414,8 +497,10 @@ export default function BookingWizard() {
       {step === 4 && service && selected && (
         <Section title="ご予約内容の確認" onBack={() => setStep(3)}>
           <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-            <Row label="メニュー" value={service.name} />
-            {!isClass && <Row label="担当" value={selectedStaff?.name || ""} />}
+            <Row label="メニュー" value={service.patient_name || service.name} />
+            {!isClass && (
+              <Row label="担当" value={selectedStaff?.display_name || selectedStaff?.name || ""} />
+            )}
             <Row label="日時" value={formatSelected(selected)} />
             <Row label="お名前" value={name} />
             <Row label="フリガナ" value={kana || "—"} />
@@ -461,8 +546,10 @@ export default function BookingWizard() {
             <p className="mt-2 text-sm text-slate-600">
               {formatSelected(selected)}
               <br />
-              {service.name}
-              {!isClass && selectedStaff ? ` / ${selectedStaff.name}` : ""}
+              {service.patient_name || service.name}
+              {!isClass && selectedStaff
+                ? ` / ${selectedStaff.display_name || selectedStaff.name}`
+                : ""}
             </p>
             <p className="mt-4 text-xs text-slate-400">
               ご来院時刻は {minToLabel(selected.startMin)} です。
@@ -486,6 +573,27 @@ export default function BookingWizard() {
 }
 
 // ---- 補助表示 ------------------------------------------------------
+
+function CatBtn({
+  on,
+  onClick,
+  children,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium ${
+        on ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-slate-600"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function formatSelected(sel: { date: string; startMin: number }): string {
   const d = fromDateStr(sel.date);

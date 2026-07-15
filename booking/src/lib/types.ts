@@ -1,5 +1,7 @@
 // 予約システムの型定義
 
+export type StaffStatus = "active" | "paused" | "retired" | "hidden";
+
 export interface Staff {
   id: string;
   name: string;
@@ -7,7 +9,22 @@ export interface Staff {
   active: boolean;
   color: string | null; // 担当者カラー（例: #2563eb）
   sort_order: number;
-  bookable: boolean;
+  bookable: boolean; // 予約受付ON/OFF
+  name_kana: string | null;
+  display_name: string | null; // 患者向け表示名
+  patient_visible: boolean; // 患者画面に表示
+  admin_visible: boolean; // 管理画面に表示
+  status: StaffStatus; // 在籍中/休止中/退職/非表示
+  bio: string | null;
+  image_path: string | null;
+  clinic: string | null;
+  note: string | null;
+}
+
+// スタッフ×メニュー 対応
+export interface StaffService {
+  staff_id: string;
+  service_id: string;
 }
 
 export interface Equipment {
@@ -16,6 +33,8 @@ export interface Equipment {
   capacity: number; // 同時利用人数（ハイチャージ=4）
   active: boolean;
   sort_order: number;
+  visible: boolean; // 表示ON/OFF
+  note: string | null;
 }
 
 export interface Service {
@@ -26,6 +45,12 @@ export interface Service {
   recommended: boolean; // イチオシ表示
   capacity: number; // 1=通常 / 2以上=定員制クラス（体幹教室=4）
   sort_order: number;
+  category: string; // 施術メニュー/体幹教室/川西整体院/その他
+  patient_name: string | null; // 患者向け表示名（未設定なら name）
+  published: boolean; // 公開/非公開
+  new_booking: boolean; // 新規受付ON/OFF
+  image_path: string | null;
+  note: string | null;
 }
 
 // メニューを構成する工程テンプレート
@@ -38,6 +63,7 @@ export interface ServiceStep {
   uses_staff: boolean; // 担当者を拘束するか
   equipment_id: string | null; // 使用機器
   headcount: number; // 機器の占有人数
+  patient_visible?: boolean; // 患者画面に工程を表示するか
 }
 
 // メニュー＋工程をまとめた表示用

@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
+  loadAllStaff,
   loadClosures,
   loadEquipment,
   loadSchedules,
   loadServices,
-  loadStaff,
 } from "@/lib/data";
 import type {
   Appointment,
@@ -67,12 +67,13 @@ export default function AdminBoard() {
   useEffect(() => {
     (async () => {
       const [st, eq, sv, sc] = await Promise.all([
-        loadStaff(supabase),
+        loadAllStaff(supabase),
         loadEquipment(supabase),
         loadServices(supabase),
         loadSchedules(supabase),
       ]);
-      setStaff(st);
+      // 管理画面に表示するスタッフ（退職は列から除外、過去予約は保持）
+      setStaff(st.filter((s) => s.admin_visible && s.status !== "retired"));
       setEquipment(eq);
       setServices(sv);
       setSchedules(sc);
@@ -363,7 +364,7 @@ export default function AdminBoard() {
             })}
 
             {/* 機器列（ハイチャージ等）*/}
-            {equipment.map((eq) => (
+            {equipment.filter((eq) => eq.visible).map((eq) => (
               <Column
                 key={eq.id}
                 header={`${eq.name}`}

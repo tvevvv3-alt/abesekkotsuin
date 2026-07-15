@@ -29,10 +29,20 @@ create table if not exists public.staff (
   created_at timestamptz not null default now()
 );
 
--- 予約用の付加情報（担当者カラー・並び順・受付可否）
-alter table public.staff add column if not exists color      text;
-alter table public.staff add column if not exists sort_order int  not null default 0;
-alter table public.staff add column if not exists bookable   boolean not null default true;
+-- 予約用の付加情報（担当者カラー・並び順・受付可否・表示制御・在籍状態 など）
+alter table public.staff add column if not exists color          text;
+alter table public.staff add column if not exists sort_order     int  not null default 0;
+alter table public.staff add column if not exists bookable       boolean not null default true; -- 予約受付ON/OFF
+alter table public.staff add column if not exists name_kana      text;
+alter table public.staff add column if not exists display_name   text;   -- 表示名（患者向け）
+alter table public.staff add column if not exists patient_visible boolean not null default true; -- 患者画面表示
+alter table public.staff add column if not exists admin_visible  boolean not null default true;  -- 管理画面表示
+-- 在籍状態：active(在籍中) / paused(休止中) / retired(退職) / hidden(非表示)
+alter table public.staff add column if not exists status         text not null default 'active';
+alter table public.staff add column if not exists bio            text;   -- 紹介文
+alter table public.staff add column if not exists image_path     text;   -- プロフィール画像
+alter table public.staff add column if not exists clinic         text;   -- 所属院
+alter table public.staff add column if not exists note           text;   -- 備考
 
 create table if not exists public.patients (
   id                uuid primary key default gen_random_uuid(),
@@ -58,6 +68,8 @@ create table if not exists public.equipment (
   sort_order int  not null default 0,
   created_at timestamptz not null default now()
 );
+alter table public.equipment add column if not exists visible boolean not null default true; -- 表示ON/OFF
+alter table public.equipment add column if not exists note    text;                          -- 備考
 
 -- =====================================================================
 --  メニュー（services）: 施術30分 / 全身通電30分→施術30分 など
@@ -77,6 +89,12 @@ create table if not exists public.services (
 -- 既存インストール向け（過去に schema.sql を実行済みの場合）
 alter table public.services add column if not exists recommended boolean not null default false;
 alter table public.services add column if not exists capacity int not null default 1;
+alter table public.services add column if not exists category      text not null default '施術メニュー'; -- 施術メニュー/体幹教室/川西整体院/その他
+alter table public.services add column if not exists patient_name  text;    -- 患者向け表示名（未設定なら name）
+alter table public.services add column if not exists published     boolean not null default true; -- 公開/非公開
+alter table public.services add column if not exists new_booking   boolean not null default true; -- 新規受付ON/OFF（体幹教室の新規停止など）
+alter table public.services add column if not exists image_path    text;    -- メニュー画像
+alter table public.services add column if not exists note          text;
 
 -- =====================================================================
 --  工程テンプレート（service_steps）: メニューを構成する工程
@@ -95,6 +113,20 @@ create table if not exists public.service_steps (
   unique (service_id, step_order)
 );
 create index if not exists service_steps_service_idx on public.service_steps (service_id, step_order);
+-- 工程を患者画面に表示するか（既定は非表示：患者にはメニュー名・説明のみ）
+alter table public.service_steps add column if not exists patient_visible boolean not null default false;
+
+-- =====================================================================
+--  スタッフ×メニュー 対応表（staff_services）
+--    どちらの画面（スタッフ側/メニュー側）から編集しても同じデータに反映。
+--    患者はメニュー選択後、対応可能なスタッフのみ表示する。
+-- =====================================================================
+create table if not exists public.staff_services (
+  staff_id   uuid not null references public.staff(id) on delete cascade,
+  service_id uuid not null references public.services(id) on delete cascade,
+  primary key (staff_id, service_id)
+);
+create index if not exists staff_services_service_idx on public.staff_services (service_id);
 
 -- =====================================================================
 --  勤務時間（staff_schedules）: 曜日ごとの勤務時間帯
@@ -488,6 +520,7 @@ alter table public.patients          enable row level security;
 alter table public.equipment         enable row level security;
 alter table public.services          enable row level security;
 alter table public.service_steps     enable row level security;
+alter table public.staff_services    enable row level security;
 alter table public.staff_schedules   enable row level security;
 alter table public.closures          enable row level security;
 alter table public.appointments      enable row level security;
@@ -503,6 +536,8 @@ drop policy if exists services_public_read on public.services;
 create policy services_public_read on public.services for select using (true);
 drop policy if exists service_steps_public_read on public.service_steps;
 create policy service_steps_public_read on public.service_steps for select using (true);
+drop policy if exists staff_services_public_read on public.staff_services;
+create policy staff_services_public_read on public.staff_services for select using (true);
 drop policy if exists schedules_public_read on public.staff_schedules;
 create policy schedules_public_read on public.staff_schedules for select using (true);
 drop policy if exists closures_public_read on public.closures;
@@ -519,7 +554,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'staff','patients','equipment','services','service_steps',
+    'staff','patients','equipment','services','service_steps','staff_services',
     'staff_schedules','closures','appointments','appointment_steps'
   ] loop
     execute format('drop policy if exists %I on public.%I', t||'_staff_all', t);

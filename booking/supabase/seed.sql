@@ -22,6 +22,12 @@ update public.staff set color = '#16a34a', sort_order = 2 where name = '澁谷' 
 update public.staff set color = '#7c3aed', sort_order = 3 where name = '萩原' and color is null;
 update public.staff set color = '#ea580c', sort_order = 4 where name = '林'   and color is null;
 
+-- フリガナ・表示名・在籍状態（未設定のみ）
+update public.staff set name_kana = 'アベ',    display_name = coalesce(display_name,'阿部') where name = '阿部' and name_kana is null;
+update public.staff set name_kana = 'シブヤ',  display_name = coalesce(display_name,'澁谷') where name = '澁谷' and name_kana is null;
+update public.staff set name_kana = 'ハギワラ',display_name = coalesce(display_name,'萩原') where name = '萩原' and name_kana is null;
+update public.staff set name_kana = 'ハヤシ',  display_name = coalesce(display_name,'林')   where name = '林'   and name_kana is null;
+
 -- ---------- 機器（ハイチャージ 同時4名）----------------------------
 insert into public.equipment (name, capacity, sort_order)
 select 'ハイチャージ', 4, 1
@@ -100,6 +106,29 @@ begin
     from public.services s
    where ss.service_id = s.id and s.name = '体幹教室'
      and (ss.duration_min <> 30 or ss.uses_staff = true);
+  -- 体幹教室：カテゴリー＝体幹教室 / 新規受付停止 / 患者向け表示名
+  update public.services
+     set category = '体幹教室', new_booking = false,
+         patient_name = '体幹教室【新規受付停止中】'
+   where name = '体幹教室';
+
+  -- 時間外予約（担当者のみ・施術30分）
+  if not exists (select 1 from public.services where name = '時間外予約') then
+    insert into public.services (name, description, category, sort_order)
+      values ('時間外予約',
+        '通常時間外に施術を希望する方向けです。通常枠が埋まっている場合や、施術30分＋全身通電20分・施術60分をご希望の場合は、電話またはLINEでご連絡ください。',
+        'その他', 6) returning id into s_id;
+    insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
+      (s_id, 1, '施術', 30, true, null, 1);
+  end if;
+
+  -- 川西整体院（担当者のみ・施術50分）
+  if not exists (select 1 from public.services where name = '川西整体院') then
+    insert into public.services (name, description, category, sort_order)
+      values ('川西整体院', '川西整体院での施術（50分）。予約可能日は管理画面から指定します。', '川西整体院', 7) returning id into s_id;
+    insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
+      (s_id, 1, '施術', 50, true, null, 1);
+  end if;
 end $$;
 
 -- ---------- 勤務時間（全担当者 月〜土, 午前/午後の2枠）--------------
@@ -163,6 +192,33 @@ begin
   insert into public.appointment_steps (appointment_id, step_order, name, date, start_min, end_min, uses_staff, staff_id, equipment_id, headcount) values
     (ap, 1, '全身通電', base, 660, 680, false, null, eq_hc, 1),
     (ap, 2, '施術',     base, 680, 710, true,  shibuya, null, 1);
+end $$;
+
+-- ---------- スタッフ×メニュー 対応表（初期値。既に登録があれば触らない）------
+do $$
+declare
+  abe uuid; sby uuid; hgw uuid; hys uuid;
+  m_ichi uuid; m_s30 uuid; m_s60 uuid; m_out uuid; m_tk uuid; m_kw uuid;
+begin
+  if exists (select 1 from public.staff_services) then return; end if;
+  select id into abe from public.staff where name='阿部' limit 1;
+  select id into sby from public.staff where name='澁谷' limit 1;
+  select id into hgw from public.staff where name='萩原' limit 1;
+  select id into hys from public.staff where name='林'   limit 1;
+  select id into m_ichi from public.services where name='施術30分＋全身通電20分' limit 1;
+  select id into m_s30  from public.services where name='施術30分' limit 1;
+  select id into m_s60  from public.services where name='施術60分' limit 1;
+  select id into m_out  from public.services where name='時間外予約' limit 1;
+  select id into m_tk   from public.services where name='体幹教室' limit 1;
+  select id into m_kw   from public.services where name='川西整体院' limit 1;
+
+  insert into public.staff_services (staff_id, service_id) values
+    (abe,m_ichi),(abe,m_s30),(abe,m_s60),(abe,m_out),
+    (sby,m_ichi),(sby,m_s30),(sby,m_s60),(sby,m_out),
+    (hgw,m_ichi),(hgw,m_s30),(hgw,m_s60),
+    (hys,m_s30),(hys,m_tk),
+    (abe,m_kw)
+  on conflict do nothing;
 end $$;
 
 -- ---------- デモ用休診（今週の日曜は元々休、土曜午後を院全体休診に）--

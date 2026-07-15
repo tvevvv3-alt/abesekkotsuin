@@ -2,9 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { loadEquipment, loadServices } from "@/lib/data";
-import type { Equipment, ServiceWithSteps } from "@/lib/types";
+import {
+  loadAllServices,
+  loadAllStaff,
+  loadEquipment,
+  loadStaffServices,
+} from "@/lib/data";
+import type { Equipment, ServiceWithSteps, Staff } from "@/lib/types";
 import { totalDuration } from "@/lib/booking";
+
+const CATEGORIES = ["施術メニュー", "体幹教室", "川西整体院", "その他"];
 
 interface StepDraft {
   name: string;
@@ -12,6 +19,7 @@ interface StepDraft {
   uses_staff: boolean;
   equipment_id: string; // "" = なし
   headcount: number;
+  patient_visible: boolean;
 }
 
 const emptyStep = (): StepDraft => ({
@@ -20,31 +28,43 @@ const emptyStep = (): StepDraft => ({
   uses_staff: true,
   equipment_id: "",
   headcount: 1,
+  patient_visible: false,
 });
 
 export default function ServicesAdmin() {
   const supabase = useMemo(() => createClient(), []);
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [editing, setEditing] = useState<ServiceWithSteps | "new" | null>(null);
   const [name, setName] = useState("");
+  const [patientName, setPatientName] = useState("");
   const [desc, setDesc] = useState("");
   const [rec, setRec] = useState(false);
   const [capacity, setCapacity] = useState(1); // 2以上=定員制クラス
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [published, setPublished] = useState(true);
+  const [newBooking, setNewBooking] = useState(true);
+  const [staffIds, setStaffIds] = useState<Set<string>>(new Set());
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep()]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [sv, eq] = await Promise.all([
-      loadServices(supabase),
+    const [sv, eq, st, ls] = await Promise.all([
+      loadAllServices(supabase),
       loadEquipment(supabase),
+      loadAllStaff(supabase),
+      loadStaffServices(supabase),
     ]);
     setServices(sv);
     setEquipment(eq);
+    setStaff(st.filter((s) => s.status !== "retired"));
+    setLinks(ls);
     setLoading(false);
   }, [supabase]);
 
@@ -55,9 +75,14 @@ export default function ServicesAdmin() {
   function openNew() {
     setEditing("new");
     setName("");
+    setPatientName("");
     setDesc("");
     setRec(false);
     setCapacity(1);
+    setCategory(CATEGORIES[0]);
+    setPublished(true);
+    setNewBooking(true);
+    setStaffIds(new Set());
     setSteps([emptyStep()]);
     setError(null);
   }
@@ -65,9 +90,14 @@ export default function ServicesAdmin() {
   function openEdit(s: ServiceWithSteps) {
     setEditing(s);
     setName(s.name);
+    setPatientName(s.patient_name || "");
     setDesc(s.description || "");
     setRec(s.recommended);
     setCapacity(s.capacity ?? 1);
+    setCategory(s.category || CATEGORIES[0]);
+    setPublished(s.published);
+    setNewBooking(s.new_booking);
+    setStaffIds(new Set(links.filter((l) => l.service_id === s.id).map((l) => l.staff_id)));
     setSteps(
       s.steps.map((st) => ({
         name: st.name,
@@ -75,9 +105,19 @@ export default function ServicesAdmin() {
         uses_staff: st.uses_staff,
         equipment_id: st.equipment_id || "",
         headcount: st.headcount,
+        patient_visible: st.patient_visible ?? false,
       }))
     );
     setError(null);
+  }
+
+  function toggleStaff(id: string) {
+    setStaffIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   }
 
   function updateStep(i: number, patch: Partial<StepDraft>) {
@@ -100,32 +140,28 @@ export default function ServicesAdmin() {
     setBusy(true);
     setError(null);
     try {
+      const fields = {
+        name: name.trim(),
+        patient_name: patientName.trim() || null,
+        description: desc.trim() || null,
+        recommended: rec,
+        capacity: Math.max(1, capacity),
+        category,
+        published,
+        new_booking: newBooking,
+      };
       let serviceId: string;
       if (editing === "new") {
         const { data, error } = await supabase
           .from("services")
-          .insert({
-            name: name.trim(),
-            description: desc.trim() || null,
-            recommended: rec,
-            capacity: Math.max(1, capacity),
-            sort_order: rec ? 0 : services.length + 1,
-          })
+          .insert({ ...fields, sort_order: rec ? 0 : services.length + 1 })
           .select("id")
           .single();
         if (error) throw new Error(error.message);
         serviceId = data.id;
       } else if (editing) {
         serviceId = editing.id;
-        const { error } = await supabase
-          .from("services")
-          .update({
-            name: name.trim(),
-            description: desc.trim() || null,
-            recommended: rec,
-            capacity: Math.max(1, capacity),
-          })
-          .eq("id", serviceId);
+        const { error } = await supabase.from("services").update(fields).eq("id", serviceId);
         if (error) throw new Error(error.message);
         await supabase.from("service_steps").delete().eq("service_id", serviceId);
       } else {
@@ -140,9 +176,15 @@ export default function ServicesAdmin() {
         uses_staff: s.uses_staff,
         equipment_id: s.equipment_id || null,
         headcount: s.headcount,
+        patient_visible: s.patient_visible,
       }));
       const { error: stepErr } = await supabase.from("service_steps").insert(rows);
       if (stepErr) throw new Error(stepErr.message);
+
+      // 対応可能スタッフ（staff_services）を作り直し
+      await supabase.from("staff_services").delete().eq("service_id", serviceId);
+      const linkRows = [...staffIds].map((staff_id) => ({ staff_id, service_id: serviceId }));
+      if (linkRows.length) await supabase.from("staff_services").insert(linkRows);
 
       setEditing(null);
       await reload();
@@ -153,8 +195,8 @@ export default function ServicesAdmin() {
     }
   }
 
-  async function toggleActive(s: ServiceWithSteps) {
-    await supabase.from("services").update({ active: !s.active }).eq("id", s.id);
+  async function togglePublished(s: ServiceWithSteps) {
+    await supabase.from("services").update({ published: !s.published }).eq("id", s.id);
     reload();
   }
 
@@ -182,7 +224,7 @@ export default function ServicesAdmin() {
         {services.map((s) => (
           <div
             key={s.id}
-            className={`rounded-xl border bg-white p-3 ${s.active ? "" : "opacity-50"}`}
+            className={`rounded-xl border bg-white p-3 ${s.published ? "" : "opacity-50"}`}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -198,8 +240,18 @@ export default function ServicesAdmin() {
                       定員{s.capacity}名
                     </span>
                   )}{" "}
+                  {!s.published && (
+                    <span className="rounded-full bg-slate-400 px-2 py-0.5 align-middle text-[10px] font-bold text-white">
+                      非公開
+                    </span>
+                  )}{" "}
+                  {!s.new_booking && (
+                    <span className="rounded-full bg-amber-500 px-2 py-0.5 align-middle text-[10px] font-bold text-white">
+                      新規停止
+                    </span>
+                  )}{" "}
                   <span className="text-xs font-normal text-slate-400">
-                    約{totalDuration(s.steps)}分
+                    {s.category}・約{totalDuration(s.steps)}分
                   </span>
                 </div>
                 {s.description && (
@@ -220,8 +272,8 @@ export default function ServicesAdmin() {
                 <button onClick={() => openEdit(s)} className="text-blue-600">
                   編集
                 </button>
-                <button onClick={() => toggleActive(s)} className="text-slate-500">
-                  {s.active ? "非表示" : "表示"}
+                <button onClick={() => togglePublished(s)} className="text-slate-500">
+                  {s.published ? "非公開に" : "公開する"}
                 </button>
                 <button onClick={() => remove(s)} className="text-red-500">
                   削除
@@ -245,12 +297,29 @@ export default function ServicesAdmin() {
               </button>
             </div>
 
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="メニュー名（例: 全身通電30分→施術30分）"
-              className="mb-2 w-full rounded-md border px-2 py-1.5 text-sm"
-            />
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">メニュー名（内部）</span>
+                <input value={name} onChange={(e) => setName(e.target.value)}
+                  placeholder="施術30分＋全身通電20分" className="w-full rounded-md border px-2 py-1.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">患者向け表示名（任意）</span>
+                <input value={patientName} onChange={(e) => setPatientName(e.target.value)}
+                  placeholder={name || "未設定なら内部名"} className="w-full rounded-md border px-2 py-1.5 text-sm" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">カテゴリー</span>
+                <select value={category} onChange={(e) => setCategory(e.target.value)}
+                  className="w-full rounded-md border px-2 py-1.5 text-sm">
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+              <div className="flex items-end gap-3 text-sm">
+                <label className="flex items-center gap-1.5"><input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />公開</label>
+                <label className="flex items-center gap-1.5"><input type="checkbox" checked={newBooking} onChange={(e) => setNewBooking(e.target.checked)} />新規受付</label>
+              </div>
+            </div>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
@@ -258,6 +327,20 @@ export default function ServicesAdmin() {
               rows={3}
               className="mb-2 w-full rounded-md border px-2 py-1.5 text-sm"
             />
+            {/* 対応可能スタッフ（メニュー側からも設定できる）*/}
+            <div className="mb-2">
+              <span className="mb-1 block text-xs font-bold text-slate-600">
+                対応できるスタッフ{capacity > 1 && "（定員制クラスは担当者不要）"}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {staff.map((s) => (
+                  <button key={s.id} onClick={() => toggleStaff(s.id)}
+                    className={`rounded-full border px-2.5 py-1 text-xs ${staffIds.has(s.id) ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-slate-600"}`}>
+                    {s.display_name || s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="mb-2 flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -363,6 +446,14 @@ export default function ServicesAdmin() {
                         />
                       </label>
                     )}
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={st.patient_visible}
+                        onChange={(e) => updateStep(i, { patient_visible: e.target.checked })}
+                      />
+                      患者画面に表示
+                    </label>
                   </div>
                 </div>
               ))}
