@@ -27,6 +27,9 @@ import {
 interface Props {
   mode: "add" | "edit";
   appt?: Appointment & { steps: AppointmentStep[] };
+  // 追加モードで担当者・来院時刻をプリセット（予約表のドラッグから）
+  initialStaffId?: string;
+  initialStartMin?: number;
   date: string;
   staff: Staff[];
   services: ServiceWithSteps[];
@@ -38,6 +41,8 @@ interface Props {
 export default function AdminBookingModal({
   mode,
   appt,
+  initialStaffId,
+  initialStartMin,
   date,
   staff,
   services,
@@ -48,9 +53,13 @@ export default function AdminBookingModal({
   const supabase = useMemo(() => createClient(), []);
 
   const [serviceId, setServiceId] = useState(appt?.service_id || services[0]?.id || "");
-  const [staffId, setStaffId] = useState(appt?.staff_id || staff[0]?.id || "");
+  const [staffId, setStaffId] = useState(
+    appt?.staff_id || initialStaffId || staff[0]?.id || ""
+  );
   const [theDate, setTheDate] = useState(appt?.date || date);
-  const [startMin, setStartMin] = useState<number | null>(appt?.start_min ?? null);
+  const [startMin, setStartMin] = useState<number | null>(
+    appt?.start_min ?? initialStartMin ?? null
+  );
 
   const [name, setName] = useState(appt?.patient_name || "");
   const [kana, setKana] = useState("");

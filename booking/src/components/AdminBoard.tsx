@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
+  loadClosures,
   loadEquipment,
   loadSchedules,
   loadServices,
@@ -11,6 +12,7 @@ import {
 import type {
   Appointment,
   AppointmentStep,
+  Closure,
   Equipment,
   ServiceWithSteps,
   Staff,
@@ -20,10 +22,18 @@ import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
 
 const PX_PER_MIN = 1.4;
-const GRID_STEP = 30; // 目盛り（分）
+const GRID_STEP = 30; // 目盛り・スナップ（分）
 
 interface ApptWithSteps extends Appointment {
   steps: AppointmentStep[];
+}
+
+// 列に描く休診バンド
+interface ClosureBand {
+  id: string;
+  start: number;
+  end: number;
+  reason: string | null;
 }
 
 export default function AdminBoard() {
@@ -35,12 +45,23 @@ export default function AdminBoard() {
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
+  const [closures, setClosures] = useState<Closure[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // モーダル：{mode:'add'} or {mode:'edit', appt}
+  // モーダル：追加は担当者・時刻をプリセットできる
   const [modal, setModal] = useState<
-    { mode: "add" } | { mode: "edit"; appt: ApptWithSteps } | null
+    | { mode: "add"; staffId?: string; startMin?: number }
+    | { mode: "edit"; appt: ApptWithSteps }
+    | null
   >(null);
+
+  // ドラッグ選択の状態
+  const [drag, setDrag] = useState<{ staffId: string; a: number; b: number } | null>(null);
+  // ドラッグ確定後に出す2択メニュー
+  const [pop, setPop] = useState<
+    { staffId: string; start: number; end: number; x: number; y: number } | null
+  >(null);
+  const trackTopRef = useRef(0);
 
   // マスタ（初回）
   useEffect(() => {
@@ -60,13 +81,10 @@ export default function AdminBoard() {
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [{ data: aData }, { data: sData }] = await Promise.all([
-      supabase
-        .from("appointments")
-        .select("*")
-        .eq("date", date)
-        .eq("status", "booked"),
+    const [{ data: aData }, { data: sData }, cl] = await Promise.all([
+      supabase.from("appointments").select("*").eq("date", date).eq("status", "booked"),
       supabase.from("appointment_steps").select("*").eq("date", date),
+      loadClosures(supabase, [date]),
     ]);
     const stepsByAppt: Record<string, AppointmentStep[]> = {};
     (sData ?? []).forEach((s: AppointmentStep) => {
@@ -77,6 +95,7 @@ export default function AdminBoard() {
       steps: (stepsByAppt[a.id] || []).sort((x, y) => x.start_min - y.start_min),
     }));
     setAppts(merged);
+    setClosures(cl);
     setLoading(false);
   }, [supabase, date]);
 
@@ -84,7 +103,6 @@ export default function AdminBoard() {
     reload();
   }, [reload]);
 
-  // 表示時間帯（当日の勤務枠の最小〜最大。無ければ 9:00-19:00）
   const weekday = useMemo(() => {
     const [y, m, d] = date.split("-").map(Number);
     return new Date(y, m - 1, d).getDay();
@@ -108,12 +126,10 @@ export default function AdminBoard() {
   for (let t = Math.ceil(minMin / GRID_STEP) * GRID_STEP; t <= maxMin; t += GRID_STEP)
     ticks.push(t);
 
-  // 担当者の勤務外/休診を薄いグレーで表現するための helper
   function staffOffRanges(staffId: string): Array<[number, number]> {
     const shifts = daySchedules
       .filter((s) => s.staff_id === staffId)
       .sort((a, b) => a.start_min - b.start_min);
-    // 勤務枠の "外" をグレーにする
     const ranges: Array<[number, number]> = [];
     let cursor = minMin;
     for (const s of shifts) {
@@ -121,11 +137,22 @@ export default function AdminBoard() {
       cursor = Math.max(cursor, s.end_min);
     }
     if (cursor < maxMin) ranges.push([cursor, maxMin]);
-    if (shifts.length === 0) ranges.push([minMin, maxMin]); // 終日休み
+    if (shifts.length === 0) ranges.push([minMin, maxMin]);
     return ranges;
   }
 
-  // 各担当者のカード（担当者占有区間で配置）
+  // 当該担当者に効く休診（院全体 or 個別）をバンド化
+  function closureBands(staffId: string): ClosureBand[] {
+    return closures
+      .filter((c) => c.staff_id === null || c.staff_id === staffId)
+      .map((c) => ({
+        id: c.id,
+        start: c.start_min ?? minMin,
+        end: c.end_min ?? maxMin,
+        reason: c.reason,
+      }));
+  }
+
   function staffCards(staffId: string) {
     return appts
       .map((a) => {
@@ -138,7 +165,6 @@ export default function AdminBoard() {
       .filter(Boolean) as Array<{ appt: ApptWithSteps; s: number; e: number }>;
   }
 
-  // 機器の占有（ハイチャージ等）
   function equipCards(equipId: string) {
     const blocks: Array<{ appt: ApptWithSteps; s: number; e: number; head: number }> = [];
     appts.forEach((a) => {
@@ -149,6 +175,54 @@ export default function AdminBoard() {
         );
     });
     return blocks;
+  }
+
+  // ---- ドラッグ選択 ----
+  const snap = (m: number) => Math.round(m / GRID_STEP) * GRID_STEP;
+  const yToMin = (clientY: number) =>
+    minMin + (clientY - trackTopRef.current) / PX_PER_MIN;
+
+  function beginDrag(staffId: string, e: React.PointerEvent) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    trackTopRef.current = rect.top;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const m = snap(yToMin(e.clientY));
+    setPop(null);
+    setDrag({ staffId, a: m, b: m });
+  }
+  function moveDrag(e: React.PointerEvent) {
+    if (!drag) return;
+    const m = snap(yToMin(e.clientY));
+    setDrag((d) => (d ? { ...d, b: m } : d));
+  }
+  function endDrag(e: React.PointerEvent) {
+    if (!drag) return;
+    const lo = Math.max(minMin, Math.min(drag.a, drag.b));
+    let hi = Math.min(maxMin, Math.max(drag.a, drag.b));
+    if (hi <= lo) hi = Math.min(maxMin, lo + GRID_STEP); // クリックは30分
+    const staffId = drag.staffId;
+    setDrag(null);
+    setPop({ staffId, start: lo, end: hi, x: e.clientX, y: e.clientY });
+  }
+
+  async function makeClosure() {
+    if (!pop) return;
+    await supabase.from("closures").insert({
+      date,
+      staff_id: pop.staffId,
+      start_min: pop.start,
+      end_min: pop.end,
+      reason: null,
+    });
+    setPop(null);
+    reload();
+  }
+
+  async function removeClosure(id: string) {
+    if (!confirm("この休診を解除しますか？")) return;
+    await supabase.from("closures").delete().eq("id", id);
+    reload();
   }
 
   const dObj = (() => {
@@ -197,6 +271,10 @@ export default function AdminBoard() {
         </button>
       </div>
 
+      <p className="mb-2 text-xs text-slate-400">
+        空き時間を上下にドラッグ → 「予約を追加」か「休診にする」を選べます。
+      </p>
+
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : (
@@ -219,40 +297,54 @@ export default function AdminBoard() {
             </div>
 
             {/* 担当者列 */}
-            {staff.map((st) => (
-              <Column
-                key={st.id}
-                header={st.name}
-                headerColor={st.color || "#334155"}
-                height={height}
-                minMin={minMin}
-                ticks={ticks}
-                offRanges={staffOffRanges(st.id)}
-              >
-                {staffCards(st.id).map(({ appt, s, e }) => (
-                  <button
-                    key={appt.id}
-                    onClick={() => setModal({ mode: "edit", appt })}
-                    className="absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
-                    style={{
-                      top: (s - minMin) * PX_PER_MIN,
-                      height: (e - s) * PX_PER_MIN - 2,
-                      backgroundColor: st.color || "#334155",
-                    }}
-                  >
-                    <div className="truncate text-xs font-bold">
-                      {appt.patient_name || "（未登録）"}
-                    </div>
-                    <div className="truncate text-[10px] opacity-90">
-                      {appt.service_name}
-                    </div>
-                    <div className="text-[10px] opacity-80">
-                      来院 {minToLabel(appt.start_min)}
-                    </div>
-                  </button>
-                ))}
-              </Column>
-            ))}
+            {staff.map((st) => {
+              const band =
+                drag && drag.staffId === st.id
+                  ? ([Math.min(drag.a, drag.b), Math.max(drag.a, drag.b)] as [number, number])
+                  : pop && pop.staffId === st.id
+                    ? ([pop.start, pop.end] as [number, number])
+                    : null;
+              return (
+                <Column
+                  key={st.id}
+                  header={st.name}
+                  headerColor={st.color || "#334155"}
+                  height={height}
+                  minMin={minMin}
+                  ticks={ticks}
+                  offRanges={staffOffRanges(st.id)}
+                  closureBands={closureBands(st.id)}
+                  onClosureClick={removeClosure}
+                  band={band}
+                  onPointerDownTrack={(e) => beginDrag(st.id, e)}
+                  onPointerMoveTrack={moveDrag}
+                  onPointerUpTrack={endDrag}
+                >
+                  {staffCards(st.id).map(({ appt, s, e }) => (
+                    <button
+                      key={appt.id}
+                      onClick={() => setModal({ mode: "edit", appt })}
+                      className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
+                      style={{
+                        top: (s - minMin) * PX_PER_MIN,
+                        height: (e - s) * PX_PER_MIN - 2,
+                        backgroundColor: st.color || "#334155",
+                      }}
+                    >
+                      <div className="truncate text-xs font-bold">
+                        {appt.patient_name || "（未登録）"}
+                      </div>
+                      <div className="truncate text-[10px] opacity-90">
+                        {appt.service_name}
+                      </div>
+                      <div className="text-[10px] opacity-80">
+                        来院 {minToLabel(appt.start_min)}
+                      </div>
+                    </button>
+                  ))}
+                </Column>
+              );
+            })}
 
             {/* 機器列（ハイチャージ等）*/}
             {equipment.map((eq) => (
@@ -265,11 +357,12 @@ export default function AdminBoard() {
                 minMin={minMin}
                 ticks={ticks}
                 offRanges={[]}
+                closureBands={[]}
               >
-                {equipCards(eq.id).map(({ appt, s, e, head }, i) => (
+                {equipCards(eq.id).map(({ appt, s, e }, i) => (
                   <div
                     key={`${appt.id}-${i}`}
-                    className="absolute left-0.5 right-0.5 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-0.5 text-left"
+                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-0.5 text-left"
                     style={{
                       top: (s - minMin) * PX_PER_MIN,
                       height: (e - s) * PX_PER_MIN - 2,
@@ -289,10 +382,45 @@ export default function AdminBoard() {
         </div>
       )}
 
+      {/* ドラッグ後の2択ポップアップ */}
+      {pop && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setPop(null)} />
+          <div
+            className="fixed z-50 w-56 -translate-x-1/2 rounded-xl border bg-white p-3 shadow-xl"
+            style={{
+              left: Math.min(Math.max(pop.x, 130), window.innerWidth - 130),
+              top: Math.min(pop.y + 8, window.innerHeight - 150),
+            }}
+          >
+            <div className="mb-2 text-center text-xs text-slate-500">
+              {minToLabel(pop.start)}〜{minToLabel(pop.end)} をどうしますか？
+            </div>
+            <button
+              onClick={() => {
+                setModal({ mode: "add", staffId: pop.staffId, startMin: pop.start });
+                setPop(null);
+              }}
+              className="mb-2 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white active:bg-blue-700"
+            >
+              予約を追加
+            </button>
+            <button
+              onClick={makeClosure}
+              className="w-full rounded-lg border border-slate-300 py-2.5 text-sm font-bold text-slate-700 active:bg-slate-100"
+            >
+              休診にする
+            </button>
+          </div>
+        </>
+      )}
+
       {modal && (
         <AdminBookingModal
           mode={modal.mode}
           appt={modal.mode === "edit" ? modal.appt : undefined}
+          initialStaffId={modal.mode === "add" ? modal.staffId : undefined}
+          initialStartMin={modal.mode === "add" ? modal.startMin : undefined}
           date={date}
           staff={staff}
           services={services}
@@ -316,6 +444,12 @@ function Column({
   minMin,
   ticks,
   offRanges,
+  closureBands,
+  onClosureClick,
+  band,
+  onPointerDownTrack,
+  onPointerMoveTrack,
+  onPointerUpTrack,
   children,
 }: {
   header: string;
@@ -325,8 +459,15 @@ function Column({
   minMin: number;
   ticks: number[];
   offRanges: Array<[number, number]>;
+  closureBands: ClosureBand[];
+  onClosureClick?: (id: string) => void;
+  band?: [number, number] | null;
+  onPointerDownTrack?: (e: React.PointerEvent) => void;
+  onPointerMoveTrack?: (e: React.PointerEvent) => void;
+  onPointerUpTrack?: (e: React.PointerEvent) => void;
   children: React.ReactNode;
 }) {
+  const draggable = Boolean(onPointerDownTrack);
   return (
     <div className="min-w-[110px] flex-1 border-r last:border-r-0">
       <div
@@ -336,7 +477,7 @@ function Column({
         <span>{header}</span>
         {subHeader && <span className="text-[9px] font-normal opacity-80">{subHeader}</span>}
       </div>
-      <div className="relative" style={{ height }}>
+      <div className="relative select-none" style={{ height }}>
         {/* 目盛り線 */}
         {ticks.map((t) => (
           <div
@@ -345,7 +486,7 @@ function Column({
             style={{ top: (t - minMin) * PX_PER_MIN }}
           />
         ))}
-        {/* 勤務外/休診グレー */}
+        {/* 勤務外グレー */}
         {offRanges.map(([s, e], i) => (
           <div
             key={i}
@@ -353,6 +494,43 @@ function Column({
             style={{ top: (s - minMin) * PX_PER_MIN, height: (e - s) * PX_PER_MIN }}
           />
         ))}
+        {/* ドラッグ用オーバーレイ（空き部分の入力を拾う。カードは z-20 で上） */}
+        {draggable && (
+          <div
+            className="absolute inset-0 z-0"
+            style={{ touchAction: "none" }}
+            onPointerDown={onPointerDownTrack}
+            onPointerMove={onPointerMoveTrack}
+            onPointerUp={onPointerUpTrack}
+          />
+        )}
+        {/* 休診バンド（クリックで解除）*/}
+        {closureBands.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => onClosureClick?.(c.id)}
+            title="クリックで休診を解除"
+            className="absolute left-0 z-10 w-full overflow-hidden border-y border-slate-400/40 bg-slate-400/45 text-[10px] font-bold text-slate-600"
+            style={{
+              top: (c.start - minMin) * PX_PER_MIN,
+              height: (c.end - c.start) * PX_PER_MIN,
+              backgroundImage:
+                "repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(100,116,139,.15) 6px, rgba(100,116,139,.15) 12px)",
+            }}
+          >
+            休診{c.reason ? `・${c.reason}` : ""}
+          </button>
+        ))}
+        {/* 選択バンド */}
+        {band && (
+          <div
+            className="pointer-events-none absolute left-0 z-10 w-full rounded-sm border-2 border-blue-500 bg-blue-500/25"
+            style={{
+              top: (band[0] - minMin) * PX_PER_MIN,
+              height: Math.max(2, (band[1] - band[0]) * PX_PER_MIN),
+            }}
+          />
+        )}
         {children}
       </div>
     </div>
