@@ -191,6 +191,59 @@ export function checkAvailability(
   return { ok: true, endMin };
 }
 
+// ---- 定員制クラス（体幹教室など）----------------------------------
+
+export interface ClassSlotResult {
+  state: "off" | "closed" | "full" | "ok";
+  remaining: number; // 残り人数
+  used: number; // 予約済み人数
+  capacity: number;
+}
+
+/**
+ * 定員制クラスの1コマの状態を返す。
+ *  ・担当者には紐づかない（営業時間＝いずれかの担当者が勤務している時間）
+ *  ・院全体休診のみ考慮
+ *  ・同時刻の同一メニュー予約人数で 残N / 満 を判定
+ */
+export function classSlot(
+  serviceId: string,
+  capacity: number,
+  serviceSteps: ServiceStep[],
+  startMin: number,
+  allSchedules: StaffSchedule[], // その曜日の全担当者分
+  closures: Closure[], // その日の休診
+  classSteps: AppointmentStep[], // その日の当該クラスの工程
+  excludeAppointmentId?: string
+): ClassSlotResult {
+  const endMin = startMin + totalDuration(serviceSteps);
+  const inOpen = allSchedules.some(
+    (s) => s.start_min <= startMin && s.end_min >= endMin
+  );
+  if (!inOpen) return { state: "off", remaining: capacity, used: 0, capacity };
+
+  const closed = closures.some(
+    (c) =>
+      c.staff_id === null &&
+      (c.start_min === null ||
+        overlap(c.start_min, c.end_min as number, startMin, endMin))
+  );
+  if (closed) return { state: "closed", remaining: 0, used: 0, capacity };
+
+  // 重複するコマの予約人数（同一メニューは1予約=1工程）
+  const ids = new Set<string>();
+  for (const a of classSteps) {
+    if (a.service_id !== serviceId) continue;
+    if (a.appointment_id === excludeAppointmentId) continue;
+    if (overlap(a.start_min, a.end_min, startMin, endMin)) ids.add(a.appointment_id);
+  }
+  const used = ids.size;
+  const remaining = Math.max(0, capacity - used);
+  return { state: remaining > 0 ? "ok" : "full", remaining, used, capacity };
+}
+
+export const isClassService = (capacity: number) => capacity > 1;
+
 /**
  * 1日の勤務枠から、表示用の候補開始時刻(30分刻み)を列挙する。
  * メニュー所要時間が枠内に収まる開始時刻のみを返す。

@@ -32,6 +32,7 @@ export default function ServicesAdmin() {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [rec, setRec] = useState(false);
+  const [capacity, setCapacity] = useState(1); // 2以上=定員制クラス
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep()]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function ServicesAdmin() {
     setName("");
     setDesc("");
     setRec(false);
+    setCapacity(1);
     setSteps([emptyStep()]);
     setError(null);
   }
@@ -65,6 +67,7 @@ export default function ServicesAdmin() {
     setName(s.name);
     setDesc(s.description || "");
     setRec(s.recommended);
+    setCapacity(s.capacity ?? 1);
     setSteps(
       s.steps.map((st) => ({
         name: st.name,
@@ -105,6 +108,7 @@ export default function ServicesAdmin() {
             name: name.trim(),
             description: desc.trim() || null,
             recommended: rec,
+            capacity: Math.max(1, capacity),
             sort_order: rec ? 0 : services.length + 1,
           })
           .select("id")
@@ -115,7 +119,12 @@ export default function ServicesAdmin() {
         serviceId = editing.id;
         const { error } = await supabase
           .from("services")
-          .update({ name: name.trim(), description: desc.trim() || null, recommended: rec })
+          .update({
+            name: name.trim(),
+            description: desc.trim() || null,
+            recommended: rec,
+            capacity: Math.max(1, capacity),
+          })
           .eq("id", serviceId);
         if (error) throw new Error(error.message);
         await supabase.from("service_steps").delete().eq("service_id", serviceId);
@@ -184,6 +193,11 @@ export default function ServicesAdmin() {
                       イチオシ
                     </span>
                   )}{" "}
+                  {s.capacity > 1 && (
+                    <span className="rounded-full bg-teal-600 px-2 py-0.5 align-middle text-[10px] font-bold text-white">
+                      定員{s.capacity}名
+                    </span>
+                  )}{" "}
                   <span className="text-xs font-normal text-slate-400">
                     約{totalDuration(s.steps)}分
                   </span>
@@ -244,7 +258,7 @@ export default function ServicesAdmin() {
               rows={3}
               className="mb-2 w-full rounded-md border px-2 py-1.5 text-sm"
             />
-            <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+            <label className="mb-2 flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
                 checked={rec}
@@ -252,6 +266,27 @@ export default function ServicesAdmin() {
               />
               イチオシとして表示（一覧で強調・先頭に表示）
             </label>
+            <label className="mb-1 flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={capacity > 1}
+                onChange={(e) => setCapacity(e.target.checked ? 4 : 1)}
+              />
+              定員制クラス（担当者なし・残り人数表示）
+            </label>
+            {capacity > 1 && (
+              <label className="mb-3 ml-6 flex items-center gap-2 text-xs text-slate-600">
+                定員
+                <input
+                  type="number"
+                  min={2}
+                  value={capacity}
+                  onChange={(e) => setCapacity(parseInt(e.target.value || "2", 10))}
+                  className="w-16 rounded-md border px-1.5 py-1"
+                />
+                名（各工程の「担当者を使用」は外してください）
+              </label>
+            )}
 
             <div className="mb-1 text-xs font-bold text-slate-600">
               工程（患者には表示されません。予約判定はこの順番で行います）

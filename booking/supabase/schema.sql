@@ -68,11 +68,15 @@ create table if not exists public.services (
   description text,
   active      boolean not null default true,
   recommended boolean not null default false, -- イチオシ表示
+  -- 定員（1=通常メニュー / 2以上=定員制クラス。体幹教室=4）
+  -- capacity>1 のメニューは担当者に紐づかず、同時刻の予約人数で判定・表示する。
+  capacity    int  not null default 1,
   sort_order  int  not null default 0,
   created_at  timestamptz not null default now()
 );
 -- 既存インストール向け（過去に schema.sql を実行済みの場合）
 alter table public.services add column if not exists recommended boolean not null default false;
+alter table public.services add column if not exists capacity int not null default 1;
 
 -- =====================================================================
 --  工程テンプレート（service_steps）: メニューを構成する工程
@@ -166,15 +170,21 @@ create table if not exists public.appointment_steps (
   uses_staff     boolean not null default false,
   staff_id       uuid references public.staff(id) on delete set null, -- uses_staff時のみ
   equipment_id   uuid references public.equipment(id) on delete set null, -- 機器工程のみ
+  service_id     uuid references public.services(id) on delete set null, -- 定員制クラスの人数集計用
   headcount      int  not null default 1,
   created_at     timestamptz not null default now()
 );
+-- 既存インストール向け
+alter table public.appointment_steps add column if not exists service_id uuid references public.services(id) on delete set null;
 -- 担当者占有の検索（date + staff）
 create index if not exists appt_steps_staff_idx
   on public.appointment_steps (date, staff_id) where uses_staff;
 -- 機器占有の検索（date + equipment）
 create index if not exists appt_steps_equip_idx
   on public.appointment_steps (date, equipment_id) where equipment_id is not null;
+-- 定員制クラスの人数集計（date + service）
+create index if not exists appt_steps_service_idx
+  on public.appointment_steps (date, service_id) where service_id is not null;
 
 -- updated_at 自動更新
 create or replace function public.booking_touch_updated_at()
@@ -214,6 +224,7 @@ declare
   v_used   int;
   v_cap    int;
   v_ok     boolean;
+  v_capacity int;
 begin
   -- メニューに工程が無ければ不可
   if not exists (select 1 from service_steps where service_id = p_service_id) then
@@ -224,6 +235,39 @@ begin
   select p_start_min + coalesce(sum(duration_min), 0)
     into v_end
     from service_steps where service_id = p_service_id;
+
+  select capacity into v_capacity from services where id = p_service_id;
+
+  -- ★ 定員制クラス（体幹教室など capacity>1）
+  --   担当者に紐づかず、同時刻の「同一メニュー予約人数」で判定する。
+  if coalesce(v_capacity, 1) > 1 then
+    -- 営業時間（いずれかの担当者が勤務している時間帯に収まること）
+    if not exists (
+      select 1 from staff_schedules
+       where weekday = v_dow and start_min <= p_start_min and end_min >= v_end
+    ) then
+      return jsonb_build_object('ok', false, 'reason', '営業時間外');
+    end if;
+    -- 院全体休診のみ考慮（個々の担当者の休みはクラスに影響しない）
+    if exists (
+      select 1 from closures c
+       where c.date = p_date and c.staff_id is null
+         and (c.start_min is null or (c.start_min < v_end and c.end_min > p_start_min))
+    ) then
+      return jsonb_build_object('ok', false, 'reason', '休診');
+    end if;
+    -- 同時刻の予約人数（=定員に対する充足）
+    select count(*) into v_used
+      from appointments ap
+     where ap.service_id = p_service_id and ap.status = 'booked'
+       and ap.date = p_date
+       and ap.start_min < v_end and ap.end_min > p_start_min
+       and (p_exclude_appointment_id is null or ap.id <> p_exclude_appointment_id);
+    if v_used >= v_capacity then
+      return jsonb_build_object('ok', false, 'reason', '満', 'used', v_used, 'capacity', v_capacity);
+    end if;
+    return jsonb_build_object('ok', true, 'end_min', v_end, 'used', v_used, 'capacity', v_capacity);
+  end if;
 
   -- ③ 勤務時間内（予約全体が担当者の勤務時間に収まること）
   select exists (
@@ -367,12 +411,12 @@ begin
   for step in select * from service_steps where service_id = p_service_id order by step_order loop
     insert into appointment_steps
       (appointment_id, step_order, name, date, start_min, end_min,
-       uses_staff, staff_id, equipment_id, headcount)
+       uses_staff, staff_id, equipment_id, service_id, headcount)
     values
       (v_appt, step.step_order, step.name, p_date, v_cursor, v_cursor + step.duration_min,
        step.uses_staff,
        case when step.uses_staff then p_staff_id else null end,
-       step.equipment_id, step.headcount);
+       step.equipment_id, p_service_id, step.headcount);
     v_cursor := v_cursor + step.duration_min;
   end loop;
 
@@ -420,12 +464,12 @@ begin
   for step in select * from service_steps where service_id = p_service_id order by step_order loop
     insert into appointment_steps
       (appointment_id, step_order, name, date, start_min, end_min,
-       uses_staff, staff_id, equipment_id, headcount)
+       uses_staff, staff_id, equipment_id, service_id, headcount)
     values
       (p_appointment_id, step.step_order, step.name, p_date, v_cursor, v_cursor + step.duration_min,
        step.uses_staff,
        case when step.uses_staff then p_staff_id else null end,
-       step.equipment_id, step.headcount);
+       step.equipment_id, p_service_id, step.headcount);
     v_cursor := v_cursor + step.duration_min;
   end loop;
 

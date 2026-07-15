@@ -70,6 +70,7 @@ export default function BookingWizard() {
 
   const service = services.find((s) => s.id === serviceId) || null;
   const selectedStaff = staff.find((s) => s.id === staffId) || null;
+  const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
 
   // ---- マスタ読み込み ----
   useEffect(() => {
@@ -116,11 +117,11 @@ export default function BookingWizard() {
   );
 
   const reloadWeek = useCallback(async () => {
-    if (!staffId) return;
     setLoadingWeek(true);
     try {
       const [sc, cl, ap] = await Promise.all([
-        loadSchedules(supabase, staffId),
+        // クラスは担当者に紐づかないため全担当者の勤務時間（＝営業時間）を使う
+        loadSchedules(supabase, isClass ? undefined : staffId),
         loadClosures(supabase, weekDates),
         loadAppointmentSteps(supabase, weekDates),
       ]);
@@ -130,7 +131,7 @@ export default function BookingWizard() {
     } finally {
       setLoadingWeek(false);
     }
-  }, [supabase, staffId, weekDates]);
+  }, [supabase, staffId, weekDates, isClass]);
 
   useEffect(() => {
     if (step === 2) reloadWeek();
@@ -153,13 +154,15 @@ export default function BookingWizard() {
   }
 
   async function submit() {
-    if (!service || !selectedStaff || !selected) return;
+    if (!service || !selected) return;
+    if (!isClass && !selectedStaff) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
       const { data, error } = await supabase.rpc("book_appointment", {
         p_service_id: service.id,
-        p_staff_id: selectedStaff.id,
+        // クラスは担当者に紐づかない
+        p_staff_id: isClass ? null : selectedStaff!.id,
         p_date: selected.date,
         p_start_min: selected.startMin,
         p_name: name.trim(),
@@ -265,26 +268,34 @@ export default function BookingWizard() {
         >
           <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             {service.name}（所要 約{totalDuration(service.steps)}分）
+            {isClass && `・定員${service.capacity}名`}
           </div>
 
-          {/* 担当者ボタン：押しても画面遷移せずカレンダーだけ切替 */}
-          <div className="mb-3 grid grid-cols-4 gap-2">
-            {staff.map((s) => {
-              const active = s.id === staffId;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => pickStaff(s.id)}
-                  className="rounded-lg py-2 text-sm font-bold text-white transition"
-                  style={{
-                    backgroundColor: active ? s.color || "#334155" : "#cbd5e1",
-                  }}
-                >
-                  {s.name}
-                </button>
-              );
-            })}
-          </div>
+          {/* 担当者ボタン：押しても画面遷移せずカレンダーだけ切替。
+              定員制クラス（体幹教室）は担当者を選ばない。 */}
+          {isClass ? (
+            <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              定員{service.capacity}名のグループレッスンです。空いている時間を選んでください（残り人数を表示）。
+            </div>
+          ) : (
+            <div className="mb-3 grid grid-cols-4 gap-2">
+              {staff.map((s) => {
+                const active = s.id === staffId;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => pickStaff(s.id)}
+                    className="rounded-lg py-2 text-sm font-bold text-white transition"
+                    style={{
+                      backgroundColor: active ? s.color || "#334155" : "#cbd5e1",
+                    }}
+                  >
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* 週切替 */}
           <div className="mb-2 flex items-center justify-between">
@@ -309,7 +320,9 @@ export default function BookingWizard() {
             <p className="py-8 text-center text-sm text-slate-500">読み込み中…</p>
           ) : (
             <WeekCalendar
+              serviceId={service.id}
               serviceSteps={service.steps}
+              capacity={service.capacity}
               staffId={staffId}
               weekStart={weekStart}
               schedules={schedules}
@@ -322,13 +335,16 @@ export default function BookingWizard() {
           )}
 
           <p className="mt-2 text-center text-[11px] text-slate-400">
-            ○＝予約可 ×＝空きなし ·＝受付時間外
+            {isClass
+              ? "残○＝空き人数 満＝定員 ×＝休診 ·＝受付時間外"
+              : "○＝予約可 ×＝空きなし ·＝受付時間外"}
           </p>
 
           {selected && (
             <div className="mt-4">
               <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                {formatSelected(selected)} / {selectedStaff?.name}
+                {formatSelected(selected)}
+                {!isClass && selectedStaff ? ` / ${selectedStaff.name}` : ""}
               </div>
               <button
                 onClick={() => setStep(3)}
@@ -399,7 +415,7 @@ export default function BookingWizard() {
         <Section title="ご予約内容の確認" onBack={() => setStep(3)}>
           <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200">
             <Row label="メニュー" value={service.name} />
-            <Row label="担当" value={selectedStaff?.name || ""} />
+            {!isClass && <Row label="担当" value={selectedStaff?.name || ""} />}
             <Row label="日時" value={formatSelected(selected)} />
             <Row label="お名前" value={name} />
             <Row label="フリガナ" value={kana || "—"} />
@@ -445,7 +461,8 @@ export default function BookingWizard() {
             <p className="mt-2 text-sm text-slate-600">
               {formatSelected(selected)}
               <br />
-              {service.name} / {selectedStaff?.name}
+              {service.name}
+              {!isClass && selectedStaff ? ` / ${selectedStaff.name}` : ""}
             </p>
             <p className="mt-4 text-xs text-slate-400">
               ご来院時刻は {minToLabel(selected.startMin)} です。

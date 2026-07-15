@@ -11,6 +11,8 @@ import type {
 import {
   addDays,
   checkAvailability,
+  classSlot,
+  isClassService,
   minToLabel,
   timeRows,
   toDateStr,
@@ -19,19 +21,32 @@ import {
 } from "@/lib/booking";
 
 interface Props {
+  serviceId: string;
   serviceSteps: ServiceStep[];
+  capacity: number; // 1=通常 / 2以上=定員制クラス
   staffId: string;
   weekStart: Date; // 月曜
-  schedules: StaffSchedule[]; // 当該担当者の全曜日分
-  closures: Closure[]; // 週内
-  apptSteps: AppointmentStep[]; // 週内
+  schedules: StaffSchedule[]; // 通常=当該担当者 / クラス=全担当者
+  closures: Closure[];
+  apptSteps: AppointmentStep[];
   equipment: Equipment[];
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
 }
 
+// セル表示の種類
+type Cell =
+  | { kind: "off" }
+  | { kind: "busy" } // 通常メニューの ×
+  | { kind: "ok" } // 通常メニューの ○
+  | { kind: "class-ok"; remaining: number }
+  | { kind: "class-full" }
+  | { kind: "class-closed" };
+
 export default function WeekCalendar({
+  serviceId,
   serviceSteps,
+  capacity,
   staffId,
   weekStart,
   schedules,
@@ -41,6 +56,8 @@ export default function WeekCalendar({
   selected,
   onSelect,
 }: Props) {
+  const isClass = isClassService(capacity);
+
   const equipmentById = useMemo(
     () => Object.fromEntries(equipment.map((e) => [e.id, e])) as Record<string, Equipment>,
     [equipment]
@@ -53,43 +70,69 @@ export default function WeekCalendar({
 
   const rows = useMemo(() => timeRows(schedules), [schedules]);
 
-  // 各セルの可否を事前計算
   const grid = useMemo(() => {
     return days.map((d) => {
       const dateStr = toDateStr(d);
       const weekday = d.getDay();
       const daySchedules = schedules.filter((s) => s.weekday === weekday);
-      const ctx: DayContext = {
-        date: dateStr,
-        weekday,
-        schedules: daySchedules,
-        closures: closures.filter(
-          (c) => c.date === dateStr && (c.staff_id === null || c.staff_id === staffId)
-        ),
-        staffSteps: apptSteps.filter(
-          (a) => a.date === dateStr && a.uses_staff && a.staff_id === staffId
-        ),
-        equipmentSteps: apptSteps.filter(
-          (a) => a.date === dateStr && a.equipment_id !== null
-        ),
-        equipmentById,
-      };
-      return rows.map((t) => {
-        // 勤務枠がまったく無い時間帯は「-」（休み）
-        const inAnyShift = daySchedules.some(
-          (s) => s.start_min <= t && s.end_min > t
-        );
-        if (!inAnyShift) return { t, state: "off" as const };
+      const dayClosures = closures.filter((c) => c.date === dateStr);
+      const dayApptSteps = apptSteps.filter((a) => a.date === dateStr);
+
+      return rows.map((t): Cell => {
+        const inAnyShift = daySchedules.some((s) => s.start_min <= t && s.end_min > t);
+        if (!inAnyShift) return { kind: "off" };
+
+        if (isClass) {
+          const r = classSlot(
+            serviceId,
+            capacity,
+            serviceSteps,
+            t,
+            daySchedules,
+            dayClosures,
+            dayApptSteps
+          );
+          if (r.state === "off") return { kind: "off" };
+          if (r.state === "closed") return { kind: "class-closed" };
+          if (r.state === "full") return { kind: "class-full" };
+          return { kind: "class-ok", remaining: r.remaining };
+        }
+
+        const ctx: DayContext = {
+          date: dateStr,
+          weekday,
+          schedules: daySchedules,
+          closures: dayClosures.filter(
+            (c) => c.staff_id === null || c.staff_id === staffId
+          ),
+          staffSteps: dayApptSteps.filter(
+            (a) => a.uses_staff && a.staff_id === staffId
+          ),
+          equipmentSteps: dayApptSteps.filter((a) => a.equipment_id !== null),
+          equipmentById,
+        };
         const res = checkAvailability(serviceSteps, staffId, t, ctx);
-        return { t, state: res.ok ? ("ok" as const) : ("busy" as const) };
+        return res.ok ? { kind: "ok" } : { kind: "busy" };
       });
     });
-  }, [days, rows, schedules, closures, apptSteps, staffId, serviceSteps, equipmentById]);
+  }, [
+    days,
+    rows,
+    schedules,
+    closures,
+    apptSteps,
+    staffId,
+    serviceId,
+    serviceSteps,
+    capacity,
+    isClass,
+    equipmentById,
+  ]);
 
   if (rows.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-slate-500">
-        この担当者の勤務時間が未設定です。
+        受付時間が設定されていません。
       </p>
     );
   }
@@ -134,38 +177,50 @@ export default function WeekCalendar({
                 const ds = toDateStr(d);
                 const isSel =
                   selected && selected.date === ds && selected.startMin === t;
-                if (cell.state === "off") {
+
+                // 予約可能セル（通常○ / クラス残N）
+                const clickable = cell.kind === "ok" || cell.kind === "class-ok";
+                if (clickable) {
+                  const label =
+                    cell.kind === "class-ok" ? `残${cell.remaining}` : "○";
                   return (
                     <td key={ds} className="p-0.5">
-                      <div className="flex h-9 items-center justify-center text-slate-300">
-                        ·
+                      <button
+                        type="button"
+                        onClick={() => onSelect(ds, t)}
+                        className={`flex h-9 w-full items-center justify-center rounded-md font-bold transition ${
+                          cell.kind === "class-ok" ? "text-xs" : "text-base"
+                        } ${
+                          isSel
+                            ? "bg-blue-600 text-white"
+                            : "bg-blue-50 text-blue-600 active:bg-blue-100"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    </td>
+                  );
+                }
+
+                // 満（クラス）
+                if (cell.kind === "class-full") {
+                  return (
+                    <td key={ds} className="p-0.5">
+                      <div className="flex h-9 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-400">
+                        満
                       </div>
                     </td>
                   );
                 }
-                if (cell.state === "busy") {
-                  return (
-                    <td key={ds} className="p-0.5">
-                      <div className="flex h-9 items-center justify-center text-slate-300">
-                        ×
-                      </div>
-                    </td>
-                  );
-                }
+
+                // × / 休 / 時間外
+                const mark =
+                  cell.kind === "busy" || cell.kind === "class-closed" ? "×" : "·";
                 return (
                   <td key={ds} className="p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => onSelect(ds, t)}
-                      className={`flex h-9 w-full items-center justify-center rounded-md text-base font-bold transition ${
-                        isSel
-                          ? "bg-blue-600 text-white"
-                          : "bg-blue-50 text-blue-600 active:bg-blue-100"
-                      }`}
-                      aria-label={`${ds} ${minToLabel(t)} を予約`}
-                    >
-                      ○
-                    </button>
+                    <div className="flex h-9 items-center justify-center text-slate-300">
+                      {mark}
+                    </div>
                   </td>
                 );
               })}

@@ -177,6 +177,22 @@ export default function AdminBoard() {
     return blocks;
   }
 
+  // 定員制クラス（体幹教室）：同時刻でグループ化して人数を表示
+  const classServices = useMemo(
+    () => services.filter((s) => s.capacity > 1),
+    [services]
+  );
+  function classGroups(serviceId: string) {
+    const map: Record<string, { start: number; end: number; list: ApptWithSteps[] }> = {};
+    appts
+      .filter((a) => a.service_id === serviceId)
+      .forEach((a) => {
+        const k = `${a.start_min}-${a.end_min}`;
+        (map[k] ||= { start: a.start_min, end: a.end_min, list: [] }).list.push(a);
+      });
+    return Object.values(map);
+  }
+
   // ---- ドラッグ選択 ----
   const snap = (m: number) => Math.round(m / GRID_STEP) * GRID_STEP;
   const yToMin = (clientY: number) =>
@@ -374,6 +390,58 @@ export default function AdminBoard() {
                     <div className="text-[9px] text-slate-500">
                       {minToLabel(s)}–{minToLabel(e)}
                     </div>
+                  </div>
+                ))}
+              </Column>
+            ))}
+
+            {/* 定員制クラス列（体幹教室）：予約人数 N/定員 を表示 */}
+            {classServices.map((cls) => (
+              <Column
+                key={cls.id}
+                header={cls.name}
+                subHeader={`定員${cls.capacity}名`}
+                headerColor="#0f766e"
+                height={height}
+                minMin={minMin}
+                ticks={ticks}
+                offRanges={[]}
+                closureBands={closures
+                  .filter((c) => c.staff_id === null)
+                  .map((c) => ({
+                    id: c.id,
+                    start: c.start_min ?? minMin,
+                    end: c.end_min ?? maxMin,
+                    reason: c.reason,
+                  }))}
+                onClosureClick={removeClosure}
+              >
+                {classGroups(cls.id).map((g, i) => (
+                  <div
+                    key={i}
+                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-teal-300 bg-teal-50 px-1 py-1"
+                    style={{
+                      top: (g.start - minMin) * PX_PER_MIN,
+                      height: (g.end - g.start) * PX_PER_MIN - 2,
+                    }}
+                  >
+                    <div className="mb-0.5 text-[11px] font-bold text-teal-800">
+                      {g.list.length}/{cls.capacity}
+                      {g.list.length >= cls.capacity && (
+                        <span className="ml-1 rounded bg-teal-700 px-1 text-[9px] text-white">
+                          満
+                        </span>
+                      )}
+                    </div>
+                    {g.list.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => setModal({ mode: "edit", appt: a })}
+                        className="block w-full truncate text-left text-[10px] text-teal-700 hover:underline"
+                      >
+                        {a.patient_name || "（未登録）"}
+                      </button>
+                    ))}
                   </div>
                 ))}
               </Column>

@@ -81,20 +81,25 @@ begin
       (s_id, 1, '施術', 60, true, null, 1);
   end if;
 
-  -- 体幹教室（担当者のみ 30分）
+  -- 体幹教室（定員4名のクラス・30分）
+  --   担当者に紐づかず、同時刻の予約人数(0〜4)で管理する。
+  --   患者側は「残○/満」、管理側は「○/4」で表示。
   if not exists (select 1 from public.services where name = '体幹教室') then
-    insert into public.services (name, description, sort_order) values ('体幹教室', '体幹トレーニング指導 30分', 5) returning id into s_id;
+    insert into public.services (name, description, capacity, sort_order)
+      values ('体幹教室', '体幹トレーニング指導 30分（定員4名のグループレッスン）', 4, 5) returning id into s_id;
     insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
-      (s_id, 1, '体幹教室', 30, true, null, 1);
+      (s_id, 1, '体幹教室', 30, false, null, 1);
   end if;
-  -- 既存 DB の体幹教室が60分のままなら30分へ更新
-  if exists (select 1 from public.services s join public.service_steps ss on ss.service_id = s.id
-             where s.name = '体幹教室' and ss.duration_min = 60) then
-    update public.service_steps ss set duration_min = 30
-      from public.services s
-     where ss.service_id = s.id and s.name = '体幹教室';
-    update public.services set description = '体幹トレーニング指導 30分' where name = '体幹教室';
-  end if;
+  -- 既存 DB の体幹教室を新仕様（定員4・担当者なし・30分）へ更新
+  update public.services
+     set capacity = 4,
+         description = '体幹トレーニング指導 30分（定員4名のグループレッスン）'
+   where name = '体幹教室' and capacity <> 4;
+  update public.service_steps ss
+     set duration_min = 30, uses_staff = false, equipment_id = null
+    from public.services s
+   where ss.service_id = s.id and s.name = '体幹教室'
+     and (ss.duration_min <> 30 or ss.uses_staff = true);
 end $$;
 
 -- ---------- 勤務時間（全担当者 月〜土, 午前/午後の2枠）--------------

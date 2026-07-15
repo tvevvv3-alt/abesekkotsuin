@@ -24,6 +24,7 @@ export interface Service {
   description: string | null;
   active: boolean;
   recommended: boolean; // イチオシ表示
+  capacity: number; // 1=通常 / 2以上=定員制クラス（体幹教室=4）
   sort_order: number;
 }
 
@@ -97,6 +98,7 @@ export interface AppointmentStep {
   uses_staff: boolean;
   staff_id: string | null;
   equipment_id: string | null;
+  service_id: string | null; // 定員制クラスの人数集計用
   headcount: number;
 }
 

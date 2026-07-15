@@ -18,6 +18,7 @@ import type {
 import {
   candidateStarts,
   checkAvailability,
+  classSlot,
   minToLabel,
   toDateStr,
   totalDuration,
@@ -77,6 +78,7 @@ export default function AdminBookingModal({
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
 
   const service = services.find((s) => s.id === serviceId) || null;
+  const isClass = !!service && service.capacity > 1;
   const equipmentById = useMemo(
     () => Object.fromEntries(equipment.map((e) => [e.id, e])),
     [equipment]
@@ -84,33 +86,53 @@ export default function AdminBookingModal({
 
   // ---- 空き時間を計算 ----
   const recompute = useCallback(async () => {
-    if (!service || !staffId) return;
+    if (!service) return;
+    if (!isClass && !staffId) return;
     setLoadingSlots(true);
     try {
       const [sc, cl, ap] = await Promise.all([
-        loadSchedules(supabase, staffId),
+        // クラスは営業時間（全担当者の勤務時間）を使う
+        loadSchedules(supabase, isClass ? undefined : staffId),
         loadClosures(supabase, [theDate]),
         loadAppointmentSteps(supabase, [theDate]),
       ]);
       const [y, m, d] = theDate.split("-").map(Number);
       const weekday = new Date(y, m - 1, d).getDay();
       const daySchedules = sc.filter((s) => s.weekday === weekday);
-      const ctx: DayContext = {
-        date: theDate,
-        weekday,
-        schedules: daySchedules,
-        closures: cl.filter((c) => c.staff_id === null || c.staff_id === staffId),
-        staffSteps: ap.filter((a) => a.uses_staff && a.staff_id === staffId),
-        equipmentSteps: ap.filter((a) => a.equipment_id !== null),
-        equipmentById: equipmentById as Record<string, Equipment>,
-      };
       const dur = totalDuration(service.steps);
       const cands = candidateStarts(daySchedules, dur);
-      const ok = cands.filter(
-        (t) => checkAvailability(service.steps, staffId, t, ctx, appt?.id).ok
-      );
+
+      let ok: number[];
+      if (isClass) {
+        ok = cands.filter(
+          (t) =>
+            classSlot(
+              service.id,
+              service.capacity,
+              service.steps,
+              t,
+              daySchedules,
+              cl,
+              ap,
+              appt?.id
+            ).state === "ok"
+        );
+      } else {
+        const ctx: DayContext = {
+          date: theDate,
+          weekday,
+          schedules: daySchedules,
+          closures: cl.filter((c) => c.staff_id === null || c.staff_id === staffId),
+          staffSteps: ap.filter((a) => a.uses_staff && a.staff_id === staffId),
+          equipmentSteps: ap.filter((a) => a.equipment_id !== null),
+          equipmentById: equipmentById as Record<string, Equipment>,
+        };
+        ok = cands.filter(
+          (t) => checkAvailability(service.steps, staffId, t, ctx, appt?.id).ok
+        );
+      }
       // 編集時、現在の開始時刻が候補に無ければ足す（同一時刻での再保存を許可）
-      if (appt && !ok.includes(appt.start_min) && theDate === appt.date && staffId === appt.staff_id) {
+      if (appt && !ok.includes(appt.start_min) && theDate === appt.date) {
         ok.push(appt.start_min);
         ok.sort((a, b) => a - b);
       }
@@ -118,7 +140,7 @@ export default function AdminBookingModal({
     } finally {
       setLoadingSlots(false);
     }
-  }, [supabase, service, staffId, theDate, equipmentById, appt]);
+  }, [supabase, service, isClass, staffId, theDate, equipmentById, appt]);
 
   useEffect(() => {
     recompute();
@@ -146,21 +168,23 @@ export default function AdminBookingModal({
   }
 
   async function save() {
-    if (!service || !staffId || startMin === null) {
-      setError("メニュー・担当者・時間を選択してください");
+    if (!service || startMin === null || (!isClass && !staffId)) {
+      setError(isClass ? "時間を選択してください" : "メニュー・担当者・時間を選択してください");
       return;
     }
     if (mode === "add" && !name.trim()) {
       setError("患者名を入力してください");
       return;
     }
+    // クラスは担当者に紐づかない
+    const staffParam = isClass ? null : staffId;
     setBusy(true);
     setError(null);
     try {
       if (mode === "add") {
         const { data, error } = await supabase.rpc("book_appointment", {
           p_service_id: service.id,
-          p_staff_id: staffId,
+          p_staff_id: staffParam,
           p_date: theDate,
           p_start_min: startMin,
           p_name: name.trim(),
@@ -181,7 +205,7 @@ export default function AdminBookingModal({
         const { data, error } = await supabase.rpc("reschedule_appointment", {
           p_appointment_id: appt.id,
           p_service_id: service.id,
-          p_staff_id: staffId,
+          p_staff_id: staffParam,
           p_date: theDate,
           p_start_min: startMin,
           p_note: note.trim() || null,
@@ -319,25 +343,31 @@ export default function AdminBookingModal({
           </select>
         </label>
 
-        {/* 担当者 */}
-        <div className="mb-2">
-          <span className="mb-1 block text-xs font-medium text-slate-600">担当者</span>
-          <div className="grid grid-cols-4 gap-1.5">
-            {staff.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => {
-                  setStaffId(s.id);
-                  setStartMin(null);
-                }}
-                className="rounded-md py-1.5 text-sm font-bold text-white"
-                style={{ backgroundColor: s.id === staffId ? s.color || "#334155" : "#cbd5e1" }}
-              >
-                {s.name}
-              </button>
-            ))}
+        {/* 担当者（定員制クラスは担当者を選ばない）*/}
+        {isClass ? (
+          <div className="mb-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            定員{service?.capacity}名のグループレッスンです（担当者の指定なし）。
           </div>
-        </div>
+        ) : (
+          <div className="mb-2">
+            <span className="mb-1 block text-xs font-medium text-slate-600">担当者</span>
+            <div className="grid grid-cols-4 gap-1.5">
+              {staff.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setStaffId(s.id);
+                    setStartMin(null);
+                  }}
+                  className="rounded-md py-1.5 text-sm font-bold text-white"
+                  style={{ backgroundColor: s.id === staffId ? s.color || "#334155" : "#cbd5e1" }}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 日付 */}
         <label className="mb-2 block">
