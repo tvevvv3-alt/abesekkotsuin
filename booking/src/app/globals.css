@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f8fafc;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: #0f172a;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* スマホ優先。数字は等幅で崩れにくく */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", "Segoe UI", Meiryo, sans-serif;
+}
+
+.tabnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* カレンダーの横スクロールを滑らかに */
+.scroll-x {
+  -webkit-overflow-scrolling: touch;
+}
