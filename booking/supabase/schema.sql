@@ -174,6 +174,20 @@ create table if not exists public.booking_windows (
 );
 
 -- =====================================================================
+--  営業時間の基本形（business_hours）: 曜日ごと・午前/午後の最大2枠
+--    スタッフの勤務時間へ「一括反映」するためのテンプレート。
+--    時刻は「0時からの分」で保持（内部5分単位）
+-- =====================================================================
+create table if not exists public.business_hours (
+  weekday    smallint primary key check (weekday between 0 and 6),
+  is_open    boolean not null default true,
+  seg1_start int,   -- 午前枠 開始（例: 10:00 → 600）
+  seg1_end   int,   -- 午前枠 終了（例: 13:00 → 780）
+  seg2_start int,   -- 午後枠 開始（例: 16:00 → 960）
+  seg2_end   int    -- 午後枠 終了（例: 20:30 → 1230）
+);
+
+-- =====================================================================
 --  勤務時間（staff_schedules）: 曜日ごとの勤務時間帯
 --    weekday: 0=日 1=月 ... 6=土（Postgres の dow と同じ）
 --    時刻は「0時からの分」で保持（内部5分単位）
@@ -574,6 +588,7 @@ alter table public.staff_services    enable row level security;
 alter table public.service_prices    enable row level security;
 alter table public.settings          enable row level security;
 alter table public.booking_windows   enable row level security;
+alter table public.business_hours    enable row level security;
 alter table public.staff_schedules   enable row level security;
 alter table public.closures          enable row level security;
 alter table public.appointments      enable row level security;
@@ -597,6 +612,8 @@ drop policy if exists settings_public_read on public.settings;
 create policy settings_public_read on public.settings for select using (true);
 drop policy if exists booking_windows_public_read on public.booking_windows;
 create policy booking_windows_public_read on public.booking_windows for select using (true);
+drop policy if exists business_hours_public_read on public.business_hours;
+create policy business_hours_public_read on public.business_hours for select using (true);
 drop policy if exists schedules_public_read on public.staff_schedules;
 create policy schedules_public_read on public.staff_schedules for select using (true);
 drop policy if exists closures_public_read on public.closures;
@@ -614,7 +631,7 @@ declare t text;
 begin
   foreach t in array array[
     'staff','patients','equipment','services','service_steps','staff_services','service_prices',
-    'settings','booking_windows','staff_schedules','closures','appointments','appointment_steps'
+    'settings','booking_windows','business_hours','staff_schedules','closures','appointments','appointment_steps'
   ] loop
     execute format('drop policy if exists %I on public.%I', t||'_staff_all', t);
     execute format(

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AppointmentStep,
   BookingWindow,
+  BusinessHours,
   Closure,
   Equipment,
   ServicePrice,
@@ -11,6 +12,26 @@ import type {
   Staff,
   StaffSchedule,
 } from "./types";
+
+// 営業時間の既定（月〜土 10:00-13:00 / 16:00-20:30、日曜休み）
+function defaultBusinessHours(): BusinessHours[] {
+  return [0, 1, 2, 3, 4, 5, 6].map((wd) =>
+    wd === 0
+      ? { weekday: 0, is_open: false, seg1_start: null, seg1_end: null, seg2_start: null, seg2_end: null }
+      : { weekday: wd, is_open: true, seg1_start: 600, seg1_end: 780, seg2_start: 960, seg2_end: 1230 }
+  );
+}
+
+// 営業時間の基本形（未設定・テーブル未作成なら既定を返す）
+export async function loadBusinessHours(sb: SupabaseClient): Promise<BusinessHours[]> {
+  const { data, error } = await sb.from("business_hours").select("*").order("weekday");
+  // テーブル未作成（マイグレーション前）でも画面が落ちないよう既定へフォールバック
+  if (error || !data || data.length === 0) return defaultBusinessHours();
+  // 欠けている曜日は既定で補完
+  const base = defaultBusinessHours();
+  const byWd = new Map(data.map((r: BusinessHours) => [r.weekday, r]));
+  return base.map((d) => (byWd.get(d.weekday) as BusinessHours) ?? d);
+}
 
 export async function loadServices(
   sb: SupabaseClient

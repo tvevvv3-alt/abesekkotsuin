@@ -12,6 +12,7 @@ const NAV = [
   { href: "/admin/staff", label: "スタッフ管理", icon: "🧑‍⚕️" },
   { href: "/admin/services", label: "施術メニュー管理", icon: "📋" },
   { href: "/admin/equipment", label: "機器管理", icon: "🔌" },
+  { href: "/admin/hours", label: "営業時間", icon: "🕐" },
   { href: "/admin/publish", label: "予約公開設定", icon: "📢" },
   { href: "/admin/settings", label: "基本設定", icon: "⚙️" },
 ];

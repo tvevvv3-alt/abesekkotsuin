@@ -160,6 +160,17 @@ export interface BookingWindow {
   note: string | null;
 }
 
+// 営業時間の基本形（曜日ごと・午前/午後の最大2枠）。
+// スタッフの勤務時間へ「一括反映」するためのテンプレート。
+export interface BusinessHours {
+  weekday: number; // 0=日..6=土
+  is_open: boolean; // その曜日を営業するか
+  seg1_start: number | null; // 午前枠 開始（分）
+  seg1_end: number | null; // 午前枠 終了（分）
+  seg2_start: number | null; // 午後枠 開始（分）
+  seg2_end: number | null; // 午後枠 終了（分）
+}
+
 // 患者情報の端末保存（2回目以降の自動入力）
 export interface SavedPatient {
   name: string;
