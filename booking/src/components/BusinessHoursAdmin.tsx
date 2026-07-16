@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { loadBusinessHours, loadStaff } from "@/lib/data";
+import { loadBusinessHours, loadSettings, loadStaff } from "@/lib/data";
 import { WEEKDAY_LABELS, labelToMin, minToLabel } from "@/lib/booking";
 import type { Staff } from "@/lib/types";
 
@@ -23,14 +23,19 @@ export default function BusinessHoursAdmin() {
   const [days, setDays] = useState<DayForm[] | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [boardStart, setBoardStart] = useState("10:00");
+  const [boardEnd, setBoardEnd] = useState("22:00");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const [bh, st] = await Promise.all([
+    const [bh, st, se] = await Promise.all([
       loadBusinessHours(supabase),
       loadStaff(supabase, false), // 在籍中スタッフ（受付ON/OFF問わず）
+      loadSettings(supabase),
     ]);
+    setBoardStart(minToLabel(se.board_start_min));
+    setBoardEnd(minToLabel(se.board_end_min));
     const form: DayForm[] = bh.map((d) => ({
       is_open: d.is_open,
       a1: toLabel(d.seg1_start),
@@ -73,6 +78,17 @@ export default function BusinessHoursAdmin() {
     const { error } = await supabase.from("business_hours").upsert(rows, { onConflict: "weekday" });
     if (error) {
       setMsg(`保存に失敗しました：${error.message}`);
+      return false;
+    }
+    // 管理ボードの表示範囲も保存
+    const { error: sErr } = await supabase.from("settings").upsert({
+      id: 1,
+      board_start_min: labelToMin(boardStart),
+      board_end_min: labelToMin(boardEnd),
+      updated_at: new Date().toISOString(),
+    });
+    if (sErr) {
+      setMsg(`保存に失敗しました：${sErr.message}`);
       return false;
     }
     return true;
@@ -206,6 +222,19 @@ export default function BusinessHoursAdmin() {
         <p className="mt-2 text-[10px] text-slate-400">
           チェックしたスタッフだけ上書きされます。人によって時間が違う場合はチェックを外して、そのスタッフの勤務時間は「スタッフ管理」で個別に設定してください。
         </p>
+      </div>
+
+      {/* 管理ボードの表示範囲（時間外用） */}
+      <div className="mt-4 rounded-xl border bg-white p-4">
+        <div className="mb-1 text-sm font-bold text-slate-700">管理ボードの表示範囲</div>
+        <p className="mb-2 text-[11px] text-slate-500">
+          管理画面の予約ボードを何時から何時まで表示するかです。営業終了後（例：20:30以降の時間外予約）も、この範囲内ならボードにドラッグして予約を追加できます。
+        </p>
+        <div className="flex items-center gap-2 text-sm">
+          <input type="time" step={300} value={boardStart} onChange={(e) => setBoardStart(e.target.value)} className="rounded border px-2 py-1" />
+          <span>〜</span>
+          <input type="time" step={300} value={boardEnd} onChange={(e) => setBoardEnd(e.target.value)} className="rounded border px-2 py-1" />
+        </div>
       </div>
 
       {/* 操作 */}

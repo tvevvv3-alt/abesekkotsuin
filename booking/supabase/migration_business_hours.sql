@@ -32,3 +32,7 @@ insert into public.business_hours (weekday, is_open, seg1_start, seg1_end, seg2_
   (5, true,  600, 780, 960, 1230),
   (6, true,  600, 780, 960, 1230)
 on conflict (weekday) do nothing;
+
+-- 管理ボードの表示範囲（時間外の枠もこの範囲にドラッグで追加できる）
+alter table public.settings add column if not exists board_start_min int not null default 600;  -- 10:00
+alter table public.settings add column if not exists board_end_min   int not null default 1320; -- 22:00

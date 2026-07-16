@@ -148,6 +148,8 @@ export interface Settings {
   change_deadline_hours: number;
   autofill: boolean;
   recheck_on_book: boolean;
+  board_start_min: number; // 管理ボード表示 開始（分）
+  board_end_min: number; // 管理ボード表示 終了（分）
 }
 
 // 月別の予約公開設定

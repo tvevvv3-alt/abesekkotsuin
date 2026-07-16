@@ -154,9 +154,13 @@ create table if not exists public.settings (
   change_deadline_hours int  not null default 0,     -- 予約変更受付期限
   autofill              boolean not null default true, -- 患者情報の自動入力
   recheck_on_book       boolean not null default true, -- 予約確定時の空き再確認（常に有効）
+  board_start_min       int  not null default 600,     -- 管理ボード表示 開始（10:00）
+  board_end_min         int  not null default 1320,    -- 管理ボード表示 終了（22:00）※時間外もこの範囲に表示
   updated_at            timestamptz not null default now(),
   check (id = 1)
 );
+alter table public.settings add column if not exists board_start_min int not null default 600;
+alter table public.settings add column if not exists board_end_min   int not null default 1320;
 insert into public.settings (id) values (1) on conflict (id) do nothing;
 
 -- =====================================================================

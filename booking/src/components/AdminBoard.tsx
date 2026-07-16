@@ -8,6 +8,7 @@ import {
   loadEquipment,
   loadSchedules,
   loadServices,
+  loadSettings,
 } from "@/lib/data";
 import type {
   Appointment,
@@ -15,6 +16,7 @@ import type {
   Closure,
   Equipment,
   ServiceWithSteps,
+  Settings,
   Staff,
   StaffSchedule,
 } from "@/lib/types";
@@ -44,6 +46,7 @@ export default function AdminBoard() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,17 +69,19 @@ export default function AdminBoard() {
   // マスタ（初回）
   useEffect(() => {
     (async () => {
-      const [st, eq, sv, sc] = await Promise.all([
+      const [st, eq, sv, sc, se] = await Promise.all([
         loadAllStaff(supabase),
         loadEquipment(supabase),
         loadServices(supabase),
         loadSchedules(supabase),
+        loadSettings(supabase),
       ]);
       // 管理画面に表示するスタッフ（退職は列から除外、過去予約は保持）
       setStaff(st.filter((s) => s.admin_visible && s.status !== "retired"));
       setEquipment(eq);
       setServices(sv);
       setSchedules(sc);
+      setSettings(se);
     })();
   }, [supabase]);
 
@@ -114,13 +119,17 @@ export default function AdminBoard() {
     [schedules, weekday]
   );
 
+  // ボード表示範囲。勤務時間外（例: 20:30以降の時間外予約）もドラッグで追加できるよう
+  // 設定の board_start/board_end まで常に広げて表示する。
   const [minMin, maxMin] = useMemo(() => {
-    if (daySchedules.length === 0) return [540, 1140];
+    const bStart = settings?.board_start_min ?? 600;
+    const bEnd = settings?.board_end_min ?? 1320;
+    if (daySchedules.length === 0) return [bStart, bEnd];
     return [
-      Math.min(...daySchedules.map((s) => s.start_min)),
-      Math.max(...daySchedules.map((s) => s.end_min)),
+      Math.min(bStart, ...daySchedules.map((s) => s.start_min)),
+      Math.max(bEnd, ...daySchedules.map((s) => s.end_min)),
     ];
-  }, [daySchedules]);
+  }, [daySchedules, settings]);
 
   const height = (maxMin - minMin) * PX_PER_MIN;
   const ticks: number[] = [];
