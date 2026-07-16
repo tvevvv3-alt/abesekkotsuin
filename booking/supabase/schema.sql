@@ -98,6 +98,8 @@ alter table public.services add column if not exists note          text;
 -- 定員制クラス等で開始時刻を固定する場合の候補（"分"のカンマ区切り。例 体幹=1020,1080,1170）
 -- 空なら受付時間内の30分刻みすべてを候補にする。曜日ごとの回数変更は休診設定で調整。
 alter table public.services add column if not exists class_starts  text;
+-- 時間外予約：勤務時間に縛られず、class_starts の固定枠(例 20:30/21:00/21:30)のみ受付
+alter table public.services add column if not exists after_hours   boolean not null default false;
 
 -- =====================================================================
 --  工程テンプレート（service_steps）: メニューを構成する工程
@@ -322,6 +324,7 @@ declare
   v_cap    int;
   v_ok     boolean;
   v_capacity int;
+  v_after_hours boolean;
 begin
   -- メニューに工程が無ければ不可
   if not exists (select 1 from service_steps where service_id = p_service_id) then
@@ -333,7 +336,9 @@ begin
     into v_end
     from service_steps where service_id = p_service_id;
 
-  select capacity into v_capacity from services where id = p_service_id;
+  select capacity, coalesce(after_hours, false)
+    into v_capacity, v_after_hours
+    from services where id = p_service_id;
 
   -- ★ 定員制クラス（体幹教室など capacity>1）
   --   担当者に紐づかず、同時刻の「同一メニュー予約人数」で判定する。
@@ -368,13 +373,16 @@ begin
   end if;
 
   -- ③ 勤務時間内（予約全体が担当者の勤務時間に収まること）
-  select exists (
-    select 1 from staff_schedules
-     where staff_id = p_staff_id and weekday = v_dow
-       and start_min <= p_start_min and end_min >= v_end
-  ) into v_ok;
-  if not v_ok then
-    return jsonb_build_object('ok', false, 'reason', '勤務時間外');
+  --    時間外予約(after_hours)は勤務時間に縛られない固定の夜枠なのでスキップ。
+  if not v_after_hours then
+    select exists (
+      select 1 from staff_schedules
+       where staff_id = p_staff_id and weekday = v_dow
+         and start_min <= p_start_min and end_min >= v_end
+    ) into v_ok;
+    if not v_ok then
+      return jsonb_build_object('ok', false, 'reason', '勤務時間外');
+    end if;
   end if;
 
   -- ④ 休診でない（院全体休診 / 当該担当者の休み。終日 or 時間帯）

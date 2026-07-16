@@ -86,6 +86,7 @@ export default function BookingWizard() {
 
   const service = services.find((s) => s.id === serviceId) || null;
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
+  const afterHours = !!service?.after_hours; // 時間外予約（固定の夜枠のみ）
 
   // クラスの開始時刻固定（体幹=17:00/18:00/19:30）
   const classStarts = useMemo(() => {
@@ -464,6 +465,8 @@ export default function BookingWizard() {
               serviceSteps={service.steps}
               capacity={service.capacity}
               classStarts={classStarts}
+              afterHours={afterHours}
+              afterHoursStarts={afterHours ? classStarts : undefined}
               staffId={staffId}
               weekStart={weekStart}
               schedules={schedules}

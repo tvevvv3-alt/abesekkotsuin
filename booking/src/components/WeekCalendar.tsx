@@ -29,6 +29,8 @@ interface Props {
   serviceSteps: ServiceStep[];
   capacity: number; // 1=通常 / 2以上=定員制クラス
   classStarts?: number[]; // クラスの開始時刻を固定する場合（分）
+  afterHours?: boolean; // 時間外予約（勤務時間外の固定夜枠のみ）
+  afterHoursStarts?: number[]; // 時間外の固定開始時刻（分）例: 20:30/21:00/21:30
   staffId: string;
   weekStart: Date; // 月曜
   schedules: StaffSchedule[]; // 通常=当該担当者 / クラス=全担当者
@@ -57,6 +59,8 @@ export default function WeekCalendar({
   serviceSteps,
   capacity,
   classStarts,
+  afterHours = false,
+  afterHoursStarts,
   staffId,
   weekStart,
   schedules,
@@ -86,7 +90,11 @@ export default function WeekCalendar({
     [weekStart]
   );
 
-  const rows = useMemo(() => timeRows(schedules, slotUnit), [schedules, slotUnit]);
+  const rows = useMemo(() => {
+    // 時間外予約は勤務時間ではなく、固定の夜枠だけを行にする
+    if (afterHours) return [...(afterHoursStarts ?? [])].sort((a, b) => a - b);
+    return timeRows(schedules, slotUnit);
+  }, [afterHours, afterHoursStarts, schedules, slotUnit]);
 
   const grid = useMemo(() => {
     const now = new Date();
@@ -111,9 +119,12 @@ export default function WeekCalendar({
         // 過去の日付・過ぎた時間・最終受付超過・未公開などは予約不可
         if (isPastDay || (isToday && t <= nowMin)) return { kind: "off" };
         if (dayBlocked) return { kind: "off" };
-        if (lastAcceptMin != null && t > lastAcceptMin) return { kind: "off" };
-        const inAnyShift = daySchedules.some((s) => s.start_min <= t && s.end_min > t);
-        if (!inAnyShift) return { kind: "off" };
+        // 時間外予約は勤務時間・最終受付に縛られない（固定の夜枠のみ）
+        if (!afterHours) {
+          if (lastAcceptMin != null && t > lastAcceptMin) return { kind: "off" };
+          const inAnyShift = daySchedules.some((s) => s.start_min <= t && s.end_min > t);
+          if (!inAnyShift) return { kind: "off" };
+        }
 
         if (isClass) {
           // 開始時刻が固定されているクラスは、その時刻以外は表示しない
@@ -149,7 +160,7 @@ export default function WeekCalendar({
           equipmentSteps: dayApptSteps.filter((a) => a.equipment_id !== null),
           equipmentById,
         };
-        const res = checkAvailability(serviceSteps, staffId, t, ctx);
+        const res = checkAvailability(serviceSteps, staffId, t, ctx, undefined, afterHours);
         return res.ok ? { kind: "ok" } : { kind: "busy" };
       });
     });
@@ -164,6 +175,7 @@ export default function WeekCalendar({
     serviceSteps,
     capacity,
     classStarts,
+    afterHours,
     isClass,
     equipmentById,
     windowByMonth,

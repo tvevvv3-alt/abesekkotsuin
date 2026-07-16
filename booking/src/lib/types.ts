@@ -60,6 +60,7 @@ export interface Service {
   image_path: string | null;
   note: string | null;
   class_starts: string | null; // 開始時刻を固定する場合（"分"カンマ区切り）
+  after_hours: boolean; // 時間外予約（勤務時間に関係なく固定の夜枠のみ受付）
 }
 
 // メニューを構成する工程テンプレート

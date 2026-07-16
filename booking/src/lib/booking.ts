@@ -155,7 +155,8 @@ export function checkAvailability(
   staffId: string,
   startMin: number,
   ctx: DayContext,
-  excludeAppointmentId?: string
+  excludeAppointmentId?: string,
+  afterHours = false
 ): AvailabilityResult {
   if (serviceSteps.length === 0) return { ok: false, reason: "工程なし" };
 
@@ -163,10 +164,13 @@ export function checkAvailability(
   const endMin = intervals[intervals.length - 1].end;
 
   // ③ 勤務時間内（予約全体が1つの勤務枠に収まること）
-  const inShift = ctx.schedules.some(
-    (s) => s.start_min <= startMin && s.end_min >= endMin
-  );
-  if (!inShift) return { ok: false, reason: "勤務時間外" };
+  //    時間外予約は勤務時間に縛られない固定の夜枠なので、このチェックはしない。
+  if (!afterHours) {
+    const inShift = ctx.schedules.some(
+      (s) => s.start_min <= startMin && s.end_min >= endMin
+    );
+    if (!inShift) return { ok: false, reason: "勤務時間外" };
+  }
 
   // ④ 休診（院全体 or 当該担当者。終日 or 時間帯）
   for (const c of ctx.closures) {

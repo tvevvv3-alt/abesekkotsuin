@@ -121,6 +121,10 @@ begin
     insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
       (s_id, 1, '施術', 30, true, null, 1);
   end if;
+  -- 時間外予約：勤務時間に縛られない固定の夜枠のみ（20:30/21:00/21:30）
+  update public.services
+     set after_hours = true, class_starts = '1230,1260,1290'
+   where name = '時間外予約';
 
   -- 川西整体院（担当者のみ・施術50分）
   if not exists (select 1 from public.services where name = '川西整体院') then
