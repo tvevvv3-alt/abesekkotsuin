@@ -60,7 +60,7 @@ export default function StaffAdmin() {
     name: "", name_kana: "", display_name: "", role: "therapist",
     color: "#2563eb", status: "active" as StaffStatus,
     bookable: true, patient_visible: true, admin_visible: true,
-    clinic: "", bio: "", note: "",
+    clinic: "", bio: "", note: "", image_path: "",
   });
   const [days, setDays] = useState<DaySeg[]>(Array.from({ length: 7 }, emptyDay));
   const [menuIds, setMenuIds] = useState<Set<string>>(new Set());
@@ -92,7 +92,7 @@ export default function StaffAdmin() {
         name: "", name_kana: "", display_name: "", role: "therapist",
         color: PALETTE[staff.length % PALETTE.length], status: "active",
         bookable: true, patient_visible: true, admin_visible: true,
-        clinic: "", bio: "", note: "",
+        clinic: "", bio: "", note: "", image_path: "",
       });
       setDays(Array.from({ length: 7 }, emptyDay));
       setMenuIds(new Set());
@@ -102,7 +102,7 @@ export default function StaffAdmin() {
       name: s.name, name_kana: s.name_kana || "", display_name: s.display_name || "",
       role: s.role, color: s.color || "#2563eb", status: s.status,
       bookable: s.bookable, patient_visible: s.patient_visible, admin_visible: s.admin_visible,
-      clinic: s.clinic || "", bio: s.bio || "", note: s.note || "",
+      clinic: s.clinic || "", bio: s.bio || "", note: s.note || "", image_path: s.image_path || "",
     });
     // 勤務時間を読み込みフォームへ
     const sc = await loadSchedules(supabase, s.id);
@@ -156,6 +156,7 @@ export default function StaffAdmin() {
         admin_visible: f.admin_visible,
         clinic: f.clinic.trim() || null,
         bio: f.bio.trim() || null,
+        image_path: f.image_path.trim() || null,
         note: f.note.trim() || null,
       };
       let staffId: string;
@@ -347,6 +348,31 @@ export default function StaffAdmin() {
                 ))}
               </div>
             </div>
+
+            {/* 患者向け 紹介文・顔写真 */}
+            <label className="mt-3 block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">紹介文（患者画面に表示）</span>
+              <textarea
+                value={f.bio}
+                onChange={(e) => setF({ ...f, bio: e.target.value })}
+                rows={3}
+                placeholder="例：柔道整復師。スポーツ外傷から慢性的な不調まで幅広く対応します。"
+                className="fld w-full"
+              />
+            </label>
+            <label className="mt-3 block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">顔写真 画像URL（患者画面に表示）</span>
+              <input
+                value={f.image_path}
+                onChange={(e) => setF({ ...f, image_path: e.target.value })}
+                placeholder="https://…（画像のURL）"
+                className="fld w-full"
+              />
+              {f.image_path && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={f.image_path} alt="" className="mt-2 h-20 w-20 rounded-full object-cover" />
+              )}
+            </label>
 
             {editing !== "new" && (
               <label className="mt-3 block">

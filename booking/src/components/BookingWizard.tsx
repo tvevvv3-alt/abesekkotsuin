@@ -72,6 +72,29 @@ function TraBadge({ size = 168 }: { size?: number }) {
   );
 }
 
+// スタッフのアバター（顔写真 or 頭文字）
+function StaffAvatar({ staff, size = 60 }: { staff: Staff; size?: number }) {
+  if (staff.image_path) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={staff.image_path}
+        alt={staff.display_name || staff.name}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full font-bold text-white"
+      style={{ width: size, height: size, backgroundColor: staff.color || "#334155" }}
+    >
+      {(staff.display_name || staff.name).slice(0, 1)}
+    </div>
+  );
+}
+
 // メニューカードの先頭アイコン
 function menuIcon(s: ServiceWithSteps): string {
   if (s.after_hours) return "🌙";
@@ -553,6 +576,32 @@ export default function BookingWizard() {
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* スタッフ紹介（担当者を選ぶと名前の下に顔写真＋紹介文） */}
+          {!isClass && selectedStaff && (
+            <div className="mb-3 flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <StaffAvatar staff={selectedStaff} />
+              <div className="min-w-0">
+                <div className="font-bold text-slate-800">
+                  {selectedStaff.display_name || selectedStaff.name}
+                </div>
+                {selectedStaff.role && (
+                  <div className="text-[11px]" style={{ color: GOLD }}>
+                    {selectedStaff.role}
+                  </div>
+                )}
+                {selectedStaff.bio ? (
+                  <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
+                    {selectedStaff.bio}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-400">
+                    {selectedStaff.clinic || ""}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
