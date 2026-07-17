@@ -376,8 +376,15 @@ begin
   end if;
 
   -- ③ 勤務時間内（予約全体が担当者の勤務時間に収まること）
-  --    時間外予約(after_hours)は勤務時間に縛られない固定の夜枠なのでスキップ。
-  if not v_after_hours then
+  --    時間外予約/別院(after_hours)は時間帯には縛られないが、
+  --    「その曜日が営業日（担当者の勤務がある日）」であることは必要＝通常と同じ休診曜日。
+  if v_after_hours then
+    if not exists (
+      select 1 from staff_schedules where staff_id = p_staff_id and weekday = v_dow
+    ) then
+      return jsonb_build_object('ok', false, 'reason', '休診');
+    end if;
+  else
     select exists (
       select 1 from staff_schedules
        where staff_id = p_staff_id and weekday = v_dow

@@ -119,11 +119,14 @@ export default function WeekCalendar({
         // 過去の日付・過ぎた時間・最終受付超過・未公開などは予約不可
         if (isPastDay || (isToday && t <= nowMin)) return { kind: "off" };
         if (dayBlocked) return { kind: "off" };
-        // 時間外予約は勤務時間・最終受付に縛られない（固定の夜枠のみ）
+        // 時間外予約は勤務時間・最終受付に縛られない（固定の夜枠のみ）。
+        // ただし営業日（その曜日に勤務がある日）でなければ出さない＝通常と同じ休診曜日。
         if (!afterHours) {
           if (lastAcceptMin != null && t > lastAcceptMin) return { kind: "off" };
           const inAnyShift = daySchedules.some((s) => s.start_min <= t && s.end_min > t);
           if (!inAnyShift) return { kind: "off" };
+        } else if (daySchedules.length === 0) {
+          return { kind: "off" };
         }
 
         if (isClass) {
