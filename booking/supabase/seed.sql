@@ -69,7 +69,7 @@ begin
     ) returning id into s_id;
     -- 内部工程：全身通電20分（機器・4名まで）→ 施術30分（担当者）
     insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
-      (s_id, 1, '全身通電', 20, false, eq_hc, 1),
+      (s_id, 1, '全身通電', 30, false, eq_hc, 1),  -- 通電の実施は20分・占有枠は30分（施術が次の30分グリッド=+30分から始まる）
       (s_id, 2, '施術',     30, true,  null,  1);
   end if;
   -- 旧メニュー（施術30分→全身通電20分）が残っていれば新仕様へ置き換える
@@ -82,7 +82,7 @@ begin
      returning id into s_id;
     delete from public.service_steps where service_id = s_id;
     insert into public.service_steps (service_id, step_order, name, duration_min, uses_staff, equipment_id, headcount) values
-      (s_id, 1, '全身通電', 20, false, eq_hc, 1),
+      (s_id, 1, '全身通電', 30, false, eq_hc, 1),  -- 通電の実施は20分・占有枠は30分（施術が次の30分グリッド=+30分から始まる）
       (s_id, 2, '施術',     30, true,  null,  1);
   end if;
 
