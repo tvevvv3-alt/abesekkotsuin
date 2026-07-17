@@ -30,6 +30,36 @@ const GRID_STEP = 30; // 目盛り・スナップ（分）
 type ColCtx = { staffId?: string; serviceId?: string; canClose: boolean };
 const ctxKey = (c: ColCtx) => c.staffId ?? `svc:${c.serviceId}`;
 
+// 重なる予約を横に並べる（lane=何列目 / cols=同時最大列数）
+function layoutLanes<T extends { s: number; e: number }>(
+  items: T[]
+): (T & { lane: number; cols: number })[] {
+  const sorted = [...items].sort((a, b) => a.s - b.s || a.e - b.e);
+  const out: (T & { lane: number; cols: number })[] = [];
+  let cluster: (T & { lane: number; cols: number })[] = [];
+  let clusterEnd = -Infinity;
+  const laneEnd: number[] = [];
+  const flush = () => {
+    const cols = cluster.reduce((m, c) => Math.max(m, c.lane + 1), 0);
+    cluster.forEach((c) => (c.cols = cols));
+    out.push(...cluster);
+    cluster = [];
+    laneEnd.length = 0;
+  };
+  for (const it of sorted) {
+    if (cluster.length && it.s >= clusterEnd) flush();
+    let lane = laneEnd.findIndex((end) => end <= it.s);
+    if (lane === -1) {
+      lane = laneEnd.length;
+      laneEnd.push(it.e);
+    } else laneEnd[lane] = it.e;
+    cluster.push({ ...it, lane, cols: 1 });
+    clusterEnd = Math.max(clusterEnd, it.e);
+  }
+  if (cluster.length) flush();
+  return out;
+}
+
 interface ApptWithSteps extends Appointment {
   steps: AppointmentStep[];
 }
@@ -463,24 +493,30 @@ export default function AdminBoard() {
                 onPointerMoveTrack={moveDrag}
                 onPointerUpTrack={endDrag}
               >
-                {equipCards(eq.id).map(({ appt, s, e }, i) => (
-                  <div
-                    key={`${appt.id}-${i}`}
-                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-0.5 text-left"
-                    style={{
-                      // 通電20分など短い枠は、見やすいよう30分グリッドまで伸ばして表示
-                      top: yFor(s),
-                      height: yFor(Math.ceil(e / GRID_STEP) * GRID_STEP) - yFor(s) - 2,
-                    }}
-                  >
-                    <div className="truncate text-[10px] font-medium text-slate-700">
-                      {appt.patient_name}
+                {layoutLanes(equipCards(eq.id)).map(({ appt, s, e, lane, cols }, i) => {
+                  const w = 100 / cols;
+                  return (
+                    <div
+                      key={`${appt.id}-${i}`}
+                      className="absolute z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-0.5 text-left"
+                      style={{
+                        // 通電20分など短い枠は、見やすいよう30分グリッドまで伸ばして表示
+                        top: yFor(s),
+                        height: yFor(Math.ceil(e / GRID_STEP) * GRID_STEP) - yFor(s) - 2,
+                        // 同時利用は横に並べる
+                        left: `calc(${lane * w}% + 2px)`,
+                        width: `calc(${w}% - 4px)`,
+                      }}
+                    >
+                      <div className="truncate text-[10px] font-medium text-slate-700">
+                        {appt.patient_name}
+                      </div>
+                      <div className="truncate text-[9px] text-slate-500">
+                        {minToLabel(s)}
+                      </div>
                     </div>
-                    <div className="text-[9px] text-slate-500">
-                      {minToLabel(s)}–{minToLabel(e)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </Column>
               );
             })}
