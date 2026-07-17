@@ -43,6 +43,22 @@ const STORAGE_KEY = "abe_booking_patient";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
+// 院（拠点）。川西整体院メニューだけ川西、それ以外は茨木本院。
+type ClinicId = "" | "ibaraki" | "kawanishi";
+const CLINICS: { id: Exclude<ClinicId, "">; name: string; sub: string; icon: string }[] = [
+  { id: "ibaraki", name: "茨木本院", sub: "接骨・鍼灸・全身通電・体幹教室", icon: "🏥" },
+  { id: "kawanishi", name: "川西整体院", sub: "整体（施術50分）", icon: "🌿" },
+];
+
+// メニューカードの先頭アイコン
+function menuIcon(s: ServiceWithSteps): string {
+  if (s.after_hours) return "🌙";
+  if (s.capacity > 1) return "🤸"; // 体幹教室など定員制クラス
+  if (s.category === "川西整体院") return "🌿";
+  if (s.recommended) return "⭐";
+  return "💪"; // 通常施術
+}
+
 export default function BookingWizard() {
   const supabase = useMemo(() => createClient(), []);
   const [step, setStep] = useState<Step>(1);
@@ -58,6 +74,8 @@ export default function BookingWizard() {
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [masterError, setMasterError] = useState<string | null>(null);
 
+  // 院（拠点）選択。空なら院選択トップを表示。
+  const [clinic, setClinic] = useState<ClinicId>("");
   // カテゴリー絞り込み
   const [category, setCategory] = useState<string>("all");
 
@@ -120,24 +138,33 @@ export default function BookingWizard() {
     return null;
   }, [windows, weekStart]);
 
-  // 患者に見せられるメニュー（公開中）。カテゴリーで絞り込み。
+  // 患者に見せられるメニュー（公開中）。選択中の院 → カテゴリーで絞り込み。
   const publicServices = useMemo(
     () => services.filter((s) => s.published),
     [services]
   );
+  // 院で絞る（川西整体院メニューだけ川西、それ以外は茨木本院）
+  const clinicServices = useMemo(() => {
+    if (!clinic) return [];
+    return publicServices.filter((s) =>
+      clinic === "kawanishi"
+        ? s.category === "川西整体院"
+        : s.category !== "川西整体院"
+    );
+  }, [publicServices, clinic]);
   const categories = useMemo(() => {
     const set: string[] = [];
-    publicServices.forEach((s) => {
+    clinicServices.forEach((s) => {
       if (!set.includes(s.category)) set.push(s.category);
     });
     return set;
-  }, [publicServices]);
+  }, [clinicServices]);
   const shownServices = useMemo(
     () =>
       category === "all"
-        ? publicServices
-        : publicServices.filter((s) => s.category === category),
-    [publicServices, category]
+        ? clinicServices
+        : clinicServices.filter((s) => s.category === category),
+    [clinicServices, category]
   );
 
   // 選択メニューに対応できるスタッフ（患者表示・受付中・在籍中のみ）
@@ -311,19 +338,74 @@ export default function BookingWizard() {
     );
   }
 
+  // ===== 院選択トップ（ブランド） =====
+  if (!clinic) {
+    return (
+      <div className="mx-auto min-h-screen max-w-md bg-white pb-16 shadow-sm">
+        <div className="bg-gradient-to-b from-slate-900 to-slate-700 px-6 pb-10 pt-12 text-center text-white">
+          <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-2xl bg-white/10 px-5 py-2 text-2xl font-black tracking-[0.3em]">
+            TRA
+          </div>
+          <h1 className="text-lg font-bold">Total Recovery Station Abe</h1>
+          <p className="mt-1 text-xs text-white/70">阿部接骨院 ／ WEB予約</p>
+        </div>
+        <div className="px-5 py-6">
+          <h2 className="mb-3 text-center text-sm font-bold text-slate-700">
+            ご予約の院を選んでください
+          </h2>
+          <div className="space-y-3">
+            {CLINICS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setClinic(c.id);
+                  setCategory("all");
+                }}
+                className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition active:scale-[.99] active:bg-slate-50"
+              >
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-2xl">
+                  {c.icon}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-slate-800">{c.name}</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">{c.sub}</span>
+                </span>
+                <span className="text-slate-300">›</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const clinicName = CLINICS.find((c) => c.id === clinic)?.name ?? "";
+
   return (
     <div className="mx-auto min-h-screen max-w-md bg-white pb-24 shadow-sm">
       {/* ヘッダ */}
-      <header className="sticky top-0 z-20 border-b bg-white/95 px-4 py-3 backdrop-blur">
-        <h1 className="text-center text-base font-bold text-slate-800">
-          阿部接骨院 WEB予約
-        </h1>
+      <header className="sticky top-0 z-20 border-b bg-white/95 px-4 py-2.5 backdrop-blur">
+        <div className="flex items-center justify-center gap-2">
+          <span className="rounded-md bg-slate-900 px-1.5 py-0.5 text-[11px] font-black tracking-wider text-white">
+            TRA
+          </span>
+          <h1 className="text-sm font-bold text-slate-800">Total Recovery Station Abe</h1>
+        </div>
+        <p className="mt-0.5 text-center text-[11px] text-slate-400">
+          {clinicName} ／ WEB予約
+        </p>
         <StepBar step={step} />
       </header>
 
       {/* ① メニュー選択 */}
       {step === 1 && (
-        <Section title="メニューを選ぶ">
+        <Section
+          title="メニューを選ぶ"
+          onBack={() => {
+            setClinic("");
+            setCategory("all");
+          }}
+        >
           {/* カテゴリー絞り込み */}
           {categories.length > 1 && (
             <div className="mb-3 flex flex-wrap gap-1.5">
@@ -346,7 +428,7 @@ export default function BookingWizard() {
                   key={s.id}
                   onClick={() => pickService(s.id)}
                   disabled={stopped}
-                  className={`flex w-full items-center justify-between rounded-xl border p-4 text-left ${
+                  className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left ${
                     stopped
                       ? "cursor-not-allowed border-slate-200 opacity-60"
                       : s.recommended
@@ -354,7 +436,10 @@ export default function BookingWizard() {
                         : "border-slate-200 active:bg-slate-50"
                   }`}
                 >
-                  <div>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">
+                    {menuIcon(s)}
+                  </span>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-800">{label}</span>
                       {s.recommended && (
