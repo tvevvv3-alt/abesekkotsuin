@@ -530,8 +530,6 @@ export default function BookingWizard() {
                   key={s.id}
                   onClick={() => pickService(s.id)}
                   className={`flex w-full items-stretch gap-3 rounded-2xl border p-3 text-left transition ${
-                    stopped ? "opacity-60 " : ""
-                  }${
                     s.recommended
                       ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200 active:bg-blue-50"
                       : "border-slate-200 bg-white active:bg-slate-50"
