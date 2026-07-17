@@ -235,6 +235,18 @@ export default function AdminBoard() {
     return blocks;
   }
 
+  // 川西整体院（別院）：その日の川西予約を列で表示
+  const kawanishiService = useMemo(
+    () => services.find((s) => s.category === "川西整体院") || null,
+    [services]
+  );
+  function kawanishiCards() {
+    if (!kawanishiService) return [];
+    return appts
+      .filter((a) => a.service_id === kawanishiService.id)
+      .map((a) => ({ appt: a, s: a.start_min, e: a.end_min }));
+  }
+
   // 定員制クラス（体幹教室）：同時刻でグループ化して人数を表示
   const classServices = useMemo(
     () => services.filter((s) => s.capacity > 1),
@@ -437,8 +449,9 @@ export default function AdminBoard() {
                     key={`${appt.id}-${i}`}
                     className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-0.5 text-left"
                     style={{
+                      // 通電20分など短い枠は、見やすいよう30分グリッドまで伸ばして表示
                       top: yFor(s),
-                      height: yFor(e) - yFor(s) - 2,
+                      height: yFor(Math.ceil(e / GRID_STEP) * GRID_STEP) - yFor(s) - 2,
                     }}
                   >
                     <div className="truncate text-[10px] font-medium text-slate-700">
@@ -507,6 +520,50 @@ export default function AdminBoard() {
                 ))}
               </Column>
             ))}
+
+            {/* 川西整体院（別院）列 */}
+            {kawanishiService && (
+              <Column
+                header="川西整体院"
+                headerColor="#b45309"
+                height={height}
+                yFor={yFor}
+                ticks={ticks}
+                offRanges={[]}
+                closureBands={closures
+                  .filter(
+                    (c) =>
+                      (c.staff_id === null && c.service_id === null) ||
+                      c.service_id === kawanishiService.id
+                  )
+                  .map((c) => ({
+                    id: c.id,
+                    start: c.start_min ?? minMin,
+                    end: c.end_min ?? maxMin,
+                    reason: c.reason,
+                  }))}
+                onClosureClick={removeClosure}
+              >
+                {kawanishiCards().map(({ appt, s, e }) => (
+                  <button
+                    key={appt.id}
+                    onClick={() => setModal({ mode: "edit", appt })}
+                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
+                    style={{
+                      top: yFor(s),
+                      height: yFor(e) - yFor(s) - 2,
+                      backgroundColor: "#b45309",
+                    }}
+                  >
+                    <div className="truncate text-xs font-bold">
+                      {appt.patient_name || "（未登録）"}
+                    </div>
+                    <div className="truncate text-[10px] opacity-90">{appt.service_name}</div>
+                    <div className="text-[10px] opacity-80">来院 {minToLabel(appt.start_min)}</div>
+                  </button>
+                ))}
+              </Column>
+            )}
           </div>
         </div>
       )}
