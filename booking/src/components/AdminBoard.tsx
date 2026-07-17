@@ -99,6 +99,9 @@ export default function AdminBoard() {
     { ctx: ColCtx; start: number; end: number; x: number; y: number } | null
   >(null);
   const trackTopRef = useRef(0);
+  const downRef = useRef<
+    { ctx: ColCtx; x: number; y: number; startMin: number; mouse: boolean } | null
+  >(null);
 
   // マスタ（初回）
   useEffect(() => {
@@ -307,28 +310,59 @@ export default function AdminBoard() {
   const snap = (m: number) => Math.round(m / GRID_STEP) * GRID_STEP;
   const yToMin = (clientY: number) => minForY(clientY - trackTopRef.current);
 
+  // タッチ＝スクロール優先／マウス＝ドラッグ選択。タップ(=ほぼ動かない)で30分枠のメニュー表示。
   function beginDrag(ctx: ColCtx, e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     trackTopRef.current = rect.top;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    const m = snap(yToMin(e.clientY));
+    downRef.current = {
+      ctx,
+      x: e.clientX,
+      y: e.clientY,
+      startMin: snap(yToMin(e.clientY)),
+      mouse: e.pointerType === "mouse",
+    };
     setPop(null);
-    setDrag({ ctx, a: m, b: m });
+    // マウスのみ即キャプチャしてドラッグ選択（タッチはブラウザのスクロールに任せる）
+    if (e.pointerType === "mouse") {
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {}
+    }
   }
   function moveDrag(e: React.PointerEvent) {
-    if (!drag) return;
+    const d = downRef.current;
+    if (!d || !d.mouse) return; // タッチはスクロールさせる
     const m = snap(yToMin(e.clientY));
-    setDrag((d) => (d ? { ...d, b: m } : d));
+    if (!drag) {
+      if (Math.abs(e.clientY - d.y) < 4 && Math.abs(e.clientX - d.x) < 4) return;
+      setDrag({ ctx: d.ctx, a: d.startMin, b: m });
+    } else {
+      setDrag((dd) => (dd ? { ...dd, b: m } : dd));
+    }
   }
   function endDrag(e: React.PointerEvent) {
-    if (!drag) return;
-    const lo = Math.max(minMin, Math.min(drag.a, drag.b));
-    let hi = Math.min(maxMin, Math.max(drag.a, drag.b));
-    if (hi <= lo) hi = Math.min(maxMin, lo + GRID_STEP); // クリックは30分
-    const ctx = drag.ctx;
+    const d = downRef.current;
+    downRef.current = null;
+    if (drag) {
+      const lo = Math.max(minMin, Math.min(drag.a, drag.b));
+      let hi = Math.min(maxMin, Math.max(drag.a, drag.b));
+      if (hi <= lo) hi = Math.min(maxMin, lo + GRID_STEP);
+      const ctx = drag.ctx;
+      setDrag(null);
+      setPop({ ctx, start: lo, end: hi, x: e.clientX, y: e.clientY });
+      return;
+    }
+    // タップ（ほぼ動いていない）→ 30分枠のメニュー
+    if (d && Math.abs(e.clientY - d.y) < 8 && Math.abs(e.clientX - d.x) < 8) {
+      const lo = Math.max(minMin, d.startMin);
+      const hi = Math.min(maxMin, lo + GRID_STEP);
+      setPop({ ctx: d.ctx, start: lo, end: hi, x: e.clientX, y: e.clientY });
+    }
+  }
+  function cancelDrag() {
+    downRef.current = null;
     setDrag(null);
-    setPop({ ctx, start: lo, end: hi, x: e.clientX, y: e.clientY });
   }
 
   function bandFor(ctx: ColCtx): [number, number] | null {
@@ -447,6 +481,7 @@ export default function AdminBoard() {
                   onPointerDownTrack={(e) => beginDrag(ctx, e)}
                   onPointerMoveTrack={moveDrag}
                   onPointerUpTrack={endDrag}
+                  onPointerCancelTrack={cancelDrag}
                 >
                   {staffCards(st.id).map(({ appt, s, e }) => (
                     <button
@@ -461,12 +496,6 @@ export default function AdminBoard() {
                     >
                       <div className="truncate text-xs font-bold">
                         {appt.patient_name || "（未登録）"}
-                      </div>
-                      <div className="truncate text-[10px] opacity-90">
-                        {appt.service_name}
-                      </div>
-                      <div className="text-[10px] opacity-80">
-                        来院 {minToLabel(appt.start_min)}
                       </div>
                     </button>
                   ))}
@@ -492,6 +521,7 @@ export default function AdminBoard() {
                 onPointerDownTrack={(e) => beginDrag(ctx, e)}
                 onPointerMoveTrack={moveDrag}
                 onPointerUpTrack={endDrag}
+                onPointerCancelTrack={cancelDrag}
               >
                 {layoutLanes(equipCards(eq.id)).map(({ appt, s, e, lane, cols }, i) => {
                   const w = 100 / cols;
@@ -510,9 +540,6 @@ export default function AdminBoard() {
                     >
                       <div className="truncate text-[10px] font-medium text-slate-700">
                         {appt.patient_name}
-                      </div>
-                      <div className="truncate text-[9px] text-slate-500">
-                        {minToLabel(s)}
                       </div>
                     </div>
                   );
@@ -551,6 +578,7 @@ export default function AdminBoard() {
                 onPointerDownTrack={(e) => beginDrag(ctx, e)}
                 onPointerMoveTrack={moveDrag}
                 onPointerUpTrack={endDrag}
+                onPointerCancelTrack={cancelDrag}
               >
                 {classGroups(cls.id).map((g, i) => (
                   <div
@@ -612,6 +640,7 @@ export default function AdminBoard() {
                 }
                 onPointerMoveTrack={moveDrag}
                 onPointerUpTrack={endDrag}
+                onPointerCancelTrack={cancelDrag}
               >
                 {kawanishiCards().map(({ appt, s, e }) => (
                   <button
@@ -627,8 +656,6 @@ export default function AdminBoard() {
                     <div className="truncate text-xs font-bold">
                       {appt.patient_name || "（未登録）"}
                     </div>
-                    <div className="truncate text-[10px] opacity-90">{appt.service_name}</div>
-                    <div className="text-[10px] opacity-80">来院 {minToLabel(appt.start_min)}</div>
                   </button>
                 ))}
               </Column>
@@ -713,6 +740,7 @@ function Column({
   onPointerDownTrack,
   onPointerMoveTrack,
   onPointerUpTrack,
+  onPointerCancelTrack,
   children,
 }: {
   header: string;
@@ -728,6 +756,7 @@ function Column({
   onPointerDownTrack?: (e: React.PointerEvent) => void;
   onPointerMoveTrack?: (e: React.PointerEvent) => void;
   onPointerUpTrack?: (e: React.PointerEvent) => void;
+  onPointerCancelTrack?: (e: React.PointerEvent) => void;
   children: React.ReactNode;
 }) {
   const draggable = Boolean(onPointerDownTrack);
@@ -761,10 +790,11 @@ function Column({
         {draggable && (
           <div
             className="absolute inset-0 z-0"
-            style={{ touchAction: "none" }}
+            style={{ touchAction: "auto" }}
             onPointerDown={onPointerDownTrack}
             onPointerMove={onPointerMoveTrack}
             onPointerUp={onPointerUpTrack}
+            onPointerCancel={onPointerCancelTrack}
           />
         )}
         {/* 休診バンド（クリックで解除）*/}
