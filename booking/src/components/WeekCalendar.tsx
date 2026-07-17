@@ -223,8 +223,10 @@ export default function WeekCalendar({
         </thead>
         <tbody>
           {rows.map((t, ri) => {
-            // どの曜日も勤務外の行（昼休みなど）は細く表示して 10-20時を見やすく
-            const isBreak = !schedules.some((s) => s.start_min <= t && s.end_min > t);
+            // どの曜日も勤務外の行（昼休みなど）は細く表示して 10-20時を見やすく。
+            // 時間外予約は行そのものが予約枠なので圧縮しない。
+            const isBreak =
+              !afterHours && !schedules.some((s) => s.start_min <= t && s.end_min > t);
             if (isBreak) {
               return (
                 <tr key={t}>

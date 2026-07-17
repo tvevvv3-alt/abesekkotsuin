@@ -126,6 +126,7 @@ export default function BookingWizard() {
 
   // 選択
   const [serviceId, setServiceId] = useState<string>("");
+  const [fromServiceId, setFromServiceId] = useState<string | null>(null); // 時間外導線の戻り先
   const [staffId, setStaffId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState<{ date: string; startMin: number } | null>(null);
@@ -312,9 +313,11 @@ export default function BookingWizard() {
     setSelected(null);
   }
 
-  function pickService(id: string) {
+  function pickService(id: string, from: string | null = null) {
     // 新規受付停止メニュー（体幹教室など）も、既存会員の予約用にタップ可。
     // 「新規停止」は表示で案内する。
+    // from: 時間外導線など「元のメニュー」を記録し、戻るで戻れるようにする。
+    setFromServiceId(from);
     setServiceId(id);
     setSelected(null);
     // 対応できるスタッフの先頭を初期選択（クラスは担当者を使わない）
@@ -538,7 +541,15 @@ export default function BookingWizard() {
       {step === 2 && service && (
         <Section
           title="担当者・日時を選ぶ"
-          onBack={() => setStep(1)}
+          onBack={() => {
+            // 時間外導線から来た場合は、元のメニューの日時選択に戻す
+            if (fromServiceId) {
+              const back = fromServiceId;
+              pickService(back);
+            } else {
+              setStep(1);
+            }
+          }}
         >
           <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             {service.patient_name || service.name}（所要 約{totalDuration(service.steps)}分）
@@ -672,7 +683,7 @@ export default function BookingWizard() {
           {/* 時間外への導線（時間外メニュー・体幹教室では出さない） */}
           {!afterHours && !isClass && afterHoursService && (
             <button
-              onClick={() => pickService(afterHoursService.id)}
+              onClick={() => pickService(afterHoursService.id, service.id)}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 py-3 text-sm font-bold text-slate-700 active:bg-slate-100"
             >
               🌙 20:30以降の「時間外予約」はこちら
