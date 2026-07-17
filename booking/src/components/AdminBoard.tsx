@@ -489,8 +489,10 @@ export default function AdminBoard() {
                       onClick={() => setModal({ mode: "edit", appt })}
                       className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
                       style={{
-                        top: yFor(s),
-                        height: yFor(e) - yFor(s) - 2,
+                        // 表示は30分グリッドにスナップして揃える
+                        top: yFor(snap(s)),
+                        height:
+                          yFor(Math.max(snap(e), snap(s) + GRID_STEP)) - yFor(snap(s)) - 2,
                         backgroundColor: st.color || "#334155",
                       }}
                     >
@@ -648,8 +650,9 @@ export default function AdminBoard() {
                     onClick={() => setModal({ mode: "edit", appt })}
                     className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
                     style={{
-                      top: yFor(s),
-                      height: yFor(e) - yFor(s) - 2,
+                      top: yFor(snap(s)),
+                      height:
+                        yFor(Math.max(snap(e), snap(s) + GRID_STEP)) - yFor(snap(s)) - 2,
                       backgroundColor: "#b45309",
                     }}
                   >
