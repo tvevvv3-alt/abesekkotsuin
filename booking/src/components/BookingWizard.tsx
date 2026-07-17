@@ -313,8 +313,8 @@ export default function BookingWizard() {
   }
 
   function pickService(id: string) {
-    const svc = services.find((s) => s.id === id);
-    if (svc && !svc.new_booking) return; // 新規受付停止メニューは選択不可
+    // 新規受付停止メニュー（体幹教室など）も、既存会員の予約用にタップ可。
+    // 「新規停止」は表示で案内する。
     setServiceId(id);
     setSelected(null);
     // 対応できるスタッフの先頭を初期選択（クラスは担当者を使わない）
@@ -493,13 +493,10 @@ export default function BookingWizard() {
                 <button
                   key={s.id}
                   onClick={() => pickService(s.id)}
-                  disabled={stopped}
                   className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left ${
-                    stopped
-                      ? "cursor-not-allowed border-slate-200 opacity-60"
-                      : s.recommended
-                        ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200 active:bg-slate-50"
-                        : "border-slate-200 active:bg-slate-50"
+                    s.recommended
+                      ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200 active:bg-slate-50"
+                      : "border-slate-200 active:bg-slate-50"
                   }`}
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">
@@ -529,7 +526,7 @@ export default function BookingWizard() {
                       {s.capacity > 1 && `・定員${s.capacity}名`}
                     </div>
                   </div>
-                  {!stopped && <span className="ml-2 shrink-0 text-slate-300">›</span>}
+                  <span className="ml-2 shrink-0 text-slate-300">›</span>
                 </button>
               );
             })}
@@ -547,6 +544,13 @@ export default function BookingWizard() {
             {service.patient_name || service.name}（所要 約{totalDuration(service.steps)}分）
             {isClass && `・定員${service.capacity}名`}
           </div>
+
+          {/* 新規受付停止メニュー（体幹教室など）：既存の方のみ案内 */}
+          {!service.new_booking && (
+            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              こちらは<b>新規受付を停止中</b>のメニューです。<b>すでに通われている方のみ</b>ご予約いただけます。はじめての方は受付できませんのでご了承ください。
+            </div>
+          )}
 
           {/* 担当者ボタン：押しても画面遷移せずカレンダーだけ切替。
               このメニューに対応できるスタッフのみ表示。
