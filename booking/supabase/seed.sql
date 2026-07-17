@@ -149,6 +149,14 @@ update public.services
        note = '月額制サブスク：月4回コース¥4,400／フリーパス¥8,150（通い放題・目安は多くて週2回程度）。予約1回ごとの課金ではなく月謝制のため、料金表(初診/再診)には登録しない。'
  where name = '体幹教室';
 
+-- 一覧カード用のバッジ・短い説明（未設定のみ。管理画面から編集できます）
+update public.services set badge = coalesce(badge,'基本'),   short_desc = coalesce(short_desc,'担当者による施術30分の基本メニューです。')          where name = '施術30分';
+update public.services set badge = coalesce(badge,'集中ケア'), short_desc = coalesce(short_desc,'慢性症状や、じっくり施術を受けたい方向けです。')      where name = '施術60分';
+update public.services set badge = coalesce(badge,'20:30以降'), short_desc = coalesce(short_desc,'通常時間外に施術を希望する方向けです。')          where name = '時間外予約';
+update public.services set short_desc = coalesce(short_desc,'まず全身通電で身体を整えやすい状態にし、その後30分間の施術を行います。')          where name = '施術30分＋全身通電20分';
+update public.services set short_desc = coalesce(short_desc,'定員4名の少人数制体幹トレーニングです。')                                          where name = '体幹教室';
+update public.services set short_desc = coalesce(short_desc,'川西整体院での整体施術（50分）です。')                                            where name = '川西整体院';
+
 -- ---------- 勤務時間（HP実データ：茨木本院 月〜土, 午前/午後の2枠）------
 --  午前 10:00-13:00 (600-780) / 午後 16:00-20:30 (960-1230)
 --  日曜(0)は休診（スケジュール無し）／不定休（完全予約制）

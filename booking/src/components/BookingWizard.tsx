@@ -95,6 +95,38 @@ function StaffAvatar({ staff, size = 60 }: { staff: Staff; size?: number }) {
   );
 }
 
+// メニューカードのサムネイル（画像 or 仮アイコン）
+function MenuThumb({ service }: { service: ServiceWithSteps }) {
+  return (
+    <div className="aspect-square w-[30%] max-w-[130px] shrink-0 self-start overflow-hidden rounded-xl bg-slate-100">
+      {service.image_path ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={service.image_path} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-3xl">
+          {menuIcon(service)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// メニューカードのバッジ
+function MenuBadge({ service, stopped }: { service: ServiceWithSteps; stopped: boolean }) {
+  const base = "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold";
+  if (stopped)
+    return <span className={`${base} bg-slate-400 text-white`}>新規受付停止中</span>;
+  if (service.recommended)
+    return <span className={`${base} bg-blue-600 text-white`}>イチオシ</span>;
+  if (service.badge)
+    return (
+      <span className={base} style={{ backgroundColor: "#f4edda", color: "#a9822f" }}>
+        {service.badge}
+      </span>
+    );
+  return null;
+}
+
 // メニューカードの先頭アイコン
 function menuIcon(s: ServiceWithSteps): string {
   if (s.after_hours) return "🌙";
@@ -477,7 +509,7 @@ export default function BookingWizard() {
         >
           {/* カテゴリー絞り込み */}
           {categories.length > 1 && (
-            <div className="mb-3 flex flex-wrap gap-1.5">
+            <div className="scroll-x mb-4 flex gap-1.5 overflow-x-auto pb-1">
               <CatBtn on={category === "all"} onClick={() => setCategory("all")}>
                 すべて
               </CatBtn>
@@ -488,48 +520,40 @@ export default function BookingWizard() {
               ))}
             </div>
           )}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {shownServices.map((s) => {
               const stopped = !s.new_booking;
               const label = s.patient_name || s.name;
+              const desc = s.short_desc || s.description;
               return (
                 <button
                   key={s.id}
                   onClick={() => pickService(s.id)}
-                  className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left ${
+                  className={`flex w-full items-stretch gap-3 rounded-2xl border p-3 text-left transition ${
+                    stopped ? "opacity-60 " : ""
+                  }${
                     s.recommended
-                      ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200 active:bg-slate-50"
-                      : "border-slate-200 active:bg-slate-50"
+                      ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200 active:bg-blue-50"
+                      : "border-slate-200 bg-white active:bg-slate-50"
                   }`}
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">
-                    {menuIcon(s)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                  <MenuThumb service={s} />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="font-bold text-slate-800">{label}</span>
-                      {s.recommended && (
-                        <span className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                          イチオシ
-                        </span>
-                      )}
-                      {stopped && (
-                        <span className="shrink-0 rounded-full bg-slate-400 px-2 py-0.5 text-[10px] font-bold text-white">
-                          新規受付停止中
-                        </span>
-                      )}
+                      <MenuBadge service={s} stopped={stopped} />
                     </div>
-                    {s.description && (
-                      <div className="mt-1 text-xs leading-relaxed text-slate-500">
-                        {s.description}
-                      </div>
+                    {desc && (
+                      <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-slate-500">
+                        {desc}
+                      </p>
                     )}
-                    <div className="mt-1 text-[11px] text-slate-400">
+                    <div className="mt-auto pt-1.5 text-[11px] text-slate-400">
                       所要 約{totalDuration(s.steps)}分
                       {s.capacity > 1 && `・定員${s.capacity}名`}
                     </div>
                   </div>
-                  <span className="ml-2 shrink-0 text-slate-300">›</span>
+                  <span className="flex shrink-0 items-center text-lg text-slate-300">›</span>
                 </button>
               );
             })}
@@ -693,20 +717,67 @@ export default function BookingWizard() {
             </button>
           )}
 
+          {/* 日時を選ぶと中央にモーダルで確認 */}
           {selected && (
-            <div className="mt-4">
-              <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                {formatSelected(selected)}
-                {!isClass && selectedStaff
-                  ? ` / ${selectedStaff.display_name || selectedStaff.name}`
-                  : ""}
-              </div>
-              <button
-                onClick={() => setStep(3)}
-                className="mt-3 w-full rounded-xl bg-blue-600 py-3 font-bold text-white active:bg-blue-700"
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+              onClick={() => setSelected(null)}
+            >
+              <div
+                className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
               >
-                この日時で進む
-              </button>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-base font-bold text-slate-800">予約日時を確認</h3>
+                  <button
+                    onClick={() => setSelected(null)}
+                    aria-label="閉じる"
+                    className="-mr-1 -mt-1 text-2xl leading-none text-slate-400 active:text-slate-600"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {!isClass && selectedStaff && (
+                    <div>
+                      <div className="text-[11px] text-slate-400">担当</div>
+                      <div className="font-bold text-slate-800">
+                        {selectedStaff.display_name || selectedStaff.name}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-[11px] text-slate-400">日時</div>
+                    <div className="font-bold text-slate-800">{fullDate(selected)}</div>
+                    <div className="font-bold text-slate-800">
+                      {minToLabel(selected.startMin)}〜
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400">メニュー</div>
+                    <div className="font-bold text-slate-800">
+                      {service.patient_name || service.name}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-2">
+                  <button
+                    onClick={() => setStep(3)}
+                    className="w-full rounded-xl py-3.5 text-base font-bold text-white active:opacity-90"
+                    style={{ backgroundColor: "#2563eb" }}
+                  >
+                    この日時で予約する
+                  </button>
+                  <button
+                    onClick={() => setSelected(null)}
+                    className="w-full rounded-xl border border-slate-300 bg-white py-3 font-bold text-slate-600 active:bg-slate-50"
+                  >
+                    戻る
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </Section>
@@ -879,6 +950,12 @@ function formatSelected(sel: { date: string; startMin: number }): string {
   return `${d.getMonth() + 1}/${d.getDate()}（${WEEKDAY_LABELS[d.getDay()]}）${minToLabel(
     sel.startMin
   )}`;
+}
+
+// モーダル用のフル日付（2026年7月17日（金））
+function fullDate(sel: { date: string; startMin: number }): string {
+  const d = fromDateStr(sel.date);
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAY_LABELS[d.getDay()]}）`;
 }
 
 function StepBar({ step }: { step: Step }) {

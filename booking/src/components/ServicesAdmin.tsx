@@ -52,6 +52,10 @@ export default function ServicesAdmin() {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [published, setPublished] = useState(true);
   const [newBooking, setNewBooking] = useState(true);
+  const [shortDesc, setShortDesc] = useState("");
+  const [badge, setBadge] = useState("");
+  const [imagePath, setImagePath] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [staffIds, setStaffIds] = useState<Set<string>>(new Set());
   const [steps, setSteps] = useState<StepDraft[]>([emptyStep()]);
   const [busy, setBusy] = useState(false);
@@ -88,6 +92,9 @@ export default function ServicesAdmin() {
     setCategory(CATEGORIES[0]);
     setPublished(true);
     setNewBooking(true);
+    setShortDesc("");
+    setBadge("");
+    setImagePath("");
     setStaffIds(new Set());
     setPriceMap({});
     setSteps([emptyStep()]);
@@ -104,6 +111,9 @@ export default function ServicesAdmin() {
     setCategory(s.category || CATEGORIES[0]);
     setPublished(s.published);
     setNewBooking(s.new_booking);
+    setShortDesc(s.short_desc || "");
+    setBadge(s.badge || "");
+    setImagePath(s.image_path || "");
     setStaffIds(new Set(links.filter((l) => l.service_id === s.id).map((l) => l.staff_id)));
     const pm: Record<string, { ini: string; rep: string }> = {};
     prices
@@ -141,6 +151,26 @@ export default function ServicesAdmin() {
     setSteps((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   }
 
+  async function uploadImage(file: File) {
+    setUploading(true);
+    setError(null);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `menu-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("menu-images")
+      .upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type });
+    if (upErr) {
+      setError(
+        `画像アップロードに失敗しました：${upErr.message}（バケット "menu-images" 作成のSQLを実行済みか確認してください）`
+      );
+      setUploading(false);
+      return;
+    }
+    const { data } = supabase.storage.from("menu-images").getPublicUrl(path);
+    setImagePath(data.publicUrl);
+    setUploading(false);
+  }
+
   async function save() {
     if (!name.trim()) {
       setError("メニュー名を入力してください");
@@ -166,6 +196,9 @@ export default function ServicesAdmin() {
         category,
         published,
         new_booking: newBooking,
+        short_desc: shortDesc.trim() || null,
+        badge: badge.trim() || null,
+        image_path: imagePath.trim() || null,
       };
       let serviceId: string;
       if (editing === "new") {
@@ -352,10 +385,75 @@ export default function ServicesAdmin() {
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder="説明（任意）"
-              rows={3}
+              placeholder="詳細説明（確認画面などで使用・任意）"
+              rows={2}
               className="mb-2 w-full rounded-md border px-2 py-1.5 text-sm"
             />
+
+            {/* 一覧カード用：短い説明・バッジ・画像 */}
+            <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-xs text-slate-500">一覧カードの短い説明（2〜3行）</span>
+                <textarea
+                  value={shortDesc}
+                  onChange={(e) => setShortDesc(e.target.value)}
+                  placeholder="例：まず全身通電で身体を整え、その後30分間の施術を行います。"
+                  rows={2}
+                  className="w-full rounded-md border px-2 py-1.5 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">バッジ（例：基本／集中ケア）</span>
+                <input
+                  value={badge}
+                  onChange={(e) => setBadge(e.target.value)}
+                  placeholder="任意"
+                  className="w-full rounded-md border px-2 py-1.5 text-sm"
+                />
+              </label>
+            </div>
+
+            <div className="mb-3">
+              <span className="mb-1 block text-xs text-slate-500">メニュー画像（一覧カードに表示）</span>
+              <div className="flex items-center gap-3">
+                {imagePath ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imagePath} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">
+                    なし
+                  </div>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-center text-xs font-medium text-slate-600 hover:bg-slate-50">
+                    {uploading ? "アップロード中…" : "画像をアップロード"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadImage(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {imagePath && (
+                    <button type="button" onClick={() => setImagePath("")} className="text-xs text-slate-400">
+                      画像を削除
+                    </button>
+                  )}
+                </div>
+              </div>
+              <input
+                value={imagePath}
+                onChange={(e) => setImagePath(e.target.value)}
+                placeholder="またはURLを直接入力"
+                className="mt-2 w-full rounded-md border px-2 py-1.5 text-sm"
+              />
+            </div>
+
             {/* 対応可能スタッフ（メニュー側からも設定できる）*/}
             <div className="mb-2">
               <span className="mb-1 block text-xs font-bold text-slate-600">

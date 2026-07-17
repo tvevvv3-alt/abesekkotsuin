@@ -57,7 +57,9 @@ export interface Service {
   patient_name: string | null; // 患者向け表示名（未設定なら name）
   published: boolean; // 公開/非公開
   new_booking: boolean; // 新規受付ON/OFF
-  image_path: string | null;
+  image_path: string | null; // メニュー画像URL
+  short_desc: string | null; // 一覧カード用の短い説明
+  badge: string | null; // カードのバッジ（イチオシ/基本/集中ケア 等）
   note: string | null;
   class_starts: string | null; // 開始時刻を固定する場合（"分"カンマ区切り）
   after_hours: boolean; // 時間外予約（勤務時間に関係なく固定の夜枠のみ受付）

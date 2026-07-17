@@ -100,6 +100,9 @@ alter table public.services add column if not exists note          text;
 alter table public.services add column if not exists class_starts  text;
 -- 時間外予約：勤務時間に縛られず、class_starts の固定枠(例 20:30/21:00/21:30)のみ受付
 alter table public.services add column if not exists after_hours   boolean not null default false;
+-- 一覧カード用の短い説明とバッジ
+alter table public.services add column if not exists short_desc    text;
+alter table public.services add column if not exists badge         text;
 
 -- =====================================================================
 --  工程テンプレート（service_steps）: メニューを構成する工程
