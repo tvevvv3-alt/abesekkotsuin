@@ -26,6 +26,10 @@ import AdminBookingModal from "./AdminBookingModal";
 const PX_PER_MIN = 1.4;
 const GRID_STEP = 30; // 目盛り・スナップ（分）
 
+// 列コンテキスト：担当者列 or メニュー列（体幹/川西/ハイチャージ）
+type ColCtx = { staffId?: string; serviceId?: string; canClose: boolean };
+const ctxKey = (c: ColCtx) => c.staffId ?? `svc:${c.serviceId}`;
+
 interface ApptWithSteps extends Appointment {
   steps: AppointmentStep[];
 }
@@ -53,16 +57,16 @@ export default function AdminBoard() {
 
   // モーダル：追加は担当者・時刻をプリセットできる
   const [modal, setModal] = useState<
-    | { mode: "add"; staffId?: string; startMin?: number }
+    | { mode: "add"; staffId?: string; serviceId?: string; startMin?: number }
     | { mode: "edit"; appt: ApptWithSteps }
     | null
   >(null);
 
-  // ドラッグ選択の状態
-  const [drag, setDrag] = useState<{ staffId: string; a: number; b: number } | null>(null);
+  // ドラッグ選択の状態（列コンテキスト付き：担当者列 or メニュー列）
+  const [drag, setDrag] = useState<{ ctx: ColCtx; a: number; b: number } | null>(null);
   // ドラッグ確定後に出す2択メニュー
   const [pop, setPop] = useState<
-    { staffId: string; start: number; end: number; x: number; y: number } | null
+    { ctx: ColCtx; start: number; end: number; x: number; y: number } | null
   >(null);
   const trackTopRef = useRef(0);
 
@@ -235,6 +239,12 @@ export default function AdminBoard() {
     return blocks;
   }
 
+  // 機器を使うメニュー（ハイチャージ列のドラッグ予約のプリセット）
+  const equipMenu = useMemo(
+    () => services.find((s) => s.steps?.some((st) => st.equipment_id)) || null,
+    [services]
+  );
+
   // 川西整体院（別院）：その日の川西予約を列で表示
   const kawanishiService = useMemo(
     () => services.find((s) => s.category === "川西整体院") || null,
@@ -267,14 +277,14 @@ export default function AdminBoard() {
   const snap = (m: number) => Math.round(m / GRID_STEP) * GRID_STEP;
   const yToMin = (clientY: number) => minForY(clientY - trackTopRef.current);
 
-  function beginDrag(staffId: string, e: React.PointerEvent) {
+  function beginDrag(ctx: ColCtx, e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     trackTopRef.current = rect.top;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const m = snap(yToMin(e.clientY));
     setPop(null);
-    setDrag({ staffId, a: m, b: m });
+    setDrag({ ctx, a: m, b: m });
   }
   function moveDrag(e: React.PointerEvent) {
     if (!drag) return;
@@ -286,16 +296,24 @@ export default function AdminBoard() {
     const lo = Math.max(minMin, Math.min(drag.a, drag.b));
     let hi = Math.min(maxMin, Math.max(drag.a, drag.b));
     if (hi <= lo) hi = Math.min(maxMin, lo + GRID_STEP); // クリックは30分
-    const staffId = drag.staffId;
+    const ctx = drag.ctx;
     setDrag(null);
-    setPop({ staffId, start: lo, end: hi, x: e.clientX, y: e.clientY });
+    setPop({ ctx, start: lo, end: hi, x: e.clientX, y: e.clientY });
+  }
+
+  function bandFor(ctx: ColCtx): [number, number] | null {
+    if (drag && ctxKey(drag.ctx) === ctxKey(ctx))
+      return [Math.min(drag.a, drag.b), Math.max(drag.a, drag.b)];
+    if (pop && ctxKey(pop.ctx) === ctxKey(ctx)) return [pop.start, pop.end];
+    return null;
   }
 
   async function makeClosure() {
     if (!pop) return;
     await supabase.from("closures").insert({
       date,
-      staff_id: pop.staffId,
+      staff_id: pop.ctx.staffId ?? null,
+      service_id: pop.ctx.serviceId ?? null,
       start_min: pop.start,
       end_min: pop.end,
       reason: null,
@@ -383,12 +401,7 @@ export default function AdminBoard() {
 
             {/* 担当者列 */}
             {staff.map((st) => {
-              const band =
-                drag && drag.staffId === st.id
-                  ? ([Math.min(drag.a, drag.b), Math.max(drag.a, drag.b)] as [number, number])
-                  : pop && pop.staffId === st.id
-                    ? ([pop.start, pop.end] as [number, number])
-                    : null;
+              const ctx: ColCtx = { staffId: st.id, canClose: true };
               return (
                 <Column
                   key={st.id}
@@ -400,8 +413,8 @@ export default function AdminBoard() {
                   offRanges={staffOffRanges(st.id)}
                   closureBands={closureBands(st.id)}
                   onClosureClick={removeClosure}
-                  band={band}
-                  onPointerDownTrack={(e) => beginDrag(st.id, e)}
+                  band={bandFor(ctx)}
+                  onPointerDownTrack={(e) => beginDrag(ctx, e)}
                   onPointerMoveTrack={moveDrag}
                   onPointerUpTrack={endDrag}
                 >
@@ -432,7 +445,9 @@ export default function AdminBoard() {
             })}
 
             {/* 機器列（ハイチャージ等）*/}
-            {equipment.filter((eq) => eq.visible).map((eq) => (
+            {equipment.filter((eq) => eq.visible).map((eq) => {
+              const ctx: ColCtx = { serviceId: equipMenu?.id, canClose: false };
+              return (
               <Column
                 key={eq.id}
                 header={`${eq.name}`}
@@ -443,6 +458,10 @@ export default function AdminBoard() {
                 ticks={ticks}
                 offRanges={[]}
                 closureBands={[]}
+                band={bandFor(ctx)}
+                onPointerDownTrack={(e) => beginDrag(ctx, e)}
+                onPointerMoveTrack={moveDrag}
+                onPointerUpTrack={endDrag}
               >
                 {equipCards(eq.id).map(({ appt, s, e }, i) => (
                   <div
@@ -463,10 +482,13 @@ export default function AdminBoard() {
                   </div>
                 ))}
               </Column>
-            ))}
+              );
+            })}
 
             {/* 定員制クラス列（体幹教室）：予約人数 N/定員 を表示 */}
-            {classServices.map((cls) => (
+            {classServices.map((cls) => {
+              const ctx: ColCtx = { serviceId: cls.id, canClose: true };
+              return (
               <Column
                 key={cls.id}
                 header={cls.name}
@@ -489,6 +511,10 @@ export default function AdminBoard() {
                     reason: c.reason,
                   }))}
                 onClosureClick={removeClosure}
+                band={bandFor(ctx)}
+                onPointerDownTrack={(e) => beginDrag(ctx, e)}
+                onPointerMoveTrack={moveDrag}
+                onPointerUpTrack={endDrag}
               >
                 {classGroups(cls.id).map((g, i) => (
                   <div
@@ -519,7 +545,8 @@ export default function AdminBoard() {
                   </div>
                 ))}
               </Column>
-            ))}
+              );
+            })}
 
             {/* 川西整体院（別院）列 */}
             {kawanishiService && (
@@ -543,6 +570,12 @@ export default function AdminBoard() {
                     reason: c.reason,
                   }))}
                 onClosureClick={removeClosure}
+                band={bandFor({ serviceId: kawanishiService.id, canClose: true })}
+                onPointerDownTrack={(e) =>
+                  beginDrag({ serviceId: kawanishiService.id, canClose: true }, e)
+                }
+                onPointerMoveTrack={moveDrag}
+                onPointerUpTrack={endDrag}
               >
                 {kawanishiCards().map(({ appt, s, e }) => (
                   <button
@@ -584,19 +617,26 @@ export default function AdminBoard() {
             </div>
             <button
               onClick={() => {
-                setModal({ mode: "add", staffId: pop.staffId, startMin: pop.start });
+                setModal({
+                  mode: "add",
+                  staffId: pop.ctx.staffId,
+                  serviceId: pop.ctx.serviceId,
+                  startMin: pop.start,
+                });
                 setPop(null);
               }}
-              className="mb-2 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white active:bg-blue-700"
+              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-bold text-white active:bg-blue-700"
             >
               予約を追加
             </button>
-            <button
-              onClick={makeClosure}
-              className="w-full rounded-lg border border-slate-300 py-2.5 text-sm font-bold text-slate-700 active:bg-slate-100"
-            >
-              休診にする
-            </button>
+            {pop.ctx.canClose && (
+              <button
+                onClick={makeClosure}
+                className="mt-2 w-full rounded-lg border border-slate-300 py-2.5 text-sm font-bold text-slate-700 active:bg-slate-100"
+              >
+                休診にする
+              </button>
+            )}
           </div>
         </>
       )}
@@ -606,6 +646,7 @@ export default function AdminBoard() {
           mode={modal.mode}
           appt={modal.mode === "edit" ? modal.appt : undefined}
           initialStaffId={modal.mode === "add" ? modal.staffId : undefined}
+          initialServiceId={modal.mode === "add" ? modal.serviceId : undefined}
           initialStartMin={modal.mode === "add" ? modal.startMin : undefined}
           date={date}
           staff={staff}
