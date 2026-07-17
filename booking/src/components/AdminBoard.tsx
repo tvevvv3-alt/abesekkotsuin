@@ -278,6 +278,10 @@ export default function AdminBoard() {
     [services]
   );
 
+  // 担当者カラー（機器カードの色分け用）
+  const staffColor = (id: string | null) =>
+    staff.find((s) => s.id === id)?.color || "#64748b";
+
   // 川西整体院（別院）：その日の川西予約を列で表示
   const kawanishiService = useMemo(
     () => services.find((s) => s.category === "川西整体院") || null,
@@ -446,7 +450,7 @@ export default function AdminBoard() {
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-white">
-          <div className="flex min-w-[640px]">
+          <div className="flex min-w-[420px]">
             {/* 時間ラベル列 */}
             <div className="w-12 shrink-0 border-r bg-slate-50">
               <div className="h-8 border-b" />
@@ -530,7 +534,7 @@ export default function AdminBoard() {
                   return (
                     <div
                       key={`${appt.id}-${i}`}
-                      className="absolute z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-0.5 text-left"
+                      className="absolute z-20 overflow-hidden rounded-md px-1 py-0.5 text-left text-white shadow-sm"
                       style={{
                         // 通電20分など短い枠は、見やすいよう30分グリッドまで伸ばして表示
                         top: yFor(s),
@@ -538,9 +542,11 @@ export default function AdminBoard() {
                         // 同時利用は横に並べる
                         left: `calc(${lane * w}% + 2px)`,
                         width: `calc(${w}% - 4px)`,
+                        // 担当者カラーで色分け
+                        backgroundColor: staffColor(appt.staff_id),
                       }}
                     >
-                      <div className="truncate text-[10px] font-medium text-slate-700">
+                      <div className="truncate text-[10px] font-bold">
                         {appt.patient_name}
                       </div>
                     </div>
@@ -764,7 +770,7 @@ function Column({
 }) {
   const draggable = Boolean(onPointerDownTrack);
   return (
-    <div className="min-w-[110px] flex-1 border-r last:border-r-0">
+    <div className="min-w-[72px] flex-1 border-r last:border-r-0">
       <div
         className="flex h-8 flex-col items-center justify-center border-b text-xs font-bold text-white"
         style={{ backgroundColor: headerColor }}
