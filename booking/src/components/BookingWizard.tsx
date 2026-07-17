@@ -188,6 +188,11 @@ export default function BookingWizard() {
         : clinicServices.filter((s) => s.category === category),
     [clinicServices, category]
   );
+  // 時間外予約メニュー（この院に受付中のものがあれば）
+  const afterHoursService = useMemo(
+    () => clinicServices.find((s) => s.after_hours && s.new_booking) || null,
+    [clinicServices]
+  );
 
   // 選択メニューに対応できるスタッフ（患者表示・受付中・在籍中のみ）
   const capableStaff = useMemo(() => {
@@ -610,6 +615,17 @@ export default function BookingWizard() {
               ? "残○＝空き人数 満＝定員 ×＝休診 ·＝受付時間外"
               : "○＝予約可 ×＝空きなし ·＝受付時間外"}
           </p>
+
+          {/* 時間外への導線（時間外メニュー表示中は出さない） */}
+          {!afterHours && afterHoursService && (
+            <button
+              onClick={() => pickService(afterHoursService.id)}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 py-3 text-sm font-bold text-slate-700 active:bg-slate-100"
+            >
+              🌙 20:30以降の「時間外予約」はこちら
+              <span style={{ color: GOLD }}>›</span>
+            </button>
+          )}
 
           {selected && (
             <div className="mt-4">
