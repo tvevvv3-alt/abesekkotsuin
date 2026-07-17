@@ -131,10 +131,56 @@ export default function AdminBoard() {
     ];
   }, [daySchedules, settings]);
 
-  const height = (maxMin - minMin) * PX_PER_MIN;
+  // 昼休みなど「勤務の内部ギャップ」を圧縮して 10-20時を一目で見やすくする
+  const BREAK_SCALE = 0.32;
+  const breakGap = useMemo<[number, number] | null>(() => {
+    const iv = daySchedules
+      .map((s) => [s.start_min, s.end_min] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+    if (iv.length < 2) return null;
+    const merged: [number, number][] = [];
+    for (const [a, b] of iv) {
+      const last = merged[merged.length - 1];
+      if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+      else merged.push([a, b]);
+    }
+    if (merged.length < 2) return null;
+    const gs = merged[0][1];
+    const ge = merged[1][0];
+    return ge - gs >= 60 ? [gs, ge] : null; // 1時間以上の内部ギャップ（昼休み）のみ圧縮
+  }, [daySchedules]);
+
+  const yFor = useCallback(
+    (m: number) => {
+      const x = Math.max(minMin, Math.min(maxMin, m));
+      if (!breakGap) return (x - minMin) * PX_PER_MIN;
+      const [gs, ge] = breakGap;
+      if (x <= gs) return (x - minMin) * PX_PER_MIN;
+      if (x >= ge) return (gs - minMin + (ge - gs) * BREAK_SCALE + (x - ge)) * PX_PER_MIN;
+      return (gs - minMin + (x - gs) * BREAK_SCALE) * PX_PER_MIN;
+    },
+    [minMin, maxMin, breakGap]
+  );
+  const minForY = useCallback(
+    (y: number) => {
+      if (!breakGap) return minMin + y / PX_PER_MIN;
+      const [gs, ge] = breakGap;
+      const yGs = (gs - minMin) * PX_PER_MIN;
+      const yGe = yGs + (ge - gs) * BREAK_SCALE * PX_PER_MIN;
+      if (y <= yGs) return minMin + y / PX_PER_MIN;
+      if (y >= yGe) return ge + (y - yGe) / PX_PER_MIN;
+      return gs + (y - yGs) / (PX_PER_MIN * BREAK_SCALE);
+    },
+    [minMin, maxMin, breakGap]
+  );
+
+  const height = yFor(maxMin);
   const ticks: number[] = [];
-  for (let t = Math.ceil(minMin / GRID_STEP) * GRID_STEP; t <= maxMin; t += GRID_STEP)
+  for (let t = Math.ceil(minMin / GRID_STEP) * GRID_STEP; t <= maxMin; t += GRID_STEP) {
+    // 圧縮した昼休み内は毎時のみ表示（ラベル重なり防止）
+    if (breakGap && t > breakGap[0] && t < breakGap[1] && t % 60 !== 0) continue;
     ticks.push(t);
+  }
 
   function staffOffRanges(staffId: string): Array<[number, number]> {
     const shifts = daySchedules
@@ -207,8 +253,7 @@ export default function AdminBoard() {
 
   // ---- ドラッグ選択 ----
   const snap = (m: number) => Math.round(m / GRID_STEP) * GRID_STEP;
-  const yToMin = (clientY: number) =>
-    minMin + (clientY - trackTopRef.current) / PX_PER_MIN;
+  const yToMin = (clientY: number) => minForY(clientY - trackTopRef.current);
 
   function beginDrag(staffId: string, e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -316,7 +361,7 @@ export default function AdminBoard() {
                   <div
                     key={t}
                     className="absolute left-0 w-full pr-1 text-right text-[10px] text-slate-400"
-                    style={{ top: (t - minMin) * PX_PER_MIN - 6 }}
+                    style={{ top: yFor(t) - 6 }}
                   >
                     {minToLabel(t)}
                   </div>
@@ -338,7 +383,7 @@ export default function AdminBoard() {
                   header={st.name}
                   headerColor={st.color || "#334155"}
                   height={height}
-                  minMin={minMin}
+                  yFor={yFor}
                   ticks={ticks}
                   offRanges={staffOffRanges(st.id)}
                   closureBands={closureBands(st.id)}
@@ -354,8 +399,8 @@ export default function AdminBoard() {
                       onClick={() => setModal({ mode: "edit", appt })}
                       className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
                       style={{
-                        top: (s - minMin) * PX_PER_MIN,
-                        height: (e - s) * PX_PER_MIN - 2,
+                        top: yFor(s),
+                        height: yFor(e) - yFor(s) - 2,
                         backgroundColor: st.color || "#334155",
                       }}
                     >
@@ -382,7 +427,7 @@ export default function AdminBoard() {
                 subHeader={`同時${eq.capacity}名`}
                 headerColor="#0f172a"
                 height={height}
-                minMin={minMin}
+                yFor={yFor}
                 ticks={ticks}
                 offRanges={[]}
                 closureBands={[]}
@@ -392,8 +437,8 @@ export default function AdminBoard() {
                     key={`${appt.id}-${i}`}
                     className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-0.5 text-left"
                     style={{
-                      top: (s - minMin) * PX_PER_MIN,
-                      height: (e - s) * PX_PER_MIN - 2,
+                      top: yFor(s),
+                      height: yFor(e) - yFor(s) - 2,
                     }}
                   >
                     <div className="truncate text-[10px] font-medium text-slate-700">
@@ -415,7 +460,7 @@ export default function AdminBoard() {
                 subHeader={`定員${cls.capacity}名`}
                 headerColor="#0f766e"
                 height={height}
-                minMin={minMin}
+                yFor={yFor}
                 ticks={ticks}
                 offRanges={[]}
                 closureBands={closures
@@ -437,8 +482,8 @@ export default function AdminBoard() {
                     key={i}
                     className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-teal-300 bg-teal-50 px-1 py-1"
                     style={{
-                      top: (g.start - minMin) * PX_PER_MIN,
-                      height: (g.end - g.start) * PX_PER_MIN - 2,
+                      top: yFor(g.start),
+                      height: yFor(g.end) - yFor(g.start) - 2,
                     }}
                   >
                     <div className="mb-0.5 text-[11px] font-bold text-teal-800">
@@ -525,7 +570,7 @@ function Column({
   subHeader,
   headerColor,
   height,
-  minMin,
+  yFor,
   ticks,
   offRanges,
   closureBands,
@@ -540,7 +585,7 @@ function Column({
   subHeader?: string;
   headerColor: string;
   height: number;
-  minMin: number;
+  yFor: (m: number) => number;
   ticks: number[];
   offRanges: Array<[number, number]>;
   closureBands: ClosureBand[];
@@ -567,7 +612,7 @@ function Column({
           <div
             key={t}
             className="absolute left-0 w-full border-t border-slate-100"
-            style={{ top: (t - minMin) * PX_PER_MIN }}
+            style={{ top: yFor(t) }}
           />
         ))}
         {/* 勤務外グレー */}
@@ -575,7 +620,7 @@ function Column({
           <div
             key={i}
             className="absolute left-0 w-full bg-slate-200/60"
-            style={{ top: (s - minMin) * PX_PER_MIN, height: (e - s) * PX_PER_MIN }}
+            style={{ top: yFor(s), height: yFor(e) - yFor(s) }}
           />
         ))}
         {/* ドラッグ用オーバーレイ（空き部分の入力を拾う。カードは z-20 で上） */}
@@ -596,8 +641,8 @@ function Column({
             title="クリックで休診を解除"
             className="absolute left-0 z-10 w-full overflow-hidden border-y border-slate-400/40 bg-slate-400/45 text-[10px] font-bold text-slate-600"
             style={{
-              top: (c.start - minMin) * PX_PER_MIN,
-              height: (c.end - c.start) * PX_PER_MIN,
+              top: yFor(c.start),
+              height: yFor(c.end) - yFor(c.start),
               backgroundImage:
                 "repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(100,116,139,.15) 6px, rgba(100,116,139,.15) 12px)",
             }}
@@ -610,8 +655,8 @@ function Column({
           <div
             className="pointer-events-none absolute left-0 z-10 w-full rounded-sm border-2 border-blue-500 bg-blue-500/25"
             style={{
-              top: (band[0] - minMin) * PX_PER_MIN,
-              height: Math.max(2, (band[1] - band[0]) * PX_PER_MIN),
+              top: yFor(band[0]),
+              height: Math.max(2, yFor(band[1]) - yFor(band[0])),
             }}
           />
         )}

@@ -222,7 +222,24 @@ export default function WeekCalendar({
           </tr>
         </thead>
         <tbody>
-          {rows.map((t, ri) => (
+          {rows.map((t, ri) => {
+            // どの曜日も勤務外の行（昼休みなど）は細く表示して 10-20時を見やすく
+            const isBreak = !schedules.some((s) => s.start_min <= t && s.end_min > t);
+            if (isBreak) {
+              return (
+                <tr key={t}>
+                  <td className="sticky left-0 z-10 whitespace-nowrap bg-slate-50 px-1 py-0 text-[10px] leading-none text-slate-300">
+                    {minToLabel(t)}
+                  </td>
+                  {days.map((d) => (
+                    <td key={toDateStr(d)} className="p-0">
+                      <div className="h-2.5" />
+                    </td>
+                  ))}
+                </tr>
+              );
+            }
+            return (
             <tr key={t}>
               <td className="sticky left-0 z-10 whitespace-nowrap bg-slate-50 p-1 text-xs text-slate-500">
                 {minToLabel(t)}
@@ -280,7 +297,8 @@ export default function WeekCalendar({
                 );
               })}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
