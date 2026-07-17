@@ -50,6 +50,28 @@ const CLINICS: { id: Exclude<ClinicId, "">; name: string; sub: string; icon: str
   { id: "kawanishi", name: "川西整体院", sub: "整体（施術50分）", icon: "🌿" },
 ];
 
+// ブランドカラー
+const NAVY = "#0f1f40";
+const GOLD = "#c9a24b";
+
+// TRA 円形ロゴバッジ（公式ロゴ準拠のSVG再現）
+function TraBadge({ size = 168 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 200 200" width={size} height={size} role="img" aria-label="TRA 阿部接骨院 大阪茨木">
+      <circle cx="100" cy="100" r="98" fill={NAVY} />
+      <circle cx="100" cy="100" r="93" fill="none" stroke={GOLD} strokeWidth="2.5" />
+      <text x="100" y="84" textAnchor="middle" fontSize="50" fontWeight="800" fill="#fff" fontFamily="Arial, sans-serif" letterSpacing="1">TR</text>
+      <text x="139" y="84" textAnchor="middle" fontSize="50" fontWeight="800" fill="#fff" fontFamily="Arial, sans-serif">A</text>
+      <line x1="120" y1="86" x2="150" y2="58" stroke={GOLD} strokeWidth="4.5" strokeLinecap="round" />
+      <text x="100" y="103" textAnchor="middle" fontSize="9.6" fill="#fff" fontFamily="Arial, sans-serif" letterSpacing="1.2">TOTAL RECOVERYTATION ABE</text>
+      <polyline points="52,119 79,119 85,110 91,130 97,113 103,119 148,119" fill="none" stroke={GOLD} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <text x="100" y="141" textAnchor="middle" fontSize="16.5" fontWeight="700" fill={GOLD} fontFamily="Arial, sans-serif" letterSpacing="2.5">ABESEKKOTSUIN</text>
+      <text x="100" y="162" textAnchor="middle" fontSize="17" fontWeight="700" fill="#fff" letterSpacing="4">阿部接骨院</text>
+      <text x="100" y="179" textAnchor="middle" fontSize="10" fill={GOLD} letterSpacing="3">大阪茨木</text>
+    </svg>
+  );
+}
+
 // メニューカードの先頭アイコン
 function menuIcon(s: ServiceWithSteps): string {
   if (s.after_hours) return "🌙";
@@ -341,17 +363,19 @@ export default function BookingWizard() {
   // ===== 院選択トップ（ブランド） =====
   if (!clinic) {
     return (
-      <div className="mx-auto min-h-screen max-w-md bg-white pb-16 shadow-sm">
-        <div className="bg-gradient-to-b from-slate-900 to-slate-700 px-6 pb-10 pt-12 text-center text-white">
-          <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-2xl bg-white/10 px-5 py-2 text-2xl font-black tracking-[0.3em]">
-            TRA
+      <div className="mx-auto min-h-screen max-w-md bg-slate-50 pb-16 shadow-sm">
+        <div
+          className="px-6 pb-12 pt-12 text-center"
+          style={{ background: `linear-gradient(180deg, ${NAVY} 0%, #172c56 100%)` }}
+        >
+          <div className="flex justify-center">
+            <TraBadge size={184} />
           </div>
-          <h1 className="text-lg font-bold">Total Recovery Station Abe</h1>
-          <p className="mt-1 text-xs text-white/70">阿部接骨院 ／ WEB予約</p>
+          <p className="mt-5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>
-        <div className="px-5 py-6">
-          <h2 className="mb-3 text-center text-sm font-bold text-slate-700">
-            ご予約の院を選んでください
+        <div className="px-5 py-7">
+          <h2 className="mb-4 text-center text-sm font-bold text-slate-700">
+            ご予約の院をお選びください
           </h2>
           <div className="space-y-3">
             {CLINICS.map((c) => (
@@ -363,17 +387,23 @@ export default function BookingWizard() {
                 }}
                 className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition active:scale-[.99] active:bg-slate-50"
               >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-2xl">
+                <span
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
+                  style={{ backgroundColor: "#f4edda", border: `1.5px solid ${GOLD}` }}
+                >
                   {c.icon}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold text-slate-800">{c.name}</span>
                   <span className="mt-0.5 block text-xs text-slate-500">{c.sub}</span>
                 </span>
-                <span className="text-slate-300">›</span>
+                <span style={{ color: GOLD }}>›</span>
               </button>
             ))}
           </div>
+          <p className="mt-6 text-center text-[11px] text-slate-400">
+            Total Recoverytation Abe ／ 阿部接骨院
+          </p>
         </div>
       </div>
     );
@@ -384,17 +414,25 @@ export default function BookingWizard() {
   return (
     <div className="mx-auto min-h-screen max-w-md bg-white pb-24 shadow-sm">
       {/* ヘッダ */}
-      <header className="sticky top-0 z-20 border-b bg-white/95 px-4 py-2.5 backdrop-blur">
-        <div className="flex items-center justify-center gap-2">
-          <span className="rounded-md bg-slate-900 px-1.5 py-0.5 text-[11px] font-black tracking-wider text-white">
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur">
+        <div
+          className="flex items-center justify-center gap-2 px-4 py-2"
+          style={{ background: NAVY }}
+        >
+          <span
+            className="rounded-md px-1.5 py-0.5 text-[11px] font-black tracking-wider"
+            style={{ background: GOLD, color: NAVY }}
+          >
             TRA
           </span>
-          <h1 className="text-sm font-bold text-slate-800">Total Recovery Station Abe</h1>
+          <h1 className="text-sm font-bold text-white">Total Recoverytation Abe</h1>
         </div>
-        <p className="mt-0.5 text-center text-[11px] text-slate-400">
-          {clinicName} ／ WEB予約
-        </p>
-        <StepBar step={step} />
+        <div className="border-b px-4 pt-2">
+          <p className="text-center text-[11px]" style={{ color: GOLD }}>
+            {clinicName} ／ WEB予約
+          </p>
+          <StepBar step={step} />
+        </div>
       </header>
 
       {/* ① メニュー選択 */}
