@@ -259,7 +259,17 @@ export default function StaffAdmin() {
                 <button onClick={() => move(i, -1)} disabled={i === 0} className="text-slate-400 disabled:opacity-30">▲</button>
                 <button onClick={() => move(i, 1)} disabled={i === staff.length - 1} className="text-slate-400 disabled:opacity-30">▼</button>
               </div>
-              <span className="h-8 w-8 shrink-0 rounded-full" style={{ backgroundColor: s.color || "#94a3b8" }} />
+              {s.image_path ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={s.image_path} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                  style={{ backgroundColor: s.color || "#94a3b8" }}
+                >
+                  {(s.display_name || s.name).slice(0, 1)}
+                </span>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="font-bold text-slate-800">
                   {s.display_name || s.name}
