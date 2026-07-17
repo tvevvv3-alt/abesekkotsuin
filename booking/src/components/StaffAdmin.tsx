@@ -65,6 +65,7 @@ export default function StaffAdmin() {
   const [days, setDays] = useState<DaySeg[]>(Array.from({ length: 7 }, emptyDay));
   const [menuIds, setMenuIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -129,6 +130,26 @@ export default function StaffAdmin() {
       else n.add(id);
       return n;
     });
+  }
+
+  async function uploadPhoto(file: File) {
+    setUploading(true);
+    setError(null);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `staff-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("staff-photos")
+      .upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type });
+    if (upErr) {
+      setError(
+        `画像アップロードに失敗しました：${upErr.message}（バケット "staff-photos" 作成のSQLを実行済みか確認してください）`
+      );
+      setUploading(false);
+      return;
+    }
+    const { data } = supabase.storage.from("staff-photos").getPublicUrl(path);
+    setF((prev) => ({ ...prev, image_path: data.publicUrl }));
+    setUploading(false);
   }
 
   async function save() {
@@ -360,19 +381,50 @@ export default function StaffAdmin() {
                 className="fld w-full"
               />
             </label>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-xs font-medium text-slate-600">顔写真 画像URL（患者画面に表示）</span>
+            <div className="mt-3">
+              <span className="mb-1 block text-xs font-medium text-slate-600">顔写真（患者画面に表示）</span>
+              <div className="flex items-center gap-3">
+                {f.image_path ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={f.image_path} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">
+                    なし
+                  </div>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-center text-xs font-medium text-slate-600 hover:bg-slate-50">
+                    {uploading ? "アップロード中…" : "画像をアップロード"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadPhoto(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {f.image_path && (
+                    <button
+                      type="button"
+                      onClick={() => setF({ ...f, image_path: "" })}
+                      className="text-xs text-slate-400"
+                    >
+                      写真を削除
+                    </button>
+                  )}
+                </div>
+              </div>
               <input
                 value={f.image_path}
                 onChange={(e) => setF({ ...f, image_path: e.target.value })}
-                placeholder="https://…（画像のURL）"
-                className="fld w-full"
+                placeholder="またはURLを直接入力"
+                className="fld mt-2 w-full"
               />
-              {f.image_path && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={f.image_path} alt="" className="mt-2 h-20 w-20 rounded-full object-cover" />
-              )}
-            </label>
+            </div>
 
             {editing !== "new" && (
               <label className="mt-3 block">
