@@ -795,20 +795,20 @@ export default function BookingWizard() {
           )}
 
           {/* 週切替（今週より前へは戻れない） */}
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <button
               onClick={() => setWeekStart(addDays(weekStart, -7))}
               disabled={toDateStr(weekStart) <= toDateStr(startOfWeek(new Date()))}
-              className="rounded-md px-3 py-1 text-sm text-slate-600 active:bg-slate-100 disabled:opacity-30"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm active:bg-slate-100 disabled:opacity-30"
             >
               ‹ 前の週
             </button>
-            <span className="text-sm font-medium text-slate-700">
+            <span className="text-sm font-bold text-slate-800">
               {weekStart.getMonth() + 1}/{weekStart.getDate()} の週
             </span>
             <button
               onClick={() => setWeekStart(addDays(weekStart, 7))}
-              className="rounded-md px-3 py-1 text-sm text-slate-600 active:bg-slate-100"
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm active:bg-slate-100"
             >
               次の週 ›
             </button>
@@ -1228,11 +1228,11 @@ function Section({
   return (
     <section className="px-4 py-4">
       {(title || onBack) && (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-3">
           {onBack && (
             <button
               onClick={onBack}
-              className="rounded-md px-2 py-1 text-sm text-slate-500 active:bg-slate-100"
+              className="shrink-0 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm active:bg-slate-100"
             >
               ‹ 戻る
             </button>
