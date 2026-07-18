@@ -781,6 +781,11 @@ export default function BookingWizard() {
                   <div className="mb-1 px-1 text-xs font-bold text-slate-600">
                     時間外予約（20:30以降）
                   </div>
+                  {afterHoursService.price_note && (
+                    <div className="mb-2 px-1 text-[11px] font-bold" style={{ color: GOLD }}>
+                      {afterHoursService.price_note}
+                    </div>
+                  )}
                   <WeekCalendar
                     serviceId={afterHoursService.id}
                     serviceSteps={afterHoursService.steps}
