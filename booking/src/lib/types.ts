@@ -63,6 +63,7 @@ export interface Service {
   image_path: string | null; // メニュー画像URL
   short_desc: string | null; // 一覧カード用の短い説明
   badge: string | null; // カードのバッジ（イチオシ/基本/集中ケア 等）
+  price_note: string | null; // 料金の自由記述（月謝制・加算など。あればカードにこれを表示）
   note: string | null;
   class_starts: string | null; // 開始時刻を固定する場合（"分"カンマ区切り）
   after_hours: boolean; // 時間外予約（勤務時間に関係なく固定の夜枠のみ受付）

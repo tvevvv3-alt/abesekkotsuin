@@ -602,9 +602,9 @@ export default function BookingWizard() {
                       </p>
                     )}
                     <div className="mt-auto pt-1.5">
-                      {menuPriceLabel(s.id) && (
+                      {(s.price_note?.trim() || menuPriceLabel(s.id)) && (
                         <div className="text-[11px] font-bold" style={{ color: GOLD }}>
-                          {menuPriceLabel(s.id)}
+                          {s.price_note?.trim() || menuPriceLabel(s.id)}
                         </div>
                       )}
                       <div className="text-[11px] text-slate-400">
