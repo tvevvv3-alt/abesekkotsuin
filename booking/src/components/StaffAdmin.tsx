@@ -69,7 +69,7 @@ export default function StaffAdmin() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const panRef = useRef<{ x: number; y: number } | null>(null);
-  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+  const clampPct = (n: number) => Math.round(Math.max(0, Math.min(100, n)));
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -184,8 +184,8 @@ export default function StaffAdmin() {
         bio: f.bio.trim() || null,
         image_path: f.image_path.trim() || null,
         image_scale: f.image_scale,
-        image_pos_x: f.image_pos_x,
-        image_pos_y: f.image_pos_y,
+        image_pos_x: Math.round(f.image_pos_x),
+        image_pos_y: Math.round(f.image_pos_y),
         note: f.note.trim() || null,
       };
       let staffId: string;

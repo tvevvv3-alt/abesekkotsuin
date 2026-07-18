@@ -54,6 +54,7 @@ export default function ServicesAdmin() {
   const [newBooking, setNewBooking] = useState(true);
   const [shortDesc, setShortDesc] = useState("");
   const [badge, setBadge] = useState("");
+  const [priceNote, setPriceNote] = useState("");
   const [imagePath, setImagePath] = useState("");
   const [uploading, setUploading] = useState(false);
   const [staffIds, setStaffIds] = useState<Set<string>>(new Set());
@@ -94,6 +95,7 @@ export default function ServicesAdmin() {
     setNewBooking(true);
     setShortDesc("");
     setBadge("");
+    setPriceNote("");
     setImagePath("");
     setStaffIds(new Set());
     setPriceMap({});
@@ -113,6 +115,7 @@ export default function ServicesAdmin() {
     setNewBooking(s.new_booking);
     setShortDesc(s.short_desc || "");
     setBadge(s.badge || "");
+    setPriceNote(s.price_note || "");
     setImagePath(s.image_path || "");
     setStaffIds(new Set(links.filter((l) => l.service_id === s.id).map((l) => l.staff_id)));
     const pm: Record<string, { ini: string; rep: string }> = {};
@@ -198,6 +201,7 @@ export default function ServicesAdmin() {
         new_booking: newBooking,
         short_desc: shortDesc.trim() || null,
         badge: badge.trim() || null,
+        price_note: priceNote.trim() || null,
         image_path: imagePath.trim() || null,
       };
       let serviceId: string;
@@ -408,6 +412,15 @@ export default function ServicesAdmin() {
                   value={badge}
                   onChange={(e) => setBadge(e.target.value)}
                   placeholder="任意"
+                  className="w-full rounded-md border px-2 py-1.5 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs text-slate-500">料金メモ（月謝制・加算など。カードに表示）</span>
+                <input
+                  value={priceNote}
+                  onChange={(e) => setPriceNote(e.target.value)}
+                  placeholder="例：月4回 ¥4,400 ／ フリーパス ¥8,150"
                   className="w-full rounded-md border px-2 py-1.5 text-sm"
                 />
               </label>
