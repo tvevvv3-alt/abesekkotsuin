@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   loadAllStaff,
@@ -68,6 +68,8 @@ export default function StaffAdmin() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const panRef = useRef<{ x: number; y: number } | null>(null);
+  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -411,11 +413,32 @@ export default function StaffAdmin() {
               <span className="mb-1 block text-xs font-medium text-slate-600">顔写真（患者画面に表示）</span>
               <div className="flex items-center gap-3">
                 {f.image_path ? (
-                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-24 w-24 shrink-0 cursor-move touch-none select-none overflow-hidden rounded-full bg-slate-100"
+                    onPointerDown={(e) => {
+                      panRef.current = { x: e.clientX, y: e.clientY };
+                      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    onPointerMove={(e) => {
+                      const p = panRef.current;
+                      if (!p) return;
+                      const dx = e.clientX - p.x;
+                      const dy = e.clientY - p.y;
+                      panRef.current = { x: e.clientX, y: e.clientY };
+                      setF((prev) => ({
+                        ...prev,
+                        image_pos_x: clampPct(prev.image_pos_x - dx * 0.6),
+                        image_pos_y: clampPct(prev.image_pos_y - dy * 0.6),
+                      }));
+                    }}
+                    onPointerUp={() => (panRef.current = null)}
+                    onPointerCancel={() => (panRef.current = null)}
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={f.image_path}
                       alt=""
+                      draggable={false}
                       className="h-full w-full object-cover"
                       style={{
                         objectPosition: `${f.image_pos_x}% ${f.image_pos_y}%`,
@@ -457,22 +480,11 @@ export default function StaffAdmin() {
               {f.image_path && (
                 <div className="mt-3 space-y-2 rounded-lg bg-slate-50 p-3">
                   <div className="text-[11px] font-bold text-slate-600">顔の大きさ・位置を調整</div>
+                  <p className="text-[11px] text-slate-400">丸い写真を<b>ドラッグして位置調整</b>、下のバーで大きさを調整できます。</p>
                   <label className="flex items-center gap-2 text-[11px] text-slate-500">
                     <span className="w-10 shrink-0">大きさ</span>
                     <input type="range" min={1} max={3} step={0.05} value={f.image_scale}
                       onChange={(e) => setF({ ...f, image_scale: parseFloat(e.target.value) })}
-                      className="w-full" />
-                  </label>
-                  <label className="flex items-center gap-2 text-[11px] text-slate-500">
-                    <span className="w-10 shrink-0">横位置</span>
-                    <input type="range" min={0} max={100} step={1} value={f.image_pos_x}
-                      onChange={(e) => setF({ ...f, image_pos_x: parseInt(e.target.value, 10) })}
-                      className="w-full" />
-                  </label>
-                  <label className="flex items-center gap-2 text-[11px] text-slate-500">
-                    <span className="w-10 shrink-0">縦位置</span>
-                    <input type="range" min={0} max={100} step={1} value={f.image_pos_y}
-                      onChange={(e) => setF({ ...f, image_pos_y: parseInt(e.target.value, 10) })}
                       className="w-full" />
                   </label>
                   <button type="button"

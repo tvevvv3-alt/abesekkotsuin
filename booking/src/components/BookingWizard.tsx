@@ -167,6 +167,7 @@ export default function BookingWizard() {
   // 選択
   const [serviceId, setServiceId] = useState<string>("");
   const [fromServiceId, setFromServiceId] = useState<string | null>(null); // 時間外導線の戻り先
+  const [showAfterHours, setShowAfterHours] = useState(false); // 時間外枠のインライン表示
   const [staffId, setStaffId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState<{ date: string; startMin: number } | null>(null);
@@ -257,6 +258,15 @@ export default function BookingWizard() {
     () => clinicServices.find((s) => s.after_hours && s.new_booking) || null,
     [clinicServices]
   );
+  // 時間外の固定開始時刻（インライン表示用）
+  const ahStarts = useMemo(() => {
+    if (!afterHoursService?.class_starts) return undefined;
+    const arr = afterHoursService.class_starts
+      .split(",")
+      .map((x) => parseInt(x.trim(), 10))
+      .filter((n) => !isNaN(n));
+    return arr.length ? arr : undefined;
+  }, [afterHoursService]);
 
   // 選択メニューに対応できるスタッフ（患者表示・受付中・在籍中のみ）
   const capableStaff = useMemo(() => {
@@ -366,10 +376,28 @@ export default function BookingWizard() {
       (s) => ids.has(s.id) && s.patient_visible && s.bookable && s.status === "active"
     );
     setStaffId(first?.id || "");
+    setShowAfterHours(false);
     setStep(2);
   }
 
   function onSelectSlot(date: string, startMin: number) {
+    setSelected({ date, startMin });
+  }
+
+  // 確認モーダルを閉じる。時間外をインラインから選んでいた場合は元のメニューへ戻す。
+  function closeConfirm() {
+    setSelected(null);
+    if (fromServiceId) {
+      setServiceId(fromServiceId);
+      setFromServiceId(null);
+    }
+  }
+
+  // インラインの時間外枠を選択（元メニューを記録して時間外へ切替＋確認モーダル）
+  function selectAfterHours(date: string, startMin: number) {
+    if (!afterHoursService) return;
+    setFromServiceId(service?.id ?? null);
+    setServiceId(afterHoursService.id);
     setSelected({ date, startMin });
   }
 
@@ -712,22 +740,51 @@ export default function BookingWizard() {
               : "○＝予約可 ×＝空きなし ·＝受付時間外"}
           </p>
 
-          {/* 時間外への導線（時間外メニュー・体幹教室では出さない） */}
+          {/* 時間外への導線（時間外メニュー・体幹教室では出さない）。その場で下に展開。 */}
           {!afterHours && !isClass && afterHoursService && (
-            <button
-              onClick={() => pickService(afterHoursService.id, service.id)}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 py-3 text-sm font-bold text-slate-700 active:bg-slate-100"
-            >
-              🌙 20:30以降の「時間外予約」はこちら
-              <span style={{ color: GOLD }}>›</span>
-            </button>
+            <div className="mt-3">
+              <button
+                onClick={() => setShowAfterHours((v) => !v)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 py-3 text-sm font-bold text-slate-700 active:bg-slate-100"
+              >
+                🌙 20:30以降の「時間外予約」はこちら
+                <span style={{ color: GOLD }}>{showAfterHours ? "▲" : "▼"}</span>
+              </button>
+              {showAfterHours && (
+                <div className="mt-3 rounded-xl border border-slate-200 p-2">
+                  <div className="mb-1 px-1 text-xs font-bold text-slate-600">
+                    時間外予約（20:30以降）
+                  </div>
+                  <WeekCalendar
+                    serviceId={afterHoursService.id}
+                    serviceSteps={afterHoursService.steps}
+                    capacity={afterHoursService.capacity}
+                    classStarts={ahStarts}
+                    afterHours={true}
+                    afterHoursStarts={ahStarts}
+                    staffId={staffId}
+                    weekStart={weekStart}
+                    schedules={schedules}
+                    closures={closures}
+                    apptSteps={apptSteps}
+                    equipment={equipment}
+                    slotUnit={settings?.slot_unit ?? 30}
+                    sameDayOk={settings?.same_day_ok ?? true}
+                    lastAcceptMin={null}
+                    windows={windows}
+                    selected={selected}
+                    onSelect={selectAfterHours}
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           {/* 日時を選ぶと中央にモーダルで確認 */}
           {selected && (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-              onClick={() => setSelected(null)}
+              onClick={closeConfirm}
             >
               <div
                 className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-2xl"
@@ -736,7 +793,7 @@ export default function BookingWizard() {
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-base font-bold text-slate-800">予約日時を確認</h3>
                   <button
-                    onClick={() => setSelected(null)}
+                    onClick={closeConfirm}
                     aria-label="閉じる"
                     className="-mr-1 -mt-1 text-2xl leading-none text-slate-400 active:text-slate-600"
                   >
@@ -777,7 +834,7 @@ export default function BookingWizard() {
                     この日時で予約する
                   </button>
                   <button
-                    onClick={() => setSelected(null)}
+                    onClick={closeConfirm}
                     className="w-full rounded-xl border border-slate-300 bg-white py-3 font-bold text-slate-600 active:bg-slate-50"
                   >
                     戻る
