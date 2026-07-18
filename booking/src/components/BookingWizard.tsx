@@ -519,6 +519,15 @@ export default function BookingWizard() {
     }
   }
 
+  // 完了画面から最初へ戻す
+  function resetWizard() {
+    setStep(1);
+    setServiceId("");
+    setSelected(null);
+    setSubmitError(null);
+    setLastAppointmentId(null);
+  }
+
   // 保存済みの家族情報をフォームへ反映
   function applySavedPatient(p: SavedPatient) {
     setName(p.name || "");
@@ -1152,34 +1161,62 @@ export default function BookingWizard() {
               ご来院時刻は {minToLabel(selected.startMin)} です。
             </p>
 
-            {lineEnabled && lastAppointmentId && (
-              <div className="mt-6">
-                <a
-                  href={`/api/line/login?a=${lastAppointmentId}`}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-base font-bold text-white active:opacity-90"
-                  style={{ backgroundColor: "#06C755" }}
+            {lineEnabled && lastAppointmentId ? (
+              <>
+                <div
+                  className="mt-6 rounded-2xl border-2 bg-white p-4 text-left shadow-sm"
+                  style={{ borderColor: "#06C755" }}
                 >
-                  <span className="text-lg">💬</span>
-                  LINEで予約確認・リマインドを受け取る
-                </a>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  LINEで友だち追加すると、予約確認と前日・当日のリマインドが届きます。
-                </p>
-              </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
+                      style={{ backgroundColor: "#06C755" }}
+                    >
+                      登録おすすめ
+                    </span>
+                    <span className="text-sm font-bold text-slate-800">
+                      LINEで予約を受け取りましょう
+                    </span>
+                  </div>
+                  <ul className="mt-3 space-y-1.5 text-sm text-slate-700">
+                    {[
+                      "予約内容がLINEにすぐ届く",
+                      "前日・当日にリマインドが届く",
+                      "予約忘れ・時間の勘違いを防げます",
+                    ].map((t) => (
+                      <li key={t} className="flex gap-2">
+                        <span style={{ color: "#06C755" }}>✓</span>
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <a
+                    href={`/api/line/login?a=${lastAppointmentId}`}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 text-base font-bold text-white shadow-md active:opacity-90"
+                    style={{ backgroundColor: "#06C755" }}
+                  >
+                    <span className="text-lg">💬</span>
+                    LINEで登録して受け取る
+                  </a>
+                  <p className="mt-2 text-center text-[11px] text-slate-500">
+                    ⚠ リマインドはLINE登録された方のみお届けします
+                  </p>
+                </div>
+                <button
+                  onClick={resetWizard}
+                  className="mt-4 text-xs text-slate-400 underline"
+                >
+                  今はしない
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={resetWizard}
+                className="mt-6 rounded-xl border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700"
+              >
+                最初に戻る
+              </button>
             )}
-
-            <button
-              onClick={() => {
-                setStep(1);
-                setServiceId("");
-                setSelected(null);
-                setSubmitError(null);
-                setLastAppointmentId(null);
-              }}
-              className="mt-6 rounded-xl border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700"
-            >
-              最初に戻る
-            </button>
           </div>
         </Section>
       )}
