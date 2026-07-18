@@ -40,6 +40,7 @@ import {
 import WeekCalendar from "./WeekCalendar";
 
 const STORAGE_KEY = "abe_booking_patient";
+const STORAGE_KEY_LIST = "abe_booking_patients"; // 端末に保存した家族分の一覧
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -183,6 +184,7 @@ export default function BookingWizard() {
   const [birth, setBirth] = useState("");
   const [phone, setPhone] = useState("");
   const [isReturning, setIsReturning] = useState(false);
+  const [savedList, setSavedList] = useState<SavedPatient[]>([]);
 
   // 確定
   const [submitting, setSubmitting] = useState(false);
@@ -361,6 +363,15 @@ export default function BookingWizard() {
         setPhone(p.phone || "");
         setIsReturning(Boolean(p.name));
       }
+      // 家族分の一覧（無ければ単体保存から作る）
+      const rawList = localStorage.getItem(STORAGE_KEY_LIST);
+      if (rawList) {
+        const list = JSON.parse(rawList) as SavedPatient[];
+        if (Array.isArray(list)) setSavedList(list.filter((p) => p && p.name));
+      } else if (raw) {
+        const p = JSON.parse(raw) as SavedPatient;
+        if (p.name) setSavedList([p]);
+      }
     } catch {
       /* noop */
     }
@@ -466,7 +477,7 @@ export default function BookingWizard() {
         setSelected(null);
         return;
       }
-      // 端末に保存（次回自動入力）
+      // 端末に保存（次回自動入力＋家族分の一覧）
       const saved: SavedPatient = {
         name: name.trim(),
         name_kana: kana.trim(),
@@ -474,11 +485,47 @@ export default function BookingWizard() {
         phone: phone.trim(),
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      // 同一人物（名前＋電話が一致）は上書き、それ以外は追加。最大8件・新しい順。
+      const merged = [
+        saved,
+        ...savedList.filter(
+          (p) => !(p.name === saved.name && p.phone === saved.phone)
+        ),
+      ].slice(0, 8);
+      setSavedList(merged);
+      localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(merged));
       setStep(5);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "エラーが発生しました");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // 保存済みの家族情報をフォームへ反映
+  function applySavedPatient(p: SavedPatient) {
+    setName(p.name || "");
+    setKana(p.name_kana || "");
+    setBirth(p.birth_date || "");
+    setPhone(p.phone || "");
+    setIsReturning(false);
+  }
+  // フォームを空にして新規入力
+  function clearPatientForm() {
+    setName("");
+    setKana("");
+    setBirth("");
+    setPhone("");
+    setIsReturning(false);
+  }
+  // 家族一覧から1件削除
+  function removeSavedPatient(idx: number) {
+    const next = savedList.filter((_, i) => i !== idx);
+    setSavedList(next);
+    try {
+      localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(next));
+    } catch {
+      /* noop */
     }
   }
 
@@ -924,6 +971,50 @@ export default function BookingWizard() {
           {isReturning && (
             <div className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
               前回の情報を自動入力しました。変更があれば修正してください。
+            </div>
+          )}
+          {savedList.length > 0 && (
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 text-xs font-bold text-slate-600">
+                ご予約される方を選択（ご家族の情報から）
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {savedList.map((p, i) => {
+                  const active = p.name === name && p.phone === phone;
+                  return (
+                    <div key={`${p.name}-${p.phone}-${i}`} className="relative">
+                      <button
+                        onClick={() => applySavedPatient(p)}
+                        className={`rounded-full border px-3 py-1.5 pr-7 text-sm font-medium transition ${
+                          active
+                            ? "border-blue-600 bg-blue-600 text-white"
+                            : "border-slate-300 bg-white text-slate-700 active:bg-slate-100"
+                        }`}
+                      >
+                        {p.name}
+                      </button>
+                      <button
+                        onClick={() => removeSavedPatient(i)}
+                        aria-label="削除"
+                        className={`absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full px-1 text-xs leading-none ${
+                          active ? "text-white/80" : "text-slate-400"
+                        }`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+                <button
+                  onClick={clearPatientForm}
+                  className="rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-500 active:bg-slate-100"
+                >
+                  ＋ 新しい方
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-slate-400">
+                親子・ご家族でご利用の方は、名前をタップすると情報が切り替わります。
+              </p>
             </div>
           )}
           <div className="space-y-3">
