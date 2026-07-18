@@ -47,7 +47,10 @@ export default function ClosuresAdmin() {
       supabase.from("closures").select("*").order("date"),
     ]);
     setStaff(st);
-    setClassServices(sv.filter((s) => s.capacity > 1));
+    // メニュー単位で休診にできる対象：体幹教室（定員制）と川西整体院
+    setClassServices(
+      sv.filter((s) => s.capacity > 1 || s.category === "川西整体院")
+    );
     setClosures(data ?? []);
     setLoading(false);
   }, [supabase]);

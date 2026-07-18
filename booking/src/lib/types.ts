@@ -17,6 +17,9 @@ export interface Staff {
   status: StaffStatus; // 在籍中/休止中/退職/非表示
   bio: string | null;
   image_path: string | null;
+  image_scale: number | null; // 顔写真のズーム（1=標準）
+  image_pos_x: number | null; // 顔写真の横位置（%）
+  image_pos_y: number | null; // 顔写真の縦位置（%）
   clinic: string | null;
   note: string | null;
 }

@@ -76,13 +76,21 @@ function TraBadge({ size = 168 }: { size?: number }) {
 function StaffAvatar({ staff, size = 60 }: { staff: Staff; size?: number }) {
   if (staff.image_path) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={staff.image_path}
-        alt={staff.display_name || staff.name}
-        className="shrink-0 rounded-full object-cover"
+      <div
+        className="shrink-0 overflow-hidden rounded-full bg-slate-100"
         style={{ width: size, height: size }}
-      />
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={staff.image_path}
+          alt={staff.display_name || staff.name}
+          className="h-full w-full object-cover"
+          style={{
+            objectPosition: `${staff.image_pos_x ?? 50}% ${staff.image_pos_y ?? 50}%`,
+            transform: `scale(${staff.image_scale ?? 1})`,
+          }}
+        />
+      </div>
     );
   }
   return (

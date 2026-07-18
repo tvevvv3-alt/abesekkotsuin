@@ -61,6 +61,7 @@ export default function StaffAdmin() {
     color: "#2563eb", status: "active" as StaffStatus,
     bookable: true, patient_visible: true, admin_visible: true,
     clinic: "", bio: "", note: "", image_path: "",
+    image_scale: 1, image_pos_x: 50, image_pos_y: 50,
   });
   const [days, setDays] = useState<DaySeg[]>(Array.from({ length: 7 }, emptyDay));
   const [menuIds, setMenuIds] = useState<Set<string>>(new Set());
@@ -94,6 +95,7 @@ export default function StaffAdmin() {
         color: PALETTE[staff.length % PALETTE.length], status: "active",
         bookable: true, patient_visible: true, admin_visible: true,
         clinic: "", bio: "", note: "", image_path: "",
+    image_scale: 1, image_pos_x: 50, image_pos_y: 50,
       });
       setDays(Array.from({ length: 7 }, emptyDay));
       setMenuIds(new Set());
@@ -104,6 +106,7 @@ export default function StaffAdmin() {
       role: s.role, color: s.color || "#2563eb", status: s.status,
       bookable: s.bookable, patient_visible: s.patient_visible, admin_visible: s.admin_visible,
       clinic: s.clinic || "", bio: s.bio || "", note: s.note || "", image_path: s.image_path || "",
+      image_scale: s.image_scale ?? 1, image_pos_x: s.image_pos_x ?? 50, image_pos_y: s.image_pos_y ?? 50,
     });
     // 勤務時間を読み込みフォームへ
     const sc = await loadSchedules(supabase, s.id);
@@ -178,6 +181,9 @@ export default function StaffAdmin() {
         clinic: f.clinic.trim() || null,
         bio: f.bio.trim() || null,
         image_path: f.image_path.trim() || null,
+        image_scale: f.image_scale,
+        image_pos_x: f.image_pos_x,
+        image_pos_y: f.image_pos_y,
         note: f.note.trim() || null,
       };
       let staffId: string;
@@ -260,8 +266,18 @@ export default function StaffAdmin() {
                 <button onClick={() => move(i, 1)} disabled={i === staff.length - 1} className="text-slate-400 disabled:opacity-30">▼</button>
               </div>
               {s.image_path ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={s.image_path} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={s.image_path}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${s.image_pos_x ?? 50}% ${s.image_pos_y ?? 50}%`,
+                      transform: `scale(${s.image_scale ?? 1})`,
+                    }}
+                  />
+                </div>
               ) : (
                 <span
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
@@ -395,10 +411,20 @@ export default function StaffAdmin() {
               <span className="mb-1 block text-xs font-medium text-slate-600">顔写真（患者画面に表示）</span>
               <div className="flex items-center gap-3">
                 {f.image_path ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.image_path} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover" />
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full bg-slate-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={f.image_path}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      style={{
+                        objectPosition: `${f.image_pos_x}% ${f.image_pos_y}%`,
+                        transform: `scale(${f.image_scale})`,
+                      }}
+                    />
+                  </div>
                 ) : (
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">
                     なし
                   </div>
                 )}
@@ -428,6 +454,32 @@ export default function StaffAdmin() {
                   )}
                 </div>
               </div>
+              {f.image_path && (
+                <div className="mt-3 space-y-2 rounded-lg bg-slate-50 p-3">
+                  <div className="text-[11px] font-bold text-slate-600">顔の大きさ・位置を調整</div>
+                  <label className="flex items-center gap-2 text-[11px] text-slate-500">
+                    <span className="w-10 shrink-0">大きさ</span>
+                    <input type="range" min={1} max={3} step={0.05} value={f.image_scale}
+                      onChange={(e) => setF({ ...f, image_scale: parseFloat(e.target.value) })}
+                      className="w-full" />
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] text-slate-500">
+                    <span className="w-10 shrink-0">横位置</span>
+                    <input type="range" min={0} max={100} step={1} value={f.image_pos_x}
+                      onChange={(e) => setF({ ...f, image_pos_x: parseInt(e.target.value, 10) })}
+                      className="w-full" />
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] text-slate-500">
+                    <span className="w-10 shrink-0">縦位置</span>
+                    <input type="range" min={0} max={100} step={1} value={f.image_pos_y}
+                      onChange={(e) => setF({ ...f, image_pos_y: parseInt(e.target.value, 10) })}
+                      className="w-full" />
+                  </label>
+                  <button type="button"
+                    onClick={() => setF({ ...f, image_scale: 1, image_pos_x: 50, image_pos_y: 50 })}
+                    className="text-[11px] text-slate-400">リセット</button>
+                </div>
+              )}
               <input
                 value={f.image_path}
                 onChange={(e) => setF({ ...f, image_path: e.target.value })}

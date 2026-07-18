@@ -41,6 +41,9 @@ alter table public.staff add column if not exists admin_visible  boolean not nul
 alter table public.staff add column if not exists status         text not null default 'active';
 alter table public.staff add column if not exists bio            text;   -- 紹介文
 alter table public.staff add column if not exists image_path     text;   -- プロフィール画像
+alter table public.staff add column if not exists image_scale    numeric not null default 1;  -- 顔写真ズーム
+alter table public.staff add column if not exists image_pos_x    int not null default 50;     -- 顔写真 横位置(%)
+alter table public.staff add column if not exists image_pos_y    int not null default 50;     -- 顔写真 縦位置(%)
 alter table public.staff add column if not exists clinic         text;   -- 所属院
 alter table public.staff add column if not exists note           text;   -- 備考
 
