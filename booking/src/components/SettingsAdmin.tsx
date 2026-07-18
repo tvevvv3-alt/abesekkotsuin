@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadSettings } from "@/lib/data";
 import type { ClinicBranding, Settings } from "@/lib/types";
@@ -13,6 +13,7 @@ export default function SettingsAdmin() {
   const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const panRef = useRef<{ x: number; y: number; id: "ibaraki" | "kawanishi" } | null>(null);
 
   const reload = useCallback(async () => {
     setS(await loadSettings(supabase));
@@ -76,14 +77,18 @@ export default function SettingsAdmin() {
     ibaraki: { name: "茨木本院", sub: "接骨・鍼灸・全身通電・体幹教室" },
     kawanishi: { name: "川西整体院", sub: "整体（施術50分）" },
   };
-  const clinicVal = (id: "ibaraki" | "kawanishi"): ClinicBranding => {
+  const clinicVal = (id: "ibaraki" | "kawanishi"): Required<ClinicBranding> => {
     const c = s.clinics?.[id];
     return {
       name: c?.name ?? CLINIC_DEFAULTS[id].name,
       sub: c?.sub ?? CLINIC_DEFAULTS[id].sub,
       logo_url: c?.logo_url ?? null,
+      logo_scale: c?.logo_scale ?? 1,
+      logo_pos_x: c?.logo_pos_x ?? 50,
+      logo_pos_y: c?.logo_pos_y ?? 50,
     };
   };
+  const clampPct = (n: number) => Math.round(Math.max(0, Math.min(100, n)));
   const updateClinic = (id: "ibaraki" | "kawanishi", patch: Partial<ClinicBranding>) => {
     const next = { ibaraki: clinicVal("ibaraki"), kawanishi: clinicVal("kawanishi") };
     next[id] = { ...next[id], ...patch };
@@ -227,13 +232,39 @@ export default function SettingsAdmin() {
                 <div key={id} className="rounded-lg border bg-slate-50 p-3">
                   <div className="mb-2 flex items-center gap-3">
                     {c.logo_url ? (
-                      <img
-                        src={c.logo_url}
-                        alt={c.name}
-                        className="h-14 w-14 rounded-full border object-cover"
-                      />
+                      <div
+                        className="h-14 w-14 shrink-0 cursor-move touch-none overflow-hidden rounded-full border"
+                        onPointerDown={(e) => {
+                          panRef.current = { x: e.clientX, y: e.clientY, id };
+                          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                        }}
+                        onPointerMove={(e) => {
+                          const p = panRef.current;
+                          if (!p || p.id !== id) return;
+                          const dx = e.clientX - p.x;
+                          const dy = e.clientY - p.y;
+                          panRef.current = { x: e.clientX, y: e.clientY, id };
+                          updateClinic(id, {
+                            logo_pos_x: clampPct(c.logo_pos_x + dx * 0.8),
+                            logo_pos_y: clampPct(c.logo_pos_y + dy * 0.8),
+                          });
+                        }}
+                        onPointerUp={() => (panRef.current = null)}
+                        onPointerCancel={() => (panRef.current = null)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={c.logo_url}
+                          alt={c.name}
+                          draggable={false}
+                          className="h-full w-full object-cover"
+                          style={{
+                            transform: `translate(${c.logo_pos_x - 50}%, ${c.logo_pos_y - 50}%) scale(${c.logo_scale})`,
+                          }}
+                        />
+                      </div>
                     ) : (
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full border border-dashed text-[10px] text-slate-400">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-dashed text-[10px] text-slate-400">
                         未設定
                       </div>
                     )}
@@ -262,6 +293,31 @@ export default function SettingsAdmin() {
                       )}
                     </div>
                   </div>
+                  {c.logo_url && (
+                    <div className="mb-2 space-y-1.5 rounded-md bg-white p-2">
+                      <p className="text-[11px] text-slate-400">
+                        丸いロゴを<b>ドラッグして位置調整</b>、下のバーで大きさを調整できます。
+                      </p>
+                      <label className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <span className="w-9 shrink-0">大きさ</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={3}
+                          step={0.05}
+                          value={c.logo_scale}
+                          onChange={(e) => updateClinic(id, { logo_scale: parseFloat(e.target.value) })}
+                          className="w-full"
+                        />
+                      </label>
+                      <button
+                        onClick={() => updateClinic(id, { logo_scale: 1, logo_pos_x: 50, logo_pos_y: 50 })}
+                        className="text-[11px] text-slate-400"
+                      >
+                        リセット
+                      </button>
+                    </div>
+                  )}
                   <label className="mb-1 block text-[11px] font-bold text-slate-500">院名</label>
                   <input
                     value={c.name}

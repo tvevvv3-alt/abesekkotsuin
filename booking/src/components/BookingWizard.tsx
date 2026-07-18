@@ -239,6 +239,9 @@ export default function BookingWizard() {
           name: o?.name?.trim() || c.name,
           sub: o?.sub?.trim() || c.sub,
           logo_url: o?.logo_url || null,
+          logo_scale: o?.logo_scale ?? 1,
+          logo_pos_x: o?.logo_pos_x ?? 50,
+          logo_pos_y: o?.logo_pos_y ?? 50,
         };
       }),
     [settings]
@@ -528,12 +531,19 @@ export default function BookingWizard() {
                 className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition active:scale-[.99] active:bg-slate-50"
               >
                 {c.logo_url ? (
-                  <img
-                    src={c.logo_url}
-                    alt={c.name}
-                    className="h-12 w-12 shrink-0 rounded-full object-cover"
+                  <span
+                    className="block h-12 w-12 shrink-0 overflow-hidden rounded-full"
                     style={{ border: `1.5px solid ${GOLD}` }}
-                  />
+                  >
+                    <img
+                      src={c.logo_url}
+                      alt={c.name}
+                      className="h-full w-full object-cover"
+                      style={{
+                        transform: `translate(${c.logo_pos_x - 50}%, ${c.logo_pos_y - 50}%) scale(${c.logo_scale})`,
+                      }}
+                    />
+                  </span>
                 ) : (
                   <span
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"

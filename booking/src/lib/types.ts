@@ -150,6 +150,9 @@ export interface ClinicBranding {
   name: string;
   sub: string;
   logo_url: string | null;
+  logo_scale?: number; // ロゴのズーム（1=標準）
+  logo_pos_x?: number; // ロゴの横位置（%）
+  logo_pos_y?: number; // ロゴの縦位置（%）
 }
 
 // 予約 基本設定（1行）
