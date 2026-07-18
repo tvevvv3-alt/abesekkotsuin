@@ -29,11 +29,13 @@ export default function LineDonePage({
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-600">
             ✓
           </div>
-          <h1 className="text-lg font-bold text-slate-800">LINE連携が完了しました</h1>
+          <h1 className="text-lg font-bold text-slate-800">
+            ご予約・LINE連携が完了しました
+          </h1>
           <p className="mt-2 text-sm text-slate-600">
             予約確認のメッセージをLINEにお送りしました。
             <br />
-            前日・当日にリマインドもお届けします。
+            前日・当日のリマインドや問診票のご案内もLINEでお届けします。
           </p>
         </>
       ) : (
@@ -41,8 +43,17 @@ export default function LineDonePage({
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-3xl text-amber-600">
             !
           </div>
-          <h1 className="text-lg font-bold text-slate-800">LINE連携</h1>
-          <p className="mt-2 text-sm text-slate-600">{errMsg}</p>
+          <h1 className="text-lg font-bold text-slate-800">
+            ご予約は完了しています
+          </h1>
+          <p className="mt-2 text-sm text-slate-600">
+            {errMsg}
+            <br />
+            <span className="text-xs text-slate-400">
+              ※ ご予約自体はお済みです。LINEでの確認・リマインドをご希望の場合は、
+              お手数ですがもう一度ご予約完了画面からお試しください。
+            </span>
+          </p>
         </>
       )}
       <a

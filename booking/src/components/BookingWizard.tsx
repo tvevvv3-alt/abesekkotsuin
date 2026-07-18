@@ -511,6 +511,12 @@ export default function BookingWizard() {
       setSavedList(merged);
       localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(merged));
       setLastAppointmentId(res.appointment_id ?? null);
+      // LINE連携が有効なら、予約完了と同時にそのままLINE連携へ進む
+      // （確認メッセージ送信＋以降の問診票などのやり取りにつなげる）
+      if (lineEnabled && res.appointment_id) {
+        window.location.assign(`/api/line/login?a=${res.appointment_id}`);
+        return;
+      }
       setStep(5);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "エラーが発生しました");
@@ -1133,8 +1139,17 @@ export default function BookingWizard() {
             onClick={submit}
             className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-300"
           >
-            {submitting ? "予約中…" : "この内容で予約する"}
+            {submitting
+              ? "予約中…"
+              : lineEnabled
+              ? "予約してLINEで受け取る"
+              : "この内容で予約する"}
           </button>
+          {lineEnabled && (
+            <p className="mt-2 text-center text-[11px] text-slate-500">
+              予約後、LINEに移動して連携します（予約確認・問診票・リマインドをLINEでお届け）
+            </p>
+          )}
         </Section>
       )}
 
