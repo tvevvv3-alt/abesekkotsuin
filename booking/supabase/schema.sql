@@ -171,6 +171,7 @@ create table if not exists public.settings (
 alter table public.settings add column if not exists board_start_min int not null default 600;
 alter table public.settings add column if not exists board_end_min   int not null default 1320;
 alter table public.settings add column if not exists logo_url        text;  -- 予約トップのロゴ画像
+alter table public.settings add column if not exists clinics         jsonb; -- 院ごとの名称・サブ・ロゴ
 insert into public.settings (id) values (1) on conflict (id) do nothing;
 
 -- =====================================================================

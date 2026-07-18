@@ -229,6 +229,20 @@ export default function BookingWizard() {
     () => services.filter((s) => s.published),
     [services]
   );
+  // 院の表示（名称・サブ・ロゴ）を設定で上書き
+  const clinicList = useMemo(
+    () =>
+      CLINICS.map((c) => {
+        const o = settings?.clinics?.[c.id];
+        return {
+          ...c,
+          name: o?.name?.trim() || c.name,
+          sub: o?.sub?.trim() || c.sub,
+          logo_url: o?.logo_url || null,
+        };
+      }),
+    [settings]
+  );
   // 院で絞る（川西整体院メニューだけ川西、それ以外は茨木本院）
   const clinicServices = useMemo(() => {
     if (!clinic) return [];
@@ -504,7 +518,7 @@ export default function BookingWizard() {
             ご予約の院をお選びください
           </h2>
           <div className="space-y-3">
-            {CLINICS.map((c) => (
+            {clinicList.map((c) => (
               <button
                 key={c.id}
                 onClick={() => {
@@ -513,12 +527,21 @@ export default function BookingWizard() {
                 }}
                 className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition active:scale-[.99] active:bg-slate-50"
               >
-                <span
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
-                  style={{ backgroundColor: "#f4edda", border: `1.5px solid ${GOLD}` }}
-                >
-                  {c.icon}
-                </span>
+                {c.logo_url ? (
+                  <img
+                    src={c.logo_url}
+                    alt={c.name}
+                    className="h-12 w-12 shrink-0 rounded-full object-cover"
+                    style={{ border: `1.5px solid ${GOLD}` }}
+                  />
+                ) : (
+                  <span
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
+                    style={{ backgroundColor: "#f4edda", border: `1.5px solid ${GOLD}` }}
+                  >
+                    {c.icon}
+                  </span>
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold text-slate-800">{c.name}</span>
                   <span className="mt-0.5 block text-xs text-slate-500">{c.sub}</span>
@@ -535,7 +558,7 @@ export default function BookingWizard() {
     );
   }
 
-  const clinicName = CLINICS.find((c) => c.id === clinic)?.name ?? "";
+  const clinicName = clinicList.find((c) => c.id === clinic)?.name ?? "";
 
   return (
     <div className="mx-auto min-h-screen max-w-md bg-white pb-24 shadow-sm">

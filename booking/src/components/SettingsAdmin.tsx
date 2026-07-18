@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadSettings } from "@/lib/data";
-import type { Settings } from "@/lib/types";
+import type { ClinicBranding, Settings } from "@/lib/types";
 import { labelToMin, minToLabel } from "@/lib/booking";
 
 export default function SettingsAdmin() {
@@ -36,6 +36,7 @@ export default function SettingsAdmin() {
       autofill: s.autofill,
       recheck_on_book: true,
       logo_url: s.logo_url,
+      clinics: s.clinics,
       updated_at: new Date().toISOString(),
     });
     setBusy(false);
@@ -43,28 +44,55 @@ export default function SettingsAdmin() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  async function uploadLogo(file: File) {
+  // 画像を staff-photos バケットへアップロードして公開URLを返す（失敗時 null）
+  async function uploadImage(file: File): Promise<string | null> {
     setUploading(true);
     setError(null);
     const ext = (file.name.split(".").pop() || "png").toLowerCase();
-    const path = `logo-${Date.now()}.${ext}`;
+    const path = `logo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
     const { error: upErr } = await supabase.storage
       .from("staff-photos")
       .upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type });
+    setUploading(false);
     if (upErr) {
       setError(
-        `ロゴのアップロードに失敗しました：${upErr.message}（バケット "staff-photos" 作成のSQLを実行済みか確認してください）`
+        `画像のアップロードに失敗しました：${upErr.message}（バケット "staff-photos" 作成のSQLを実行済みか確認してください）`
       );
-      setUploading(false);
-      return;
+      return null;
     }
-    const { data } = supabase.storage.from("staff-photos").getPublicUrl(path);
-    setS((prev) => (prev ? { ...prev, logo_url: data.publicUrl } : prev));
-    setUploading(false);
+    return supabase.storage.from("staff-photos").getPublicUrl(path).data.publicUrl;
+  }
+
+  async function uploadLogo(file: File) {
+    const url = await uploadImage(file);
+    if (url) setS((prev) => (prev ? { ...prev, logo_url: url } : prev));
   }
 
   if (!s) return <p className="py-8 text-center text-sm text-slate-500">読み込み中…</p>;
   const up = (patch: Partial<Settings>) => setS({ ...s, ...patch });
+
+  // 院ごとの表示（未設定は既定値）
+  const CLINIC_DEFAULTS: Record<"ibaraki" | "kawanishi", { name: string; sub: string }> = {
+    ibaraki: { name: "茨木本院", sub: "接骨・鍼灸・全身通電・体幹教室" },
+    kawanishi: { name: "川西整体院", sub: "整体（施術50分）" },
+  };
+  const clinicVal = (id: "ibaraki" | "kawanishi"): ClinicBranding => {
+    const c = s.clinics?.[id];
+    return {
+      name: c?.name ?? CLINIC_DEFAULTS[id].name,
+      sub: c?.sub ?? CLINIC_DEFAULTS[id].sub,
+      logo_url: c?.logo_url ?? null,
+    };
+  };
+  const updateClinic = (id: "ibaraki" | "kawanishi", patch: Partial<ClinicBranding>) => {
+    const next = { ibaraki: clinicVal("ibaraki"), kawanishi: clinicVal("kawanishi") };
+    next[id] = { ...next[id], ...patch };
+    up({ clinics: next });
+  };
+  const uploadClinicLogo = async (id: "ibaraki" | "kawanishi", file: File) => {
+    const url = await uploadImage(file);
+    if (url) updateClinic(id, { logo_url: url });
+  };
 
   return (
     <div className="max-w-lg">
@@ -189,6 +217,69 @@ export default function SettingsAdmin() {
           <p className="mt-1 text-xs text-slate-400">
             ※ アップロード後は「保存」を押すと反映されます。正方形の画像がきれいに表示されます。
           </p>
+        </Row>
+
+        <Row label="院の表示（名称・説明・ロゴ）">
+          <div className="space-y-3">
+            {(["ibaraki", "kawanishi"] as const).map((id) => {
+              const c = clinicVal(id);
+              return (
+                <div key={id} className="rounded-lg border bg-slate-50 p-3">
+                  <div className="mb-2 flex items-center gap-3">
+                    {c.logo_url ? (
+                      <img
+                        src={c.logo_url}
+                        alt={c.name}
+                        className="h-14 w-14 rounded-full border object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full border border-dashed text-[10px] text-slate-400">
+                        未設定
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      <label className="cursor-pointer rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100">
+                        {uploading ? "アップロード中…" : "ロゴをアップロード"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploading}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadClinicLogo(id, file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      {c.logo_url && (
+                        <button
+                          onClick={() => updateClinic(id, { logo_url: null })}
+                          className="text-left text-[11px] text-slate-500 hover:text-red-500"
+                        >
+                          ロゴを削除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <label className="mb-1 block text-[11px] font-bold text-slate-500">院名</label>
+                  <input
+                    value={c.name}
+                    onChange={(e) => updateClinic(id, { name: e.target.value })}
+                    className="mb-2 w-full rounded-md border px-2 py-1.5 text-sm"
+                    placeholder={CLINIC_DEFAULTS[id].name}
+                  />
+                  <label className="mb-1 block text-[11px] font-bold text-slate-500">説明（施術内容など）</label>
+                  <input
+                    value={c.sub}
+                    onChange={(e) => updateClinic(id, { sub: e.target.value })}
+                    className="w-full rounded-md border px-2 py-1.5 text-sm"
+                    placeholder={CLINIC_DEFAULTS[id].sub}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </Row>
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
