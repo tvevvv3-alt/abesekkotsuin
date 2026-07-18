@@ -10,7 +10,9 @@ export default function SettingsAdmin() {
   const supabase = useMemo(() => createClient(), []);
   const [s, setS] = useState<Settings | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setS(await loadSettings(supabase));
@@ -33,11 +35,32 @@ export default function SettingsAdmin() {
       change_deadline_hours: s.change_deadline_hours,
       autofill: s.autofill,
       recheck_on_book: true,
+      logo_url: s.logo_url,
       updated_at: new Date().toISOString(),
     });
     setBusy(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function uploadLogo(file: File) {
+    setUploading(true);
+    setError(null);
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const path = `logo-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("staff-photos")
+      .upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type });
+    if (upErr) {
+      setError(
+        `ロゴのアップロードに失敗しました：${upErr.message}（バケット "staff-photos" 作成のSQLを実行済みか確認してください）`
+      );
+      setUploading(false);
+      return;
+    }
+    const { data } = supabase.storage.from("staff-photos").getPublicUrl(path);
+    setS((prev) => (prev ? { ...prev, logo_url: data.publicUrl } : prev));
+    setUploading(false);
   }
 
   if (!s) return <p className="py-8 text-center text-sm text-slate-500">読み込み中…</p>;
@@ -124,6 +147,51 @@ export default function SettingsAdmin() {
         <Row label="予約確定時の空き再確認">
           <span className="text-sm text-slate-500">常に有効（二重予約防止のため変更不可）</span>
         </Row>
+
+        <Row label="予約トップのロゴ画像">
+          <div className="flex items-center gap-3">
+            {s.logo_url ? (
+              <img
+                src={s.logo_url}
+                alt="ロゴ"
+                className="h-20 w-20 rounded-full border object-cover"
+              />
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-dashed text-[10px] text-slate-400">
+                未設定
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50">
+                {uploading ? "アップロード中…" : "ロゴをアップロード"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadLogo(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {s.logo_url && (
+                <button
+                  onClick={() => up({ logo_url: null })}
+                  className="text-left text-xs text-slate-500 hover:text-red-500"
+                >
+                  削除（既定のロゴに戻す）
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            ※ アップロード後は「保存」を押すと反映されます。正方形の画像がきれいに表示されます。
+          </p>
+        </Row>
+
+        {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
         <div className="flex items-center gap-3 pt-2">
           <button

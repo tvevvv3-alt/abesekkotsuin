@@ -487,7 +487,15 @@ export default function BookingWizard() {
           style={{ background: `linear-gradient(180deg, ${NAVY} 0%, #172c56 100%)` }}
         >
           <div className="flex justify-center">
-            <TraBadge size={184} />
+            {settings?.logo_url ? (
+              <img
+                src={settings.logo_url}
+                alt="Total Recoverytation Abe"
+                className="h-44 w-44 rounded-full object-cover"
+              />
+            ) : (
+              <TraBadge size={184} />
+            )}
           </div>
           <p className="mt-5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>

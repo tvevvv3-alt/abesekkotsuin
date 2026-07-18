@@ -157,6 +157,7 @@ export interface Settings {
   recheck_on_book: boolean;
   board_start_min: number; // 管理ボード表示 開始（分）
   board_end_min: number; // 管理ボード表示 終了（分）
+  logo_url: string | null; // 予約トップのロゴ画像URL（未設定なら既定バッジ）
 }
 
 // 月別の予約公開設定

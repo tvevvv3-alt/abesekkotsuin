@@ -114,6 +114,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     recheck_on_book: true,
     board_start_min: 600,
     board_end_min: 1320,
+    logo_url: null,
   };
   if (!data) return defaults;
   // 移行前で列が無い場合も既定で補完
@@ -122,6 +123,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     ...data,
     board_start_min: data.board_start_min ?? defaults.board_start_min,
     board_end_min: data.board_end_min ?? defaults.board_end_min,
+    logo_url: data.logo_url ?? null,
   };
 }
 
