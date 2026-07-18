@@ -1066,6 +1066,7 @@ export default function BookingWizard() {
       {step === 4 && service && selected && (
         <Section title="ご予約内容の確認" onBack={() => setStep(3)}>
           <dl className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+            <Row label="院" value={clinicName} />
             <Row label="メニュー" value={service.patient_name || service.name} />
             {!isClass && (
               <Row label="担当" value={selectedStaff?.display_name || selectedStaff?.name || ""} />
@@ -1119,6 +1120,9 @@ export default function BookingWizard() {
               ✓
             </div>
             <h2 className="text-lg font-bold text-slate-800">予約が完了しました</h2>
+            <p className="mt-1 text-sm font-bold" style={{ color: GOLD }}>
+              {clinicName}
+            </p>
             <p className="mt-2 text-sm text-slate-600">
               {formatSelected(selected)}
               <br />
