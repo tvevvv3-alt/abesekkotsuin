@@ -189,6 +189,8 @@ export default function BookingWizard() {
   // 確定
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [lastAppointmentId, setLastAppointmentId] = useState<string | null>(null);
+  const [lineEnabled, setLineEnabled] = useState(false);
 
   const service = services.find((s) => s.id === serviceId) || null;
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
@@ -377,6 +379,20 @@ export default function BookingWizard() {
     }
   }, []);
 
+  // ---- LINE連携が使えるか確認（設定済みならボタンを表示）----
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/line/status")
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive) setLineEnabled(Boolean(d?.enabled));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // ---- 週データ読み込み（担当者・週が変わるたび）----
   const weekDates = useMemo(
     () => Array.from({ length: 7 }, (_, i) => toDateStr(addDays(weekStart, i))),
@@ -468,7 +484,7 @@ export default function BookingWizard() {
         p_source: "patient",
       });
       if (error) throw new Error(error.message);
-      const res = data as { ok: boolean; reason?: string };
+      const res = data as { ok: boolean; reason?: string; appointment_id?: string };
       if (!res.ok) {
         // 直前に他の人が予約したケース等
         setSubmitError(res.reason || "予約できませんでした。別の時間をお選びください。");
@@ -494,6 +510,7 @@ export default function BookingWizard() {
       ].slice(0, 8);
       setSavedList(merged);
       localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(merged));
+      setLastAppointmentId(res.appointment_id ?? null);
       setStep(5);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "エラーが発生しました");
@@ -1134,12 +1151,30 @@ export default function BookingWizard() {
             <p className="mt-4 text-xs text-slate-400">
               ご来院時刻は {minToLabel(selected.startMin)} です。
             </p>
+
+            {lineEnabled && lastAppointmentId && (
+              <div className="mt-6">
+                <a
+                  href={`/api/line/login?a=${lastAppointmentId}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-base font-bold text-white active:opacity-90"
+                  style={{ backgroundColor: "#06C755" }}
+                >
+                  <span className="text-lg">💬</span>
+                  LINEで予約確認・リマインドを受け取る
+                </a>
+                <p className="mt-2 text-[11px] text-slate-400">
+                  LINEで友だち追加すると、予約確認と前日・当日のリマインドが届きます。
+                </p>
+              </div>
+            )}
+
             <button
               onClick={() => {
                 setStep(1);
                 setServiceId("");
                 setSelected(null);
                 setSubmitError(null);
+                setLastAppointmentId(null);
               }}
               className="mt-6 rounded-xl border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700"
             >

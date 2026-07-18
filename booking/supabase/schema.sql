@@ -259,6 +259,12 @@ create table if not exists public.appointments (
 );
 create index if not exists appointments_date_idx on public.appointments (date, staff_id);
 create index if not exists appointments_patient_idx on public.appointments (patient_id);
+-- LINE連携（予約確認・リマインドの送信先と送信済み記録）
+alter table public.appointments add column if not exists line_user_id           text;
+alter table public.appointments add column if not exists confirm_sent_at         timestamptz;
+alter table public.appointments add column if not exists reminder_eve_sent_at    timestamptz;
+alter table public.appointments add column if not exists reminder_morning_sent_at timestamptz;
+create index if not exists appointments_line_idx on public.appointments (date, status) where line_user_id is not null;
 
 -- =====================================================================
 --  工程の実体（appointment_steps）: 予約可否判定の中核データ
