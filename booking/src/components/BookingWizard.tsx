@@ -86,8 +86,7 @@ function StaffAvatar({ staff, size = 60 }: { staff: Staff; size?: number }) {
           alt={staff.display_name || staff.name}
           className="h-full w-full object-cover"
           style={{
-            objectPosition: `${staff.image_pos_x ?? 50}% ${staff.image_pos_y ?? 50}%`,
-            transform: `scale(${staff.image_scale ?? 1})`,
+            transform: `translate(${(staff.image_pos_x ?? 50) - 50}%, ${(staff.image_pos_y ?? 50) - 50}%) scale(${staff.image_scale ?? 1})`,
           }}
         />
       </div>
@@ -258,6 +257,26 @@ export default function BookingWizard() {
     () => clinicServices.find((s) => s.after_hours && s.new_booking) || null,
     [clinicServices]
   );
+  // メニューカードの料金表示（スタッフ差があれば最小額＋「〜」）
+  function menuPriceLabel(serviceId: string): string | null {
+    const ps = prices.filter((p) => p.service_id === serviceId);
+    const fmt = (n: number) => `¥${n.toLocaleString()}`;
+    const part = (arr: number[], label: string) => {
+      if (!arr.length) return null;
+      const mn = Math.min(...arr);
+      const mx = Math.max(...arr);
+      return `${label} ${fmt(mn)}${mn !== mx ? "〜" : ""}`;
+    };
+    const inis = ps
+      .map((p) => p.initial_price)
+      .filter((n): n is number => n != null);
+    const reps = ps
+      .map((p) => p.repeat_price)
+      .filter((n): n is number => n != null);
+    const parts = [part(inis, "初診"), part(reps, "再診")].filter(Boolean);
+    return parts.length ? parts.join(" ・ ") : null;
+  }
+
   // 時間外の固定開始時刻（インライン表示用）
   const ahStarts = useMemo(() => {
     if (!afterHoursService?.class_starts) return undefined;
@@ -578,13 +597,20 @@ export default function BookingWizard() {
                       <MenuBadge service={s} stopped={stopped} />
                     </div>
                     {desc && (
-                      <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-slate-500">
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
                         {desc}
                       </p>
                     )}
-                    <div className="mt-auto pt-1.5 text-[11px] text-slate-400">
-                      所要 約{totalDuration(s.steps)}分
-                      {s.capacity > 1 && `・定員${s.capacity}名`}
+                    <div className="mt-auto pt-1.5">
+                      {menuPriceLabel(s.id) && (
+                        <div className="text-[11px] font-bold" style={{ color: GOLD }}>
+                          {menuPriceLabel(s.id)}
+                        </div>
+                      )}
+                      <div className="text-[11px] text-slate-400">
+                        所要 約{totalDuration(s.steps)}分
+                        {s.capacity > 1 && `・定員${s.capacity}名`}
+                      </div>
                     </div>
                   </div>
                   <span className="flex shrink-0 items-center text-lg text-slate-300">›</span>

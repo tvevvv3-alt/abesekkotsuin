@@ -275,8 +275,7 @@ export default function StaffAdmin() {
                     alt=""
                     className="h-full w-full object-cover"
                     style={{
-                      objectPosition: `${s.image_pos_x ?? 50}% ${s.image_pos_y ?? 50}%`,
-                      transform: `scale(${s.image_scale ?? 1})`,
+                      transform: `translate(${(s.image_pos_x ?? 50) - 50}%, ${(s.image_pos_y ?? 50) - 50}%) scale(${s.image_scale ?? 1})`,
                     }}
                   />
                 </div>
@@ -427,8 +426,8 @@ export default function StaffAdmin() {
                       panRef.current = { x: e.clientX, y: e.clientY };
                       setF((prev) => ({
                         ...prev,
-                        image_pos_x: clampPct(prev.image_pos_x - dx * 0.6),
-                        image_pos_y: clampPct(prev.image_pos_y - dy * 0.6),
+                        image_pos_x: clampPct(prev.image_pos_x + dx * 0.6),
+                        image_pos_y: clampPct(prev.image_pos_y + dy * 0.6),
                       }));
                     }}
                     onPointerUp={() => (panRef.current = null)}
@@ -441,8 +440,7 @@ export default function StaffAdmin() {
                       draggable={false}
                       className="h-full w-full object-cover"
                       style={{
-                        objectPosition: `${f.image_pos_x}% ${f.image_pos_y}%`,
-                        transform: `scale(${f.image_scale})`,
+                        transform: `translate(${f.image_pos_x - 50}%, ${f.image_pos_y - 50}%) scale(${f.image_scale})`,
                       }}
                     />
                   </div>
