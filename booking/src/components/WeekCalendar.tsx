@@ -6,6 +6,7 @@ import type {
   BookingWindow,
   Closure,
   Equipment,
+  Opening,
   ServiceStep,
   StaffSchedule,
 } from "@/lib/types";
@@ -34,6 +35,7 @@ interface Props {
   staffId: string;
   weekStart: Date; // 月曜
   schedules: StaffSchedule[]; // 通常=当該担当者 / クラス=全担当者
+  openings?: Opening[]; // 臨時の予約可能枠（昼休み開放など）
   closures: Closure[];
   apptSteps: AppointmentStep[];
   equipment: Equipment[];
@@ -64,6 +66,7 @@ export default function WeekCalendar({
   staffId,
   weekStart,
   schedules,
+  openings = [],
   closures,
   apptSteps,
   equipment,
@@ -103,7 +106,24 @@ export default function WeekCalendar({
     return days.map((d) => {
       const dateStr = toDateStr(d);
       const weekday = d.getDay();
-      const daySchedules = schedules.filter((s) => s.weekday === weekday);
+      const baseSchedules = schedules.filter((s) => s.weekday === weekday);
+      // 臨時開放枠（当該担当者・当日）を勤務枠として追加
+      const dayOpenings =
+        !isClass && !afterHours
+          ? openings.filter((o) => o.date === dateStr && o.staff_id === staffId)
+          : [];
+      const daySchedules = dayOpenings.length
+        ? [
+            ...baseSchedules,
+            ...dayOpenings.map((o) => ({
+              id: o.id,
+              staff_id: staffId,
+              weekday,
+              start_min: o.start_min,
+              end_min: o.end_min,
+            })),
+          ]
+        : baseSchedules;
       const dayClosures = closures.filter((c) => c.date === dateStr);
       const dayApptSteps = apptSteps.filter((a) => a.date === dateStr);
       const isPastDay = dateStr < todayStr;
@@ -171,6 +191,7 @@ export default function WeekCalendar({
     days,
     rows,
     schedules,
+    openings,
     closures,
     apptSteps,
     staffId,
@@ -229,7 +250,9 @@ export default function WeekCalendar({
             // どの曜日も勤務外の行（昼休みなど）は細く表示して 10-20時を見やすく。
             // 時間外予約は行そのものが予約枠なので圧縮しない。
             const isBreak =
-              !afterHours && !schedules.some((s) => s.start_min <= t && s.end_min > t);
+              !afterHours &&
+              !schedules.some((s) => s.start_min <= t && s.end_min > t) &&
+              !openings.some((o) => o.start_min <= t && o.end_min > t);
             if (isBreak) {
               return (
                 <tr key={t}>

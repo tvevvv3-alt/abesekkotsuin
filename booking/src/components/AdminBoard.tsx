@@ -6,6 +6,7 @@ import {
   loadAllStaff,
   loadClosures,
   loadEquipment,
+  loadOpenings,
   loadSchedules,
   loadServices,
   loadSettings,
@@ -15,6 +16,7 @@ import type {
   AppointmentStep,
   Closure,
   Equipment,
+  Opening,
   ServiceWithSteps,
   Settings,
   Staff,
@@ -83,6 +85,7 @@ export default function AdminBoard() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
+  const [openings, setOpenings] = useState<Opening[]>([]);
   const [loading, setLoading] = useState(true);
 
   // モーダル：追加は担当者・時刻をプリセットできる
@@ -124,10 +127,11 @@ export default function AdminBoard() {
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [{ data: aData }, { data: sData }, cl] = await Promise.all([
+    const [{ data: aData }, { data: sData }, cl, op] = await Promise.all([
       supabase.from("appointments").select("*").eq("date", date).eq("status", "booked"),
       supabase.from("appointment_steps").select("*").eq("date", date),
       loadClosures(supabase, [date]),
+      loadOpenings(supabase, [date]),
     ]);
     const stepsByAppt: Record<string, AppointmentStep[]> = {};
     (sData ?? []).forEach((s: AppointmentStep) => {
@@ -139,6 +143,7 @@ export default function AdminBoard() {
     }));
     setAppts(merged);
     setClosures(cl);
+    setOpenings(op);
     setLoading(false);
   }, [supabase, date]);
 
@@ -396,6 +401,28 @@ export default function AdminBoard() {
     reload();
   }
 
+  // 臨時の予約可能枠（昼休み開放など）を作成／解除
+  async function makeOpening() {
+    if (!pop || !pop.ctx.staffId) return;
+    await supabase.from("openings").insert({
+      date,
+      staff_id: pop.ctx.staffId,
+      start_min: pop.start,
+      end_min: pop.end,
+    });
+    setPop(null);
+    reload();
+  }
+  async function removeOpening(id: string) {
+    if (!confirm("この予約可能枠を解除しますか？")) return;
+    await supabase.from("openings").delete().eq("id", id);
+    reload();
+  }
+  // 当該担当者の臨時開放枠
+  function openingBands(staffId: string): Opening[] {
+    return openings.filter((o) => o.staff_id === staffId);
+  }
+
   const dObj = (() => {
     const [y, m, d] = date.split("-").map(Number);
     return new Date(y, m - 1, d);
@@ -481,6 +508,8 @@ export default function AdminBoard() {
                   offRanges={staffOffRanges(st.id)}
                   closureBands={closureBands(st.id)}
                   onClosureClick={removeClosure}
+                  openingBands={openingBands(st.id)}
+                  onOpeningClick={removeOpening}
                   band={bandFor(ctx)}
                   onPointerDownTrack={(e) => beginDrag(ctx, e)}
                   onPointerMoveTrack={moveDrag}
@@ -701,6 +730,34 @@ export default function AdminBoard() {
             >
               予約を追加
             </button>
+            {pop.ctx.staffId &&
+              (() => {
+                const sid = pop.ctx.staffId;
+                const overlap = openings.find(
+                  (o) =>
+                    o.staff_id === sid &&
+                    o.start_min < pop.end &&
+                    o.end_min > pop.start
+                );
+                return overlap ? (
+                  <button
+                    onClick={() => {
+                      removeOpening(overlap.id);
+                      setPop(null);
+                    }}
+                    className="mt-2 w-full rounded-lg border border-emerald-300 bg-emerald-50 py-2.5 text-sm font-bold text-emerald-700 active:bg-emerald-100"
+                  >
+                    予約可能を解除
+                  </button>
+                ) : (
+                  <button
+                    onClick={makeOpening}
+                    className="mt-2 w-full rounded-lg border border-emerald-500 bg-emerald-500 py-2.5 text-sm font-bold text-white active:bg-emerald-600"
+                  >
+                    予約可能にする
+                  </button>
+                );
+              })()}
             {pop.ctx.canClose && (
               <button
                 onClick={makeClosure}
@@ -745,6 +802,8 @@ function Column({
   offRanges,
   closureBands,
   onClosureClick,
+  openingBands = [],
+  onOpeningClick,
   band,
   onPointerDownTrack,
   onPointerMoveTrack,
@@ -761,6 +820,8 @@ function Column({
   offRanges: Array<[number, number]>;
   closureBands: ClosureBand[];
   onClosureClick?: (id: string) => void;
+  openingBands?: Opening[];
+  onOpeningClick?: (id: string) => void;
   band?: [number, number] | null;
   onPointerDownTrack?: (e: React.PointerEvent) => void;
   onPointerMoveTrack?: (e: React.PointerEvent) => void;
@@ -821,6 +882,21 @@ function Column({
             }}
           >
             休診{c.reason ? `・${c.reason}` : ""}
+          </button>
+        ))}
+        {/* 臨時の予約可能枠（クリックで解除）*/}
+        {openingBands.map((o) => (
+          <button
+            key={o.id}
+            onClick={() => onOpeningClick?.(o.id)}
+            title="クリックで予約可能を解除"
+            className="absolute left-0 z-10 flex w-full items-center justify-center overflow-hidden border-y border-emerald-400/50 bg-emerald-400/25 text-[10px] font-bold text-emerald-700"
+            style={{
+              top: yFor(o.start_min),
+              height: yFor(o.end_min) - yFor(o.start_min),
+            }}
+          >
+            予約可
           </button>
         ))}
         {/* 選択バンド */}

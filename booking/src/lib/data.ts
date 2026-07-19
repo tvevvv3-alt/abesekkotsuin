@@ -6,6 +6,7 @@ import type {
   BusinessHours,
   Closure,
   Equipment,
+  Opening,
   ServicePrice,
   ServiceWithSteps,
   Settings,
@@ -186,6 +187,17 @@ export async function loadClosures(
     .in("date", dates);
   if (error) throw error;
   return data ?? [];
+}
+
+// 臨時の予約可能枠（昼休み開放など）。テーブル未作成でも落ちないよう空配列へ。
+export async function loadOpenings(
+  sb: SupabaseClient,
+  dates: string[]
+): Promise<Opening[]> {
+  if (dates.length === 0) return [];
+  const { data, error } = await sb.from("openings").select("*").in("date", dates);
+  if (error || !data) return [];
+  return data;
 }
 
 export async function loadAppointmentSteps(

@@ -8,6 +8,7 @@ import {
   loadBookingWindows,
   loadClosures,
   loadEquipment,
+  loadOpenings,
   loadSchedules,
   loadServicePrices,
   loadServices,
@@ -19,6 +20,7 @@ import type {
   BookingWindow,
   Closure,
   Equipment,
+  Opening,
   SavedPatient,
   ServicePrice,
   ServiceWithSteps,
@@ -182,6 +184,7 @@ export default function BookingWizard() {
   // 週データ
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
+  const [openings, setOpenings] = useState<Opening[]>([]);
   const [apptSteps, setApptSteps] = useState<AppointmentStep[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(false);
 
@@ -447,15 +450,17 @@ export default function BookingWizard() {
   const reloadWeek = useCallback(async () => {
     setLoadingWeek(true);
     try {
-      const [sc, cl, ap] = await Promise.all([
+      const [sc, cl, ap, op] = await Promise.all([
         // クラスは担当者に紐づかないため全担当者の勤務時間（＝営業時間）を使う
         loadSchedules(supabase, isClass ? undefined : staffId),
         loadClosures(supabase, weekDates),
         loadAppointmentSteps(supabase, weekDates),
+        loadOpenings(supabase, weekDates),
       ]);
       setSchedules(sc);
       setClosures(cl);
       setApptSteps(ap);
+      setOpenings(op);
     } finally {
       setLoadingWeek(false);
     }
@@ -938,6 +943,7 @@ export default function BookingWizard() {
               staffId={staffId}
               weekStart={weekStart}
               schedules={schedules}
+              openings={openings}
               closures={closures}
               apptSteps={apptSteps}
               equipment={equipment}

@@ -244,6 +244,17 @@ create index if not exists closures_date_idx on public.closures (date);
 -- 特定メニュー（体幹教室など）だけの休み。NULL=メニュー限定でない
 alter table public.closures add column if not exists service_id uuid references public.services(id) on delete cascade;
 
+-- 臨時の予約可能枠（昼休みなど通常閉じている時間を、その日だけ担当者ごとに開放）
+create table if not exists public.openings (
+  id         uuid primary key default gen_random_uuid(),
+  date       date not null,
+  staff_id   uuid references public.staff(id) on delete cascade,
+  start_min  int not null,
+  end_min    int not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists openings_date_idx on public.openings (date);
+
 -- =====================================================================
 --  予約（appointments）: 患者から見た1件の予約
 --    date + start_min（来院時刻）を保持。工程の実体は appointment_steps。
@@ -405,11 +416,16 @@ begin
       return jsonb_build_object('ok', false, 'reason', '休診');
     end if;
   else
-    select exists (
+    select (exists (
       select 1 from staff_schedules
        where staff_id = p_staff_id and weekday = v_dow
          and start_min <= p_start_min and end_min >= v_end
-    ) into v_ok;
+    ) or exists (
+      -- 臨時の予約可能枠（昼休み開放など）でもOK
+      select 1 from openings o
+       where o.staff_id = p_staff_id and o.date = p_date
+         and o.start_min <= p_start_min and o.end_min >= v_end
+    )) into v_ok;
     if not v_ok then
       return jsonb_build_object('ok', false, 'reason', '勤務時間外');
     end if;
@@ -660,6 +676,11 @@ drop policy if exists schedules_public_read on public.staff_schedules;
 create policy schedules_public_read on public.staff_schedules for select using (true);
 drop policy if exists closures_public_read on public.closures;
 create policy closures_public_read on public.closures for select using (true);
+alter table public.openings enable row level security;
+drop policy if exists openings_public_read on public.openings;
+create policy openings_public_read on public.openings for select using (true);
+drop policy if exists openings_staff_all on public.openings;
+create policy openings_staff_all on public.openings for all to authenticated using (true) with check (true);
 
 -- 占有情報のみ匿名可（患者名などは appointment_steps に含めない）
 drop policy if exists appt_steps_public_read on public.appointment_steps;

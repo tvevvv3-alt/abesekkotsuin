@@ -105,6 +105,15 @@ export interface Closure {
   reason: string | null;
 }
 
+// 臨時の予約可能枠（昼休みなど通常は閉まっている時間を、その日だけ開放）
+export interface Opening {
+  id: string;
+  date: string; // YYYY-MM-DD
+  staff_id: string | null; // 担当者（施術）に紐づく開放
+  start_min: number;
+  end_min: number;
+}
+
 export interface Patient {
   id: string;
   patient_number: string;
