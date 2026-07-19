@@ -200,6 +200,8 @@ export default function BookingWizard() {
   const [lineEnabled, setLineEnabled] = useState(false);
   const [liffIdToken, setLiffIdToken] = useState<string | null>(null); // LINE内で開いた時の本人トークン
   const [linkedViaLiff, setLinkedViaLiff] = useState(false);
+  const [lineSent, setLineSent] = useState<boolean | null>(null); // 確認メッセージ送信の成否
+  const [lineErr, setLineErr] = useState<string | null>(null); // 送信失敗時の理由（診断用）
 
   const service = services.find((s) => s.id === serviceId) || null;
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
@@ -556,16 +558,25 @@ export default function BookingWizard() {
       setLastAppointmentId(res.appointment_id ?? null);
       // ① LINE内（リッチメニュー経由）なら、タップ0回で自動連携＋確認送信
       if (liffIdToken && res.appointment_id) {
-        fetch("/api/line/link", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            appointmentId: res.appointment_id,
-            idToken: liffIdToken,
-          }),
-        }).catch(() => {});
         setLinkedViaLiff(true);
+        setLineSent(null);
+        setLineErr(null);
         setStep(5);
+        try {
+          const resp = await fetch("/api/line/link", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              appointmentId: res.appointment_id,
+              idToken: liffIdToken,
+            }),
+          }).then((r) => r.json());
+          setLineSent(Boolean(resp?.sent));
+          if (!resp?.sent) setLineErr(resp?.error || resp?.stage || "unknown");
+        } catch (e) {
+          setLineSent(false);
+          setLineErr(e instanceof Error ? e.message : "network");
+        }
         return;
       }
       // ② LINE外ブラウザだがOAuth設定済みなら、完了と同時にLINEログインへ誘導
@@ -589,6 +600,8 @@ export default function BookingWizard() {
     setSubmitError(null);
     setLastAppointmentId(null);
     setLinkedViaLiff(false);
+    setLineSent(null);
+    setLineErr(null);
   }
 
   // 保存済みの家族情報をフォームへ反映
@@ -1237,13 +1250,27 @@ export default function BookingWizard() {
 
             {linkedViaLiff ? (
               <>
-                <div
-                  className="mt-6 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
-                  style={{ backgroundColor: "#e7f8ee", color: "#06860f" }}
-                >
-                  <span className="text-lg">💬</span>
-                  予約確認をLINEにお送りしました
-                </div>
+                {lineSent === false ? (
+                  <div
+                    className="mt-6 rounded-xl px-4 py-3 text-left text-sm"
+                    style={{ backgroundColor: "#fff7e6", color: "#8a6d1a" }}
+                  >
+                    <div className="font-bold">⚠ LINE通知の送信に失敗しました</div>
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      予約自体は完了しています。{lineErr ? `（${lineErr}）` : ""}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="mt-6 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
+                    style={{ backgroundColor: "#e7f8ee", color: "#06860f" }}
+                  >
+                    <span className="text-lg">💬</span>
+                    {lineSent === null
+                      ? "LINEに送信中…"
+                      : "予約確認をLINEにお送りしました"}
+                  </div>
+                )}
                 <p className="mt-2 text-[11px] text-slate-400">
                   前日・当日にリマインドもLINEに届きます。
                 </p>

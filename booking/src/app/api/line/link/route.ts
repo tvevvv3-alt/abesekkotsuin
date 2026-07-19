@@ -37,33 +37,40 @@ export async function POST(req: NextRequest) {
   if (!vr.ok) return ok({ ok: false, error: "verify failed" });
   const claims = (await vr.json()) as { sub?: string };
   const userId = claims.sub;
-  if (!userId) return ok({ ok: false, error: "no sub" });
+  if (!userId) return ok({ ok: false, stage: "verify", error: "no sub" });
 
   const admin = createAdminClient();
-  if (!admin) return ok({ ok: false, error: "server" });
+  if (!admin) return ok({ ok: false, stage: "admin", error: "service role 未設定" });
 
-  const { data: appt } = await admin
+  const { data: appt, error: apptErr } = await admin
     .from("appointments")
     .select("id, service_id, staff_id, date, start_min, service_name, confirm_sent_at")
     .eq("id", appointmentId)
     .maybeSingle();
-  if (!appt) return ok({ ok: false, error: "no appt" });
+  if (apptErr) return ok({ ok: false, stage: "select", error: apptErr.message });
+  if (!appt) return ok({ ok: false, stage: "select", error: "予約が見つかりません" });
 
-  await admin
+  const { error: upErr } = await admin
     .from("appointments")
     .update({ line_user_id: userId })
     .eq("id", appointmentId);
+  if (upErr) return ok({ ok: false, stage: "update", error: upErr.message });
 
   // 予約確認メッセージ（未送信のときだけ）
-  if (lineMessagingConfigured() && !appt.confirm_sent_at) {
-    const info = await buildApptInfo(admin, appt);
-    const r = await pushText(userId, buildConfirmText(info));
-    if (r.ok) {
-      await admin
-        .from("appointments")
-        .update({ confirm_sent_at: new Date().toISOString() })
-        .eq("id", appointmentId);
-    }
+  if (!lineMessagingConfigured()) {
+    return ok({ ok: true, linked: true, sent: false, stage: "push", error: "アクセストークン未設定" });
   }
-  return ok({ ok: true });
+  if (appt.confirm_sent_at) {
+    return ok({ ok: true, linked: true, sent: false, error: "already sent" });
+  }
+  const info = await buildApptInfo(admin, appt);
+  const r = await pushText(userId, buildConfirmText(info));
+  if (r.ok) {
+    await admin
+      .from("appointments")
+      .update({ confirm_sent_at: new Date().toISOString() })
+      .eq("id", appointmentId);
+    return ok({ ok: true, linked: true, sent: true });
+  }
+  return ok({ ok: true, linked: true, sent: false, stage: "push", error: r.error });
 }
