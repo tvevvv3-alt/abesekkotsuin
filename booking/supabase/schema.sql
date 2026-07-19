@@ -172,6 +172,14 @@ alter table public.settings add column if not exists board_start_min int not nul
 alter table public.settings add column if not exists board_end_min   int not null default 1320;
 alter table public.settings add column if not exists logo_url        text;  -- 予約トップのロゴ画像
 alter table public.settings add column if not exists clinics         jsonb; -- 院ごとの名称・サブ・ロゴ
+-- LINE メッセージ設定
+alter table public.settings add column if not exists confirm_text            text;
+alter table public.settings add column if not exists remind_eve_enabled       boolean not null default true;
+alter table public.settings add column if not exists remind_eve_hour          int not null default 18;
+alter table public.settings add column if not exists remind_eve_text          text;
+alter table public.settings add column if not exists remind_morning_enabled   boolean not null default true;
+alter table public.settings add column if not exists remind_morning_hour      int not null default 9;
+alter table public.settings add column if not exists remind_morning_text      text;
 insert into public.settings (id) values (1) on conflict (id) do nothing;
 
 -- =====================================================================

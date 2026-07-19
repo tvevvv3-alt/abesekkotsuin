@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { loadSettings } from "@/lib/data";
 import type { ClinicBranding, Settings } from "@/lib/types";
 import { labelToMin, minToLabel } from "@/lib/booking";
+import { DEFAULT_CONFIRM_TEXT, DEFAULT_EVE_TEXT, DEFAULT_MORNING_TEXT } from "@/lib/line";
 
 export default function SettingsAdmin() {
   const supabase = useMemo(() => createClient(), []);
@@ -38,6 +39,13 @@ export default function SettingsAdmin() {
       recheck_on_book: true,
       logo_url: s.logo_url,
       clinics: s.clinics,
+      confirm_text: s.confirm_text,
+      remind_eve_enabled: s.remind_eve_enabled,
+      remind_eve_hour: s.remind_eve_hour,
+      remind_eve_text: s.remind_eve_text,
+      remind_morning_enabled: s.remind_morning_enabled,
+      remind_morning_hour: s.remind_morning_hour,
+      remind_morning_text: s.remind_morning_text,
       updated_at: new Date().toISOString(),
     });
     setBusy(false);
@@ -337,6 +345,89 @@ export default function SettingsAdmin() {
             })}
           </div>
         </Row>
+
+        <div className="rounded-xl border bg-slate-50 p-3">
+          <div className="mb-1 text-sm font-bold text-slate-700">LINEメッセージ設定</div>
+          <p className="mb-3 text-[11px] text-slate-500">
+            差し込みタグ：
+            <code className="rounded bg-white px-1">{"{院}"}</code>{" "}
+            <code className="rounded bg-white px-1">{"{メニュー}"}</code>{" "}
+            <code className="rounded bg-white px-1">{"{日時}"}</code>{" "}
+            <code className="rounded bg-white px-1">{"{担当}"}</code>{" "}
+            <code className="rounded bg-white px-1">{"{来院時刻}"}</code>
+            （自動で予約情報に置き換わります。空欄の行は自動で消えます）
+          </p>
+
+          <label className="mb-1 block text-[11px] font-bold text-slate-500">
+            予約確認メッセージ
+          </label>
+          <textarea
+            value={s.confirm_text ?? DEFAULT_CONFIRM_TEXT}
+            onChange={(e) => up({ confirm_text: e.target.value })}
+            rows={7}
+            className="mb-3 w-full rounded-md border px-2 py-1.5 font-mono text-xs"
+          />
+
+          <div className="mb-3 rounded-lg border bg-white p-2.5">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <input
+                type="checkbox"
+                checked={s.remind_eve_enabled}
+                onChange={(e) => up({ remind_eve_enabled: e.target.checked })}
+              />
+              前日リマインド
+            </label>
+            <div className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+              <span>送信時刻</span>
+              <select
+                value={s.remind_eve_hour}
+                onChange={(e) => up({ remind_eve_hour: parseInt(e.target.value, 10) })}
+                className="rounded-md border px-2 py-1"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{`${h}時`}</option>
+                ))}
+              </select>
+              <span className="text-slate-400">（前日のこの時刻に翌日分を送信）</span>
+            </div>
+            <textarea
+              value={s.remind_eve_text ?? DEFAULT_EVE_TEXT}
+              onChange={(e) => up({ remind_eve_text: e.target.value })}
+              rows={7}
+              className="mt-2 w-full rounded-md border px-2 py-1.5 font-mono text-xs"
+            />
+          </div>
+
+          <div className="rounded-lg border bg-white p-2.5">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <input
+                type="checkbox"
+                checked={s.remind_morning_enabled}
+                onChange={(e) => up({ remind_morning_enabled: e.target.checked })}
+              />
+              当日リマインド
+            </label>
+            <div className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+              <span>送信時刻</span>
+              <select
+                value={s.remind_morning_hour}
+                onChange={(e) => up({ remind_morning_hour: parseInt(e.target.value, 10) })}
+                className="rounded-md border px-2 py-1"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{`${h}時`}</option>
+                ))}
+              </select>
+              <span className="text-slate-400">（当日のこの時刻に当日分を送信）</span>
+            </div>
+            <textarea
+              value={s.remind_morning_text ?? DEFAULT_MORNING_TEXT}
+              onChange={(e) => up({ remind_morning_text: e.target.value })}
+              rows={7}
+              className="mt-2 w-full rounded-md border px-2 py-1.5 font-mono text-xs"
+            />
+          </div>
+        </div>
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 

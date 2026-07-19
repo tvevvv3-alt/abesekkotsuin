@@ -35,39 +35,58 @@ export interface ApptInfo {
 
 const CLINIC_LABEL = "阿部接骨院 / Total Recoverytation Abe";
 
+// 差し込みタグ付きの既定テンプレート（管理画面で上書き可能）
+export const DEFAULT_CONFIRM_TEXT = [
+  "【ご予約ありがとうございます】",
+  "",
+  "■院　　：{院}",
+  "■メニュー：{メニュー}",
+  "■日時　：{日時}",
+  "■担当　：{担当}",
+  "",
+  "ご来院お待ちしております。",
+  `― ${CLINIC_LABEL}`,
+].join("\n");
+
+export const DEFAULT_EVE_TEXT = [
+  "【明日のご予約のお知らせ】",
+  "",
+  "■院　　：{院}",
+  "■メニュー：{メニュー}",
+  "■日時　：{日時}",
+  "■担当　：{担当}",
+  "",
+  "ご来院時刻は {来院時刻} です。",
+  "ご来院お待ちしております。",
+  `― ${CLINIC_LABEL}`,
+].join("\n");
+
+export const DEFAULT_MORNING_TEXT = DEFAULT_EVE_TEXT.replace(
+  "【明日のご予約のお知らせ】",
+  "【本日のご予約のお知らせ】"
+);
+
+// テンプレートに予約情報を差し込む。値が空の「ラベル：」行は自動で消す。
+export function renderMessage(tpl: string, i: ApptInfo): string {
+  const out = tpl
+    .split("{院}").join(i.clinicName)
+    .split("{メニュー}").join(i.serviceName)
+    .split("{日時}").join(i.dateTime)
+    .split("{担当}").join(i.staffName || "")
+    .split("{来院時刻}").join(i.visitTime);
+  // 「■担当　：」のように値が空になったラベル行を削除
+  return out
+    .split("\n")
+    .filter((line) => !/^[^：\n]*：\s*$/.test(line))
+    .join("\n");
+}
+
 export function buildConfirmText(i: ApptInfo): string {
-  const lines = [
-    "【ご予約ありがとうございます】",
-    "",
-    `■院　　：${i.clinicName}`,
-    `■メニュー：${i.serviceName}`,
-    `■日時　：${i.dateTime}`,
-  ];
-  if (i.staffName) lines.push(`■担当　：${i.staffName}`);
-  lines.push("", "ご来院お待ちしております。", `― ${CLINIC_LABEL}`);
-  return lines.join("\n");
+  return renderMessage(DEFAULT_CONFIRM_TEXT, i);
 }
 
 export function buildReminderText(i: ApptInfo, when: "eve" | "morning"): string {
-  const head =
-    when === "eve"
-      ? "【明日のご予約のお知らせ】"
-      : "【本日のご予約のお知らせ】";
-  const lines = [
-    head,
-    "",
-    `■院　　：${i.clinicName}`,
-    `■メニュー：${i.serviceName}`,
-    `■日時　：${i.dateTime}`,
-  ];
-  if (i.staffName) lines.push(`■担当　：${i.staffName}`);
-  lines.push(
-    "",
-    `ご来院時刻は ${i.visitTime} です。`,
-    "ご来院お待ちしております。",
-    `― ${CLINIC_LABEL}`
-  );
-  return lines.join("\n");
+  return renderMessage(when === "eve" ? DEFAULT_EVE_TEXT : DEFAULT_MORNING_TEXT, i);
 }
 
 // 予約行から、メッセージ組み立てに必要な情報を集める。

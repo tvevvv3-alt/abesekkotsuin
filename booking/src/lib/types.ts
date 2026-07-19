@@ -169,6 +169,14 @@ export interface Settings {
   board_end_min: number; // 管理ボード表示 終了（分）
   logo_url: string | null; // 予約トップのロゴ画像URL（未設定なら既定バッジ）
   clinics: { ibaraki: ClinicBranding; kawanishi: ClinicBranding } | null; // 院ごとの名称・ロゴ
+  // LINE メッセージ設定（null は既定テンプレートを使用）
+  confirm_text: string | null; // 予約確認メッセージの本文
+  remind_eve_enabled: boolean; // 前日リマインドを送るか
+  remind_eve_hour: number; // 前日リマインドの送信時刻（JST 時, 0-23）
+  remind_eve_text: string | null; // 前日リマインドの本文
+  remind_morning_enabled: boolean; // 当日リマインドを送るか
+  remind_morning_hour: number; // 当日リマインドの送信時刻（JST 時）
+  remind_morning_text: string | null; // 当日リマインドの本文
 }
 
 // 月別の予約公開設定

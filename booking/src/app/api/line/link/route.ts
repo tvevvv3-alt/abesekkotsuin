@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildApptInfo,
-  buildConfirmText,
+  DEFAULT_CONFIRM_TEXT,
   lineMessagingConfigured,
   pushText,
+  renderMessage,
 } from "@/lib/line";
 
 export const runtime = "nodejs";
@@ -63,8 +64,14 @@ export async function POST(req: NextRequest) {
   if (appt.confirm_sent_at) {
     return ok({ ok: true, linked: true, sent: false, error: "already sent" });
   }
-  const info = await buildApptInfo(admin, appt);
-  const r = await pushText(userId, buildConfirmText(info));
+  const { data: s } = await admin
+    .from("settings")
+    .select("clinics, confirm_text")
+    .eq("id", 1)
+    .maybeSingle();
+  const info = await buildApptInfo(admin, appt, (s?.clinics as never) ?? null);
+  const tpl = s?.confirm_text?.trim() || DEFAULT_CONFIRM_TEXT;
+  const r = await pushText(userId, renderMessage(tpl, info));
   if (r.ok) {
     await admin
       .from("appointments")

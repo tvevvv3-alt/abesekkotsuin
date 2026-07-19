@@ -116,6 +116,13 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     board_end_min: 1320,
     logo_url: null,
     clinics: null,
+    confirm_text: null,
+    remind_eve_enabled: true,
+    remind_eve_hour: 18,
+    remind_eve_text: null,
+    remind_morning_enabled: true,
+    remind_morning_hour: 9,
+    remind_morning_text: null,
   };
   if (!data) return defaults;
   // 移行前で列が無い場合も既定で補完
@@ -126,6 +133,13 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     board_end_min: data.board_end_min ?? defaults.board_end_min,
     logo_url: data.logo_url ?? null,
     clinics: data.clinics ?? null,
+    confirm_text: data.confirm_text ?? null,
+    remind_eve_enabled: data.remind_eve_enabled ?? true,
+    remind_eve_hour: data.remind_eve_hour ?? 18,
+    remind_eve_text: data.remind_eve_text ?? null,
+    remind_morning_enabled: data.remind_morning_enabled ?? true,
+    remind_morning_hour: data.remind_morning_hour ?? 9,
+    remind_morning_text: data.remind_morning_text ?? null,
   };
 }
 
