@@ -42,6 +42,13 @@ import WeekCalendar from "./WeekCalendar";
 const STORAGE_KEY = "abe_booking_patient";
 const STORAGE_KEY_LIST = "abe_booking_patients"; // 端末に保存した家族分の一覧
 
+// LIFF SDK の最小型（CDN読み込みのため型定義だけ用意）
+interface LiffApi {
+  init: (config: { liffId: string }) => Promise<void>;
+  isLoggedIn: () => boolean;
+  getIDToken: () => string | null;
+}
+
 type Step = 1 | 2 | 3 | 4 | 5;
 
 // 院（拠点）。川西整体院メニューだけ川西、それ以外は茨木本院。
@@ -191,6 +198,8 @@ export default function BookingWizard() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastAppointmentId, setLastAppointmentId] = useState<string | null>(null);
   const [lineEnabled, setLineEnabled] = useState(false);
+  const [liffIdToken, setLiffIdToken] = useState<string | null>(null); // LINE内で開いた時の本人トークン
+  const [linkedViaLiff, setLinkedViaLiff] = useState(false);
 
   const service = services.find((s) => s.id === serviceId) || null;
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
@@ -393,6 +402,40 @@ export default function BookingWizard() {
     };
   }, []);
 
+  // ---- LIFF初期化（リッチメニュー経由＝LINE内で開いた場合、本人を自動判別）----
+  useEffect(() => {
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+    if (!liffId) return;
+    let cancelled = false;
+    (async () => {
+      // LIFF SDK を CDN から読み込み
+      const w = window as unknown as { liff?: LiffApi };
+      if (!w.liff) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://static.line-scdn.net/liff/edge/2/sdk.js";
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error("liff sdk load failed"));
+          document.head.appendChild(s);
+        });
+      }
+      const liff = (window as unknown as { liff?: LiffApi }).liff;
+      if (!liff) return;
+      await liff.init({ liffId });
+      if (cancelled) return;
+      // LINEアプリ内で開いていればログイン済み→本人トークンを取得
+      if (liff.isLoggedIn()) {
+        const token = liff.getIDToken();
+        if (token) setLiffIdToken(token);
+      }
+    })().catch(() => {
+      /* LINE外ブラウザ等では無視（OAuthボタンにフォールバック）*/
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ---- 週データ読み込み（担当者・週が変わるたび）----
   const weekDates = useMemo(
     () => Array.from({ length: 7 }, (_, i) => toDateStr(addDays(weekStart, i))),
@@ -511,8 +554,21 @@ export default function BookingWizard() {
       setSavedList(merged);
       localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(merged));
       setLastAppointmentId(res.appointment_id ?? null);
-      // LINE連携が有効なら、予約完了と同時にそのままLINE連携へ進む
-      // （確認メッセージ送信＋以降の問診票などのやり取りにつなげる）
+      // ① LINE内（リッチメニュー経由）なら、タップ0回で自動連携＋確認送信
+      if (liffIdToken && res.appointment_id) {
+        fetch("/api/line/link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            appointmentId: res.appointment_id,
+            idToken: liffIdToken,
+          }),
+        }).catch(() => {});
+        setLinkedViaLiff(true);
+        setStep(5);
+        return;
+      }
+      // ② LINE外ブラウザだがOAuth設定済みなら、完了と同時にLINEログインへ誘導
       if (lineEnabled && res.appointment_id) {
         window.location.assign(`/api/line/login?a=${res.appointment_id}`);
         return;
@@ -532,6 +588,7 @@ export default function BookingWizard() {
     setSelected(null);
     setSubmitError(null);
     setLastAppointmentId(null);
+    setLinkedViaLiff(false);
   }
 
   // 保存済みの家族情報をフォームへ反映
@@ -1141,13 +1198,15 @@ export default function BookingWizard() {
           >
             {submitting
               ? "予約中…"
-              : lineEnabled
+              : lineEnabled && !liffIdToken
               ? "予約してLINEで受け取る"
               : "この内容で予約する"}
           </button>
-          {lineEnabled && (
+          {(liffIdToken || lineEnabled) && (
             <p className="mt-2 text-center text-[11px] text-slate-500">
-              予約後、LINEに移動して連携します（予約確認・問診票・リマインドをLINEでお届け）
+              {liffIdToken
+                ? "予約確認・リマインドをLINEにお届けします"
+                : "予約後、LINEに移動して連携します（予約確認・問診票・リマインドをLINEでお届け）"}
             </p>
           )}
         </Section>
@@ -1176,7 +1235,26 @@ export default function BookingWizard() {
               ご来院時刻は {minToLabel(selected.startMin)} です。
             </p>
 
-            {lineEnabled && lastAppointmentId ? (
+            {linkedViaLiff ? (
+              <>
+                <div
+                  className="mt-6 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
+                  style={{ backgroundColor: "#e7f8ee", color: "#06860f" }}
+                >
+                  <span className="text-lg">💬</span>
+                  予約確認をLINEにお送りしました
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400">
+                  前日・当日にリマインドもLINEに届きます。
+                </p>
+                <button
+                  onClick={resetWizard}
+                  className="mt-6 rounded-xl border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700"
+                >
+                  最初に戻る
+                </button>
+              </>
+            ) : lineEnabled && lastAppointmentId ? (
               <>
                 <div
                   className="mt-6 rounded-2xl border-2 bg-white p-4 text-left shadow-sm"
