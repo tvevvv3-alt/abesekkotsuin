@@ -140,7 +140,7 @@ export async function pushText(
   userId: string,
   text: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const token = (process.env.LINE_CHANNEL_ACCESS_TOKEN || "").trim();
   if (!token) return { ok: false, error: "LINE_CHANNEL_ACCESS_TOKEN 未設定" };
   try {
     const res = await fetch("https://api.line.me/v2/bot/message/push", {
