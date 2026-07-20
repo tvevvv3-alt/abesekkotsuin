@@ -73,7 +73,7 @@ begin
      where ap.service_id = p_service_id and ap.status = 'booked'
        and ap.date = p_date
        and ap.start_min < v_end and ap.end_min > p_start_min
-       and (p_exclude_appointment_id is null or ap.id <> p_exclude_appointment_id);
+       and (p_exclude_appointment_id is null or ap.id != p_exclude_appointment_id);
     if v_used >= v_capacity then
       return jsonb_build_object('ok', false, 'reason', '満', 'used', v_used, 'capacity', v_capacity);
     end if;
@@ -125,7 +125,7 @@ begin
           and a.staff_id = p_staff_id
           and a.date = p_date
           and a.start_min < s_end and a.end_min > s_start
-          and (p_exclude_appointment_id is null or a.appointment_id <> p_exclude_appointment_id)
+          and (p_exclude_appointment_id is null or a.appointment_id != p_exclude_appointment_id)
       ) then
         return jsonb_build_object('ok', false, 'reason', '担当者の空きなし', 'step', step.name);
       end if;
@@ -138,7 +138,7 @@ begin
       where a.equipment_id = step.equipment_id
         and a.date = p_date
         and a.start_min < s_end and a.end_min > s_start
-        and (p_exclude_appointment_id is null or a.appointment_id <> p_exclude_appointment_id);
+        and (p_exclude_appointment_id is null or a.appointment_id != p_exclude_appointment_id);
 
       select capacity into v_cap from equipment where id = step.equipment_id;
       if v_used + step.headcount > coalesce(v_cap, 1) then
