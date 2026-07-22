@@ -66,6 +66,55 @@ interface ApptWithSteps extends Appointment {
   steps: AppointmentStep[];
 }
 
+const KAWANISHI_COLOR = "#92400e"; // 川西整体院＝茶色
+const CLASS_COLOR = "#64748b"; // 体幹教室＝グレー
+
+// #rrggbb → 白へ amt(0..1) だけ寄せた薄い色
+function lighten(hex: string, amt: number): string {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  if ([r, g, b].some(isNaN)) return hex;
+  const mix = (c: number) => Math.round(c + (255 - c) * amt);
+  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+}
+
+// 工程の色分け：通電＝薄い / 施術＝濃い
+function stepTone(st: AppointmentStep): "light" | "dark" {
+  if (/通電/.test(st.name)) return "light";
+  if (/施術|手技|整体|矯正|マッサージ|検査|カウンセリング/.test(st.name)) return "dark";
+  return st.uses_staff ? "dark" : "light";
+}
+
+// 予約を「薄い通電 / 濃い施術」のセグメントへ分解
+function apptSegments(
+  a: ApptWithSteps,
+  s: number,
+  e: number
+): { s: number; e: number; tone: "light" | "dark" }[] {
+  const steps = (a.steps ?? [])
+    .filter((st) => st.start_min != null && st.end_min != null)
+    .sort((x, y) => x.start_min - y.start_min);
+  if (steps.length === 0) return [{ s, e, tone: "dark" }];
+  const segs: { s: number; e: number; tone: "light" | "dark" }[] = [];
+  for (const st of steps) {
+    const tone = stepTone(st);
+    const last = segs[segs.length - 1];
+    if (last && last.tone === tone && st.start_min <= last.e) {
+      last.e = Math.max(last.e, st.end_min);
+    } else {
+      segs.push({ s: st.start_min, e: st.end_min, tone });
+    }
+  }
+  return segs.map((sg) => ({
+    tone: sg.tone,
+    s: Math.max(s, Math.min(e, sg.s)),
+    e: Math.min(e, Math.max(sg.e, Math.max(s, Math.min(e, sg.s)) + 1)),
+  }));
+}
+
 // 列に描く休診バンド
 interface ClosureBand {
   id: string;
@@ -253,57 +302,70 @@ export default function AdminBoard() {
       }));
   }
 
-  function staffCards(staffId: string) {
-    return appts
-      .map((a) => {
-        const own = a.steps.filter((s) => s.uses_staff && s.staff_id === staffId);
-        if (own.length === 0) return null;
-        const s = Math.min(...own.map((x) => x.start_min));
-        const e = Math.max(...own.map((x) => x.end_min));
-        return { appt: a, s, e };
-      })
-      .filter(Boolean) as Array<{ appt: ApptWithSteps; s: number; e: number }>;
-  }
-
-  function equipCards(equipId: string) {
-    const blocks: Array<{ appt: ApptWithSteps; s: number; e: number; head: number }> = [];
-    appts.forEach((a) => {
-      a.steps
-        .filter((st) => st.equipment_id === equipId)
-        .forEach((st) =>
-          blocks.push({ appt: a, s: st.start_min, e: st.end_min, head: st.headcount })
-        );
-    });
-    return blocks;
-  }
-
-  // 機器を使うメニュー（ハイチャージ列のドラッグ予約のプリセット）
-  const equipMenu = useMemo(
-    () => services.find((s) => s.steps?.some((st) => st.equipment_id)) || null,
-    [services]
-  );
-
-  // 担当者カラー（機器カードの色分け用）
-  const staffColor = (id: string | null) =>
-    staff.find((s) => s.id === id)?.color || "#64748b";
-
-  // 川西整体院（別院）：その日の川西予約を列で表示
+  // 川西整体院（別院）：列は廃止し、阿部の列に茶色で表示する
   const kawanishiService = useMemo(
     () => services.find((s) => s.category === "川西整体院") || null,
     [services]
   );
-  function kawanishiCards() {
-    if (!kawanishiService) return [];
-    return appts
-      .filter((a) => a.service_id === kawanishiService.id)
-      .map((a) => ({ appt: a, s: a.start_min, e: a.end_min }));
-  }
 
   // 定員制クラス（体幹教室）：同時刻でグループ化して人数を表示
   const classServices = useMemo(
     () => services.filter((s) => s.capacity > 1),
     [services]
   );
+
+  // 川西整体院を受け持つ列（＝阿部）。名前に「阿部」を含むスタッフ、無ければ先頭。
+  const kawanishiHostId = useMemo(() => {
+    const abe = staff.find((s) => s.name.includes("阿部"));
+    return abe?.id ?? staff[0]?.id ?? null;
+  }, [staff]);
+
+  // 担当者列から除外するサービス（体幹教室＝別列 / 川西＝阿部列に別枠で追加）
+  const excludeFromStaff = useMemo(() => {
+    const set = new Set<string>();
+    classServices.forEach((c) => set.add(c.id));
+    if (kawanishiService) set.add(kawanishiService.id);
+    return set;
+  }, [classServices, kawanishiService]);
+
+  // 担当者列のカード（通常予約＋阿部列には川西を茶色で追加）→ 重なりはレーン分割
+  function columnCards(st: Staff) {
+    type Card = {
+      appt: ApptWithSteps;
+      s: number;
+      e: number;
+      color: string;
+      kawanishi: boolean;
+    };
+    const cards: Card[] = [];
+    appts
+      .filter((a) => !excludeFromStaff.has(a.service_id ?? ""))
+      .filter((a) =>
+        a.staff_id
+          ? a.staff_id === st.id
+          : a.steps.some((x) => x.uses_staff && x.staff_id === st.id)
+      )
+      .forEach((a) => {
+        const withT = a.steps.filter((x) => x.start_min != null);
+        const s = withT.length ? Math.min(...withT.map((x) => x.start_min)) : a.start_min;
+        const e = withT.length ? Math.max(...withT.map((x) => x.end_min)) : a.end_min;
+        cards.push({ appt: a, s, e, color: st.color || "#334155", kawanishi: false });
+      });
+    if (kawanishiService && kawanishiHostId === st.id) {
+      appts
+        .filter((a) => a.service_id === kawanishiService.id)
+        .forEach((a) =>
+          cards.push({
+            appt: a,
+            s: a.start_min,
+            e: a.end_min,
+            color: KAWANISHI_COLOR,
+            kawanishi: true,
+          })
+        );
+    }
+    return layoutLanes(cards);
+  }
   function classGroups(serviceId: string) {
     const map: Record<string, { start: number; end: number; list: ApptWithSteps[] }> = {};
     appts
@@ -516,72 +578,53 @@ export default function AdminBoard() {
                   onPointerUpTrack={endDrag}
                   onPointerCancelTrack={cancelDrag}
                 >
-                  {staffCards(st.id).map(({ appt, s, e }) => (
-                    <button
-                      key={appt.id}
-                      onClick={() => setModal({ mode: "edit", appt })}
-                      className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
-                      style={{
-                        // 表示は30分グリッドにスナップして揃える
-                        top: yFor(snap(s)),
-                        height:
-                          yFor(Math.max(snap(e), snap(s) + GRID_STEP)) - yFor(snap(s)) - 2,
-                        backgroundColor: st.color || "#334155",
-                      }}
-                    >
-                      <div className="truncate text-xs font-bold">
-                        {appt.patient_name || "（未登録）"}
-                      </div>
-                    </button>
-                  ))}
+                  {columnCards(st).map(({ appt, s, e, color, kawanishi, lane, cols }) => {
+                    const topSnap = snap(s);
+                    const botSnap = Math.max(snap(e), topSnap + GRID_STEP);
+                    const cardTop = yFor(topSnap);
+                    const w = 100 / cols;
+                    // 川西は単色、通常予約は通電（薄）＋施術（濃）の2段
+                    const segs = kawanishi
+                      ? [{ s: topSnap, e: botSnap, tone: "dark" as const }]
+                      : apptSegments(appt, topSnap, botSnap);
+                    return (
+                      <button
+                        key={`${appt.id}-${lane}`}
+                        onClick={() => setModal({ mode: "edit", appt })}
+                        className="absolute z-20 overflow-hidden rounded-md shadow-sm"
+                        style={{
+                          top: cardTop,
+                          height: yFor(botSnap) - cardTop - 2,
+                          left: `calc(${lane * w}% + 2px)`,
+                          width: `calc(${w}% - 4px)`,
+                          backgroundColor: color,
+                        }}
+                        title={`${minToLabel(appt.start_min)} ${appt.patient_name ?? ""}`}
+                      >
+                        {segs.map((sg, i) => (
+                          <div
+                            key={i}
+                            className="absolute left-0 w-full"
+                            style={{
+                              top: yFor(sg.s) - cardTop,
+                              height: yFor(sg.e) - yFor(sg.s),
+                              backgroundColor: sg.tone === "light" ? lighten(color, 0.42) : color,
+                              borderTop: i > 0 ? "1px solid rgba(255,255,255,.5)" : undefined,
+                            }}
+                          />
+                        ))}
+                        <span className="absolute inset-0 flex items-center px-1">
+                          <span
+                            className="line-clamp-2 w-full text-[11px] font-bold leading-[1.12] text-white"
+                            style={{ textShadow: "0 1px 2px rgba(0,0,0,.55)" }}
+                          >
+                            {appt.patient_name || "（未登録）"}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </Column>
-              );
-            })}
-
-            {/* 機器列（ハイチャージ等）*/}
-            {equipment.filter((eq) => eq.visible).map((eq) => {
-              const ctx: ColCtx = { serviceId: equipMenu?.id, canClose: false };
-              return (
-              <Column
-                key={eq.id}
-                header={`${eq.name}`}
-                subHeader={`同時${eq.capacity}名`}
-                headerColor="#0f172a"
-                height={height}
-                yFor={yFor}
-                ticks={ticks}
-                offRanges={[]}
-                closureBands={[]}
-                band={bandFor(ctx)}
-                onPointerDownTrack={(e) => beginDrag(ctx, e)}
-                onPointerMoveTrack={moveDrag}
-                onPointerUpTrack={endDrag}
-                onPointerCancelTrack={cancelDrag}
-              >
-                {layoutLanes(equipCards(eq.id)).map(({ appt, s, e, lane, cols }, i) => {
-                  const w = 100 / cols;
-                  return (
-                    <div
-                      key={`${appt.id}-${i}`}
-                      className="absolute z-20 overflow-hidden rounded-md px-1 py-0.5 text-left text-white shadow-sm"
-                      style={{
-                        // 通電20分など短い枠は、見やすいよう30分グリッドまで伸ばして表示
-                        top: yFor(s),
-                        height: yFor(Math.ceil(e / GRID_STEP) * GRID_STEP) - yFor(s) - 2,
-                        // 同時利用は横に並べる
-                        left: `calc(${lane * w}% + 2px)`,
-                        width: `calc(${w}% - 4px)`,
-                        // 担当者カラーで色分け
-                        backgroundColor: staffColor(appt.staff_id),
-                      }}
-                    >
-                      <div className="truncate text-[10px] font-bold">
-                        {appt.patient_name}
-                      </div>
-                    </div>
-                  );
-                })}
-              </Column>
               );
             })}
 
@@ -593,7 +636,7 @@ export default function AdminBoard() {
                 key={cls.id}
                 header={cls.name}
                 subHeader={`定員${cls.capacity}名`}
-                headerColor="#0f766e"
+                headerColor={CLASS_COLOR}
                 height={height}
                 yFor={yFor}
                 ticks={ticks}
@@ -620,16 +663,16 @@ export default function AdminBoard() {
                 {classGroups(cls.id).map((g, i) => (
                   <div
                     key={i}
-                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-teal-300 bg-teal-50 px-1 py-1"
+                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-1"
                     style={{
                       top: yFor(g.start),
                       height: yFor(g.end) - yFor(g.start) - 2,
                     }}
                   >
-                    <div className="mb-0.5 text-[11px] font-bold text-teal-800">
+                    <div className="mb-0.5 text-[11px] font-bold text-slate-700">
                       {g.list.length}/{cls.capacity}
                       {g.list.length >= cls.capacity && (
-                        <span className="ml-1 rounded bg-teal-700 px-1 text-[9px] text-white">
+                        <span className="ml-1 rounded bg-slate-600 px-1 text-[9px] text-white">
                           満
                         </span>
                       )}
@@ -638,7 +681,7 @@ export default function AdminBoard() {
                       <button
                         key={a.id}
                         onClick={() => setModal({ mode: "edit", appt: a })}
-                        className="block w-full truncate text-left text-[10px] text-teal-700 hover:underline"
+                        className="block w-full truncate text-left text-[10px] text-slate-700 hover:underline"
                       >
                         {a.patient_name || "（未登録）"}
                       </button>
@@ -649,55 +692,6 @@ export default function AdminBoard() {
               );
             })}
 
-            {/* 川西整体院（別院）列 */}
-            {kawanishiService && (
-              <Column
-                header="川西整体院"
-                headerColor="#b45309"
-                height={height}
-                yFor={yFor}
-                ticks={ticks}
-                offRanges={[]}
-                closureBands={closures
-                  .filter(
-                    (c) =>
-                      (c.staff_id === null && c.service_id === null) ||
-                      c.service_id === kawanishiService.id
-                  )
-                  .map((c) => ({
-                    id: c.id,
-                    start: c.start_min ?? minMin,
-                    end: c.end_min ?? maxMin,
-                    reason: c.reason,
-                  }))}
-                onClosureClick={removeClosure}
-                band={bandFor({ serviceId: kawanishiService.id, canClose: true })}
-                onPointerDownTrack={(e) =>
-                  beginDrag({ serviceId: kawanishiService.id, canClose: true }, e)
-                }
-                onPointerMoveTrack={moveDrag}
-                onPointerUpTrack={endDrag}
-                onPointerCancelTrack={cancelDrag}
-              >
-                {kawanishiCards().map(({ appt, s, e }) => (
-                  <button
-                    key={appt.id}
-                    onClick={() => setModal({ mode: "edit", appt })}
-                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md px-1.5 py-1 text-left text-white shadow-sm"
-                    style={{
-                      top: yFor(snap(s)),
-                      height:
-                        yFor(Math.max(snap(e), snap(s) + GRID_STEP)) - yFor(snap(s)) - 2,
-                      backgroundColor: "#b45309",
-                    }}
-                  >
-                    <div className="truncate text-xs font-bold">
-                      {appt.patient_name || "（未登録）"}
-                    </div>
-                  </button>
-                ))}
-              </Column>
-            )}
           </div>
         </div>
       )}
