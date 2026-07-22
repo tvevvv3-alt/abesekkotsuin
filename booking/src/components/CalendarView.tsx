@@ -62,6 +62,53 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number })[] {
 
 const snap = (m: number) => Math.round(m / SNAP) * SNAP;
 
+// #rrggbb → 白へ amt(0..1) だけ寄せた薄い色
+function lighten(hex: string, amt: number): string {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  if ([r, g, b].some(isNaN)) return hex;
+  const mix = (c: number) => Math.round(c + (255 - c) * amt);
+  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+}
+
+// 工程の色分け：通電＝薄い / 施術＝濃い
+function stepTone(st: AppointmentStep): "light" | "dark" {
+  if (/通電/.test(st.name)) return "light";
+  if (/施術|手技|整体|矯正|マッサージ|検査|カウンセリング/.test(st.name)) return "dark";
+  return st.uses_staff ? "dark" : "light";
+}
+
+// 予約ブロックを工程ごとに「薄い通電 / 濃い施術」のセグメントへ分解
+function apptSegments(
+  a: ApptWithSteps,
+  s: number,
+  e: number
+): { s: number; e: number; tone: "light" | "dark" }[] {
+  const steps = (a.steps ?? [])
+    .filter((st) => st.start_min != null && st.end_min != null)
+    .sort((x, y) => x.start_min - y.start_min);
+  if (steps.length === 0) return [{ s, e, tone: "dark" }];
+  const segs: { s: number; e: number; tone: "light" | "dark" }[] = [];
+  for (const st of steps) {
+    const tone = stepTone(st);
+    const last = segs[segs.length - 1];
+    if (last && last.tone === tone && st.start_min <= last.e) {
+      last.e = Math.max(last.e, st.end_min);
+    } else {
+      segs.push({ s: st.start_min, e: st.end_min, tone });
+    }
+  }
+  // 外枠の範囲へ丸める
+  return segs.map((sg) => ({
+    tone: sg.tone,
+    s: Math.max(s, Math.min(e, sg.s)),
+    e: Math.min(e, Math.max(sg.e, Math.max(s, Math.min(e, sg.s)) + 1)),
+  }));
+}
+
 export default function CalendarView() {
   const supabase = useMemo(() => createClient(), []);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -326,6 +373,9 @@ export default function CalendarView() {
                       );
                     }
                     const a = it.appt;
+                    const col = staffColor(a.staff_id);
+                    const segs = apptSegments(a, it.s, it.e);
+                    const span = Math.max(1, it.e - it.s);
                     return (
                       <button
                         key={a.id}
@@ -333,13 +383,37 @@ export default function CalendarView() {
                           ev.stopPropagation();
                           setModal({ mode: "edit", appt: a });
                         }}
-                        className="absolute overflow-hidden rounded-[5px] px-1 text-left text-[10px] font-bold leading-[1.15] text-white shadow-sm"
-                        style={{ ...style, backgroundColor: staffColor(a.staff_id) }}
+                        className="absolute overflow-hidden rounded-[5px] shadow-sm"
+                        style={{ ...style, backgroundColor: col }}
                         title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
                       >
-                        <span className="line-clamp-2" style={{ textShadow: "0 1px 2px rgba(0,0,0,.4)" }}>
-                          {a.patient_name || "（未登録）"}
-                        </span>
+                        {segs.map((sg, i) => {
+                          const light = sg.tone === "light";
+                          return (
+                            <div
+                              key={i}
+                              className="absolute left-0 w-full px-1 text-left leading-[1.1]"
+                              style={{
+                                top: `${((sg.s - it.s) / span) * 100}%`,
+                                height: `${((sg.e - sg.s) / span) * 100}%`,
+                                backgroundColor: light ? lighten(col, 0.62) : col,
+                                borderTop: i > 0 ? "1px solid rgba(255,255,255,.45)" : undefined,
+                              }}
+                            >
+                              {i === 0 && (
+                                <span
+                                  className="line-clamp-2 text-[10px] font-bold"
+                                  style={{
+                                    color: light ? "#0f172a" : "#fff",
+                                    textShadow: light ? "none" : "0 1px 2px rgba(0,0,0,.4)",
+                                  }}
+                                >
+                                  {a.patient_name || "（未登録）"}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </button>
                     );
                   })}
