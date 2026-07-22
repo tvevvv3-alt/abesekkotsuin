@@ -23,6 +23,12 @@ jobs:
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Ensure public env is inlined at build
+        run: |
+          f=".vercel/.env.production.local"
+          touch "$f"
+          grep -q '^NEXT_PUBLIC_LIFF_ID=' "$f"  || echo 'NEXT_PUBLIC_LIFF_ID=2010754963-gieRq73Z' >> "$f"
+          grep -q '^NEXT_PUBLIC_SITE_URL=' "$f" || echo 'NEXT_PUBLIC_SITE_URL=https://abesekkotsuin.vercel.app' >> "$f"
       - name: Build
         run: vercel build --prod --token="$VERCEL_TOKEN"
         env:

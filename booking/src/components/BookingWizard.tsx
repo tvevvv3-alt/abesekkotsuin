@@ -49,6 +49,8 @@ interface LiffApi {
   init: (config: { liffId: string }) => Promise<void>;
   isLoggedIn: () => boolean;
   getIDToken: () => string | null;
+  login: (config?: { redirectUri?: string }) => void;
+  isInClient: () => boolean;
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -428,10 +430,13 @@ export default function BookingWizard() {
       if (!liff) return;
       await liff.init({ liffId });
       if (cancelled) return;
-      // LINEアプリ内で開いていればログイン済み→本人トークンを取得
       if (liff.isLoggedIn()) {
+        // ログイン済み → 本人トークンを取得
         const token = liff.getIDToken();
         if (token) setLiffIdToken(token);
+      } else if (liff.isInClient()) {
+        // LINEアプリ内なのに未ログイン → LIFF標準ログイン（独自OAuthは使わない）
+        liff.login();
       }
     })().catch(() => {
       /* LINE外ブラウザ等では無視（OAuthボタンにフォールバック）*/
