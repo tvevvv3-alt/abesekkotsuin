@@ -21,6 +21,18 @@ type ApptWithSteps = Appointment & { steps: AppointmentStep[] };
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
 
+// 色を白に近づけて薄くする（通電＝薄い、施術＝濃い の表現用）
+function lighten(hex: string, ratio: number): string {
+  const h = (hex || "#64748b").replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * ratio);
+  if ([r, g, b].some(Number.isNaN)) return hex;
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
 const PX_PER_MIN = 0.9; // 1分あたりの高さ(px)
 const GUTTER = 44; // 左の時間軸の幅(px)
 const MIN_COL = 120; // 日カラムの最小幅(px)
@@ -256,6 +268,8 @@ export default function CalendarView() {
                     const top = yFor(s);
                     const h = Math.max(16, yFor(e) - yFor(s) - 1);
                     const w = 100 / cols;
+                    const color = staffColor(appt.staff_id);
+                    const light = lighten(color, 0.55);
                     return (
                       <button
                         key={appt.id}
@@ -263,24 +277,39 @@ export default function CalendarView() {
                           ev.stopPropagation();
                           setModal({ mode: "edit", appt });
                         }}
-                        className="absolute overflow-hidden rounded-md px-1 py-0.5 text-left text-white shadow-sm"
+                        className="absolute overflow-hidden rounded-md text-left text-white shadow-sm"
                         style={{
                           top,
                           height: h,
                           left: `calc(${lane * w}% + 1px)`,
                           width: `calc(${w}% - 2px)`,
-                          backgroundColor: staffColor(appt.staff_id),
+                          backgroundColor: color,
                         }}
                         title={`${minToLabel(appt.start_min)} ${appt.patient_name ?? ""}（${staffName(appt.staff_id)}）`}
                       >
-                        <div className="truncate text-[10px] font-bold leading-tight">
-                          {minToLabel(appt.start_min)} {appt.patient_name || "（未登録）"}
+                        {/* 工程ごとの色分け：通電（機器）＝薄い / 施術＝濃い */}
+                        {(appt.steps ?? []).map((st) => {
+                          const bt = (st.start_min - appt.start_min) * PX_PER_MIN;
+                          const bh = Math.max(2, (st.end_min - st.start_min) * PX_PER_MIN);
+                          return (
+                            <div
+                              key={st.id}
+                              className="pointer-events-none absolute inset-x-0"
+                              style={{
+                                top: bt,
+                                height: bh,
+                                backgroundColor: st.equipment_id ? light : color,
+                              }}
+                            />
+                          );
+                        })}
+                        {/* 患者名（主役） */}
+                        <div
+                          className="relative z-10 truncate px-1 pt-0.5 text-[11px] font-bold leading-tight"
+                          style={{ textShadow: "0 1px 2px rgba(0,0,0,.45)" }}
+                        >
+                          {appt.patient_name || "（未登録）"}
                         </div>
-                        {h > 28 && (
-                          <div className="truncate text-[9px] leading-tight opacity-90">
-                            {appt.service_name || ""}
-                          </div>
-                        )}
                       </button>
                     );
                   })}
