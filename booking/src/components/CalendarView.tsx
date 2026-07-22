@@ -396,8 +396,10 @@ export default function CalendarView() {
     setStart((cur) => toDateStr(addDays(new Date(cur + "T00:00:00"), dir * days)));
     requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)));
   }
-  // 即時移動（今日・日付・日数変更）
+  // 即時移動（今日・日付・日数変更）：スライド状態を全リセットして左端＝指定日に
   function jump(newStart: string) {
+    drag.current = null;
+    setDragging(false);
     setInstant(true);
     setShown(1);
     setDragX(0);
@@ -477,7 +479,7 @@ export default function CalendarView() {
                   ev.stopPropagation();
                   setNoteModal({ mode: "edit", note: it.note });
                 }}
-                className="absolute flex items-center justify-center overflow-hidden rounded-[6px] border-2 border-white px-0.5 text-center shadow-sm"
+                className="absolute flex items-center justify-center overflow-hidden rounded-[5px] border border-white px-0.5 text-center shadow-sm"
                 style={{ ...style, backgroundColor: it.note.color || "#64748b" }}
               >
                 <span
@@ -512,7 +514,7 @@ export default function CalendarView() {
                 return (
                   <div
                     key={i}
-                    className="absolute inset-x-0 flex items-center justify-center overflow-hidden rounded-[6px] border-2 border-white px-0.5 text-center shadow-sm"
+                    className="absolute inset-x-0 flex items-center justify-center overflow-hidden rounded-[5px] border border-white px-0.5 text-center shadow-sm"
                     style={{
                       top: segTop,
                       height: segH - 1,
