@@ -77,6 +77,22 @@ function lighten(hex: string, amt: number): string {
   return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
 }
 
+const CLASS_COLOR = "#EF6C00"; // 体幹教室＝オレンジ
+
+// 背景の明るさで文字色を自動選択（黄色など明るい色は黒文字）
+function textOn(hex: string): { color: string; shadow: string } {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  if ([r, g, b].some(isNaN)) return { color: "#fff", shadow: "0 1px 2px rgba(0,0,0,.55)" };
+  const L = 0.299 * r + 0.587 * g + 0.114 * b;
+  return L > 165
+    ? { color: "#1f2937", shadow: "0 1px 1px rgba(255,255,255,.45)" }
+    : { color: "#fff", shadow: "0 1px 2px rgba(0,0,0,.55)" };
+}
+
 // 工程の色分け：通電＝薄い / 施術＝濃い
 function stepTone(st: AppointmentStep): "light" | "dark" {
   if (/通電/.test(st.name)) return "light";
@@ -215,6 +231,17 @@ export default function CalendarView() {
     () => staff.find((s) => s.name.includes("阿部"))?.color ?? "#2563eb",
     [staff]
   );
+  // 体幹教室（定員制クラス）は担当に関わらずオレンジ
+  const classIds = useMemo(
+    () => new Set(services.filter((s) => s.capacity > 1).map((s) => s.id)),
+    [services]
+  );
+  const colorFor = (a: ApptWithSteps) =>
+    a.service_id === kawanishiId
+      ? abeColor
+      : classIds.has(a.service_id ?? "")
+      ? CLASS_COLOR
+      : staffColor(a.staff_id);
 
   const boardStart = settings?.board_start_min ?? 540;
   const boardEnd = Math.max(boardStart + 60, settings?.board_end_min ?? 1290);
@@ -433,19 +460,16 @@ export default function CalendarView() {
         ))}
         {laid.map((it) => {
           const top = yFor(it.s);
-          const blockH = yFor(it.e) - top;
           const style = {
             top,
-            height: blockH - 1,
+            height: yFor(it.e) - top - 1,
             left: `calc(${(it.lane * 100) / it.cols}% + 1px)`,
             width: `calc(${100 / it.cols}% - 2px)`,
           };
-          // 短い/重なり枠は1行省略（潰れ防止）、広くて高い枠は折り返し
-          const multiline = it.cols === 1 && blockH >= 34;
-          const textCls = multiline
-            ? "pointer-events-none absolute inset-0 overflow-hidden px-1 pt-[3px] text-[12px] font-semibold leading-[1.3] text-white"
-            : "pointer-events-none absolute inset-x-0 top-0 truncate px-1 pt-[3px] text-[11.5px] font-semibold leading-[1.15] text-white";
           if (it.kind === "note") {
+            const tc = textOn(it.note.color || "#64748b");
+            const h = yFor(it.e) - top;
+            const ml = it.cols === 1 && h >= 40;
             return (
               <button
                 key={it.note.id}
@@ -453,17 +477,21 @@ export default function CalendarView() {
                   ev.stopPropagation();
                   setNoteModal({ mode: "edit", note: it.note });
                 }}
-                className="absolute overflow-hidden rounded-[5px] shadow-sm"
+                className="absolute flex items-center justify-center overflow-hidden rounded-[6px] border-2 border-white px-0.5 text-center shadow-sm"
                 style={{ ...style, backgroundColor: it.note.color || "#64748b" }}
               >
-                <span className={textCls} style={{ wordBreak: multiline ? "break-word" : undefined, textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+                <span
+                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold`}
+                  style={{ color: tc.color, textShadow: tc.shadow, wordBreak: ml ? "break-word" : undefined }}
+                >
                   {it.note.text}
                 </span>
               </button>
             );
           }
           const a = it.appt;
-          const col = a.service_id === kawanishiId ? abeColor : staffColor(a.staff_id);
+          const col = colorFor(a);
+          const tc = textOn(col);
           const segs = apptSegments(a);
           return (
             <button
@@ -472,25 +500,34 @@ export default function CalendarView() {
                 ev.stopPropagation();
                 setModal({ mode: "edit", appt: a });
               }}
-              className="absolute overflow-hidden rounded-[5px] shadow-sm"
-              style={{ ...style, backgroundColor: col }}
+              className="absolute"
+              style={{ ...style, background: "transparent" }}
               title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
             >
-              {segs.map((sg, i) => (
-                <div
-                  key={i}
-                  className="absolute left-0 w-full"
-                  style={{
-                    top: yFor(sg.s) - top,
-                    height: yFor(sg.e) - yFor(sg.s),
-                    backgroundColor: sg.tone === "light" ? lighten(col, 0.42) : col,
-                    borderTop: i > 0 ? "1px solid rgba(255,255,255,.5)" : undefined,
-                  }}
-                />
-              ))}
-              <span className={textCls} style={{ wordBreak: multiline ? "break-word" : undefined, textShadow: "0 1px 2px rgba(0,0,0,.55)" }}>
-                {a.patient_name || "（未登録）"}
-              </span>
+              {segs.map((sg, i) => {
+                const segTop = yFor(sg.s) - top;
+                const segH = yFor(sg.e) - yFor(sg.s);
+                const ml = it.cols === 1 && segH >= 44;
+                // 各30分枠を白枠で囲い、通電・施術それぞれに名前を入れる
+                return (
+                  <div
+                    key={i}
+                    className="absolute inset-x-0 flex items-center justify-center overflow-hidden rounded-[6px] border-2 border-white px-0.5 text-center shadow-sm"
+                    style={{
+                      top: segTop,
+                      height: segH - 1,
+                      backgroundColor: sg.tone === "light" ? lighten(col, 0.42) : col,
+                    }}
+                  >
+                    <span
+                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold`}
+                      style={{ color: tc.color, textShadow: tc.shadow, wordBreak: ml ? "break-word" : undefined }}
+                    >
+                      {a.patient_name || "（未登録）"}
+                    </span>
+                  </div>
+                );
+              })}
             </button>
           );
         })}
