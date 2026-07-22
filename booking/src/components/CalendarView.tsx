@@ -84,7 +84,7 @@ function stepTone(st: AppointmentStep): "light" | "dark" {
   return st.uses_staff ? "dark" : "light";
 }
 
-// 予約ブロックを「薄い通電 / 濃い施術」のセグメントへ分解。
+// 予約を「薄い通電 / 濃い施術」のセグメントへ分解。
 // 30分グリッドで区切る：通電20分→30分枠(薄)、施術30分(濃)。60分施術のみ→60分ひとつながり。
 type Seg = { s: number; e: number; tone: "light" | "dark" };
 function apptSegments(a: ApptWithSteps): Seg[] {
@@ -94,7 +94,6 @@ function apptSegments(a: ApptWithSteps): Seg[] {
     .filter((st) => st.start_min != null && st.end_min != null)
     .sort((x, y) => x.start_min - y.start_min);
   if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark" }];
-  // まず工程を色（通電=薄 / 施術=濃）でまとめる
   const merged: Seg[] = [];
   for (const st of steps) {
     const tone = stepTone(st);
@@ -105,12 +104,11 @@ function apptSegments(a: ApptWithSteps): Seg[] {
       merged.push({ s: st.start_min, e: st.end_min, tone });
     }
   }
-  // 30分グリッドへスナップし、境界を隙間なく連続させる
   let cursor = blockStart;
   const out: Seg[] = [];
   for (const seg of merged) {
     let end = snap(seg.e);
-    if (end <= cursor) end = cursor + SNAP; // 通電20分などは最低30分枠にする
+    if (end <= cursor) end = cursor + SNAP;
     out.push({ s: cursor, e: end, tone: seg.tone });
     cursor = end;
   }
@@ -129,12 +127,19 @@ export default function CalendarView() {
   const [start, setStart] = useState<string>(toDateStr(new Date()));
   const [zoom, setZoom] = useState(1);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
-  const [boxH, setBoxH] = useState(600); // スクロール枠の高さ(px)
-  const pxRef = useRef(1); // 現在の px/分（ハンドラ用）
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [boxH, setBoxH] = useState(600);
+  const pxRef = useRef(1);
   const pendScrollRef = useRef<number | null>(null);
   const didInit = useRef(false);
+
+  // 横スライド（前・今・次の3ページ）
+  const [shown, setShown] = useState(1); // 0=前 / 1=今 / 2=次 を表示
+  const [dragX, setDragX] = useState(0); // 指の横移動(px)
+  const [dragging, setDragging] = useState(false);
+  const [instant, setInstant] = useState(false); // コミット時に無アニメで中央へ戻す
+  const shownRef = useRef(1);
+  shownRef.current = shown;
 
   const [modal, setModal] = useState<
     | { mode: "add"; date: string; startMin: number }
@@ -165,18 +170,27 @@ export default function CalendarView() {
     })();
   }, [supabase]);
 
-  const dateList = useMemo(() => {
+  // 3ページ分の日付（前・今・次）
+  const baseDate = useMemo(() => {
     const [y, m, d] = start.split("-").map(Number);
-    const base = new Date(y, m - 1, d);
-    return Array.from({ length: days }, (_, i) => toDateStr(addDays(base, i)));
-  }, [start, days]);
+    return new Date(y, m - 1, d);
+  }, [start]);
+  const makeList = useCallback(
+    (offset: number) => Array.from({ length: days }, (_, i) => toDateStr(addDays(baseDate, offset + i))),
+    [baseDate, days]
+  );
+  const lists = useMemo(
+    () => [makeList(-days), makeList(0), makeList(days)],
+    [makeList, days]
+  );
+  const allDates = useMemo(() => lists.flat(), [lists]);
 
   const reload = useCallback(async () => {
-    if (dateList.length === 0) return;
+    if (allDates.length === 0) return;
     const [{ data: aData }, { data: sData }, nt] = await Promise.all([
-      supabase.from("appointments").select("*").in("date", dateList).eq("status", "booked"),
-      supabase.from("appointment_steps").select("*").in("date", dateList),
-      loadCalendarNotes(supabase, dateList),
+      supabase.from("appointments").select("*").in("date", allDates).eq("status", "booked"),
+      supabase.from("appointment_steps").select("*").in("date", allDates),
+      loadCalendarNotes(supabase, allDates),
     ]);
     const stepsByAppt: Record<string, AppointmentStep[]> = {};
     (sData ?? []).forEach((s: AppointmentStep) => {
@@ -184,7 +198,7 @@ export default function CalendarView() {
     });
     setAppts((aData ?? []).map((a: Appointment) => ({ ...a, steps: stepsByAppt[a.id] || [] })));
     setNotes(nt);
-  }, [supabase, dateList]);
+  }, [supabase, allDates]);
 
   useEffect(() => {
     reload();
@@ -193,7 +207,6 @@ export default function CalendarView() {
   const staffColor = (id: string | null) => staff.find((s) => s.id === id)?.color || "#64748b";
   const staffName = (id: string | null) => staff.find((s) => s.id === id)?.name || "";
 
-  // 川西整体院の予約は「阿部の青」で表示（川西院である事は上の終日メモで示す）
   const kawanishiId = useMemo(
     () => services.find((s) => s.category === "川西整体院")?.id ?? null,
     [services]
@@ -203,13 +216,13 @@ export default function CalendarView() {
     [staff]
   );
 
-  // 営業時間（この幅が zoom=1 でちょうど画面に収まる基準）
   const boardStart = settings?.board_start_min ?? 540;
   const boardEnd = Math.max(boardStart + 60, settings?.board_end_min ?? 1290);
+  const boardRange = boardEnd - boardStart;
 
-  // スクロール枠の高さを計測
+  // グリッド枠の高さを計測
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = gridRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => setBoxH(el.clientHeight || 600));
     ro.observe(el);
@@ -217,138 +230,343 @@ export default function CalendarView() {
     return () => ro.disconnect();
   }, []);
 
-  // px/分：営業時間ぶんが枠にちょうど収まる高さ × ズーム
-  const headerH = headerRef.current?.offsetHeight ?? 52;
-  const boardRange = boardEnd - boardStart;
-  const basePx = Math.max(0.15, (boxH - headerH) / boardRange);
-  // 縮小の下限：表示レンジ(6:00-24:00)全体がちょうど枠に収まる所で止める
+  const basePx = Math.max(0.15, boxH / boardRange);
   const zoomMin = Math.min(1, Math.max(0.2, boardRange / RANGE));
   const zoomMinRef = useRef(zoomMin);
   zoomMinRef.current = zoomMin;
   const pxPerMin = basePx * zoom;
   pxRef.current = pxPerMin;
   const gridH = RANGE * pxPerMin;
+  const yFor = (m: number) => (Math.max(VIEW_START, Math.min(VIEW_END, m)) - VIEW_START) * pxPerMin;
 
-  // 設定読込などで下限が上がったら、はみ出さないよう補正
   useEffect(() => {
     setZoom((z) => (z < zoomMin ? zoomMin : z));
   }, [zoomMin]);
-  const yFor = (m: number) => (Math.max(VIEW_START, Math.min(VIEW_END, m)) - VIEW_START) * pxPerMin;
 
-  // 初回：営業開始が上に来るようスクロール
   useLayoutEffect(() => {
     if (didInit.current || boxH <= 0) return;
-    const el = scrollRef.current;
+    const el = gridRef.current;
     if (!el) return;
     el.scrollTop = (boardStart - VIEW_START) * pxPerMin;
     didInit.current = true;
   }, [boxH, pxPerMin, boardStart]);
 
-  // ズーム変更後、焦点の時刻が同じ位置に来るようスクロール補正
   useLayoutEffect(() => {
-    if (pendScrollRef.current != null && scrollRef.current) {
-      scrollRef.current.scrollTop = pendScrollRef.current;
+    if (pendScrollRef.current != null && gridRef.current) {
+      gridRef.current.scrollTop = pendScrollRef.current;
       pendScrollRef.current = null;
     }
   }, [zoom]);
 
-  // focalClientY（画面上のY）を中心に factor 倍ズーム
   const zoomAt = useCallback(
     (factor: number, focalClientY: number) => {
-      const el = scrollRef.current;
+      const el = gridRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const hH = headerRef.current?.offsetHeight ?? 52;
       const px = pxRef.current;
-      const gridY = focalClientY - rect.top - hH + el.scrollTop;
+      const gridY = focalClientY - rect.top + el.scrollTop;
       const t = VIEW_START + gridY / px;
       setZoom((z) => {
         const nz = Math.min(ZOOM_MAX, Math.max(zoomMinRef.current, z * factor));
         const npx = basePx * nz;
-        const newGridY = (t - VIEW_START) * npx;
-        pendScrollRef.current = Math.max(0, newGridY + hH - (focalClientY - rect.top));
+        pendScrollRef.current = Math.max(0, (t - VIEW_START) * npx - (focalClientY - rect.top));
         return nz;
       });
     },
     [basePx]
   );
+  function zoomBtn(factor: number) {
+    const el = gridRef.current;
+    const rect = el?.getBoundingClientRect();
+    zoomAt(factor, rect ? rect.top + rect.height / 2 : 0);
+  }
 
-  // ピンチズーム（2本指）
+  // ---- ジェスチャ：ピンチ拡大 / 横ドラッグでページ送り ----
   const pinch = useRef<{ dist: number; zoom: number; midY: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; axis: null | "h" | "v" } | null>(null);
+  const swipedRef = useRef(false);
+
   function onTouchStart(e: React.TouchEvent) {
     if (e.touches.length === 2) {
-      swipe.current = null;
+      drag.current = null;
       const [a, b] = [e.touches[0], e.touches[1]];
       pinch.current = {
         dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
         zoom,
         midY: (a.clientY + b.clientY) / 2,
       };
+      return;
+    }
+    if (shownRef.current === 1 && !instant) {
+      drag.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, axis: null };
     }
   }
   function onTouchMove(e: React.TouchEvent) {
-    const p = pinch.current;
-    if (p && e.touches.length === 2) {
+    if (pinch.current && e.touches.length === 2) {
       e.preventDefault();
       const [a, b] = [e.touches[0], e.touches[1]];
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      const target = Math.min(ZOOM_MAX, Math.max(zoomMinRef.current, p.zoom * (dist / p.dist)));
-      zoomAt(target / zoom, p.midY);
+      const target = Math.min(ZOOM_MAX, Math.max(zoomMinRef.current, pinch.current.zoom * (dist / pinch.current.dist)));
+      zoomAt(target / zoom, pinch.current.midY);
+      return;
     }
+    const d = drag.current;
+    if (!d) return;
+    const t = e.touches[0];
+    const dx = t.clientX - d.x;
+    const dy = t.clientY - d.y;
+    if (d.axis === null) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+        d.axis = "h";
+        setDragging(true);
+      } else if (Math.abs(dy) > 6) {
+        d.axis = "v"; // 縦はネイティブスクロールに任せる
+        drag.current = null;
+        return;
+      }
+    }
+    if (d.axis === "h") setDragX(dx);
   }
   function onTouchEnd(e: React.TouchEvent) {
-    if (e.touches.length < 2) pinch.current = null;
-  }
-  function zoomBtn(factor: number) {
-    const el = scrollRef.current;
-    const rect = el?.getBoundingClientRect();
-    zoomAt(factor, rect ? rect.top + rect.height / 2 : 0);
-  }
-
-  // 横スワイプで期間送り（左へ＝翌週、右へ＝前週）。縦スクロールとは競合させない。
-  const swipe = useRef<{ x: number; y: number } | null>(null);
-  const swipedRef = useRef(false);
-  function shift(dir: number) {
-    setStart(toDateStr(addDays(new Date(start + "T00:00:00"), dir * days)));
-  }
-  function onSwipeStart(e: React.TouchEvent) {
-    if (e.touches.length === 1) swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  }
-  function onSwipeEnd(e: React.TouchEvent) {
-    const s = swipe.current;
-    swipe.current = null;
-    if (!s || pinch.current || e.touches.length > 0) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - s.x;
-    const dy = t.clientY - s.y;
-    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      swipedRef.current = true;
-      shift(dx < 0 ? 1 : -1);
+    if (pinch.current) {
+      if (e.touches.length < 2) pinch.current = null;
+      return;
+    }
+    const d = drag.current;
+    drag.current = null;
+    if (d && d.axis === "h") {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - d.x;
+      const w = gridRef.current?.clientWidth || 320;
+      setDragging(false);
+      if (Math.abs(dx) > Math.min(90, w * 0.2)) {
+        swipedRef.current = true;
+        setShown(dx < 0 ? 2 : 0);
+        setDragX(0);
+      } else {
+        setShown(1);
+        setDragX(0);
+      }
     }
   }
+  // ボタンでのページ送り（アニメあり）
+  function go(dir: number) {
+    if (shownRef.current !== 1) return;
+    setInstant(false);
+    setDragging(false);
+    setDragX(0);
+    setShown(dir > 0 ? 2 : 0);
+  }
+  // スライド完了 → 実データを1ページ進めて中央へ戻す（無アニメ）
+  function onSlideEnd(e: React.TransitionEvent) {
+    if (e.propertyName !== "transform") return;
+    const s = shownRef.current;
+    if (s === 1) return;
+    const dir = s === 2 ? 1 : -1;
+    setInstant(true);
+    setShown(1);
+    setDragX(0);
+    setStart((cur) => toDateStr(addDays(new Date(cur + "T00:00:00"), dir * days)));
+    requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)));
+  }
+  // 即時移動（今日・日付・日数変更）
+  function jump(newStart: string) {
+    setInstant(true);
+    setShown(1);
+    setDragX(0);
+    setStart(newStart);
+    requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)));
+  }
+
+  const trackStyle = {
+    transform: `translateX(calc(${-shown * (100 / 3)}% + ${dragX}px))`,
+    transition: instant || dragging ? "none" : "transform .3s cubic-bezier(.4,0,.2,1)",
+  } as const;
 
   const hours: number[] = [];
   for (let t = Math.ceil(VIEW_START / 60) * 60; t <= VIEW_END; t += 60) hours.push(t);
   const todayStr = toDateStr(new Date());
+
+  // 1日カラム
+  function renderColumn(ds: string) {
+    const items: Item[] = [
+      ...appts
+        .filter((a) => a.date === ds)
+        .map((a): Item => {
+          const rk = staff.findIndex((s) => s.id === a.staff_id);
+          const segs = apptSegments(a);
+          return { kind: "appt", s: segs[0].s, e: segs[segs.length - 1].e, rank: rk === -1 ? 900 : rk, appt: a };
+        }),
+      ...notes
+        .filter((n) => n.date === ds && n.start_min != null)
+        .map((n): Item => ({
+          kind: "note",
+          s: snap(n.start_min as number),
+          e: Math.max(snap(n.end_min ?? (n.start_min as number) + SNAP), snap(n.start_min as number) + SNAP),
+          rank: 999,
+          note: n,
+        })),
+    ];
+    const laid = layoutLanes(items);
+    return (
+      <div
+        key={ds}
+        className="relative min-w-0 flex-1 border-l"
+        style={{ height: gridH }}
+        onClick={(e) => {
+          if (swipedRef.current) {
+            swipedRef.current = false;
+            return;
+          }
+          if (e.target !== e.currentTarget) return;
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          const raw = VIEW_START + ((e.clientY - rect.top) / rect.height) * RANGE;
+          setPop({ date: ds, startMin: snap(raw), x: e.clientX, y: e.clientY });
+        }}
+      >
+        {hours.map((t) => (
+          <div
+            key={t}
+            className="pointer-events-none absolute left-0 w-full border-t border-slate-100"
+            style={{ top: yFor(t) }}
+          />
+        ))}
+        {laid.map((it) => {
+          const top = yFor(it.s);
+          const blockH = yFor(it.e) - top;
+          const style = {
+            top,
+            height: blockH - 1,
+            left: `calc(${(it.lane * 100) / it.cols}% + 1px)`,
+            width: `calc(${100 / it.cols}% - 2px)`,
+          };
+          // 短い/重なり枠は1行省略（潰れ防止）、広くて高い枠は折り返し
+          const multiline = it.cols === 1 && blockH >= 34;
+          const textCls = multiline
+            ? "pointer-events-none absolute inset-0 overflow-hidden px-1 pt-[3px] text-[12px] font-semibold leading-[1.3] text-white"
+            : "pointer-events-none absolute inset-x-0 top-0 truncate px-1 pt-[3px] text-[11.5px] font-semibold leading-[1.15] text-white";
+          if (it.kind === "note") {
+            return (
+              <button
+                key={it.note.id}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  setNoteModal({ mode: "edit", note: it.note });
+                }}
+                className="absolute overflow-hidden rounded-[5px] shadow-sm"
+                style={{ ...style, backgroundColor: it.note.color || "#64748b" }}
+              >
+                <span className={textCls} style={{ wordBreak: multiline ? "break-word" : undefined, textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+                  {it.note.text}
+                </span>
+              </button>
+            );
+          }
+          const a = it.appt;
+          const col = a.service_id === kawanishiId ? abeColor : staffColor(a.staff_id);
+          const segs = apptSegments(a);
+          return (
+            <button
+              key={a.id}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                setModal({ mode: "edit", appt: a });
+              }}
+              className="absolute overflow-hidden rounded-[5px] shadow-sm"
+              style={{ ...style, backgroundColor: col }}
+              title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
+            >
+              {segs.map((sg, i) => (
+                <div
+                  key={i}
+                  className="absolute left-0 w-full"
+                  style={{
+                    top: yFor(sg.s) - top,
+                    height: yFor(sg.e) - yFor(sg.s),
+                    backgroundColor: sg.tone === "light" ? lighten(col, 0.42) : col,
+                    borderTop: i > 0 ? "1px solid rgba(255,255,255,.5)" : undefined,
+                  }}
+                />
+              ))}
+              <span className={textCls} style={{ wordBreak: multiline ? "break-word" : undefined, textShadow: "0 1px 2px rgba(0,0,0,.55)" }}>
+                {a.patient_name || "（未登録）"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ヘッダー（日付＋終日メモ帯）1ページ分
+  function renderHeaderPanel(list: string[]) {
+    return (
+      <div style={{ flex: "0 0 100%" }}>
+        <div className="flex">
+          {list.map((ds) => {
+            const dd = new Date(ds + "T00:00:00");
+            const isToday = ds === todayStr;
+            return (
+              <div
+                key={ds}
+                className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold ${
+                  isToday ? "text-blue-600" : "text-slate-600"
+                }`}
+              >
+                {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex bg-slate-50/60">
+          {list.map((ds) => {
+            const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
+            return (
+              <div
+                key={ds}
+                className="min-w-0 flex-1 cursor-pointer border-l p-0.5"
+                style={{ minHeight: 20 }}
+                onClick={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  setNoteModal({ mode: "add", date: ds, allDay: true, startMin: boardStart });
+                }}
+              >
+                {allDay.map((n) => (
+                  <button
+                    key={n.id}
+                    onClick={() => setNoteModal({ mode: "edit", note: n })}
+                    className="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-bold text-white"
+                    style={{ backgroundColor: n.color || "#64748b" }}
+                  >
+                    {n.text}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       {/* 操作バー */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setStart(toDateStr(addDays(new Date(start + "T00:00:00"), -days)))}
+          onClick={() => go(-1)}
           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 active:bg-slate-100"
         >
           ‹ 前
         </button>
         <button
-          onClick={() => setStart(toDateStr(new Date()))}
+          onClick={() => jump(toDateStr(new Date()))}
           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 active:bg-slate-100"
         >
           今日
         </button>
         <button
-          onClick={() => setStart(toDateStr(addDays(new Date(start + "T00:00:00"), days)))}
+          onClick={() => go(1)}
           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 active:bg-slate-100"
         >
           次 ›
@@ -356,10 +574,9 @@ export default function CalendarView() {
         <input
           type="date"
           value={start}
-          onChange={(e) => e.target.value && setStart(e.target.value)}
+          onChange={(e) => e.target.value && jump(e.target.value)}
           className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
         />
-        {/* 拡大縮小 */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => zoomBtn(1 / 1.25)}
@@ -391,74 +608,31 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* カレンダー本体：縦スクロール＋ピンチ拡大／横スクロールで次の日 */}
-      <div
-        ref={scrollRef}
-        className="relative overflow-y-auto overflow-x-hidden rounded-xl border bg-white"
-        style={{ height: "calc(100dvh - 170px)", touchAction: "pan-y" }}
-        onTouchStart={(e) => {
-          onTouchStart(e);
-          onSwipeStart(e);
-        }}
-        onTouchMove={onTouchMove}
-        onTouchEnd={(e) => {
-          onSwipeEnd(e);
-          onTouchEnd(e);
-        }}
-      >
-        <div>
-          {/* 固定ヘッダー（日付＋終日メモ帯） */}
-          <div ref={headerRef} className="sticky top-0 z-30 bg-white">
-            {/* 日付ヘッダー */}
-            <div className="flex border-b">
-              <div className="shrink-0 bg-white" style={{ width: GUTTER }} />
-              {dateList.map((ds) => {
-                const dd = new Date(ds + "T00:00:00");
-                const isToday = ds === todayStr;
-                return (
-                  <div
-                    key={ds}
-                    className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold ${
-                      isToday ? "text-blue-600" : "text-slate-600"
-                    }`}
-                  >
-                    {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
-                  </div>
-                );
-              })}
-            </div>
-            {/* 終日メモ帯（受付シフト等）*/}
-            <div className="flex border-b bg-slate-50/60">
-              <div className="shrink-0 bg-slate-50" style={{ width: GUTTER }} />
-              {dateList.map((ds) => {
-                const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
-                return (
-                  <div
-                    key={ds}
-                    className="min-w-0 flex-1 cursor-pointer border-l p-0.5"
-                    style={{ minHeight: 20 }}
-                    onClick={(e) => {
-                      if (e.target !== e.currentTarget) return;
-                      setNoteModal({ mode: "add", date: ds, allDay: true, startMin: boardStart });
-                    }}
-                  >
-                    {allDay.map((n) => (
-                      <button
-                        key={n.id}
-                        onClick={() => setNoteModal({ mode: "edit", note: n })}
-                        className="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-bold text-white"
-                        style={{ backgroundColor: n.color || "#64748b" }}
-                      >
-                        {n.text}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
+      {/* カレンダー本体 */}
+      <div className="overflow-hidden rounded-xl border bg-white">
+        {/* 固定ヘッダー（横スライド） */}
+        <div className="flex border-b">
+          <div className="shrink-0 bg-white" style={{ width: GUTTER }} />
+          <div className="relative min-w-0 flex-1 overflow-hidden">
+            <div className="flex" style={trackStyle}>
+              {lists.map((list, i) => (
+                <div key={i} style={{ flex: "0 0 100%" }}>
+                  {renderHeaderPanel(list)}
+                </div>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* 時間グリッド */}
+        {/* 時間グリッド（縦スクロール＋ピンチ／横スライド） */}
+        <div
+          ref={gridRef}
+          className="relative overflow-y-auto overflow-x-hidden"
+          style={{ height: "calc(100dvh - 190px)", touchAction: "pan-y" }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <div className="flex" style={{ height: gridH }}>
             {/* 左：時間軸 */}
             <div className="relative shrink-0 border-r bg-white" style={{ width: GUTTER, height: gridH }}>
@@ -472,131 +646,22 @@ export default function CalendarView() {
                 </div>
               ))}
             </div>
-
-            {dateList.map((ds) => {
-              const items: Item[] = [
-                ...appts
-                  .filter((a) => a.date === ds)
-                  .map((a): Item => {
-                    const rk = staff.findIndex((s) => s.id === a.staff_id);
-                    const segs = apptSegments(a);
-                    return {
-                      kind: "appt",
-                      s: segs[0].s,
-                      e: segs[segs.length - 1].e,
-                      rank: rk === -1 ? 900 : rk,
-                      appt: a,
-                    };
-                  }),
-                ...notes
-                  .filter((n) => n.date === ds && n.start_min != null)
-                  .map((n): Item => ({
-                    kind: "note",
-                    s: snap(n.start_min as number),
-                    e: Math.max(
-                      snap(n.end_min ?? (n.start_min as number) + SNAP),
-                      snap(n.start_min as number) + SNAP
-                    ),
-                    rank: 999,
-                    note: n,
-                  })),
-              ];
-              const laid = layoutLanes(items);
-              return (
-                <div
-                  key={ds}
-                  className="relative min-w-0 flex-1 border-l"
-                  style={{ height: gridH }}
-                  onClick={(e) => {
-                    if (swipedRef.current) {
-                      swipedRef.current = false;
-                      return;
-                    }
-                    if (e.target !== e.currentTarget) return;
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    const raw = VIEW_START + ((e.clientY - rect.top) / rect.height) * RANGE;
-                    setPop({ date: ds, startMin: snap(raw), x: e.clientX, y: e.clientY });
-                  }}
-                >
-                  {hours.map((t) => (
-                    <div
-                      key={t}
-                      className="pointer-events-none absolute left-0 w-full border-t border-slate-100"
-                      style={{ top: yFor(t) }}
-                    />
-                  ))}
-                  {laid.map((it) => {
-                    const top = yFor(it.s);
-                    const style = {
-                      top,
-                      height: yFor(it.e) - top - 1,
-                      left: `calc(${(it.lane * 100) / it.cols}% + 1px)`,
-                      width: `calc(${100 / it.cols}% - 2px)`,
-                    };
-                    if (it.kind === "note") {
-                      return (
-                        <button
-                          key={it.note.id}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            setNoteModal({ mode: "edit", note: it.note });
-                          }}
-                          className="absolute overflow-hidden rounded-[5px] px-1 pt-[3px] text-left text-[12px] font-semibold leading-[1.32] text-white shadow-sm"
-                          style={{
-                            ...style,
-                            backgroundColor: it.note.color || "#64748b",
-                            wordBreak: "break-word",
-                            textShadow: "0 1px 2px rgba(0,0,0,.5)",
-                          }}
-                        >
-                          {it.note.text}
-                        </button>
-                      );
-                    }
-                    const a = it.appt;
-                    const col = a.service_id === kawanishiId ? abeColor : staffColor(a.staff_id);
-                    const segs = apptSegments(a);
-                    return (
-                      <button
-                        key={a.id}
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          setModal({ mode: "edit", appt: a });
-                        }}
-                        className="absolute overflow-hidden rounded-[5px] shadow-sm"
-                        style={{ ...style, backgroundColor: col }}
-                        title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
-                      >
-                        {segs.map((sg, i) => (
-                          <div
-                            key={i}
-                            className="absolute left-0 w-full"
-                            style={{
-                              top: yFor(sg.s) - top,
-                              height: yFor(sg.e) - yFor(sg.s),
-                              backgroundColor: sg.tone === "light" ? lighten(col, 0.42) : col,
-                              borderTop: i > 0 ? "1px solid rgba(255,255,255,.5)" : undefined,
-                            }}
-                          />
-                        ))}
-                        <span
-                          className="pointer-events-none absolute inset-0 overflow-hidden px-1 pt-[3px] text-[12px] font-semibold leading-[1.32] text-white"
-                          style={{ wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,.55)" }}
-                        >
-                          {a.patient_name || "（未登録）"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            {/* 右：3ページの横トラック */}
+            <div className="relative min-w-0 flex-1 overflow-hidden" style={{ height: gridH }}>
+              <div className="flex" style={{ ...trackStyle, height: gridH }} onTransitionEnd={onSlideEnd}>
+                {lists.map((list, i) => (
+                  <div key={i} className="flex" style={{ flex: "0 0 100%", height: gridH }}>
+                    {list.map((ds) => renderColumn(ds))}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <p className="mt-1.5 text-[11px] text-slate-400">
-        空き時間タップで「予約」か「メモ」、上の帯タップで終日メモ。2本指ピンチ／＋−で拡大縮小できます。
+        空き時間タップで「予約」か「メモ」。横スワイプで前後の週、2本指ピンチ／＋−で拡大縮小。
       </p>
 
       {/* 空きタップ → 予約 or メモ 選択 */}
