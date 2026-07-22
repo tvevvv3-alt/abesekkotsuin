@@ -65,32 +65,31 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number })[] {
 
 const snap = (m: number) => Math.round(m / SNAP) * SNAP;
 
-// #rrggbb → 白へ amt(0..1) だけ寄せた薄い色
-function lighten(hex: string, amt: number): string {
-  const h = hex.replace("#", "");
-  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  if ([r, g, b].some(isNaN)) return hex;
-  const mix = (c: number) => Math.round(c + (255 - c) * amt);
-  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
-}
-
 const CLASS_COLOR = "#EF6C00"; // 体幹教室＝オレンジ
+const TEXT_SHADOW = "0 1px 3px rgba(0,0,0,.6)"; // 白文字を読みやすくする影
 
-// 背景の明るさで文字色を自動選択（黄色など明るい色は黒文字）
-function textOn(hex: string): { color: string; shadow: string } {
+// 表示用の背景色。白文字が読めるよう明るすぎる色は暗くし、通電(light)は少し薄くする。
+function segColor(hex: string, tone: "light" | "dark"): string {
   const h = hex.replace("#", "");
   const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
-  if ([r, g, b].some(isNaN)) return { color: "#fff", shadow: "0 1px 2px rgba(0,0,0,.55)" };
+  let r = parseInt(n.slice(0, 2), 16);
+  let g = parseInt(n.slice(2, 4), 16);
+  let b = parseInt(n.slice(4, 6), 16);
+  if ([r, g, b].some(isNaN)) return hex;
   const L = 0.299 * r + 0.587 * g + 0.114 * b;
-  return L > 165
-    ? { color: "#1f2937", shadow: "0 1px 1px rgba(255,255,255,.45)" }
-    : { color: "#fff", shadow: "0 1px 2px rgba(0,0,0,.55)" };
+  if (L > 150) {
+    const f = 150 / L; // 黄色など明るい色は暗くして白文字を読めるように
+    r *= f;
+    g *= f;
+    b *= f;
+  }
+  if (tone === "light") {
+    const a = 0.3; // 通電は少しだけ薄く（白文字が読める範囲）
+    r += (255 - r) * a;
+    g += (255 - g) * a;
+    b += (255 - b) * a;
+  }
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
 // 工程の色分け：通電＝薄い / 施術＝濃い
@@ -469,7 +468,6 @@ export default function CalendarView() {
             width: `calc(${100 / it.cols}% - 2px)`,
           };
           if (it.kind === "note") {
-            const tc = textOn(it.note.color || "#64748b");
             const h = yFor(it.e) - top;
             const ml = it.cols === 1 && h >= 40;
             return (
@@ -480,11 +478,11 @@ export default function CalendarView() {
                   setNoteModal({ mode: "edit", note: it.note });
                 }}
                 className="absolute flex items-center justify-center overflow-hidden rounded-[5px] border border-white px-0.5 text-center shadow-sm"
-                style={{ ...style, backgroundColor: it.note.color || "#64748b" }}
+                style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark") }}
               >
                 <span
-                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold`}
-                  style={{ color: tc.color, textShadow: tc.shadow, wordBreak: ml ? "break-word" : undefined }}
+                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold text-white`}
+                  style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                 >
                   {it.note.text}
                 </span>
@@ -493,7 +491,6 @@ export default function CalendarView() {
           }
           const a = it.appt;
           const col = colorFor(a);
-          const tc = textOn(col);
           const segs = apptSegments(a);
           return (
             <button
@@ -518,12 +515,12 @@ export default function CalendarView() {
                     style={{
                       top: segTop,
                       height: segH - 1,
-                      backgroundColor: sg.tone === "light" ? lighten(col, 0.42) : col,
+                      backgroundColor: segColor(col, sg.tone),
                     }}
                   >
                     <span
-                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold`}
-                      style={{ color: tc.color, textShadow: tc.shadow, wordBreak: ml ? "break-word" : undefined }}
+                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold text-white`}
+                      style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
                       {a.patient_name || "（未登録）"}
                     </span>
