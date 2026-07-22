@@ -25,30 +25,35 @@ const PX_PER_MIN = 0.9; // 1分あたりの高さ(px)
 const GUTTER = 44; // 左の時間軸の幅(px)
 const MIN_COL = 120; // 日カラムの最小幅(px)
 
-// 重なる予約を横に並べる（lane=何列目 / cols=同時最大列数）
-function layoutLanes<T extends { s: number; e: number }>(
+// 重なる予約を横に並べる。同じ時間帯に重なるものは rank（スタッフ順）で
+// 左→右に並べる（阿部→澁谷→萩原→林→体幹教室…）。
+function layoutLanes<T extends { s: number; e: number; rank: number }>(
   items: T[]
 ): (T & { lane: number; cols: number })[] {
   const sorted = [...items].sort((a, b) => a.s - b.s || a.e - b.e);
   const out: (T & { lane: number; cols: number })[] = [];
-  let cluster: (T & { lane: number; cols: number })[] = [];
+  let cluster: T[] = [];
   let clusterEnd = -Infinity;
-  const laneEnd: number[] = [];
   const flush = () => {
-    const cols = cluster.reduce((m, c) => Math.max(m, c.lane + 1), 0);
-    cluster.forEach((c) => (c.cols = cols));
-    out.push(...cluster);
+    // クラスタ内は rank 順に並べてからレーンを詰める（重なりの左右順を固定）
+    const cl = [...cluster].sort((a, b) => a.rank - b.rank || a.s - b.s || a.e - b.e);
+    const laneEnd: number[] = [];
+    const placed = cl.map((it) => {
+      let lane = laneEnd.findIndex((end) => end <= it.s);
+      if (lane === -1) {
+        lane = laneEnd.length;
+        laneEnd.push(it.e);
+      } else laneEnd[lane] = it.e;
+      return { ...it, lane, cols: 1 };
+    });
+    const cols = laneEnd.length;
+    placed.forEach((p) => (p.cols = cols));
+    out.push(...placed);
     cluster = [];
-    laneEnd.length = 0;
   };
   for (const it of sorted) {
     if (cluster.length && it.s >= clusterEnd) flush();
-    let lane = laneEnd.findIndex((end) => end <= it.s);
-    if (lane === -1) {
-      lane = laneEnd.length;
-      laneEnd.push(it.e);
-    } else laneEnd[lane] = it.e;
-    cluster.push({ ...it, lane, cols: 1 });
+    cluster.push(it);
     clusterEnd = Math.max(clusterEnd, it.e);
   }
   if (cluster.length) flush();
@@ -212,7 +217,16 @@ export default function CalendarView() {
             {dateList.map((ds) => {
               const dayItems = appts
                 .filter((a) => a.date === ds)
-                .map((a) => ({ s: a.start_min, e: Math.max(a.end_min, a.start_min + 15), appt: a }));
+                .map((a) => {
+                  // スタッフ表示順（阿部→澁谷→萩原→林…）。担当なし（体幹/川西）は最後。
+                  const rk = staff.findIndex((s) => s.id === a.staff_id);
+                  return {
+                    s: a.start_min,
+                    e: Math.max(a.end_min, a.start_min + 15),
+                    appt: a,
+                    rank: rk === -1 ? 999 : rk,
+                  };
+                });
               const laid = layoutLanes(dayItems);
               return (
                 <div
