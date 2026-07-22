@@ -27,7 +27,6 @@ const SNAP = 30;
 const VIEW_START = 360; // 表示レンジ 6:00
 const VIEW_END = 1440; //  〜 24:00（出張の早朝発なども入力できる）
 const RANGE = VIEW_END - VIEW_START;
-const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 5;
 const NOTE_COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#0ea5e9", "#64748b"];
 
@@ -205,10 +204,20 @@ export default function CalendarView() {
 
   // px/分：営業時間ぶんが枠にちょうど収まる高さ × ズーム
   const headerH = headerRef.current?.offsetHeight ?? 52;
-  const basePx = Math.max(0.15, (boxH - headerH) / (boardEnd - boardStart));
+  const boardRange = boardEnd - boardStart;
+  const basePx = Math.max(0.15, (boxH - headerH) / boardRange);
+  // 縮小の下限：表示レンジ(6:00-24:00)全体がちょうど枠に収まる所で止める
+  const zoomMin = Math.min(1, Math.max(0.2, boardRange / RANGE));
+  const zoomMinRef = useRef(zoomMin);
+  zoomMinRef.current = zoomMin;
   const pxPerMin = basePx * zoom;
   pxRef.current = pxPerMin;
   const gridH = RANGE * pxPerMin;
+
+  // 設定読込などで下限が上がったら、はみ出さないよう補正
+  useEffect(() => {
+    setZoom((z) => (z < zoomMin ? zoomMin : z));
+  }, [zoomMin]);
   const yFor = (m: number) => (Math.max(VIEW_START, Math.min(VIEW_END, m)) - VIEW_START) * pxPerMin;
 
   // 初回：営業開始が上に来るようスクロール
@@ -239,7 +248,7 @@ export default function CalendarView() {
       const gridY = focalClientY - rect.top - hH + el.scrollTop;
       const t = VIEW_START + gridY / px;
       setZoom((z) => {
-        const nz = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z * factor));
+        const nz = Math.min(ZOOM_MAX, Math.max(zoomMinRef.current, z * factor));
         const npx = basePx * nz;
         const newGridY = (t - VIEW_START) * npx;
         pendScrollRef.current = Math.max(0, newGridY + hH - (focalClientY - rect.top));
@@ -267,7 +276,7 @@ export default function CalendarView() {
       e.preventDefault();
       const [a, b] = [e.touches[0], e.touches[1]];
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      const target = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, p.zoom * (dist / p.dist)));
+      const target = Math.min(ZOOM_MAX, Math.max(zoomMinRef.current, p.zoom * (dist / p.dist)));
       zoomAt(target / zoom, p.midY);
     }
   }
@@ -488,12 +497,15 @@ export default function CalendarView() {
                             ev.stopPropagation();
                             setNoteModal({ mode: "edit", note: it.note });
                           }}
-                          className="absolute flex items-center overflow-hidden rounded-[5px] px-1 text-left text-[11px] font-bold leading-[1.12] text-white shadow-sm"
-                          style={{ ...style, backgroundColor: it.note.color || "#64748b" }}
+                          className="absolute overflow-hidden rounded-[5px] px-1 pt-[3px] text-left text-[12px] font-semibold leading-[1.32] text-white shadow-sm"
+                          style={{
+                            ...style,
+                            backgroundColor: it.note.color || "#64748b",
+                            wordBreak: "break-word",
+                            textShadow: "0 1px 2px rgba(0,0,0,.5)",
+                          }}
                         >
-                          <span className="line-clamp-2 w-full" style={{ textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
-                            {it.note.text}
-                          </span>
+                          {it.note.text}
                         </button>
                       );
                     }
@@ -523,13 +535,11 @@ export default function CalendarView() {
                             }}
                           />
                         ))}
-                        <span className="absolute inset-0 flex items-center px-1">
-                          <span
-                            className="line-clamp-2 w-full text-[11px] font-bold leading-[1.12] text-white"
-                            style={{ textShadow: "0 1px 2px rgba(0,0,0,.55)" }}
-                          >
-                            {a.patient_name || "（未登録）"}
-                          </span>
+                        <span
+                          className="pointer-events-none absolute inset-0 overflow-hidden px-1 pt-[3px] text-[12px] font-semibold leading-[1.32] text-white"
+                          style={{ wordBreak: "break-word", textShadow: "0 1px 2px rgba(0,0,0,.55)" }}
+                        >
+                          {a.patient_name || "（未登録）"}
                         </span>
                       </button>
                     );
