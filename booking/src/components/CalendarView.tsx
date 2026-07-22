@@ -149,13 +149,11 @@ export default function CalendarView() {
   const pendScrollRef = useRef<number | null>(null);
   const didInit = useRef(false);
 
-  // 横スライド（前・今・次の3ページ）
-  const [shown, setShown] = useState(1); // 0=前 / 1=今 / 2=次 を表示
-  const [dragX, setDragX] = useState(0); // 指の横移動(px)
-  const [dragging, setDragging] = useState(false);
-  const [instant, setInstant] = useState(false); // コミット時に無アニメで中央へ戻す
-  const shownRef = useRef(1);
-  shownRef.current = shown;
+  // 横スライド（前・今・次の3ページ）：transformを直接操作して滑らかに
+  const headerTrackRef = useRef<HTMLDivElement>(null);
+  const gridTrackRef = useRef<HTMLDivElement>(null);
+  const pendingDir = useRef(0); // アニメ完了後に送る方向（+1/-1）
+  const animating = useRef(false);
 
   const [modal, setModal] = useState<
     | { mode: "add"; date: string; startMin: number }
@@ -308,6 +306,23 @@ export default function CalendarView() {
     zoomAt(factor, rect ? rect.top + rect.height / 2 : 0);
   }
 
+  // 3ページの横トラックを直接操作（React再描画なしで滑らかに）。idx: 0=前/1=今/2=次
+  const applyTransform = useCallback((idx: number, px: number, animate: boolean) => {
+    const tf = `translateX(calc(${(-idx * 100) / 3}% + ${px}px))`;
+    const tr = animate ? "transform .28s cubic-bezier(.22,0,.24,1)" : "none";
+    [headerTrackRef.current, gridTrackRef.current].forEach((el) => {
+      if (!el) return;
+      el.style.transition = tr;
+      el.style.transform = tf;
+    });
+  }, []);
+  // start/days が変わったら中央（今）へ即リセット（＝今日で今日が左端に来る）
+  useLayoutEffect(() => {
+    applyTransform(1, 0, false);
+    animating.current = false;
+    pendingDir.current = 0;
+  }, [start, days, applyTransform]);
+
   // ---- ジェスチャ：ピンチ拡大 / 横ドラッグでページ送り ----
   const pinch = useRef<{ dist: number; zoom: number; midY: number } | null>(null);
   const drag = useRef<{ x: number; y: number; axis: null | "h" | "v" } | null>(null);
@@ -324,7 +339,7 @@ export default function CalendarView() {
       };
       return;
     }
-    if (shownRef.current === 1 && !instant) {
+    if (!animating.current) {
       drag.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, axis: null };
     }
   }
@@ -343,16 +358,14 @@ export default function CalendarView() {
     const dx = t.clientX - d.x;
     const dy = t.clientY - d.y;
     if (d.axis === null) {
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
-        d.axis = "h";
-        setDragging(true);
-      } else if (Math.abs(dy) > 6) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) d.axis = "h";
+      else if (Math.abs(dy) > 6) {
         d.axis = "v"; // 縦はネイティブスクロールに任せる
         drag.current = null;
         return;
       }
     }
-    if (d.axis === "h") setDragX(dx);
+    if (d.axis === "h") applyTransform(1, dx, false); // 指に追従（再描画なし）
   }
   function onTouchEnd(e: React.TouchEvent) {
     if (pinch.current) {
@@ -362,55 +375,44 @@ export default function CalendarView() {
     const d = drag.current;
     drag.current = null;
     if (d && d.axis === "h") {
-      const t = e.changedTouches[0];
-      const dx = t.clientX - d.x;
+      const dx = e.changedTouches[0].clientX - d.x;
       const w = gridRef.current?.clientWidth || 320;
-      setDragging(false);
+      if (Math.abs(dx) > 8) swipedRef.current = true;
+      animating.current = true;
       if (Math.abs(dx) > Math.min(90, w * 0.2)) {
-        swipedRef.current = true;
-        setShown(dx < 0 ? 2 : 0);
-        setDragX(0);
+        pendingDir.current = dx < 0 ? 1 : -1;
+        applyTransform(dx < 0 ? 2 : 0, 0, true); // 次/前ページまで完全移動
       } else {
-        setShown(1);
-        setDragX(0);
+        applyTransform(1, 0, true); // 戻す
       }
     }
   }
   // ボタンでのページ送り（アニメあり）
   function go(dir: number) {
-    if (shownRef.current !== 1) return;
-    setInstant(false);
-    setDragging(false);
-    setDragX(0);
-    setShown(dir > 0 ? 2 : 0);
+    if (animating.current) return;
+    animating.current = true;
+    pendingDir.current = dir;
+    applyTransform(dir > 0 ? 2 : 0, 0, true);
   }
-  // スライド完了 → 実データを1ページ進めて中央へ戻す（無アニメ）
+  // スライド完了 → 実データを1ページ進める（start変更でlayout effectが中央へ即リセット）
   function onSlideEnd(e: React.TransitionEvent) {
     if (e.propertyName !== "transform") return;
-    const s = shownRef.current;
-    if (s === 1) return;
-    const dir = s === 2 ? 1 : -1;
-    setInstant(true);
-    setShown(1);
-    setDragX(0);
-    setStart((cur) => toDateStr(addDays(new Date(cur + "T00:00:00"), dir * days)));
-    requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)));
+    if (pendingDir.current) {
+      const d = pendingDir.current;
+      pendingDir.current = 0;
+      setStart((cur) => toDateStr(addDays(new Date(cur + "T00:00:00"), d * days)));
+    } else {
+      animating.current = false;
+    }
   }
-  // 即時移動（今日・日付・日数変更）：スライド状態を全リセットして左端＝指定日に
+  // 即時移動（今日・日付・日数変更）：中央へ即リセットして左端＝指定日に
   function jump(newStart: string) {
     drag.current = null;
-    setDragging(false);
-    setInstant(true);
-    setShown(1);
-    setDragX(0);
+    pendingDir.current = 0;
+    animating.current = false;
+    applyTransform(1, 0, false);
     setStart(newStart);
-    requestAnimationFrame(() => requestAnimationFrame(() => setInstant(false)));
   }
-
-  const trackStyle = {
-    transform: `translateX(calc(${-shown * (100 / 3)}% + ${dragX}px))`,
-    transition: instant || dragging ? "none" : "transform .3s cubic-bezier(.4,0,.2,1)",
-  } as const;
 
   const hours: number[] = [];
   for (let t = Math.ceil(VIEW_START / 60) * 60; t <= VIEW_END; t += 60) hours.push(t);
@@ -464,10 +466,11 @@ export default function CalendarView() {
           const top = yFor(it.s);
           const style = {
             top,
-            height: yFor(it.e) - top - 1,
-            left: `calc(${(it.lane * 100) / it.cols}% + 1px)`,
-            width: `calc(${100 / it.cols}% - 2px)`,
+            height: yFor(it.e) - top,
+            left: `${(it.lane * 100) / it.cols}%`,
+            width: `${100 / it.cols}%`,
           };
+          const HAIRLINE = "0.5px solid rgba(255,255,255,.95)"; // 細い白枠
           if (it.kind === "note") {
             const h = yFor(it.e) - top;
             const ml = it.cols === 1 && h >= 40;
@@ -478,8 +481,8 @@ export default function CalendarView() {
                   ev.stopPropagation();
                   setNoteModal({ mode: "edit", note: it.note });
                 }}
-                className="absolute flex items-center justify-center overflow-hidden rounded-[5px] border border-white px-0.5 text-center shadow-sm"
-                style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark") }}
+                className="absolute flex items-center justify-center overflow-hidden rounded-[4px] px-0.5 text-center shadow-sm"
+                style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
                 <span
                   className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold text-white`}
@@ -512,11 +515,12 @@ export default function CalendarView() {
                 return (
                   <div
                     key={i}
-                    className="absolute inset-x-0 flex items-center justify-center overflow-hidden rounded-[5px] border border-white px-0.5 text-center shadow-sm"
+                    className="absolute inset-x-0 flex items-center justify-center overflow-hidden rounded-[4px] px-0.5 text-center shadow-sm"
                     style={{
                       top: segTop,
-                      height: segH - 1,
+                      height: segH,
                       backgroundColor: segColor(col, sg.tone),
+                      border: HAIRLINE,
                     }}
                   >
                     <span
@@ -669,7 +673,7 @@ export default function CalendarView() {
         <div className="flex border-b">
           <div className="shrink-0 bg-white" style={{ width: GUTTER }} />
           <div className="relative min-w-0 flex-1 overflow-hidden">
-            <div className="flex" style={trackStyle}>
+            <div ref={headerTrackRef} className="flex" style={{ willChange: "transform" }}>
               {lists.map((list, i) => (
                 <div key={i} style={{ flex: "0 0 100%" }}>
                   {renderHeaderPanel(list)}
@@ -703,7 +707,12 @@ export default function CalendarView() {
             </div>
             {/* 右：3ページの横トラック */}
             <div className="relative min-w-0 flex-1 overflow-hidden" style={{ height: gridH }}>
-              <div className="flex" style={{ ...trackStyle, height: gridH }} onTransitionEnd={onSlideEnd}>
+              <div
+                ref={gridTrackRef}
+                className="flex"
+                style={{ height: gridH, willChange: "transform" }}
+                onTransitionEnd={onSlideEnd}
+              >
                 {lists.map((list, i) => (
                   <div key={i} className="flex" style={{ flex: "0 0 100%", height: gridH }}>
                     {list.map((ds) => renderColumn(ds))}
