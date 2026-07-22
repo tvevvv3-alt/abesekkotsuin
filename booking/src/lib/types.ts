@@ -114,6 +114,16 @@ export interface Opening {
   end_min: number;
 }
 
+// カレンダーの自由メモ（受付シフト・zoom・ゴミ捨て 等）。予約とは別。
+export interface CalendarNote {
+  id: string;
+  date: string; // YYYY-MM-DD
+  start_min: number | null; // null=終日（上部の帯）
+  end_min: number | null;
+  text: string;
+  color: string | null;
+}
+
 export interface Patient {
   id: string;
   patient_number: string;

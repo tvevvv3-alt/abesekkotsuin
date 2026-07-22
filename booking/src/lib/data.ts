@@ -4,6 +4,7 @@ import type {
   AppointmentStep,
   BookingWindow,
   BusinessHours,
+  CalendarNote,
   Closure,
   Equipment,
   Opening,
@@ -196,6 +197,17 @@ export async function loadOpenings(
 ): Promise<Opening[]> {
   if (dates.length === 0) return [];
   const { data, error } = await sb.from("openings").select("*").in("date", dates);
+  if (error || !data) return [];
+  return data;
+}
+
+// カレンダーの自由メモ（受付シフト・zoom等）。テーブル未作成でも落ちない。
+export async function loadCalendarNotes(
+  sb: SupabaseClient,
+  dates: string[]
+): Promise<CalendarNote[]> {
+  if (dates.length === 0) return [];
+  const { data, error } = await sb.from("calendar_notes").select("*").in("date", dates);
   if (error || !data) return [];
   return data;
 }
