@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/reminders/tick", "schedule": "0 * * * *" }
+    { "path": "/api/cron/reminders/tick?force=eve", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/reminders/tick?force=morning", "schedule": "0 0 * * *" }
   ]
 }
