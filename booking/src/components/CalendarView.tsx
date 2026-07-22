@@ -21,9 +21,8 @@ import type {
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
 
-const PX_PER_MIN = 1.05; // 1分あたりの高さ(px)
-const GUTTER = 46; // 左の時間軸の幅(px)
-const MIN_COL = 138; // 日カラムの最小幅(px)。狭い画面では横スクロールで次の日が出る
+const GUTTER = 42; // 左の時間軸の幅(px)
+const MIN_COL = 116; // 日カラムの最小幅(px)。狭い画面では横スクロールで次の日
 const SNAP = 30;
 const NOTE_COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#0ea5e9", "#64748b"];
 
@@ -32,7 +31,6 @@ type Item =
   | { kind: "appt"; s: number; e: number; rank: number; appt: ApptWithSteps }
   | { kind: "note"; s: number; e: number; rank: number; note: CalendarNote };
 
-// 重なりを横に並べる。rank順（スタッフ順）で左→右。
 function layoutLanes(items: Item[]): (Item & { lane: number; cols: number })[] {
   const sorted = [...items].sort((a, b) => a.s - b.s || a.e - b.e);
   const out: (Item & { lane: number; cols: number })[] = [];
@@ -132,10 +130,11 @@ export default function CalendarView() {
   const staffColor = (id: string | null) => staff.find((s) => s.id === id)?.color || "#64748b";
   const staffName = (id: string | null) => staff.find((s) => s.id === id)?.name || "";
 
+  // 表示範囲。1日ぜんぶを画面高さに収める（縦は%で自動フィット）
   const startMin = settings?.board_start_min ?? 540;
   const endMin = Math.max(startMin + 60, settings?.board_end_min ?? 1290);
-  const height = (endMin - startMin) * PX_PER_MIN;
-  const yFor = (m: number) => (Math.max(startMin, Math.min(endMin, m)) - startMin) * PX_PER_MIN;
+  const RANGE = endMin - startMin;
+  const pct = (m: number) => ((Math.max(startMin, Math.min(endMin, m)) - startMin) / RANGE) * 100;
 
   const hours: number[] = [];
   for (let t = Math.ceil(startMin / 60) * 60; t <= endMin; t += 60) hours.push(t);
@@ -184,70 +183,71 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* カレンダー本体（縦横スクロール・横スクロールで次の日） */}
+      {/* カレンダー本体：1日ぜんぶが1画面に収まる（横スクロールで次の日） */}
       <div
-        className="overflow-auto rounded-xl border bg-white"
-        style={{ maxHeight: "calc(100vh - 150px)" }}
+        className="overflow-x-auto rounded-xl border bg-white"
+        style={{ height: "calc(100dvh - 150px)" }}
       >
-        <div style={{ minWidth: GUTTER + dateList.length * MIN_COL }}>
-          {/* 日付ヘッダー＋終日メモ帯（上に固定） */}
-          <div className="sticky top-0 z-30 bg-white">
-            <div className="flex border-b" style={{ paddingLeft: GUTTER }}>
-              {dateList.map((ds) => {
-                const dd = new Date(ds + "T00:00:00");
-                const isToday = ds === todayStr;
-                return (
-                  <div
-                    key={ds}
-                    className={`flex-1 border-l py-1 text-center text-xs font-bold ${
-                      isToday ? "text-blue-600" : "text-slate-600"
-                    }`}
-                    style={{ minWidth: MIN_COL }}
-                  >
-                    {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
-                  </div>
-                );
-              })}
-            </div>
-            {/* 終日メモ帯（受付シフト等）*/}
-            <div className="flex border-b bg-slate-50/60" style={{ paddingLeft: GUTTER }}>
-              {dateList.map((ds) => {
-                const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
-                return (
-                  <div
-                    key={ds}
-                    className="flex-1 cursor-pointer border-l p-0.5"
-                    style={{ minWidth: MIN_COL, minHeight: 22 }}
-                    onClick={(e) => {
-                      if (e.target !== e.currentTarget) return;
-                      setNoteModal({ mode: "add", date: ds, allDay: true, startMin: startMin });
-                    }}
-                  >
-                    {allDay.map((n) => (
-                      <button
-                        key={n.id}
-                        onClick={() => setNoteModal({ mode: "edit", note: n })}
-                        className="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-bold text-white"
-                        style={{ backgroundColor: n.color || "#64748b" }}
-                      >
-                        {n.text}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+        <div
+          className="flex h-full flex-col"
+          style={{ minWidth: GUTTER + dateList.length * MIN_COL }}
+        >
+          {/* 日付ヘッダー */}
+          <div className="flex border-b" style={{ paddingLeft: GUTTER }}>
+            {dateList.map((ds) => {
+              const dd = new Date(ds + "T00:00:00");
+              const isToday = ds === todayStr;
+              return (
+                <div
+                  key={ds}
+                  className={`flex-1 border-l py-1 text-center text-xs font-bold ${
+                    isToday ? "text-blue-600" : "text-slate-600"
+                  }`}
+                  style={{ minWidth: MIN_COL }}
+                >
+                  {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
+                </div>
+              );
+            })}
+          </div>
+          {/* 終日メモ帯（受付シフト等）*/}
+          <div className="flex border-b bg-slate-50/60" style={{ paddingLeft: GUTTER }}>
+            {dateList.map((ds) => {
+              const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
+              return (
+                <div
+                  key={ds}
+                  className="flex-1 cursor-pointer border-l p-0.5"
+                  style={{ minWidth: MIN_COL, minHeight: 20 }}
+                  onClick={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    setNoteModal({ mode: "add", date: ds, allDay: true, startMin });
+                  }}
+                >
+                  {allDay.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => setNoteModal({ mode: "edit", note: n })}
+                      className="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-bold text-white"
+                      style={{ backgroundColor: n.color || "#64748b" }}
+                    >
+                      {n.text}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
           </div>
 
-          {/* 時間グリッド */}
-          <div className="relative flex" style={{ height }}>
-            {/* 左：時間軸（左に固定） */}
-            <div className="sticky left-0 z-20 shrink-0 bg-white" style={{ width: GUTTER }}>
+          {/* 時間グリッド（残りの高さいっぱい） */}
+          <div className="relative flex min-h-0 flex-1">
+            {/* 左：時間軸 */}
+            <div className="relative shrink-0" style={{ width: GUTTER }}>
               {hours.map((t) => (
                 <div
                   key={t}
                   className="absolute right-1 -translate-y-1/2 text-[10px] text-slate-400"
-                  style={{ top: yFor(t) }}
+                  style={{ top: `${pct(t)}%` }}
                 >
                   {minToLabel(t)}
                 </div>
@@ -273,7 +273,10 @@ export default function CalendarView() {
                   .map((n): Item => ({
                     kind: "note",
                     s: snap(n.start_min as number),
-                    e: Math.max(snap((n.end_min ?? (n.start_min as number) + SNAP)), snap(n.start_min as number) + SNAP),
+                    e: Math.max(
+                      snap(n.end_min ?? (n.start_min as number) + SNAP),
+                      snap(n.start_min as number) + SNAP
+                    ),
                     rank: 999,
                     note: n,
                   })),
@@ -287,7 +290,7 @@ export default function CalendarView() {
                   onClick={(e) => {
                     if (e.target !== e.currentTarget) return;
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    const raw = startMin + (e.clientY - rect.top) / PX_PER_MIN;
+                    const raw = startMin + ((e.clientY - rect.top) / rect.height) * RANGE;
                     setPop({ date: ds, startMin: snap(raw), x: e.clientX, y: e.clientY });
                   }}
                 >
@@ -295,18 +298,15 @@ export default function CalendarView() {
                     <div
                       key={t}
                       className="pointer-events-none absolute left-0 w-full border-t border-slate-100"
-                      style={{ top: yFor(t) }}
+                      style={{ top: `${pct(t)}%` }}
                     />
                   ))}
                   {laid.map((it) => {
-                    const top = yFor(it.s);
-                    const h = Math.max(16, yFor(it.e) - yFor(it.s) - 1);
-                    const w = 100 / it.cols;
                     const style = {
-                      top,
-                      height: h,
-                      left: `calc(${it.lane * w}% + 1px)`,
-                      width: `calc(${w}% - 2px)`,
+                      top: `${pct(it.s)}%`,
+                      height: `calc(${pct(it.e) - pct(it.s)}% - 1px)`,
+                      left: `calc(${(it.lane * 100) / it.cols}% + 1px)`,
+                      width: `calc(${100 / it.cols}% - 2px)`,
                     };
                     if (it.kind === "note") {
                       return (
@@ -316,10 +316,10 @@ export default function CalendarView() {
                             ev.stopPropagation();
                             setNoteModal({ mode: "edit", note: it.note });
                           }}
-                          className="absolute overflow-hidden rounded-md px-1 pt-0.5 text-left text-[11px] font-bold leading-tight text-white shadow-sm"
+                          className="absolute overflow-hidden rounded-[5px] px-1 text-left text-[10px] font-bold leading-[1.15] text-white shadow-sm"
                           style={{ ...style, backgroundColor: it.note.color || "#64748b" }}
                         >
-                          <span className="block truncate" style={{ textShadow: "0 1px 2px rgba(0,0,0,.4)" }}>
+                          <span className="line-clamp-2" style={{ textShadow: "0 1px 2px rgba(0,0,0,.4)" }}>
                             {it.note.text}
                           </span>
                         </button>
@@ -333,14 +333,11 @@ export default function CalendarView() {
                           ev.stopPropagation();
                           setModal({ mode: "edit", appt: a });
                         }}
-                        className="absolute overflow-hidden rounded-md px-1 pt-0.5 text-left text-[11px] font-bold leading-tight text-white shadow-sm"
+                        className="absolute overflow-hidden rounded-[5px] px-1 text-left text-[10px] font-bold leading-[1.15] text-white shadow-sm"
                         style={{ ...style, backgroundColor: staffColor(a.staff_id) }}
                         title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
                       >
-                        <span
-                          className="block truncate"
-                          style={{ textShadow: "0 1px 2px rgba(0,0,0,.4)" }}
-                        >
+                        <span className="line-clamp-2" style={{ textShadow: "0 1px 2px rgba(0,0,0,.4)" }}>
                           {a.patient_name || "（未登録）"}
                         </span>
                       </button>
@@ -353,8 +350,8 @@ export default function CalendarView() {
         </div>
       </div>
 
-      <p className="mt-2 text-[11px] text-slate-400">
-        色はスタッフごと。空き時間タップで「予約」か「メモ」、上の帯タップで終日メモ（受付シフト等）を追加できます。
+      <p className="mt-1.5 text-[11px] text-slate-400">
+        空き時間タップで「予約」か「メモ」、上の帯タップで終日メモ（受付シフト等）を追加できます。
       </p>
 
       {/* 空きタップ → 予約 or メモ 選択 */}
