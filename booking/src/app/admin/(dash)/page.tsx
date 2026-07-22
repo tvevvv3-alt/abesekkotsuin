@@ -1,5 +1,5 @@
-import AdminBoard from "@/components/AdminBoard";
+import AdminSchedule from "@/components/AdminSchedule";
 
 export default function AdminHome() {
-  return <AdminBoard />;
+  return <AdminSchedule />;
 }
