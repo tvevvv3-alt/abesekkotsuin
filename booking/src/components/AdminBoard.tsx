@@ -914,5 +914,3 @@ function Column({
     </div>
   );
 }
-
-// deploy marker: openings popup live
