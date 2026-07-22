@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   loadAllStaff,
@@ -21,9 +21,14 @@ import type {
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
 
-const GUTTER = 42; // 左の時間軸の幅(px)
-const MIN_COL = 116; // 日カラムの最小幅(px)。狭い画面では横スクロールで次の日
+const GUTTER = 44; // 左の時間軸の幅(px)
+const MIN_COL = 118; // 日カラムの最小幅(px)。狭い画面では横スクロールで次の日
 const SNAP = 30;
+const VIEW_START = 360; // 表示レンジ 6:00
+const VIEW_END = 1440; //  〜 24:00（出張の早朝発なども入力できる）
+const RANGE = VIEW_END - VIEW_START;
+const ZOOM_MIN = 0.35;
+const ZOOM_MAX = 5;
 const NOTE_COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#0ea5e9", "#64748b"];
 
 type ApptWithSteps = Appointment & { steps: AppointmentStep[] };
@@ -101,7 +106,6 @@ function apptSegments(
       segs.push({ s: st.start_min, e: st.end_min, tone });
     }
   }
-  // 外枠の範囲へ丸める
   return segs.map((sg) => ({
     tone: sg.tone,
     s: Math.max(s, Math.min(e, sg.s)),
@@ -119,6 +123,14 @@ export default function CalendarView() {
   const [notes, setNotes] = useState<CalendarNote[]>([]);
   const [days, setDays] = useState(4);
   const [start, setStart] = useState<string>(toDateStr(new Date()));
+  const [zoom, setZoom] = useState(1);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [boxH, setBoxH] = useState(600); // スクロール枠の高さ(px)
+  const pxRef = useRef(1); // 現在の px/分（ハンドラ用）
+  const pendScrollRef = useRef<number | null>(null);
+  const didInit = useRef(false);
 
   const [modal, setModal] = useState<
     | { mode: "add"; date: string; startMin: number }
@@ -177,15 +189,101 @@ export default function CalendarView() {
   const staffColor = (id: string | null) => staff.find((s) => s.id === id)?.color || "#64748b";
   const staffName = (id: string | null) => staff.find((s) => s.id === id)?.name || "";
 
-  // 表示範囲。1日ぜんぶを画面高さに収める（縦は%で自動フィット）
-  const startMin = settings?.board_start_min ?? 540;
-  const endMin = Math.max(startMin + 60, settings?.board_end_min ?? 1290);
-  const RANGE = endMin - startMin;
-  const pct = (m: number) => ((Math.max(startMin, Math.min(endMin, m)) - startMin) / RANGE) * 100;
+  // 営業時間（この幅が zoom=1 でちょうど画面に収まる基準）
+  const boardStart = settings?.board_start_min ?? 540;
+  const boardEnd = Math.max(boardStart + 60, settings?.board_end_min ?? 1290);
+
+  // スクロール枠の高さを計測
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBoxH(el.clientHeight || 600));
+    ro.observe(el);
+    setBoxH(el.clientHeight || 600);
+    return () => ro.disconnect();
+  }, []);
+
+  // px/分：営業時間ぶんが枠にちょうど収まる高さ × ズーム
+  const headerH = headerRef.current?.offsetHeight ?? 52;
+  const basePx = Math.max(0.15, (boxH - headerH) / (boardEnd - boardStart));
+  const pxPerMin = basePx * zoom;
+  pxRef.current = pxPerMin;
+  const gridH = RANGE * pxPerMin;
+  const yFor = (m: number) => (Math.max(VIEW_START, Math.min(VIEW_END, m)) - VIEW_START) * pxPerMin;
+
+  // 初回：営業開始が上に来るようスクロール
+  useLayoutEffect(() => {
+    if (didInit.current || boxH <= 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = (boardStart - VIEW_START) * pxPerMin;
+    didInit.current = true;
+  }, [boxH, pxPerMin, boardStart]);
+
+  // ズーム変更後、焦点の時刻が同じ位置に来るようスクロール補正
+  useLayoutEffect(() => {
+    if (pendScrollRef.current != null && scrollRef.current) {
+      scrollRef.current.scrollTop = pendScrollRef.current;
+      pendScrollRef.current = null;
+    }
+  }, [zoom]);
+
+  // focalClientY（画面上のY）を中心に factor 倍ズーム
+  const zoomAt = useCallback(
+    (factor: number, focalClientY: number) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const hH = headerRef.current?.offsetHeight ?? 52;
+      const px = pxRef.current;
+      const gridY = focalClientY - rect.top - hH + el.scrollTop;
+      const t = VIEW_START + gridY / px;
+      setZoom((z) => {
+        const nz = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z * factor));
+        const npx = basePx * nz;
+        const newGridY = (t - VIEW_START) * npx;
+        pendScrollRef.current = Math.max(0, newGridY + hH - (focalClientY - rect.top));
+        return nz;
+      });
+    },
+    [basePx]
+  );
+
+  // ピンチズーム（2本指）
+  const pinch = useRef<{ dist: number; zoom: number; midY: number } | null>(null);
+  function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      pinch.current = {
+        dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        zoom,
+        midY: (a.clientY + b.clientY) / 2,
+      };
+    }
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    const p = pinch.current;
+    if (p && e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const target = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, p.zoom * (dist / p.dist)));
+      zoomAt(target / zoom, p.midY);
+    }
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (e.touches.length < 2) pinch.current = null;
+  }
+  function zoomBtn(factor: number) {
+    const el = scrollRef.current;
+    const rect = el?.getBoundingClientRect();
+    zoomAt(factor, rect ? rect.top + rect.height / 2 : 0);
+  }
 
   const hours: number[] = [];
-  for (let t = Math.ceil(startMin / 60) * 60; t <= endMin; t += 60) hours.push(t);
+  for (let t = Math.ceil(VIEW_START / 60) * 60; t <= VIEW_END; t += 60) hours.push(t);
   const todayStr = toDateStr(new Date());
+  const totalW = GUTTER + dateList.length * MIN_COL;
 
   return (
     <div>
@@ -215,6 +313,23 @@ export default function CalendarView() {
           onChange={(e) => e.target.value && setStart(e.target.value)}
           className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
         />
+        {/* 拡大縮小 */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => zoomBtn(1 / 1.25)}
+            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-lg font-bold text-slate-600 active:bg-slate-100"
+            aria-label="縮小"
+          >
+            −
+          </button>
+          <button
+            onClick={() => zoomBtn(1.25)}
+            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-lg font-bold text-slate-600 active:bg-slate-100"
+            aria-label="拡大"
+          >
+            ＋
+          </button>
+        </div>
         <div className="ml-auto flex gap-1">
           {[1, 3, 4, 7].map((n) => (
             <button
@@ -230,71 +345,80 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* カレンダー本体：1日ぜんぶが1画面に収まる（横スクロールで次の日） */}
+      {/* カレンダー本体：縦スクロール＋ピンチ拡大／横スクロールで次の日 */}
       <div
-        className="overflow-x-auto rounded-xl border bg-white"
-        style={{ height: "calc(100dvh - 150px)" }}
+        ref={scrollRef}
+        className="relative overflow-auto rounded-xl border bg-white"
+        style={{ height: "calc(100dvh - 170px)", touchAction: "pan-x pan-y" }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
-        <div
-          className="flex h-full flex-col"
-          style={{ minWidth: GUTTER + dateList.length * MIN_COL }}
-        >
-          {/* 日付ヘッダー */}
-          <div className="flex border-b" style={{ paddingLeft: GUTTER }}>
-            {dateList.map((ds) => {
-              const dd = new Date(ds + "T00:00:00");
-              const isToday = ds === todayStr;
-              return (
-                <div
-                  key={ds}
-                  className={`flex-1 border-l py-1 text-center text-xs font-bold ${
-                    isToday ? "text-blue-600" : "text-slate-600"
-                  }`}
-                  style={{ minWidth: MIN_COL }}
-                >
-                  {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
-                </div>
-              );
-            })}
-          </div>
-          {/* 終日メモ帯（受付シフト等）*/}
-          <div className="flex border-b bg-slate-50/60" style={{ paddingLeft: GUTTER }}>
-            {dateList.map((ds) => {
-              const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
-              return (
-                <div
-                  key={ds}
-                  className="flex-1 cursor-pointer border-l p-0.5"
-                  style={{ minWidth: MIN_COL, minHeight: 20 }}
-                  onClick={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    setNoteModal({ mode: "add", date: ds, allDay: true, startMin });
-                  }}
-                >
-                  {allDay.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => setNoteModal({ mode: "edit", note: n })}
-                      className="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-bold text-white"
-                      style={{ backgroundColor: n.color || "#64748b" }}
-                    >
-                      {n.text}
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
+        <div style={{ minWidth: totalW }}>
+          {/* 固定ヘッダー（日付＋終日メモ帯） */}
+          <div ref={headerRef} className="sticky top-0 z-30 bg-white">
+            {/* 日付ヘッダー */}
+            <div className="flex border-b" style={{ minWidth: totalW }}>
+              <div className="sticky left-0 z-10 shrink-0 bg-white" style={{ width: GUTTER }} />
+              {dateList.map((ds) => {
+                const dd = new Date(ds + "T00:00:00");
+                const isToday = ds === todayStr;
+                return (
+                  <div
+                    key={ds}
+                    className={`flex-1 border-l py-1 text-center text-xs font-bold ${
+                      isToday ? "text-blue-600" : "text-slate-600"
+                    }`}
+                    style={{ minWidth: MIN_COL }}
+                  >
+                    {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
+                  </div>
+                );
+              })}
+            </div>
+            {/* 終日メモ帯（受付シフト等）*/}
+            <div className="flex border-b bg-slate-50/60" style={{ minWidth: totalW }}>
+              <div className="sticky left-0 z-10 shrink-0 bg-slate-50" style={{ width: GUTTER }} />
+              {dateList.map((ds) => {
+                const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
+                return (
+                  <div
+                    key={ds}
+                    className="flex-1 cursor-pointer border-l p-0.5"
+                    style={{ minWidth: MIN_COL, minHeight: 20 }}
+                    onClick={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      setNoteModal({ mode: "add", date: ds, allDay: true, startMin: boardStart });
+                    }}
+                  >
+                    {allDay.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => setNoteModal({ mode: "edit", note: n })}
+                        className="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-bold text-white"
+                        style={{ backgroundColor: n.color || "#64748b" }}
+                      >
+                        {n.text}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* 時間グリッド（残りの高さいっぱい） */}
-          <div className="relative flex min-h-0 flex-1">
-            {/* 左：時間軸 */}
-            <div className="relative shrink-0" style={{ width: GUTTER }}>
+          {/* 時間グリッド */}
+          <div className="flex" style={{ minWidth: totalW, height: gridH }}>
+            {/* 左：時間軸（横スクロールでも固定） */}
+            <div
+              className="sticky left-0 z-20 shrink-0 border-r bg-white"
+              style={{ width: GUTTER, height: gridH }}
+            >
               {hours.map((t) => (
                 <div
                   key={t}
                   className="absolute right-1 -translate-y-1/2 text-[10px] text-slate-400"
-                  style={{ top: `${pct(t)}%` }}
+                  style={{ top: yFor(t) }}
                 >
                   {minToLabel(t)}
                 </div>
@@ -333,11 +457,11 @@ export default function CalendarView() {
                 <div
                   key={ds}
                   className="relative flex-1 border-l"
-                  style={{ minWidth: MIN_COL }}
+                  style={{ minWidth: MIN_COL, height: gridH }}
                   onClick={(e) => {
                     if (e.target !== e.currentTarget) return;
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    const raw = startMin + ((e.clientY - rect.top) / rect.height) * RANGE;
+                    const raw = VIEW_START + ((e.clientY - rect.top) / rect.height) * RANGE;
                     setPop({ date: ds, startMin: snap(raw), x: e.clientX, y: e.clientY });
                   }}
                 >
@@ -345,13 +469,14 @@ export default function CalendarView() {
                     <div
                       key={t}
                       className="pointer-events-none absolute left-0 w-full border-t border-slate-100"
-                      style={{ top: `${pct(t)}%` }}
+                      style={{ top: yFor(t) }}
                     />
                   ))}
                   {laid.map((it) => {
+                    const top = yFor(it.s);
                     const style = {
-                      top: `${pct(it.s)}%`,
-                      height: `calc(${pct(it.e) - pct(it.s)}% - 1px)`,
+                      top,
+                      height: yFor(it.e) - top - 1,
                       left: `calc(${(it.lane * 100) / it.cols}% + 1px)`,
                       width: `calc(${100 / it.cols}% - 2px)`,
                     };
@@ -375,7 +500,6 @@ export default function CalendarView() {
                     const a = it.appt;
                     const col = staffColor(a.staff_id);
                     const segs = apptSegments(a, it.s, it.e);
-                    const span = Math.max(1, it.e - it.s);
                     return (
                       <button
                         key={a.id}
@@ -387,20 +511,18 @@ export default function CalendarView() {
                         style={{ ...style, backgroundColor: col }}
                         title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
                       >
-                        {/* 背景：通電（薄）＋施術（濃）の2段 */}
                         {segs.map((sg, i) => (
                           <div
                             key={i}
                             className="absolute left-0 w-full"
                             style={{
-                              top: `${((sg.s - it.s) / span) * 100}%`,
-                              height: `${((sg.e - sg.s) / span) * 100}%`,
+                              top: yFor(sg.s) - top,
+                              height: yFor(sg.e) - yFor(sg.s),
                               backgroundColor: sg.tone === "light" ? lighten(col, 0.42) : col,
                               borderTop: i > 0 ? "1px solid rgba(255,255,255,.5)" : undefined,
                             }}
                           />
                         ))}
-                        {/* 名前：縦中央・はっきり */}
                         <span className="absolute inset-0 flex items-center px-1">
                           <span
                             className="line-clamp-2 w-full text-[11px] font-bold leading-[1.12] text-white"
@@ -420,7 +542,7 @@ export default function CalendarView() {
       </div>
 
       <p className="mt-1.5 text-[11px] text-slate-400">
-        空き時間タップで「予約」か「メモ」、上の帯タップで終日メモ（受付シフト等）を追加できます。
+        空き時間タップで「予約」か「メモ」、上の帯タップで終日メモ。2本指ピンチ／＋−で拡大縮小できます。
       </p>
 
       {/* 空きタップ → 予約 or メモ 選択 */}
