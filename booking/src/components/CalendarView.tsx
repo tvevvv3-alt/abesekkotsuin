@@ -22,7 +22,6 @@ import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
 
 const GUTTER = 44; // 左の時間軸の幅(px)
-const MIN_COL = 118; // 日カラムの最小幅(px)。狭い画面では横スクロールで次の日
 const SNAP = 30;
 const VIEW_START = 360; // 表示レンジ 6:00
 const VIEW_END = 1440; //  〜 24:00（出張の早朝発なども入力できる）
@@ -85,31 +84,37 @@ function stepTone(st: AppointmentStep): "light" | "dark" {
   return st.uses_staff ? "dark" : "light";
 }
 
-// 予約ブロックを工程ごとに「薄い通電 / 濃い施術」のセグメントへ分解
-function apptSegments(
-  a: ApptWithSteps,
-  s: number,
-  e: number
-): { s: number; e: number; tone: "light" | "dark" }[] {
+// 予約ブロックを「薄い通電 / 濃い施術」のセグメントへ分解。
+// 30分グリッドで区切る：通電20分→30分枠(薄)、施術30分(濃)。60分施術のみ→60分ひとつながり。
+type Seg = { s: number; e: number; tone: "light" | "dark" };
+function apptSegments(a: ApptWithSteps): Seg[] {
+  const blockStart = snap(a.start_min);
+  const blockEnd = Math.max(snap(a.end_min), blockStart + SNAP);
   const steps = (a.steps ?? [])
     .filter((st) => st.start_min != null && st.end_min != null)
     .sort((x, y) => x.start_min - y.start_min);
-  if (steps.length === 0) return [{ s, e, tone: "dark" }];
-  const segs: { s: number; e: number; tone: "light" | "dark" }[] = [];
+  if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark" }];
+  // まず工程を色（通電=薄 / 施術=濃）でまとめる
+  const merged: Seg[] = [];
   for (const st of steps) {
     const tone = stepTone(st);
-    const last = segs[segs.length - 1];
+    const last = merged[merged.length - 1];
     if (last && last.tone === tone && st.start_min <= last.e) {
       last.e = Math.max(last.e, st.end_min);
     } else {
-      segs.push({ s: st.start_min, e: st.end_min, tone });
+      merged.push({ s: st.start_min, e: st.end_min, tone });
     }
   }
-  return segs.map((sg) => ({
-    tone: sg.tone,
-    s: Math.max(s, Math.min(e, sg.s)),
-    e: Math.min(e, Math.max(sg.e, Math.max(s, Math.min(e, sg.s)) + 1)),
-  }));
+  // 30分グリッドへスナップし、境界を隙間なく連続させる
+  let cursor = blockStart;
+  const out: Seg[] = [];
+  for (const seg of merged) {
+    let end = snap(seg.e);
+    if (end <= cursor) end = cursor + SNAP; // 通電20分などは最低30分枠にする
+    out.push({ s: cursor, e: end, tone: seg.tone });
+    cursor = end;
+  }
+  return out;
 }
 
 export default function CalendarView() {
@@ -188,6 +193,16 @@ export default function CalendarView() {
   const staffColor = (id: string | null) => staff.find((s) => s.id === id)?.color || "#64748b";
   const staffName = (id: string | null) => staff.find((s) => s.id === id)?.name || "";
 
+  // 川西整体院の予約は「阿部の青」で表示（川西院である事は上の終日メモで示す）
+  const kawanishiId = useMemo(
+    () => services.find((s) => s.category === "川西整体院")?.id ?? null,
+    [services]
+  );
+  const abeColor = useMemo(
+    () => staff.find((s) => s.name.includes("阿部"))?.color ?? "#2563eb",
+    [staff]
+  );
+
   // 営業時間（この幅が zoom=1 でちょうど画面に収まる基準）
   const boardStart = settings?.board_start_min ?? 540;
   const boardEnd = Math.max(boardStart + 60, settings?.board_end_min ?? 1290);
@@ -262,6 +277,7 @@ export default function CalendarView() {
   const pinch = useRef<{ dist: number; zoom: number; midY: number } | null>(null);
   function onTouchStart(e: React.TouchEvent) {
     if (e.touches.length === 2) {
+      swipe.current = null;
       const [a, b] = [e.touches[0], e.touches[1]];
       pinch.current = {
         dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
@@ -289,10 +305,31 @@ export default function CalendarView() {
     zoomAt(factor, rect ? rect.top + rect.height / 2 : 0);
   }
 
+  // 横スワイプで期間送り（左へ＝翌週、右へ＝前週）。縦スクロールとは競合させない。
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const swipedRef = useRef(false);
+  function shift(dir: number) {
+    setStart(toDateStr(addDays(new Date(start + "T00:00:00"), dir * days)));
+  }
+  function onSwipeStart(e: React.TouchEvent) {
+    if (e.touches.length === 1) swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function onSwipeEnd(e: React.TouchEvent) {
+    const s = swipe.current;
+    swipe.current = null;
+    if (!s || pinch.current || e.touches.length > 0) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      swipedRef.current = true;
+      shift(dx < 0 ? 1 : -1);
+    }
+  }
+
   const hours: number[] = [];
   for (let t = Math.ceil(VIEW_START / 60) * 60; t <= VIEW_END; t += 60) hours.push(t);
   const todayStr = toDateStr(new Date());
-  const totalW = GUTTER + dateList.length * MIN_COL;
 
   return (
     <div>
@@ -357,28 +394,33 @@ export default function CalendarView() {
       {/* カレンダー本体：縦スクロール＋ピンチ拡大／横スクロールで次の日 */}
       <div
         ref={scrollRef}
-        className="relative overflow-auto rounded-xl border bg-white"
-        style={{ height: "calc(100dvh - 170px)", touchAction: "pan-x pan-y" }}
-        onTouchStart={onTouchStart}
+        className="relative overflow-y-auto overflow-x-hidden rounded-xl border bg-white"
+        style={{ height: "calc(100dvh - 170px)", touchAction: "pan-y" }}
+        onTouchStart={(e) => {
+          onTouchStart(e);
+          onSwipeStart(e);
+        }}
         onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        onTouchEnd={(e) => {
+          onSwipeEnd(e);
+          onTouchEnd(e);
+        }}
       >
-        <div style={{ minWidth: totalW }}>
+        <div>
           {/* 固定ヘッダー（日付＋終日メモ帯） */}
           <div ref={headerRef} className="sticky top-0 z-30 bg-white">
             {/* 日付ヘッダー */}
-            <div className="flex border-b" style={{ minWidth: totalW }}>
-              <div className="sticky left-0 z-10 shrink-0 bg-white" style={{ width: GUTTER }} />
+            <div className="flex border-b">
+              <div className="shrink-0 bg-white" style={{ width: GUTTER }} />
               {dateList.map((ds) => {
                 const dd = new Date(ds + "T00:00:00");
                 const isToday = ds === todayStr;
                 return (
                   <div
                     key={ds}
-                    className={`flex-1 border-l py-1 text-center text-xs font-bold ${
+                    className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold ${
                       isToday ? "text-blue-600" : "text-slate-600"
                     }`}
-                    style={{ minWidth: MIN_COL }}
                   >
                     {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
                   </div>
@@ -386,15 +428,15 @@ export default function CalendarView() {
               })}
             </div>
             {/* 終日メモ帯（受付シフト等）*/}
-            <div className="flex border-b bg-slate-50/60" style={{ minWidth: totalW }}>
-              <div className="sticky left-0 z-10 shrink-0 bg-slate-50" style={{ width: GUTTER }} />
+            <div className="flex border-b bg-slate-50/60">
+              <div className="shrink-0 bg-slate-50" style={{ width: GUTTER }} />
               {dateList.map((ds) => {
                 const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
                 return (
                   <div
                     key={ds}
-                    className="flex-1 cursor-pointer border-l p-0.5"
-                    style={{ minWidth: MIN_COL, minHeight: 20 }}
+                    className="min-w-0 flex-1 cursor-pointer border-l p-0.5"
+                    style={{ minHeight: 20 }}
                     onClick={(e) => {
                       if (e.target !== e.currentTarget) return;
                       setNoteModal({ mode: "add", date: ds, allDay: true, startMin: boardStart });
@@ -417,12 +459,9 @@ export default function CalendarView() {
           </div>
 
           {/* 時間グリッド */}
-          <div className="flex" style={{ minWidth: totalW, height: gridH }}>
-            {/* 左：時間軸（横スクロールでも固定） */}
-            <div
-              className="sticky left-0 z-20 shrink-0 border-r bg-white"
-              style={{ width: GUTTER, height: gridH }}
-            >
+          <div className="flex" style={{ height: gridH }}>
+            {/* 左：時間軸 */}
+            <div className="relative shrink-0 border-r bg-white" style={{ width: GUTTER, height: gridH }}>
               {hours.map((t) => (
                 <div
                   key={t}
@@ -440,10 +479,11 @@ export default function CalendarView() {
                   .filter((a) => a.date === ds)
                   .map((a): Item => {
                     const rk = staff.findIndex((s) => s.id === a.staff_id);
+                    const segs = apptSegments(a);
                     return {
                       kind: "appt",
-                      s: snap(a.start_min),
-                      e: Math.max(snap(a.end_min), snap(a.start_min) + SNAP),
+                      s: segs[0].s,
+                      e: segs[segs.length - 1].e,
                       rank: rk === -1 ? 900 : rk,
                       appt: a,
                     };
@@ -465,9 +505,13 @@ export default function CalendarView() {
               return (
                 <div
                   key={ds}
-                  className="relative flex-1 border-l"
-                  style={{ minWidth: MIN_COL, height: gridH }}
+                  className="relative min-w-0 flex-1 border-l"
+                  style={{ height: gridH }}
                   onClick={(e) => {
+                    if (swipedRef.current) {
+                      swipedRef.current = false;
+                      return;
+                    }
                     if (e.target !== e.currentTarget) return;
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                     const raw = VIEW_START + ((e.clientY - rect.top) / rect.height) * RANGE;
@@ -510,8 +554,8 @@ export default function CalendarView() {
                       );
                     }
                     const a = it.appt;
-                    const col = staffColor(a.staff_id);
-                    const segs = apptSegments(a, it.s, it.e);
+                    const col = a.service_id === kawanishiId ? abeColor : staffColor(a.staff_id);
+                    const segs = apptSegments(a);
                     return (
                       <button
                         key={a.id}
