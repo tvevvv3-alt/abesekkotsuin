@@ -138,7 +138,8 @@ export default function CalendarView() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
-  const [days, setDays] = useState(4);
+  const [days, setDays] = useState(3);
+  const [dayMenu, setDayMenu] = useState(false);
   const [start, setStart] = useState<string>(toDateStr(new Date()));
   const [zoom, setZoom] = useState(1);
 
@@ -587,60 +588,78 @@ export default function CalendarView() {
 
   return (
     <div>
-      {/* 操作バー */}
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      {/* 操作バー（今日をメインに、前後は小さく、日数はドロップダウン） */}
+      <div className="mb-2 flex items-center gap-1.5">
         <button
           onClick={() => go(-1)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 active:bg-slate-100"
+          className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-sm text-slate-500 active:bg-slate-100"
+          aria-label="前へ"
         >
-          ‹ 前
+          ‹
         </button>
         <button
           onClick={() => jump(toDateStr(new Date()))}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 active:bg-slate-100"
+          className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700"
         >
           今日
         </button>
         <button
           onClick={() => go(1)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 active:bg-slate-100"
+          className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-sm text-slate-500 active:bg-slate-100"
+          aria-label="次へ"
         >
-          次 ›
+          ›
         </button>
         <input
           type="date"
           value={start}
           onChange={(e) => e.target.value && jump(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+          className="rounded-lg border border-slate-300 px-1.5 py-1.5 text-xs text-slate-600"
         />
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={() => zoomBtn(1 / 1.25)}
-            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-lg font-bold text-slate-600 active:bg-slate-100"
+            className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-base font-bold text-slate-500 active:bg-slate-100"
             aria-label="縮小"
           >
             −
           </button>
           <button
             onClick={() => zoomBtn(1.25)}
-            className="h-8 w-8 rounded-lg border border-slate-300 bg-white text-lg font-bold text-slate-600 active:bg-slate-100"
+            className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-base font-bold text-slate-500 active:bg-slate-100"
             aria-label="拡大"
           >
             ＋
           </button>
-        </div>
-        <div className="ml-auto flex gap-1">
-          {[1, 3, 4, 7].map((n) => (
+          <div className="relative">
             <button
-              key={n}
-              onClick={() => setDays(n)}
-              className={`rounded-md border px-2.5 py-1 text-xs font-bold ${
-                days === n ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white text-slate-600"
-              }`}
+              onClick={() => setDayMenu((v) => !v)}
+              className="flex h-8 items-center gap-0.5 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-600 active:bg-slate-100"
             >
-              {n}日
+              {days}日 <span className="text-[9px]">▾</span>
             </button>
-          ))}
+            {dayMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setDayMenu(false)} />
+                <div className="absolute right-0 z-50 mt-1 w-20 overflow-hidden rounded-lg border bg-white shadow-lg">
+                  {[1, 3, 4, 7].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => {
+                        setDays(n);
+                        setDayMenu(false);
+                      }}
+                      className={`block w-full px-3 py-2 text-left text-sm ${
+                        days === n ? "bg-blue-600 font-bold text-white" : "text-slate-600 active:bg-slate-100"
+                      }`}
+                    >
+                      {n}日
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
