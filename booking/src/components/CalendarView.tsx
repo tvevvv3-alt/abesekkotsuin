@@ -363,10 +363,10 @@ export default function CalendarView() {
                             ev.stopPropagation();
                             setNoteModal({ mode: "edit", note: it.note });
                           }}
-                          className="absolute overflow-hidden rounded-[5px] px-1 text-left text-[10px] font-bold leading-[1.15] text-white shadow-sm"
+                          className="absolute flex items-center overflow-hidden rounded-[5px] px-1 text-left text-[11px] font-bold leading-[1.12] text-white shadow-sm"
                           style={{ ...style, backgroundColor: it.note.color || "#64748b" }}
                         >
-                          <span className="line-clamp-2" style={{ textShadow: "0 1px 2px rgba(0,0,0,.4)" }}>
+                          <span className="line-clamp-2 w-full" style={{ textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
                             {it.note.text}
                           </span>
                         </button>
@@ -387,33 +387,28 @@ export default function CalendarView() {
                         style={{ ...style, backgroundColor: col }}
                         title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
                       >
-                        {segs.map((sg, i) => {
-                          const light = sg.tone === "light";
-                          return (
-                            <div
-                              key={i}
-                              className="absolute left-0 w-full px-1 text-left leading-[1.1]"
-                              style={{
-                                top: `${((sg.s - it.s) / span) * 100}%`,
-                                height: `${((sg.e - sg.s) / span) * 100}%`,
-                                backgroundColor: light ? lighten(col, 0.62) : col,
-                                borderTop: i > 0 ? "1px solid rgba(255,255,255,.45)" : undefined,
-                              }}
-                            >
-                              {i === 0 && (
-                                <span
-                                  className="line-clamp-2 text-[10px] font-bold"
-                                  style={{
-                                    color: light ? "#0f172a" : "#fff",
-                                    textShadow: light ? "none" : "0 1px 2px rgba(0,0,0,.4)",
-                                  }}
-                                >
-                                  {a.patient_name || "（未登録）"}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
+                        {/* 背景：通電（薄）＋施術（濃）の2段 */}
+                        {segs.map((sg, i) => (
+                          <div
+                            key={i}
+                            className="absolute left-0 w-full"
+                            style={{
+                              top: `${((sg.s - it.s) / span) * 100}%`,
+                              height: `${((sg.e - sg.s) / span) * 100}%`,
+                              backgroundColor: sg.tone === "light" ? lighten(col, 0.42) : col,
+                              borderTop: i > 0 ? "1px solid rgba(255,255,255,.5)" : undefined,
+                            }}
+                          />
+                        ))}
+                        {/* 名前：縦中央・はっきり */}
+                        <span className="absolute inset-0 flex items-center px-1">
+                          <span
+                            className="line-clamp-2 w-full text-[11px] font-bold leading-[1.12] text-white"
+                            style={{ textShadow: "0 1px 2px rgba(0,0,0,.55)" }}
+                          >
+                            {a.patient_name || "（未登録）"}
+                          </span>
+                        </span>
                       </button>
                     );
                   })}
