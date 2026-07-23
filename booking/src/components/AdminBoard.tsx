@@ -64,6 +64,7 @@ function layoutLanes<T extends { s: number; e: number }>(
 
 interface ApptWithSteps extends Appointment {
   steps: AppointmentStep[];
+  line_user_id?: string | null; // LINE連携済みなら値あり（終了時に自動送信された＝✅判定に使用）
 }
 
 const KAWANISHI_COLOR = "#3F51B5"; // 川西整体院＝阿部の青（カレンダーに合わせる）
@@ -362,12 +363,6 @@ export default function AdminBoard({ date }: { date: string }) {
     [services]
   );
 
-  // 川西整体院を受け持つ列（＝阿部）。名前に「阿部」を含むスタッフ、無ければ先頭。
-  const kawanishiHostId = useMemo(() => {
-    const abe = staff.find((s) => s.name.includes("阿部"));
-    return abe?.id ?? staff[0]?.id ?? null;
-  }, [staff]);
-
   // 担当者列から除外するサービス（体幹教室＝別列 / 川西＝阿部列に別枠で追加）
   const excludeFromStaff = useMemo(() => {
     const set = new Set<string>();
@@ -399,19 +394,14 @@ export default function AdminBoard({ date }: { date: string }) {
         const e = withT.length ? Math.max(...withT.map((x) => x.end_min)) : a.end_min;
         cards.push({ appt: a, s, e, color: st.color || "#334155", kawanishi: false });
       });
-    if (kawanishiService && kawanishiHostId === st.id) {
-      appts
-        .filter((a) => a.service_id === kawanishiService.id)
-        .forEach((a) =>
-          cards.push({
-            appt: a,
-            s: a.start_min,
-            e: a.end_min,
-            color: KAWANISHI_COLOR,
-            kawanishi: true,
-          })
-        );
-    }
+    return layoutLanes(cards);
+  }
+  // 川西整体院：専用列に単色カードで表示（重なりはレーン分割）
+  function kawanishiCards() {
+    if (!kawanishiService) return [];
+    const cards = appts
+      .filter((a) => a.service_id === kawanishiService.id)
+      .map((a) => ({ appt: a, s: a.start_min, e: a.end_min }));
     return layoutLanes(cards);
   }
   function classGroups(serviceId: string) {
@@ -566,7 +556,7 @@ export default function AdminBoard({ date }: { date: string }) {
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-white">
-          <div className="flex min-w-[420px]">
+          <div className="flex w-full min-w-[420px]">
             {/* 時間ラベル列 */}
             <div className="w-12 shrink-0 border-r bg-slate-50">
               <div className="h-8 border-b" />
@@ -661,6 +651,90 @@ export default function AdminBoard({ date }: { date: string }) {
               );
             })}
 
+            {/* 川西整体院 専用列（予約管理用） */}
+            {kawanishiService && (() => {
+              const ctx: ColCtx = { serviceId: kawanishiService.id, canClose: true };
+              return (
+                <Column
+                  key="kawanishi"
+                  header={kawanishiService.name}
+                  headerColor={KAWANISHI_COLOR}
+                  height={height}
+                  yFor={yFor}
+                  ticks={ticks}
+                  offRanges={[]}
+                  closureBands={closures
+                    .filter(
+                      (c) =>
+                        (c.staff_id === null && c.service_id === null) ||
+                        c.service_id === kawanishiService.id
+                    )
+                    .map((c) => ({
+                      id: c.id,
+                      start: c.start_min ?? minMin,
+                      end: c.end_min ?? maxMin,
+                      reason: c.reason,
+                    }))}
+                  onClosureClick={removeClosure}
+                  openingBands={classOpeningBands(kawanishiService.id)}
+                  onOpeningClick={removeOpening}
+                  band={bandFor(ctx)}
+                  onPointerDownTrack={(e) => beginDrag(ctx, e)}
+                  onPointerMoveTrack={moveDrag}
+                  onPointerUpTrack={endDrag}
+                  onPointerCancelTrack={cancelDrag}
+                >
+                  {kawanishiCards().map(({ appt, s, e, lane, cols }) => {
+                    const topSnap = snap(s);
+                    const botSnap = Math.max(snap(e), topSnap + GRID_STEP);
+                    const cardTop = yFor(topSnap);
+                    const w = 100 / cols;
+                    return (
+                      <button
+                        key={`${appt.id}-${lane}`}
+                        onClick={() => setModal({ mode: "edit", appt })}
+                        className="absolute z-20"
+                        style={{
+                          top: cardTop,
+                          height: yFor(botSnap) - cardTop - 2,
+                          left: `calc(${lane * w}% + 2px)`,
+                          width: `calc(${w}% - 4px)`,
+                          background: "transparent",
+                          opacity: appt.status === "done" ? 0.5 : undefined,
+                        }}
+                        title={`${minToLabel(appt.start_min)} ${appt.patient_name ?? ""}`}
+                      >
+                        {appt.status === "done" && (
+                          <span className="absolute right-0.5 top-0.5 z-30 rounded bg-white/90 px-1 text-[9px] font-bold text-slate-600">
+                            済
+                          </span>
+                        )}
+                        <div
+                          className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
+                          style={{
+                            top: 0,
+                            height: yFor(botSnap) - cardTop - 2,
+                            backgroundColor: KAWANISHI_COLOR,
+                            border: "0.5px solid rgba(255,255,255,.95)",
+                          }}
+                        >
+                          <span
+                            className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
+                            style={{ textShadow: TEXT_SHADOW }}
+                          >
+                            {appt.patient_name || "（未登録）"}
+                            <span className="ml-1 font-normal opacity-90">
+                              {minToLabel(appt.start_min)}
+                            </span>
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </Column>
+              );
+            })()}
+
             {/* 定員制クラス列（体幹教室）：予約人数 N/定員 を表示 */}
             {classServices.map((cls) => {
               const ctx: ColCtx = { serviceId: cls.id, canClose: true };
@@ -698,10 +772,10 @@ export default function AdminBoard({ date }: { date: string }) {
                 {classGroups(cls.id).map((g, i) => (
                   <div
                     key={i}
-                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-[4px] px-1 py-1 shadow-sm"
+                    className="absolute left-0.5 right-0.5 z-20 rounded-[4px] px-1 py-1 shadow-sm"
                     style={{
                       top: yFor(g.start),
-                      height: yFor(g.end) - yFor(g.start) - 2,
+                      minHeight: yFor(g.end) - yFor(g.start) - 2,
                       backgroundColor: CLASS_COLOR,
                       border: "0.5px solid rgba(255,255,255,.95)",
                     }}
@@ -716,11 +790,18 @@ export default function AdminBoard({ date }: { date: string }) {
                       <button
                         key={a.id}
                         onClick={() => setModal({ mode: "edit", appt: a })}
-                        className="block w-full truncate text-left text-[10px] font-medium text-white hover:underline"
-                        style={{ textShadow: TEXT_SHADOW, opacity: a.status === "done" ? 0.6 : 1 }}
+                        className="flex w-full items-center gap-1 text-left text-[10px] font-medium text-white hover:underline"
+                        style={{ textShadow: TEXT_SHADOW }}
                       >
-                        {a.patient_name || "（未登録）"}
-                        {a.status === "done" && " ✓済"}
+                        <span className="min-w-0 flex-1 truncate">
+                          {a.patient_name || "（未登録）"}
+                        </span>
+                        {a.status === "done" &&
+                          (a.line_user_id ? (
+                            <span className="shrink-0">✅</span>
+                          ) : (
+                            <span className="shrink-0 text-[9px] opacity-80">済</span>
+                          ))}
                       </button>
                     ))}
                   </div>
