@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import AdminBoard from "./AdminBoard";
 import CalendarView from "./CalendarView";
-import { toDateStr } from "@/lib/booking";
+import { addDays, toDateStr } from "@/lib/booking";
 
-// 管理の予定表示：トグル・今日・日付・日数を1行にまとめたツールバー＋本体
+// 管理の予定表示：トグル・今日・前後・日付・日数を1行にまとめた共通ツールバー＋本体
 export default function AdminSchedule() {
   const [view, setView] = useState<"board" | "calendar">("board");
-  const [todaySignal, setTodaySignal] = useState(0);
-  const [calStart, setCalStart] = useState<string>(toDateStr(new Date()));
+  const [curDate, setCurDate] = useState<string>(toDateStr(new Date()));
   const [calDays, setCalDays] = useState(3);
   const [dayMenu, setDayMenu] = useState(false);
 
@@ -21,10 +20,14 @@ export default function AdminSchedule() {
     setView(v);
     localStorage.setItem("abe_sched_view", v);
   }
-  function goToday() {
-    setCalStart(toDateStr(new Date()));
-    setTodaySignal((n) => n + 1);
+  // 前後：カレンダーは表示日数ぶん、1日ボードは1日ずつ移動
+  function shift(dir: number) {
+    const step = view === "calendar" ? calDays : 1;
+    setCurDate((d) => toDateStr(addDays(new Date(d + "T00:00:00"), dir * step)));
   }
+
+  const arrowCls =
+    "flex h-8 w-7 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm text-slate-500 active:bg-slate-100";
 
   return (
     <div>
@@ -48,59 +51,63 @@ export default function AdminSchedule() {
           </button>
         </div>
         <button
-          onClick={goToday}
+          onClick={() => setCurDate(toDateStr(new Date()))}
           className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700"
         >
           今日
         </button>
+        <button onClick={() => shift(-1)} className={arrowCls} aria-label="前へ">
+          ‹
+        </button>
+        <button onClick={() => shift(1)} className={arrowCls} aria-label="次へ">
+          ›
+        </button>
+        <input
+          type="date"
+          value={curDate}
+          onChange={(e) => e.target.value && setCurDate(e.target.value)}
+          className="rounded-lg border border-slate-300 px-1.5 py-1.5 text-xs text-slate-600"
+        />
 
         {view === "calendar" && (
-          <>
-            <input
-              type="date"
-              value={calStart}
-              onChange={(e) => e.target.value && setCalStart(e.target.value)}
-              className="rounded-lg border border-slate-300 px-1.5 py-1.5 text-xs text-slate-600"
-            />
-            <div className="relative ml-auto">
-              <button
-                onClick={() => setDayMenu((v) => !v)}
-                className="flex h-8 items-center gap-0.5 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-600 active:bg-slate-100"
-              >
-                {calDays}日 <span className="text-[9px]">▾</span>
-              </button>
-              {dayMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setDayMenu(false)} />
-                  <div className="absolute right-0 z-50 mt-1 w-20 overflow-hidden rounded-lg border bg-white shadow-lg">
-                    {[1, 3, 4, 7].map((n) => (
-                      <button
-                        key={n}
-                        onClick={() => {
-                          setCalDays(n);
-                          setDayMenu(false);
-                        }}
-                        className={`block w-full px-3 py-2 text-left text-sm ${
-                          calDays === n
-                            ? "bg-blue-600 font-bold text-white"
-                            : "text-slate-600 active:bg-slate-100"
-                        }`}
-                      >
-                        {n}日
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </>
+          <div className="relative ml-auto">
+            <button
+              onClick={() => setDayMenu((v) => !v)}
+              className="flex h-8 items-center gap-0.5 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-600 active:bg-slate-100"
+            >
+              {calDays}日 <span className="text-[9px]">▾</span>
+            </button>
+            {dayMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setDayMenu(false)} />
+                <div className="absolute right-0 z-50 mt-1 w-20 overflow-hidden rounded-lg border bg-white shadow-lg">
+                  {[1, 3, 4, 7].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => {
+                        setCalDays(n);
+                        setDayMenu(false);
+                      }}
+                      className={`block w-full px-3 py-2 text-left text-sm ${
+                        calDays === n
+                          ? "bg-blue-600 font-bold text-white"
+                          : "text-slate-600 active:bg-slate-100"
+                      }`}
+                    >
+                      {n}日
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
 
       {view === "board" ? (
-        <AdminBoard todaySignal={todaySignal} />
+        <AdminBoard date={curDate} />
       ) : (
-        <CalendarView start={calStart} days={calDays} onStartChange={setCalStart} />
+        <CalendarView start={curDate} days={calDays} onStartChange={setCurDate} />
       )}
     </div>
   );

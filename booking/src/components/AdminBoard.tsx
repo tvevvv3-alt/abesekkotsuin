@@ -22,7 +22,7 @@ import type {
   Staff,
   StaffSchedule,
 } from "@/lib/types";
-import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
+import { minToLabel, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
 
 const PX_PER_MIN = 1.4;
@@ -143,20 +143,8 @@ interface ClosureBand {
   reason: string | null;
 }
 
-export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
+export default function AdminBoard({ date }: { date: string }) {
   const supabase = useMemo(() => createClient(), []);
-  const [date, setDate] = useState<string>(toDateStr(new Date()));
-
-  // 親（トグル横）の「今日」ボタンから呼ばれる（初回は無視）
-  const firstToday = useRef(true);
-  useEffect(() => {
-    if (firstToday.current) {
-      firstToday.current = false;
-      return;
-    }
-    setDate(toDateStr(new Date()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaySignal]);
 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -557,37 +545,11 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
 
   return (
     <div>
-      {/* 日付ナビ */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setDate(toDateStr(addDays(dObj, -1)))}
-            className="rounded-md border bg-white px-3 py-1.5 text-sm active:bg-slate-100"
-          >
-            ‹ 前日
-          </button>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border bg-white px-2 py-1.5 text-sm"
-          />
-          <span className="text-sm font-bold text-slate-700">
-            {dObj.getMonth() + 1}/{dObj.getDate()}（{WEEKDAY_LABELS[dObj.getDay()]}）
-          </span>
-          <button
-            onClick={() => setDate(toDateStr(addDays(dObj, 1)))}
-            className="rounded-md border bg-white px-3 py-1.5 text-sm active:bg-slate-100"
-          >
-            翌日 ›
-          </button>
-          <button
-            onClick={() => setDate(toDateStr(new Date()))}
-            className="rounded-md px-2 py-1.5 text-sm text-slate-500"
-          >
-            今日
-          </button>
-        </div>
+      {/* 日付表示＋予約追加（前後・今日は上部の共通ツールバー） */}
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-bold text-slate-700">
+          {dObj.getMonth() + 1}/{dObj.getDate()}（{WEEKDAY_LABELS[dObj.getDay()]}）
+        </span>
         <button
           onClick={() => setModal({ mode: "add" })}
           className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white active:bg-blue-700"
