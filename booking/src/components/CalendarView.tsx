@@ -154,11 +154,9 @@ export default function CalendarView({
   const pendScrollRef = useRef<number | null>(null);
   const didInit = useRef(false);
 
-  // 横スライド（前・今・次の3ページ）：transformを直接操作して滑らかに
+  // 横（前・今・次の3ページ）：グリッドはネイティブ横スクロール、ヘッダーはそれに追従
   const headerTrackRef = useRef<HTMLDivElement>(null);
-  const gridTrackRef = useRef<HTMLDivElement>(null);
-  const pendingDir = useRef(0); // アニメ完了後に送る方向（+1/-1）
-  const animating = useRef(false);
+  const hScrollRef = useRef<HTMLDivElement>(null);
 
   const [modal, setModal] = useState<
     | { mode: "add"; date: string; startMin: number }
@@ -305,137 +303,73 @@ export default function CalendarView({
     },
     [basePx]
   );
-  // 3ページの横トラックを直接操作（React再描画なしで滑らかに）。idx: 0=前/1=今/2=次
-  const applyTransform = useCallback((idx: number, px: number, animate: boolean, durMs = 400) => {
-    // translate3d でGPU合成にのせてカクつきを防ぐ
-    const tf = `translate3d(calc(${(-idx * 100) / 3}% + ${px}px), 0, 0)`;
-    // なめらかに減速してスナップ（easeOutQuint 風）。フリック時は短めに。
-    const tr = animate ? `transform ${durMs}ms cubic-bezier(.22,1,.36,1)` : "none";
-    [headerTrackRef.current, gridTrackRef.current].forEach((el) => {
-      if (!el) return;
-      el.style.transition = tr;
-      el.style.transform = tf;
-    });
+  // ---- 横スクロール：ネイティブ＋日付スナップ（縦と同じ物理でヌルヌルに）----
+  const recentering = useRef(false);
+  const settleTimer = useRef<number | null>(null);
+  // ヘッダーはグリッドの横スクロール量に追従（transformで同期）
+  const syncHeader = useCallback((sl: number) => {
+    const h = headerTrackRef.current;
+    if (h) h.style.transform = `translate3d(${-sl}px, 0, 0)`;
   }, []);
-  // start/days が変わったら中央（今）へ即リセット（＝今日で今日が左端に来る）
+  // start/days が変わったら中央ページ（＝現在の並び）へ即リセット（今日で今日が左端）
   useLayoutEffect(() => {
-    applyTransform(1, 0, false);
-    animating.current = false;
-    pendingDir.current = 0;
-  }, [start, days, applyTransform]);
+    const el = hScrollRef.current;
+    if (!el) return;
+    recentering.current = true;
+    el.scrollLeft = el.clientWidth; // 3ページ中の真ん中＝現在ページ
+    syncHeader(el.scrollLeft);
+    requestAnimationFrame(() => {
+      recentering.current = false;
+    });
+  }, [start, days, syncHeader]);
+  // 横スクロール中：ヘッダー同期＋止まったら日付を確定（データを進める）
+  const onHScroll = useCallback(() => {
+    const el = hScrollRef.current;
+    if (!el) return;
+    syncHeader(el.scrollLeft);
+    if (recentering.current) return;
+    if (settleTimer.current) window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      const e2 = hScrollRef.current;
+      if (!e2) return;
+      const colW = e2.clientWidth / days;
+      if (colW <= 0) return;
+      const dayIndex = Math.round(e2.scrollLeft / colW);
+      const delta = dayIndex - days; // 中央ページ先頭 = days
+      if (delta !== 0) {
+        onStartChange(toDateStr(addDays(new Date(start + "T00:00:00"), delta)));
+      }
+    }, 120);
+  }, [days, start, onStartChange, syncHeader]);
 
-  // ---- ジェスチャ：ピンチ拡大 / 横ドラッグでページ送り ----
+  // ---- ジェスチャ：2本指ピンチで拡大縮小（1本指の縦横スクロールはネイティブに任せる）----
   const pinch = useRef<{ dist: number; zoom: number; midY: number } | null>(null);
-  const drag = useRef<{
-    x: number;
-    y: number;
-    axis: null | "h" | "v";
-    lastX: number;
-    lastT: number;
-    vx: number; // 速度(px/ms)：フリック判定用
-  } | null>(null);
-  const swipedRef = useRef(false);
-
   function onTouchStart(e: TouchEvent) {
     if (e.touches.length === 2) {
-      drag.current = null;
       const [a, b] = [e.touches[0], e.touches[1]];
       pinch.current = {
         dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
         zoom,
         midY: (a.clientY + b.clientY) / 2,
       };
-      return;
-    }
-    if (!animating.current) {
-      drag.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        axis: null,
-        lastX: e.touches[0].clientX,
-        lastT: performance.now(),
-        vx: 0,
-      };
     }
   }
   function onTouchMove(e: TouchEvent) {
     if (pinch.current && e.touches.length === 2) {
-      e.preventDefault();
+      e.preventDefault(); // ピンチ中はネイティブのスクロール／ズームを止める
       const [a, b] = [e.touches[0], e.touches[1]];
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
       const target = Math.min(ZOOM_MAX, Math.max(zoomMinRef.current, pinch.current.zoom * (dist / pinch.current.dist)));
       zoomAt(target / zoom, pinch.current.midY);
-      return;
-    }
-    const d = drag.current;
-    if (!d) return;
-    const t = e.touches[0];
-    const dx = t.clientX - d.x;
-    const dy = t.clientY - d.y;
-    if (d.axis === null) {
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 5) d.axis = "h";
-      else if (Math.abs(dy) > 5) {
-        d.axis = "v"; // 縦はネイティブスクロールに任せる
-        drag.current = null;
-        return;
-      } else {
-        return; // まだ方向が決まっていない
-      }
-    }
-    if (d.axis === "h") {
-      // ネイティブの縦スクロール／ラバーバンドを止めて指に追従（カクつき防止）
-      e.preventDefault();
-      // 直近の速度を記録（指を離した瞬間の勢いでフリック判定するため）
-      const now = performance.now();
-      const dt = now - d.lastT;
-      if (dt > 0) {
-        const inst = (t.clientX - d.lastX) / dt; // px/ms
-        d.vx = 0.75 * inst + 0.25 * d.vx; // 平滑化してブレを抑える
-        d.lastX = t.clientX;
-        d.lastT = now;
-      }
-      const max = (gridRef.current?.clientWidth || 320) - GUTTER; // 一度に動かせるのは最大1ページ
-      applyTransform(1, Math.max(-max, Math.min(max, dx)), false); // 指に追従（再描画なし）
     }
   }
   function onTouchEnd(e: TouchEvent) {
-    if (pinch.current) {
-      if (e.touches.length < 2) pinch.current = null;
-      return;
-    }
-    const d = drag.current;
-    drag.current = null;
-    if (d && d.axis === "h") {
-      const dx = e.changedTouches[0].clientX - d.x;
-      if (Math.abs(dx) > 8) swipedRef.current = true;
-      const colW = ((gridRef.current?.clientWidth || 320) - GUTTER) / days;
-      // 指を離す直前に止まっていたら勢いは無しとみなす（誤フリック防止）
-      const idle = performance.now() - d.lastT;
-      const vx = idle > 90 ? 0 : d.vx;
-      // まずは動かした距離から最寄りの日へスナップ
-      let delta = Math.round(-dx / colW);
-      // フリック（速く弾いた）ときは、距離が短くてもその方向へ最低1コマ送る
-      const FLICK = 0.3; // px/ms（≒300px/s）
-      if (Math.abs(vx) > FLICK) {
-        if (vx < 0) delta = Math.max(delta, 1); // 左へ弾く＝前へ
-        else delta = Math.min(delta, -1); // 右へ弾く＝後ろへ
-      }
-      delta = Math.max(-days, Math.min(days, delta)); // 一度に動けるのは最大1ページぶん
-      animating.current = true;
-      if (delta === 0) {
-        applyTransform(1, 0, true, 170); // 戻し（指を離したらキビキビ戻す）
-      } else {
-        // 勢いがあるほど短時間で決める（ネイティブっぽい手応え）
-        const dur = Math.abs(vx) > FLICK ? 220 : 300;
-        pendingDir.current = delta;
-        applyTransform(1, -delta * colW, true, dur); // スナップ先の日まで移動
-      }
-    }
+    if (pinch.current && e.touches.length < 2) pinch.current = null;
   }
   // 最新のハンドラを保持（ネイティブリスナーを付け替えずに済むように）
   const touchHandlers = useRef({ onTouchStart, onTouchMove, onTouchEnd });
   touchHandlers.current = { onTouchStart, onTouchMove, onTouchEnd };
-  // ネイティブの非パッシブ touchmove を登録（preventDefault を効かせるため）
+  // ピンチ用に非パッシブ touchmove を登録（preventDefault を効かせるため）
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
@@ -453,17 +387,6 @@ export default function CalendarView({
       el.removeEventListener("touchcancel", te);
     };
   }, []);
-  // スライド完了 → 実データを delta 日ぶん進める（start変更でlayout effectが中央へ即リセット）
-  function onSlideEnd(e: React.TransitionEvent) {
-    if (e.propertyName !== "transform") return;
-    if (pendingDir.current) {
-      const d = pendingDir.current;
-      pendingDir.current = 0;
-      onStartChange(toDateStr(addDays(new Date(start + "T00:00:00"), d)));
-    } else {
-      animating.current = false;
-    }
-  }
 
   const hours: number[] = [];
   for (let t = Math.ceil(VIEW_START / 60) * 60; t <= VIEW_END; t += 60) hours.push(t);
@@ -494,12 +417,8 @@ export default function CalendarView({
       <div
         key={ds}
         className="relative min-w-0 flex-1 border-l"
-        style={{ height: gridH }}
+        style={{ height: gridH, scrollSnapAlign: "start" }}
         onClick={(e) => {
-          if (swipedRef.current) {
-            swipedRef.current = false;
-            return;
-          }
           if (e.target !== e.currentTarget) return;
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
           const raw = VIEW_START + ((e.clientY - rect.top) / rect.height) * RANGE;
@@ -686,14 +605,20 @@ export default function CalendarView({
                 </div>
               ))}
             </div>
-            {/* 右：3ページの横トラック */}
-            <div className="relative min-w-0 flex-1 overflow-hidden" style={{ height: gridH }}>
-              <div
-                ref={gridTrackRef}
-                className="flex"
-                style={{ width: "300%", height: gridH, willChange: "transform" }}
-                onTransitionEnd={onSlideEnd}
-              >
+            {/* 右：ネイティブ横スクロール（日付スナップ）の3ページ */}
+            <div
+              ref={hScrollRef}
+              onScroll={onHScroll}
+              className="relative min-w-0 flex-1 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden"
+              style={{
+                height: gridH,
+                scrollSnapType: "x mandatory",
+                touchAction: "pan-x",
+                overscrollBehaviorX: "contain",
+                scrollbarWidth: "none",
+              }}
+            >
+              <div className="flex" style={{ width: "300%", height: gridH }}>
                 {lists.map((list, i) => (
                   <div key={i} className="flex" style={{ flex: "0 0 33.3333%", height: gridH }}>
                     {list.map((ds) => renderColumn(ds))}
