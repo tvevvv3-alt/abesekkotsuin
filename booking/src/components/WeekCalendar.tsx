@@ -207,11 +207,6 @@ export default function WeekCalendar({
           return { kind: "class-ok", remaining: r.remaining };
         }
 
-        // 時間外は順次解放：activeAh（最も早い予約可能枠）だけ◯、あとは✕
-        if (afterHours) {
-          return t === activeAh ? { kind: "ok" } : { kind: "busy" };
-        }
-
         const ctx: DayContext = {
           date: dateStr,
           weekday,
@@ -226,6 +221,20 @@ export default function WeekCalendar({
           equipmentSteps: dayApptSteps.filter((a) => a.equipment_id !== null),
           equipmentById,
         };
+
+        // 時間外は順次解放：activeAh（最も早い予約可能枠）だけ◯。
+        // 予約が入っている枠だけ✕、順次解放前・休診などは ・（off）にする。
+        if (afterHours) {
+          if (t === activeAh) return { kind: "ok" };
+          const r = checkAvailability(serviceSteps, staffId, t, ctx, undefined, true);
+          const booked =
+            !r.ok &&
+            (r.reason === "担当者の空きなし" ||
+              r.reason === "機器の空きなし" ||
+              r.reason === "満");
+          return booked ? { kind: "busy" } : { kind: "off" };
+        }
+
         const res = checkAvailability(serviceSteps, staffId, t, ctx, undefined, afterHours);
         return res.ok ? { kind: "ok" } : { kind: "busy" };
       });
