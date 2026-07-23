@@ -495,6 +495,21 @@ export default function AdminBoard({ date }: { date: string }) {
     reload();
   }
 
+  // タップ位置から営業終了までを一括休診（急な「17時以降ドーンと休診」用）
+  async function makeClosureFromHere() {
+    if (!pop) return;
+    await supabase.from("closures").insert({
+      date,
+      staff_id: pop.ctx.staffId ?? null,
+      service_id: pop.ctx.serviceId ?? null,
+      start_min: pop.start,
+      end_min: maxMin,
+      reason: null,
+    });
+    setPop(null);
+    reload();
+  }
+
   async function removeClosure(id: string) {
     if (!confirm("この休診を解除しますか？")) return;
     await supabase.from("closures").delete().eq("id", id);
@@ -882,7 +897,15 @@ export default function AdminBoard({ date }: { date: string }) {
                 onClick={makeClosure}
                 className="mt-2 w-full rounded-lg border border-slate-300 py-2.5 text-sm font-bold text-slate-700 active:bg-slate-100"
               >
-                休診にする
+                この枠を休診にする
+              </button>
+            )}
+            {pop.ctx.canClose && pop.start < maxMin && (
+              <button
+                onClick={makeClosureFromHere}
+                className="mt-2 w-full rounded-lg border border-rose-300 bg-rose-50 py-2.5 text-sm font-bold text-rose-700 active:bg-rose-100"
+              >
+                {minToLabel(pop.start)}以降ぜんぶ休診
               </button>
             )}
           </div>
