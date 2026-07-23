@@ -16,6 +16,7 @@ import type {
   BookingWindow,
   Closure,
   Equipment,
+  Opening,
   ServiceStep,
   StaffSchedule,
 } from "./types";
@@ -247,12 +248,16 @@ export function classSlot(
   allSchedules: StaffSchedule[], // その曜日の全担当者分
   closures: Closure[], // その日の休診
   classSteps: AppointmentStep[], // その日の当該クラスの工程
-  excludeAppointmentId?: string
+  excludeAppointmentId?: string,
+  classOpenings: Opening[] = [] // その日の当該クラスの臨時開放枠
 ): ClassSlotResult {
   const endMin = startMin + totalDuration(serviceSteps);
-  const inOpen = allSchedules.some(
-    (s) => s.start_min <= startMin && s.end_min >= endMin
+  // 臨時開放枠（その日だけ体幹を開ける）があれば営業時間外でも可。開放枠に開始時刻が入っていればOK
+  const openByOpening = classOpenings.some(
+    (o) => o.service_id === serviceId && o.start_min <= startMin && o.end_min > startMin
   );
+  const inOpen =
+    openByOpening || allSchedules.some((s) => s.start_min <= startMin && s.end_min >= endMin);
   if (!inOpen) return { state: "off", remaining: capacity, used: 0, capacity };
 
   const closed = closures.some(

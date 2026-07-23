@@ -150,8 +150,20 @@ export default function WeekCalendar({
         }
 
         if (isClass) {
-          // 開始時刻が固定されているクラスは、その時刻以外は表示しない
-          if (classStarts && classStarts.length > 0 && !classStarts.includes(t)) {
+          // その日の当該クラスの臨時開放枠
+          const classOpenings = openings.filter(
+            (o) => o.date === dateStr && o.service_id === serviceId
+          );
+          const openedHere = classOpenings.some(
+            (o) => o.start_min <= t && o.end_min > t
+          );
+          // 開始時刻が固定されているクラスは、その時刻＋臨時開放枠 以外は表示しない
+          if (
+            classStarts &&
+            classStarts.length > 0 &&
+            !classStarts.includes(t) &&
+            !openedHere
+          ) {
             return { kind: "off" };
           }
           const r = classSlot(
@@ -161,7 +173,9 @@ export default function WeekCalendar({
             t,
             daySchedules,
             dayClosures,
-            dayApptSteps
+            dayApptSteps,
+            undefined,
+            classOpenings
           );
           if (r.state === "off") return { kind: "off" };
           if (r.state === "closed") return { kind: "class-closed" };

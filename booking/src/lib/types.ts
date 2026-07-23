@@ -110,6 +110,7 @@ export interface Opening {
   id: string;
   date: string; // YYYY-MM-DD
   staff_id: string | null; // 担当者（施術）に紐づく開放
+  service_id?: string | null; // 定員制クラス（体幹教室）に紐づく開放
   start_min: number;
   end_min: number;
 }

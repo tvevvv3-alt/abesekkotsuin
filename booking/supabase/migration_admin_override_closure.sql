@@ -3,6 +3,9 @@
 -- 管理者はその確保枠に実際の予約（全身通電など複数工程）を入れられる必要がある。
 -- Supabase の SQL Editor で1回実行（再実行しても安全）。
 
+-- 体幹教室（定員制クラス）の臨時開放枠に対応：openings に service_id を追加
+alter table public.openings add column if not exists service_id uuid references public.services(id) on delete cascade;
+
 -- 旧5引数版を破棄（6引数＋既定値と衝突するため）
 drop function if exists public.check_booking_availability(uuid, uuid, date, int, uuid);
 
@@ -46,6 +49,11 @@ begin
     if not exists (
       select 1 from staff_schedules
        where weekday = v_dow and start_min <= p_start_min and end_min >= v_end
+    ) and not exists (
+      -- その日の体幹の臨時開放枠（開始時刻が入っていればOK）
+      select 1 from openings o
+       where o.service_id = p_service_id and o.date = p_date
+         and o.start_min <= p_start_min and o.end_min > p_start_min
     ) then
       return jsonb_build_object('ok', false, 'reason', '営業時間外');
     end if;

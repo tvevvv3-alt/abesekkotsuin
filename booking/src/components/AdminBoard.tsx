@@ -494,12 +494,13 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
     reload();
   }
 
-  // 臨時の予約可能枠（昼休み開放など）を作成／解除
+  // 臨時の予約可能枠（昼休み開放・体幹の臨時開催など）を作成／解除
   async function makeOpening() {
-    if (!pop || !pop.ctx.staffId) return;
+    if (!pop || (!pop.ctx.staffId && !pop.ctx.serviceId)) return;
     await supabase.from("openings").insert({
       date,
-      staff_id: pop.ctx.staffId,
+      staff_id: pop.ctx.staffId ?? null,
+      service_id: pop.ctx.serviceId ?? null,
       start_min: pop.start,
       end_min: pop.end,
     });
@@ -514,6 +515,10 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
   // 当該担当者の臨時開放枠
   function openingBands(staffId: string): Opening[] {
     return openings.filter((o) => o.staff_id === staffId);
+  }
+  // 当該クラス（体幹教室）の臨時開放枠
+  function classOpeningBands(serviceId: string): Opening[] {
+    return openings.filter((o) => o.service_id === serviceId);
   }
 
   const dObj = (() => {
@@ -685,6 +690,8 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
                     reason: c.reason,
                   }))}
                 onClosureClick={removeClosure}
+                openingBands={classOpeningBands(cls.id)}
+                onOpeningClick={removeOpening}
                 band={bandFor(ctx)}
                 onPointerDownTrack={(e) => beginDrag(ctx, e)}
                 onPointerMoveTrack={moveDrag}
@@ -756,12 +763,13 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
             >
               予約を追加
             </button>
-            {pop.ctx.staffId &&
+            {(pop.ctx.staffId || pop.ctx.serviceId) &&
               (() => {
                 const sid = pop.ctx.staffId;
+                const svc = pop.ctx.serviceId;
                 const overlap = openings.find(
                   (o) =>
-                    o.staff_id === sid &&
+                    (sid ? o.staff_id === sid : o.service_id === svc) &&
                     o.start_min < pop.end &&
                     o.end_min > pop.start
                 );
