@@ -246,6 +246,13 @@ export default function CalendarView({
       ? CLASS_COLOR
       : staffColor(a.staff_id);
 
+  // メモの色パレット：各担当カラー＋体幹＋汎用5色（重複は除外）
+  const notePalette = useMemo(() => {
+    const staffCols = staff.map((s) => s.color).filter((c): c is string => !!c);
+    const extras = [CLASS_COLOR, "#ef4444", "#ec4899", "#14b8a6", "#0ea5e9", "#64748b"];
+    return Array.from(new Set([...staffCols, ...extras]));
+  }, [staff]);
+
   const boardStart = settings?.board_start_min ?? 540;
   const boardEnd = Math.max(boardStart + 60, settings?.board_end_min ?? 1290);
   const boardRange = boardEnd - boardStart;
@@ -804,6 +811,7 @@ export default function CalendarView({
         <NoteModal
           supabase={supabase}
           data={noteModal}
+          palette={notePalette}
           onClose={() => setNoteModal(null)}
           onDone={() => {
             setNoteModal(null);
@@ -819,6 +827,7 @@ export default function CalendarView({
 function NoteModal({
   supabase,
   data,
+  palette,
   onClose,
   onDone,
 }: {
@@ -826,12 +835,14 @@ function NoteModal({
   data:
     | { mode: "add"; date: string; allDay: boolean; startMin: number }
     | { mode: "edit"; note: CalendarNote };
+  palette: string[];
   onClose: () => void;
   onDone: () => void;
 }) {
+  const colors = palette.length ? palette : NOTE_COLORS;
   const editing = data.mode === "edit" ? data.note : null;
   const [text, setText] = useState(editing?.text ?? "");
-  const [color, setColor] = useState(editing?.color ?? NOTE_COLORS[0]);
+  const [color, setColor] = useState(editing?.color ?? colors[0]);
   const allDay = editing ? editing.start_min == null : data.mode === "add" && data.allDay;
   const initStart = editing?.start_min ?? (data.mode === "add" ? data.startMin : 600);
   const [startMin, setStartMin] = useState<number>(initStart ?? 600);
@@ -916,8 +927,8 @@ function NoteModal({
             {timeInput(endMin, setEndMin)}
           </div>
         )}
-        <div className="mb-3 flex gap-2">
-          {NOTE_COLORS.map((c) => (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {colors.map((c) => (
             <button
               key={c}
               onClick={() => setColor(c)}
