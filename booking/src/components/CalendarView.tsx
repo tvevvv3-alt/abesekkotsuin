@@ -130,7 +130,7 @@ function apptSegments(a: ApptWithSteps): Seg[] {
   return out;
 }
 
-export default function CalendarView() {
+export default function CalendarView({ todaySignal }: { todaySignal?: number }) {
   const supabase = useMemo(() => createClient(), []);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
@@ -300,12 +300,6 @@ export default function CalendarView() {
     },
     [basePx]
   );
-  function zoomBtn(factor: number) {
-    const el = gridRef.current;
-    const rect = el?.getBoundingClientRect();
-    zoomAt(factor, rect ? rect.top + rect.height / 2 : 0);
-  }
-
   // 3ページの横トラックを直接操作（React再描画なしで滑らかに）。idx: 0=前/1=今/2=次
   const applyTransform = useCallback((idx: number, px: number, animate: boolean) => {
     const tf = `translateX(calc(${(-idx * 100) / 3}% + ${px}px))`;
@@ -393,13 +387,6 @@ export default function CalendarView() {
       }
     }
   }
-  // ボタンは1ページ送り（アニメあり）
-  function go(dir: number) {
-    if (animating.current) return;
-    animating.current = true;
-    pendingDir.current = dir * days;
-    applyTransform(dir > 0 ? 2 : 0, 0, true);
-  }
   // スライド完了 → 実データを delta 日ぶん進める（start変更でlayout effectが中央へ即リセット）
   function onSlideEnd(e: React.TransitionEvent) {
     if (e.propertyName !== "transform") return;
@@ -419,6 +406,17 @@ export default function CalendarView() {
     applyTransform(1, 0, false);
     setStart(newStart);
   }
+
+  // 親（トグル横）の「今日」ボタンから呼ばれる（初回は無視）
+  const firstToday = useRef(true);
+  useEffect(() => {
+    if (firstToday.current) {
+      firstToday.current = false;
+      return;
+    }
+    setStart(toDateStr(new Date()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todaySignal]);
 
   const hours: number[] = [];
   for (let t = Math.ceil(VIEW_START / 60) * 60; t <= VIEW_END; t += 60) hours.push(t);
@@ -491,7 +489,7 @@ export default function CalendarView() {
                 style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
                 <span
-                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-medium text-white`}
+                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-medium text-white`}
                   style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                 >
                   {it.note.text}
@@ -531,7 +529,7 @@ export default function CalendarView() {
                     }}
                   >
                     <span
-                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-medium text-white`}
+                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-medium text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
                       {a.patient_name || "（未登録）"}
@@ -600,28 +598,8 @@ export default function CalendarView() {
 
   return (
     <div>
-      {/* 操作バー（今日をメインに、前後は小さく、日数はドロップダウン） */}
+      {/* 操作バー：日付とビュー日数だけ（前後=スワイプ / 拡大縮小=ピンチ） */}
       <div className="mb-2 flex items-center gap-1.5">
-        <button
-          onClick={() => go(-1)}
-          className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-sm text-slate-500 active:bg-slate-100"
-          aria-label="前へ"
-        >
-          ‹
-        </button>
-        <button
-          onClick={() => jump(toDateStr(new Date()))}
-          className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700"
-        >
-          今日
-        </button>
-        <button
-          onClick={() => go(1)}
-          className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-sm text-slate-500 active:bg-slate-100"
-          aria-label="次へ"
-        >
-          ›
-        </button>
         <input
           type="date"
           value={start}
@@ -629,20 +607,6 @@ export default function CalendarView() {
           className="rounded-lg border border-slate-300 px-1.5 py-1.5 text-xs text-slate-600"
         />
         <div className="ml-auto flex items-center gap-1.5">
-          <button
-            onClick={() => zoomBtn(1 / 1.25)}
-            className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-base font-bold text-slate-500 active:bg-slate-100"
-            aria-label="縮小"
-          >
-            −
-          </button>
-          <button
-            onClick={() => zoomBtn(1.25)}
-            className="h-8 w-7 rounded-lg border border-slate-300 bg-white text-base font-bold text-slate-500 active:bg-slate-100"
-            aria-label="拡大"
-          >
-            ＋
-          </button>
           <div className="relative">
             <button
               onClick={() => setDayMenu((v) => !v)}
@@ -733,7 +697,7 @@ export default function CalendarView() {
       </div>
 
       <p className="mt-1.5 text-[11px] text-slate-400">
-        空き時間タップで「予約」か「メモ」。横スワイプで前後の週、2本指ピンチ／＋−で拡大縮小。
+        空き時間タップで「予約」か「メモ」。横スワイプで前後、2本指ピンチで拡大縮小。
       </p>
 
       {/* 空きタップ → 予約 or メモ 選択 */}

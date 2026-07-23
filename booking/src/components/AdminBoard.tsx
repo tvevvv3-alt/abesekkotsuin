@@ -123,9 +123,20 @@ interface ClosureBand {
   reason: string | null;
 }
 
-export default function AdminBoard() {
+export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
   const supabase = useMemo(() => createClient(), []);
   const [date, setDate] = useState<string>(toDateStr(new Date()));
+
+  // 親（トグル横）の「今日」ボタンから呼ばれる（初回は無視）
+  const firstToday = useRef(true);
+  useEffect(() => {
+    if (firstToday.current) {
+      firstToday.current = false;
+      return;
+    }
+    setDate(toDateStr(new Date()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todaySignal]);
 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
