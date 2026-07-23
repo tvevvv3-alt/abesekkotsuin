@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  loadAppointmentSteps,
-  loadClosures,
-  loadSchedules,
-} from "@/lib/data";
+import { loadAppointmentSteps, loadSchedules } from "@/lib/data";
 import type {
   Appointment,
   AppointmentStep,
@@ -94,10 +90,9 @@ export default function AdminBookingModal({
     if (!isClass && !staffId) return;
     setLoadingSlots(true);
     try {
-      const [sc, cl, ap] = await Promise.all([
+      const [sc, ap] = await Promise.all([
         // クラスは営業時間（全担当者の勤務時間）を使う
         loadSchedules(supabase, isClass ? undefined : staffId),
-        loadClosures(supabase, [theDate]),
         loadAppointmentSteps(supabase, [theDate]),
       ]);
       const [y, m, d] = theDate.split("-").map(Number);
@@ -106,6 +101,7 @@ export default function AdminBookingModal({
       const dur = totalDuration(service.steps);
       const cands = candidateStarts(daySchedules, dur);
 
+      // 管理画面は休診（枠の確保）を無視して予約可能にする（電話予約の確保枠に入れられるように）
       let ok: number[];
       if (isClass) {
         ok = cands.filter(
@@ -116,7 +112,7 @@ export default function AdminBookingModal({
               service.steps,
               t,
               daySchedules,
-              cl,
+              [],
               ap,
               appt?.id
             ).state === "ok"
@@ -126,9 +122,7 @@ export default function AdminBookingModal({
           date: theDate,
           weekday,
           schedules: daySchedules,
-          closures: cl.filter(
-            (c) => c.service_id === null && (c.staff_id === null || c.staff_id === staffId)
-          ),
+          closures: [],
           staffSteps: ap.filter((a) => a.uses_staff && a.staff_id === staffId),
           equipmentSteps: ap.filter((a) => a.equipment_id !== null),
           equipmentById: equipmentById as Record<string, Equipment>,
