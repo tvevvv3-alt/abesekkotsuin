@@ -365,7 +365,10 @@ export default function CalendarView() {
         return;
       }
     }
-    if (d.axis === "h") applyTransform(1, dx, false); // 指に追従（再描画なし）
+    if (d.axis === "h") {
+      const max = (gridRef.current?.clientWidth || 320) - GUTTER; // 一度に動かせるのは最大1ページ
+      applyTransform(1, Math.max(-max, Math.min(max, dx)), false); // 指に追従（再描画なし）
+    }
   }
   function onTouchEnd(e: React.TouchEvent) {
     if (pinch.current) {
@@ -376,31 +379,34 @@ export default function CalendarView() {
     drag.current = null;
     if (d && d.axis === "h") {
       const dx = e.changedTouches[0].clientX - d.x;
-      const w = gridRef.current?.clientWidth || 320;
       if (Math.abs(dx) > 8) swipedRef.current = true;
+      // 動かした分だけ日単位でスナップ（一気に1ページではない）
+      const colW = ((gridRef.current?.clientWidth || 320) - GUTTER) / days;
+      let delta = Math.round(-dx / colW);
+      delta = Math.max(-days, Math.min(days, delta)); // 一度に動けるのは最大1ページぶん
       animating.current = true;
-      if (Math.abs(dx) > Math.min(90, w * 0.2)) {
-        pendingDir.current = dx < 0 ? 1 : -1;
-        applyTransform(dx < 0 ? 2 : 0, 0, true); // 次/前ページまで完全移動
-      } else {
+      if (delta === 0) {
         applyTransform(1, 0, true); // 戻す
+      } else {
+        pendingDir.current = delta;
+        applyTransform(1, -delta * colW, true); // スナップ先の日まで移動
       }
     }
   }
-  // ボタンでのページ送り（アニメあり）
+  // ボタンは1ページ送り（アニメあり）
   function go(dir: number) {
     if (animating.current) return;
     animating.current = true;
-    pendingDir.current = dir;
+    pendingDir.current = dir * days;
     applyTransform(dir > 0 ? 2 : 0, 0, true);
   }
-  // スライド完了 → 実データを1ページ進める（start変更でlayout effectが中央へ即リセット）
+  // スライド完了 → 実データを delta 日ぶん進める（start変更でlayout effectが中央へ即リセット）
   function onSlideEnd(e: React.TransitionEvent) {
     if (e.propertyName !== "transform") return;
     if (pendingDir.current) {
       const d = pendingDir.current;
       pendingDir.current = 0;
-      setStart((cur) => toDateStr(addDays(new Date(cur + "T00:00:00"), d * days)));
+      setStart((cur) => toDateStr(addDays(new Date(cur + "T00:00:00"), d)));
     } else {
       animating.current = false;
     }
