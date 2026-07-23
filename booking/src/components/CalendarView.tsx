@@ -66,7 +66,7 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number })[] {
 const snap = (m: number) => Math.round(m / SNAP) * SNAP;
 
 const CLASS_COLOR = "#EF6C00"; // 体幹教室＝オレンジ
-const TEXT_SHADOW = "0 1px 3px rgba(0,0,0,.6)"; // 白文字を読みやすくする影
+const TEXT_SHADOW = "0 1px 1px rgba(0,0,0,.28)"; // 白文字を読みやすくする控えめな影（Google風にシャキッと）
 
 // 表示用の背景色。白文字が読めるよう明るすぎる色は暗くし、通電(light)は少し薄くする。
 function segColor(hex: string, tone: "light" | "dark"): string {
@@ -491,7 +491,7 @@ export default function CalendarView() {
                 style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
                 <span
-                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold text-white`}
+                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-medium text-white`}
                   style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                 >
                   {it.note.text}
@@ -531,7 +531,7 @@ export default function CalendarView() {
                     }}
                   >
                     <span
-                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-semibold text-white`}
+                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full truncate text-[11.5px] leading-[1.15]"} font-medium text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
                       {a.patient_name || "（未登録）"}

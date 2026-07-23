@@ -187,7 +187,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </button>
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 py-4 md:px-6">{children}</main>
+        <main className="min-w-0 flex-1 px-2 py-4 md:px-3">{children}</main>
       </div>
 
       {/* 操作者の切替（Google風） */}

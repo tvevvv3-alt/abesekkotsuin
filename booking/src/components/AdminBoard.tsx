@@ -213,7 +213,7 @@ export default function AdminBoard() {
   // ボード表示範囲。勤務時間外（例: 20:30以降の時間外予約）もドラッグで追加できるよう
   // 設定の board_start/board_end まで常に広げて表示する。
   const [minMin, maxMin] = useMemo(() => {
-    const bStart = settings?.board_start_min ?? 600;
+    const bStart = Math.min(540, settings?.board_start_min ?? 540); // 9時スタート（早番があればさらに前へ）
     const bEnd = settings?.board_end_min ?? 1320;
     if (daySchedules.length === 0) return [bStart, bEnd];
     return [
