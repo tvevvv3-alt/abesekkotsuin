@@ -246,86 +246,113 @@ export default function ClassRoster() {
       ) : shown.length === 0 ? (
         <p className="py-10 text-center text-sm text-slate-500">該当する予約はありません。</p>
       ) : (
-        <div className="space-y-3">
-          {shown.map(([name, visits]) => {
-            const mem = passOf(name);
-            const count = visits.length;
-            const hasLine = visits.some((v) => v.line_user_id);
-            const remainLabel =
-              mem.pass_type === "free" ? "フリーパス" : `残り ${Math.max(0, mem.quota - count)}回`;
-            return (
-              <div key={name} className="overflow-hidden rounded-xl border bg-white">
-                <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-4 py-2.5">
-                  <span className="text-sm font-bold text-slate-800">{name}</span>
-                  {hasLine ? (
-                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">
-                      LINE
-                    </span>
-                  ) : (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">
-                      未連携
-                    </span>
-                  )}
-                  <select
-                    value={mem.pass_type}
-                    onChange={(e) => setPass(name, e.target.value as PassType)}
-                    className="rounded-md border border-slate-300 px-1.5 py-1 text-xs"
-                  >
-                    <option value="month4">月間パス(4回)</option>
-                    <option value="free">フリーパス</option>
-                  </select>
-                  <span className="ml-auto text-sm font-bold text-slate-700">
-                    今月 {count}回
-                    <span
-                      className={`ml-2 text-xs font-bold ${
-                        mem.pass_type === "free"
-                          ? "text-violet-600"
-                          : mem.quota - count <= 0
-                          ? "text-red-500"
-                          : "text-blue-600"
-                      }`}
-                    >
-                      {remainLabel}
-                    </span>
-                  </span>
-                </div>
-                <ul className="divide-y">
-                  {visits.map((r, i) => {
-                    const d = new Date(r.date + "T00:00:00");
+        (() => {
+          const maxVisits = Math.max(1, ...shown.map(([, v]) => v.length));
+          return (
+            <div className="overflow-x-auto rounded-xl border bg-white">
+              <table className="border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500">
+                    <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-2 text-left font-bold">
+                      名前
+                    </th>
+                    <th className="border-b px-2 py-2 font-bold">種類</th>
+                    <th className="whitespace-nowrap border-b px-2 py-2 font-bold">今月</th>
+                    {Array.from({ length: maxVisits }).map((_, i) => (
+                      <th
+                        key={i}
+                        className="whitespace-nowrap border-b border-l px-2 py-2 text-center font-bold"
+                      >
+                        {i + 1}回目
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map(([name, visits]) => {
+                    const mem = passOf(name);
+                    const count = visits.length;
+                    const hasLine = visits.some((v) => v.line_user_id);
                     return (
-                      <li key={r.id} className="flex items-center gap-3 px-4 py-2">
-                        <span className="w-6 shrink-0 text-center text-[11px] font-bold text-slate-400">
-                          {i + 1}
-                        </span>
-                        <span className="w-24 shrink-0 text-sm text-slate-600">
-                          {d.getMonth() + 1}/{d.getDate()} {minToLabel(r.start_min)}
-                        </span>
-                        {r.status === "done" ? (
-                          <span className="ml-auto text-xs font-bold text-slate-400">
-                            {r.line_user_id ? "✅ 送信済" : "済"}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => finish(r)}
-                            disabled={busy === r.id}
-                            className="ml-auto rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white active:bg-blue-700 disabled:bg-slate-300"
+                      <tr key={name} className="border-t">
+                        <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-800">{name}</span>
+                            {hasLine && (
+                              <span className="rounded bg-green-100 px-1 text-[9px] font-bold text-green-700">
+                                LINE
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2">
+                          <select
+                            value={mem.pass_type}
+                            onChange={(e) => setPass(name, e.target.value as PassType)}
+                            className="rounded border border-slate-300 px-1 py-0.5 text-[11px]"
                           >
-                            {busy === r.id ? "処理中…" : "終了＋LINE"}
-                          </button>
-                        )}
-                      </li>
+                            <option value="month4">月4回</option>
+                            <option value="free">フリー</option>
+                          </select>
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-center">
+                          <span className="font-bold text-slate-700">{count}</span>
+                          <span
+                            className={`ml-1 ${
+                              mem.pass_type === "free"
+                                ? "text-violet-600"
+                                : mem.quota - count <= 0
+                                ? "text-red-500"
+                                : "text-blue-600"
+                            }`}
+                          >
+                            {mem.pass_type === "free" ? "フリー" : `/残${Math.max(0, mem.quota - count)}`}
+                          </span>
+                        </td>
+                        {Array.from({ length: maxVisits }).map((_, i) => {
+                          const v = visits[i];
+                          if (!v) return <td key={i} className="border-l px-2 py-2" />;
+                          const d = new Date(v.date + "T00:00:00");
+                          const done = v.status === "done";
+                          return (
+                            <td
+                              key={i}
+                              onClick={() => {
+                                if (!done && busy !== v.id && confirm(`${name} を終了＋LINE送信しますか？`))
+                                  finish(v);
+                              }}
+                              className={`whitespace-nowrap border-l px-2 py-1.5 text-center ${
+                                done ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-blue-50"
+                              }`}
+                            >
+                              <div className="font-medium text-slate-700">
+                                {d.getMonth() + 1}/{d.getDate()}
+                              </div>
+                              <div className="text-[10px] text-slate-500">{minToLabel(v.start_min)}</div>
+                              {done ? (
+                                <div className="text-[10px] font-bold">
+                                  {v.line_user_id ? "✅" : "済"}
+                                </div>
+                              ) : (
+                                <div className="text-[9px] text-blue-500">タップで終了</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
                     );
                   })}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
+                </tbody>
+              </table>
+            </div>
+          );
+        })()
       )}
 
       <p className="mt-3 text-[11px] text-slate-400">
-        予約が入ると自動で一覧に反映されます。「終了＋LINE」で来場日・今月何回目・残り回数を
-        LINEで通知します（フリーパスは無制限）。パス種別は氏名ごとに保存されます。
+        予約が入ると自動で表に反映されます（行＝人・列＝回数）。各回のマスを
+        タップすると「終了＋LINE」（来場日・今月何回目・残り回数を通知／フリーは無制限）。
+        名前は横スクロールしても固定、パス種別は氏名ごとに保存されます。
       </p>
     </div>
   );
