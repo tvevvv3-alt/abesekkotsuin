@@ -313,8 +313,15 @@ export default function CalendarView({
     const tr = animate ? `transform ${durMs}ms cubic-bezier(.22,1,.36,1)` : "none";
     [headerTrackRef.current, gridTrackRef.current].forEach((el) => {
       if (!el) return;
+      el.style.willChange = "transform"; // 操作中だけGPU昇格（常時だと縦スクロールが重くなる）
       el.style.transition = tr;
       el.style.transform = tf;
+    });
+  }, []);
+  // 横操作が終わったらGPU昇格を解除して縦スクロールを軽く保つ
+  const clearWillChange = useCallback(() => {
+    [headerTrackRef.current, gridTrackRef.current].forEach((el) => {
+      if (el) el.style.willChange = "auto";
     });
   }, []);
   // start/days が変わったら中央（今）へ即リセット（＝今日で今日が左端に来る）
@@ -422,13 +429,18 @@ export default function CalendarView({
       }
       delta = Math.max(-days, Math.min(days, delta)); // 一度に動けるのは最大1ページぶん
       animating.current = true;
+      // 指を離した勢い(速度)に合わせてアニメ時間を決める → ドラッグから慣性でスッと流れる
       if (delta === 0) {
-        applyTransform(1, 0, true, 170); // 戻し（指を離したらキビキビ戻す）
+        const remain = Math.abs(dx);
+        const dur = Math.max(150, Math.min(320, remain / Math.max(Math.abs(vx), 0.9)));
+        applyTransform(1, 0, true, dur); // 戻し
       } else {
-        // 勢いがあるほど短時間で決める（ネイティブっぽい手応え）
-        const dur = Math.abs(vx) > FLICK ? 220 : 300;
+        const targetPx = -delta * colW;
+        const remain = Math.abs(targetPx - dx); // 残り距離
+        const speed = Math.max(Math.abs(vx), 0.55); // px/ms（遅い離しでも間延びしない下限）
+        const dur = Math.max(210, Math.min(560, remain / speed));
         pendingDir.current = delta;
-        applyTransform(1, -delta * colW, true, dur); // スナップ先の日まで移動
+        applyTransform(1, targetPx, true, dur); // スナップ先の日まで滑らかに流す
       }
     }
   }
@@ -456,6 +468,7 @@ export default function CalendarView({
   // スライド完了 → 実データを delta 日ぶん進める（start変更でlayout effectが中央へ即リセット）
   function onSlideEnd(e: React.TransitionEvent) {
     if (e.propertyName !== "transform") return;
+    clearWillChange(); // 操作完了 → GPU昇格を解除（縦スクロールを軽く保つ）
     if (pendingDir.current) {
       const d = pendingDir.current;
       pendingDir.current = 0;
@@ -532,7 +545,7 @@ export default function CalendarView({
                   ev.stopPropagation();
                   setNoteModal({ mode: "edit", note: it.note });
                 }}
-                className="absolute flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
+                className="absolute flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                 style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
                 <span
@@ -573,7 +586,7 @@ export default function CalendarView({
                 return (
                   <div
                     key={i}
-                    className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
+                    className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                     style={{
                       top: segTop,
                       height: segH,
@@ -657,7 +670,7 @@ export default function CalendarView({
         <div className="flex border-b">
           <div className="shrink-0 bg-white" style={{ width: GUTTER }} />
           <div className="relative min-w-0 flex-1 overflow-hidden">
-            <div ref={headerTrackRef} className="flex" style={{ width: "300%", willChange: "transform" }}>
+            <div ref={headerTrackRef} className="flex" style={{ width: "300%" }}>
               {lists.map((list, i) => (
                 <div key={i} style={{ flex: "0 0 33.3333%" }}>
                   {renderHeaderPanel(list)}
@@ -691,7 +704,7 @@ export default function CalendarView({
               <div
                 ref={gridTrackRef}
                 className="flex"
-                style={{ width: "300%", height: gridH, willChange: "transform" }}
+                style={{ width: "300%", height: gridH }}
                 onTransitionEnd={onSlideEnd}
               >
                 {lists.map((list, i) => (

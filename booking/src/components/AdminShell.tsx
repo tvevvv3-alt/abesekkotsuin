@@ -154,7 +154,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
       )}
 
-      <div className="mx-auto flex max-w-6xl">
+      <div className="flex w-full">
         {/* デスクトップ：サイドメニュー */}
         <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-white md:flex">
           <div className="border-b px-4 py-4">
