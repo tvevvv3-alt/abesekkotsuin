@@ -125,6 +125,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     remind_morning_enabled: true,
     remind_morning_hour: 9,
     remind_morning_text: null,
+    class_done_text: null,
   };
   if (!data) return defaults;
   // 移行前で列が無い場合も既定で補完
@@ -142,6 +143,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     remind_morning_enabled: data.remind_morning_enabled ?? true,
     remind_morning_hour: data.remind_morning_hour ?? 9,
     remind_morning_text: data.remind_morning_text ?? null,
+    class_done_text: data.class_done_text ?? null,
   };
 }
 

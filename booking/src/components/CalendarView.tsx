@@ -421,12 +421,12 @@ export default function CalendarView({
         else delta = Math.min(delta, -1); // 右へ弾く＝後ろへ
       }
       delta = Math.max(-days, Math.min(days, delta)); // 一度に動けるのは最大1ページぶん
-      // 勢いがあるほど短時間で決める（ネイティブっぽい手応え）
-      const dur = Math.abs(vx) > FLICK ? 230 : 340;
       animating.current = true;
       if (delta === 0) {
-        applyTransform(1, 0, true, dur); // 戻す
+        applyTransform(1, 0, true, 170); // 戻し（指を離したらキビキビ戻す）
       } else {
+        // 勢いがあるほど短時間で決める（ネイティブっぽい手応え）
+        const dur = Math.abs(vx) > FLICK ? 220 : 300;
         pendingDir.current = delta;
         applyTransform(1, -delta * colW, true, dur); // スナップ先の日まで移動
       }

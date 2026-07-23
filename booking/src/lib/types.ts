@@ -197,6 +197,7 @@ export interface Settings {
   remind_morning_enabled: boolean; // 当日リマインドを送るか
   remind_morning_hour: number; // 当日リマインドの送信時刻（JST 時）
   remind_morning_text: string | null; // 当日リマインドの本文
+  class_done_text: string | null; // 体幹教室「終了」時のお礼メッセージ本文
 }
 
 // 月別の予約公開設定

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { lineMessagingConfigured, pushText } from "@/lib/line";
+import {
+  DEFAULT_CLASS_DONE_TEXT,
+  lineMessagingConfigured,
+  pushText,
+  renderClassDone,
+} from "@/lib/line";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,13 +44,14 @@ export async function POST(req: NextRequest) {
     ? `https://liff.line.me/${liffId}`
     : process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app";
 
-  const text = [
-    "本日は体幹教室へのご参加ありがとうございました！",
-    "またのお越しをお待ちしております。",
-    "",
-    `次回のご予約はこちら↓`,
-    bookUrl,
-  ].join("\n");
+  // 設定でテンプレートを上書き可能（未設定なら既定）
+  const { data: st } = await admin
+    .from("settings")
+    .select("class_done_text")
+    .eq("id", 1)
+    .maybeSingle();
+  const tpl = (st?.class_done_text as string | null)?.trim() || DEFAULT_CLASS_DONE_TEXT;
+  const text = renderClassDone(tpl, { name: appt.patient_name, url: bookUrl });
 
   const r = await pushText(appt.line_user_id, text);
   if (!r.ok) return NextResponse.json({ ok: false, reason: "send", error: r.error });
