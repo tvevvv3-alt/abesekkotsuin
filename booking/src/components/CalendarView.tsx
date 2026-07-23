@@ -681,9 +681,9 @@ export default function CalendarView() {
         <div className="flex border-b">
           <div className="shrink-0 bg-white" style={{ width: GUTTER }} />
           <div className="relative min-w-0 flex-1 overflow-hidden">
-            <div ref={headerTrackRef} className="flex" style={{ willChange: "transform" }}>
+            <div ref={headerTrackRef} className="flex" style={{ width: "300%", willChange: "transform" }}>
               {lists.map((list, i) => (
-                <div key={i} style={{ flex: "0 0 100%" }}>
+                <div key={i} style={{ flex: "0 0 33.3333%" }}>
                   {renderHeaderPanel(list)}
                 </div>
               ))}
@@ -718,11 +718,11 @@ export default function CalendarView() {
               <div
                 ref={gridTrackRef}
                 className="flex"
-                style={{ height: gridH, willChange: "transform" }}
+                style={{ width: "300%", height: gridH, willChange: "transform" }}
                 onTransitionEnd={onSlideEnd}
               >
                 {lists.map((list, i) => (
-                  <div key={i} className="flex" style={{ flex: "0 0 100%", height: gridH }}>
+                  <div key={i} className="flex" style={{ flex: "0 0 33.3333%", height: gridH }}>
                     {list.map((ds) => renderColumn(ds))}
                   </div>
                 ))}
