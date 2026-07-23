@@ -435,8 +435,15 @@ export default function BookingWizard() {
         const token = liff.getIDToken();
         if (token) setLiffIdToken(token);
       } else if (liff.isInClient()) {
-        // LINEアプリ内なのに未ログイン → LIFF標準ログイン（独自OAuthは使わない）
-        liff.login();
+        // LINEアプリ内なのに未ログイン → LIFF標準ログイン。
+        // redirectUri を省略するとSDKがカスタムスキーム(line3rdp://等)で戻り先を組み立て、
+        // LINE側で「Invalid redirect custom scheme」400になることがある。
+        // 現在のhttps URLを明示して戻り先をhttpsに固定する。
+        try {
+          liff.login({ redirectUri: window.location.href });
+        } catch {
+          /* ログインできなくても予約ページは通常どおり使える（下のOAuthボタンにフォールバック）*/
+        }
       }
     })().catch(() => {
       /* LINE外ブラウザ等では無視（OAuthボタンにフォールバック）*/
