@@ -306,11 +306,11 @@ export default function CalendarView({
     [basePx]
   );
   // 3ページの横トラックを直接操作（React再描画なしで滑らかに）。idx: 0=前/1=今/2=次
-  const applyTransform = useCallback((idx: number, px: number, animate: boolean) => {
+  const applyTransform = useCallback((idx: number, px: number, animate: boolean, durMs = 400) => {
     // translate3d でGPU合成にのせてカクつきを防ぐ
     const tf = `translate3d(calc(${(-idx * 100) / 3}% + ${px}px), 0, 0)`;
-    // なめらかに減速してスナップ（easeOutQuint 風）
-    const tr = animate ? "transform .4s cubic-bezier(.22,1,.36,1)" : "none";
+    // なめらかに減速してスナップ（easeOutQuint 風）。フリック時は短めに。
+    const tr = animate ? `transform ${durMs}ms cubic-bezier(.22,1,.36,1)` : "none";
     [headerTrackRef.current, gridTrackRef.current].forEach((el) => {
       if (!el) return;
       el.style.transition = tr;
@@ -326,7 +326,14 @@ export default function CalendarView({
 
   // ---- ジェスチャ：ピンチ拡大 / 横ドラッグでページ送り ----
   const pinch = useRef<{ dist: number; zoom: number; midY: number } | null>(null);
-  const drag = useRef<{ x: number; y: number; axis: null | "h" | "v" } | null>(null);
+  const drag = useRef<{
+    x: number;
+    y: number;
+    axis: null | "h" | "v";
+    lastX: number;
+    lastT: number;
+    vx: number; // 速度(px/ms)：フリック判定用
+  } | null>(null);
   const swipedRef = useRef(false);
 
   function onTouchStart(e: TouchEvent) {
@@ -341,7 +348,14 @@ export default function CalendarView({
       return;
     }
     if (!animating.current) {
-      drag.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, axis: null };
+      drag.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        axis: null,
+        lastX: e.touches[0].clientX,
+        lastT: performance.now(),
+        vx: 0,
+      };
     }
   }
   function onTouchMove(e: TouchEvent) {
@@ -371,6 +385,15 @@ export default function CalendarView({
     if (d.axis === "h") {
       // ネイティブの縦スクロール／ラバーバンドを止めて指に追従（カクつき防止）
       e.preventDefault();
+      // 直近の速度を記録（指を離した瞬間の勢いでフリック判定するため）
+      const now = performance.now();
+      const dt = now - d.lastT;
+      if (dt > 0) {
+        const inst = (t.clientX - d.lastX) / dt; // px/ms
+        d.vx = 0.75 * inst + 0.25 * d.vx; // 平滑化してブレを抑える
+        d.lastX = t.clientX;
+        d.lastT = now;
+      }
       const max = (gridRef.current?.clientWidth || 320) - GUTTER; // 一度に動かせるのは最大1ページ
       applyTransform(1, Math.max(-max, Math.min(max, dx)), false); // 指に追従（再描画なし）
     }
@@ -385,16 +408,27 @@ export default function CalendarView({
     if (d && d.axis === "h") {
       const dx = e.changedTouches[0].clientX - d.x;
       if (Math.abs(dx) > 8) swipedRef.current = true;
-      // 動かした分だけ日単位でスナップ（一気に1ページではない）
       const colW = ((gridRef.current?.clientWidth || 320) - GUTTER) / days;
+      // 指を離す直前に止まっていたら勢いは無しとみなす（誤フリック防止）
+      const idle = performance.now() - d.lastT;
+      const vx = idle > 90 ? 0 : d.vx;
+      // まずは動かした距離から最寄りの日へスナップ
       let delta = Math.round(-dx / colW);
+      // フリック（速く弾いた）ときは、距離が短くてもその方向へ最低1コマ送る
+      const FLICK = 0.3; // px/ms（≒300px/s）
+      if (Math.abs(vx) > FLICK) {
+        if (vx < 0) delta = Math.max(delta, 1); // 左へ弾く＝前へ
+        else delta = Math.min(delta, -1); // 右へ弾く＝後ろへ
+      }
       delta = Math.max(-days, Math.min(days, delta)); // 一度に動けるのは最大1ページぶん
+      // 勢いがあるほど短時間で決める（ネイティブっぽい手応え）
+      const dur = Math.abs(vx) > FLICK ? 230 : 340;
       animating.current = true;
       if (delta === 0) {
-        applyTransform(1, 0, true); // 戻す
+        applyTransform(1, 0, true, dur); // 戻す
       } else {
         pendingDir.current = delta;
-        applyTransform(1, -delta * colW, true); // スナップ先の日まで移動
+        applyTransform(1, -delta * colW, true, dur); // スナップ先の日まで移動
       }
     }
   }
