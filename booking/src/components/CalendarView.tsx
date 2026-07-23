@@ -664,6 +664,29 @@ export default function CalendarView({
 
   return (
     <div>
+      {/* スタッフ色の凡例（カレンダーは列見出しが日付なので色で担当を判別） */}
+      <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+        {staff.map((s) => (
+          <span key={s.id} className="inline-flex items-center gap-1">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: s.color || "#64748b" }}
+            />
+            {s.name}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1">
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: CLASS_COLOR }} />
+          体幹教室
+        </span>
+        {kawanishiId && (
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: abeColor }} />
+            川西整体院
+          </span>
+        )}
+      </div>
+
       {/* カレンダー本体（ツールバーは親のAdminScheduleに統合） */}
       <div className="overflow-hidden rounded-xl border bg-white">
         {/* 固定ヘッダー（横スライド） */}
@@ -814,6 +837,9 @@ function NoteModal({
   const [startMin, setStartMin] = useState<number>(initStart ?? 600);
   const [endMin, setEndMin] = useState<number>(editing?.end_min ?? (initStart ?? 600) + 60);
   const [busy, setBusy] = useState(false);
+  // 繰り返し（追加時のみ）：なし/毎日/毎週/毎月 × 回数ぶん行を作成
+  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly">("none");
+  const [count, setCount] = useState(4);
   const date = editing?.date ?? (data.mode === "add" ? data.date : "");
 
   async function save() {
@@ -826,8 +852,26 @@ function NoteModal({
       start_min: allDay ? null : startMin,
       end_min: allDay ? null : Math.max(endMin, startMin + 15),
     };
-    if (editing) await supabase.from("calendar_notes").update(row).eq("id", editing.id);
-    else await supabase.from("calendar_notes").insert(row);
+    if (editing) {
+      await supabase.from("calendar_notes").update(row).eq("id", editing.id);
+    } else if (repeat !== "none") {
+      // 繰り返し：回数ぶんの日付に同じメモを作成
+      const base = new Date(date + "T00:00:00");
+      const n = Math.max(1, Math.min(60, count));
+      const rows = Array.from({ length: n }, (_, i) => {
+        let d: Date;
+        if (repeat === "daily") d = addDays(base, i);
+        else if (repeat === "weekly") d = addDays(base, i * 7);
+        else {
+          d = new Date(base);
+          d.setMonth(d.getMonth() + i);
+        }
+        return { ...row, date: toDateStr(d) };
+      });
+      await supabase.from("calendar_notes").insert(rows);
+    } else {
+      await supabase.from("calendar_notes").insert(row);
+    }
     setBusy(false);
     onDone();
   }
@@ -872,7 +916,7 @@ function NoteModal({
             {timeInput(endMin, setEndMin)}
           </div>
         )}
-        <div className="mb-4 flex gap-2">
+        <div className="mb-3 flex gap-2">
           {NOTE_COLORS.map((c) => (
             <button
               key={c}
@@ -882,6 +926,34 @@ function NoteModal({
             />
           ))}
         </div>
+        {!editing && (
+          <div className="mb-4 flex items-center gap-2 text-sm text-slate-600">
+            <span className="text-[13px]">🔁 繰り返し</span>
+            <select
+              value={repeat}
+              onChange={(e) => setRepeat(e.target.value as typeof repeat)}
+              className="rounded-md border px-2 py-1 text-sm"
+            >
+              <option value="none">なし</option>
+              <option value="daily">毎日</option>
+              <option value="weekly">毎週</option>
+              <option value="monthly">毎月</option>
+            </select>
+            {repeat !== "none" && (
+              <>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={count}
+                  onChange={(e) => setCount(parseInt(e.target.value || "1", 10))}
+                  className="w-16 rounded-md border px-2 py-1 text-sm"
+                />
+                <span className="text-xs text-slate-400">回</span>
+              </>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {editing && (
             <button onClick={remove} className="rounded-lg px-3 py-2 text-sm font-bold text-red-500">
