@@ -66,19 +66,32 @@ interface ApptWithSteps extends Appointment {
   steps: AppointmentStep[];
 }
 
-const KAWANISHI_COLOR = "#92400e"; // 川西整体院＝茶色
-const CLASS_COLOR = "#64748b"; // 体幹教室＝グレー
+const KAWANISHI_COLOR = "#3F51B5"; // 川西整体院＝阿部の青（カレンダーに合わせる）
+const CLASS_COLOR = "#EF6C00"; // 体幹教室＝オレンジ
+const TEXT_SHADOW = "0 1px 1px rgba(0,0,0,.28)"; // 白文字の控えめな影
 
-// #rrggbb → 白へ amt(0..1) だけ寄せた薄い色
-function lighten(hex: string, amt: number): string {
+// カレンダーと同じ：白文字が読めるよう明るすぎる色は暗くし、通電(light)は少し薄くする
+function segColor(hex: string, tone: "light" | "dark"): string {
   const h = hex.replace("#", "");
   const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  const r = parseInt(n.slice(0, 2), 16);
-  const g = parseInt(n.slice(2, 4), 16);
-  const b = parseInt(n.slice(4, 6), 16);
+  let r = parseInt(n.slice(0, 2), 16);
+  let g = parseInt(n.slice(2, 4), 16);
+  let b = parseInt(n.slice(4, 6), 16);
   if ([r, g, b].some(isNaN)) return hex;
-  const mix = (c: number) => Math.round(c + (255 - c) * amt);
-  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+  const L = 0.299 * r + 0.587 * g + 0.114 * b;
+  if (L > 150) {
+    const f = 150 / L;
+    r *= f;
+    g *= f;
+    b *= f;
+  }
+  if (tone === "light") {
+    const a = 0.3;
+    r += (255 - r) * a;
+    g += (255 - g) * a;
+    b += (255 - b) * a;
+  }
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
 // 工程の色分け：通電＝薄い / 施術＝濃い
@@ -88,31 +101,38 @@ function stepTone(st: AppointmentStep): "light" | "dark" {
   return st.uses_staff ? "dark" : "light";
 }
 
-// 予約を「薄い通電 / 濃い施術」のセグメントへ分解
+// 予約を「薄い通電 / 濃い施術」のセグメントへ分解（30分グリッドで区切る＝カレンダーと同じ）
 function apptSegments(
   a: ApptWithSteps,
   s: number,
   e: number
 ): { s: number; e: number; tone: "light" | "dark" }[] {
+  const snap30 = (m: number) => Math.round(m / 30) * 30;
+  const blockStart = snap30(s);
+  const blockEnd = Math.max(snap30(e), blockStart + 30);
   const steps = (a.steps ?? [])
     .filter((st) => st.start_min != null && st.end_min != null)
     .sort((x, y) => x.start_min - y.start_min);
-  if (steps.length === 0) return [{ s, e, tone: "dark" }];
-  const segs: { s: number; e: number; tone: "light" | "dark" }[] = [];
+  if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark" }];
+  const merged: { s: number; e: number; tone: "light" | "dark" }[] = [];
   for (const st of steps) {
     const tone = stepTone(st);
-    const last = segs[segs.length - 1];
+    const last = merged[merged.length - 1];
     if (last && last.tone === tone && st.start_min <= last.e) {
       last.e = Math.max(last.e, st.end_min);
     } else {
-      segs.push({ s: st.start_min, e: st.end_min, tone });
+      merged.push({ s: st.start_min, e: st.end_min, tone });
     }
   }
-  return segs.map((sg) => ({
-    tone: sg.tone,
-    s: Math.max(s, Math.min(e, sg.s)),
-    e: Math.min(e, Math.max(sg.e, Math.max(s, Math.min(e, sg.s)) + 1)),
-  }));
+  let cursor = blockStart;
+  const out: { s: number; e: number; tone: "light" | "dark" }[] = [];
+  for (const seg of merged) {
+    let end = snap30(seg.e);
+    if (end <= cursor) end = cursor + 30;
+    out.push({ s: cursor, e: end, tone: seg.tone });
+    cursor = end;
+  }
+  return out;
 }
 
 // 列に描く休診バンド
@@ -602,36 +622,36 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
                       <button
                         key={`${appt.id}-${lane}`}
                         onClick={() => setModal({ mode: "edit", appt })}
-                        className="absolute z-20 overflow-hidden rounded-md shadow-sm"
+                        className="absolute z-20"
                         style={{
                           top: cardTop,
                           height: yFor(botSnap) - cardTop - 2,
                           left: `calc(${lane * w}% + 2px)`,
                           width: `calc(${w}% - 4px)`,
-                          backgroundColor: color,
+                          background: "transparent",
                         }}
                         title={`${minToLabel(appt.start_min)} ${appt.patient_name ?? ""}`}
                       >
                         {segs.map((sg, i) => (
                           <div
                             key={i}
-                            className="absolute left-0 w-full"
+                            className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
                             style={{
                               top: yFor(sg.s) - cardTop,
                               height: yFor(sg.e) - yFor(sg.s),
-                              backgroundColor: sg.tone === "light" ? lighten(color, 0.42) : color,
-                              borderTop: i > 0 ? "1px solid rgba(255,255,255,.5)" : undefined,
+                              backgroundColor: kawanishi ? color : segColor(color, sg.tone),
+                              border: "0.5px solid rgba(255,255,255,.95)",
                             }}
-                          />
-                        ))}
-                        <span className="absolute inset-0 flex items-center px-1">
-                          <span
-                            className="line-clamp-2 w-full text-[11px] font-bold leading-[1.12] text-white"
-                            style={{ textShadow: "0 1px 2px rgba(0,0,0,.55)" }}
                           >
-                            {appt.patient_name || "（未登録）"}
-                          </span>
-                        </span>
+                            <span
+                              className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
+                              style={{ textShadow: TEXT_SHADOW }}
+                            >
+                              {appt.patient_name || "（未登録）"}
+                              <span className="ml-1 font-normal opacity-90">{minToLabel(sg.s)}</span>
+                            </span>
+                          </div>
+                        ))}
                       </button>
                     );
                   })}
@@ -674,25 +694,26 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
                 {classGroups(cls.id).map((g, i) => (
                   <div
                     key={i}
-                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-1 py-1"
+                    className="absolute left-0.5 right-0.5 z-20 overflow-hidden rounded-[4px] px-1 py-1 shadow-sm"
                     style={{
                       top: yFor(g.start),
                       height: yFor(g.end) - yFor(g.start) - 2,
+                      backgroundColor: CLASS_COLOR,
+                      border: "0.5px solid rgba(255,255,255,.95)",
                     }}
                   >
-                    <div className="mb-0.5 text-[11px] font-bold text-slate-700">
+                    <div className="mb-0.5 text-[11px] font-bold text-white" style={{ textShadow: TEXT_SHADOW }}>
                       {g.list.length}/{cls.capacity}
                       {g.list.length >= cls.capacity && (
-                        <span className="ml-1 rounded bg-slate-600 px-1 text-[9px] text-white">
-                          満
-                        </span>
+                        <span className="ml-1 rounded bg-white/25 px-1 text-[9px] text-white">満</span>
                       )}
                     </div>
                     {g.list.map((a) => (
                       <button
                         key={a.id}
                         onClick={() => setModal({ mode: "edit", appt: a })}
-                        className="block w-full truncate text-left text-[10px] text-slate-700 hover:underline"
+                        className="block w-full truncate text-left text-[10px] font-medium text-white hover:underline"
+                        style={{ textShadow: TEXT_SHADOW }}
                       >
                         {a.patient_name || "（未登録）"}
                       </button>
