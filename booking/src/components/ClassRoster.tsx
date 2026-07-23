@@ -34,6 +34,8 @@ export default function ClassRoster() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "month4" | "free">("all");
+  const [sort, setSort] = useState<"name" | "date">("name");
 
   const from = useMemo(() => toDateStr(month), [month]);
   const to = useMemo(
@@ -99,6 +101,23 @@ export default function ClassRoster() {
   function passOf(name: string): Member {
     return members[name] ?? { name, pass_type: "month4", quota: 4 };
   }
+
+  // フィルタ（パス種別）＋並び替え（名前順／来院日順）
+  const shown = useMemo(() => {
+    const arr = groups.filter(
+      ([name]) => filter === "all" || (members[name]?.pass_type ?? "month4") === filter
+    );
+    if (sort === "name") {
+      arr.sort((a, b) => a[0].localeCompare(b[0], "ja"));
+    } else {
+      arr.sort((a, b) => {
+        const av = a[1][0];
+        const bv = b[1][0];
+        return av.date.localeCompare(bv.date) || av.start_min - bv.start_min;
+      });
+    }
+    return arr;
+  }, [groups, members, filter, sort]);
 
   async function setPass(name: string, pass_type: PassType) {
     await supabase
@@ -175,17 +194,54 @@ export default function ClassRoster() {
         </div>
       </div>
 
+      {/* フィルタ（パス種別）＋並び替え */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
+          {([
+            ["all", "すべて"],
+            ["month4", "月間パス"],
+            ["free", "フリーパス"],
+          ] as const).map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setFilter(v)}
+              className={`rounded-md px-2.5 py-1 text-xs font-bold ${
+                filter === v ? "bg-blue-600 text-white" : "text-slate-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
+          {([
+            ["name", "名前順"],
+            ["date", "来院日順"],
+          ] as const).map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setSort(v)}
+              className={`rounded-md px-2.5 py-1 text-xs font-bold ${
+                sort === v ? "bg-slate-700 text-white" : "text-slate-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {msg && (
         <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">{msg}</div>
       )}
 
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
-      ) : groups.length === 0 ? (
-        <p className="py-10 text-center text-sm text-slate-500">この月の予約はありません。</p>
+      ) : shown.length === 0 ? (
+        <p className="py-10 text-center text-sm text-slate-500">該当する予約はありません。</p>
       ) : (
         <div className="space-y-3">
-          {groups.map(([name, visits]) => {
+          {shown.map(([name, visits]) => {
             const mem = passOf(name);
             const count = visits.length;
             const hasLine = visits.some((v) => v.line_user_id);
