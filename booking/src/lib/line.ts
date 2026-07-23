@@ -68,21 +68,32 @@ export const DEFAULT_MORNING_TEXT = DEFAULT_EVE_TEXT.replace(
 
 // 体幹教室「終了」時に送るお礼メッセージの既定テンプレート（管理画面で上書き可能）
 export const DEFAULT_CLASS_DONE_TEXT = [
-  "本日は体幹教室へのご参加ありがとうございました！",
-  "またのお越しをお待ちしております。",
+  "本日は体幹教室へのご参加ありがとうございました！（{来場日}）",
+  "今月 {回数}回目・{残り}",
   "",
+  "またのお越しをお待ちしております。",
   "次回のご予約はこちら↓",
   "{予約URL}",
 ].join("\n");
 
-// 体幹教室の終了メッセージにタグを差し込む（{名前}=患者名 / {予約URL}=予約リンク）
+// 体幹教室の終了メッセージにタグを差し込む
+// {名前}=患者名 / {予約URL}=予約リンク / {来場日}=M月D日 / {回数}=今月何回目 / {残り}=あとN回 or フリーパス
 export function renderClassDone(
   tpl: string,
-  vals: { name?: string | null; url: string }
+  vals: {
+    name?: string | null;
+    url: string;
+    visitDate?: string;
+    nth?: number;
+    remaining?: string;
+  }
 ): string {
   return tpl
     .split("{名前}").join((vals.name ?? "").trim())
-    .split("{予約URL}").join(vals.url);
+    .split("{予約URL}").join(vals.url)
+    .split("{来場日}").join(vals.visitDate ?? "")
+    .split("{回数}").join(vals.nth != null ? String(vals.nth) : "")
+    .split("{残り}").join(vals.remaining ?? "");
 }
 
 // テンプレートに予約情報を差し込む。値が空の「ラベル：」行は自動で消す。

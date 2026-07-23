@@ -441,7 +441,11 @@ export default function SettingsAdmin() {
             <p className="mt-1 text-[11px] text-slate-500">
               体幹教室の予約で「終了＋LINE」を押したときに送るお礼メッセージ。差し込みタグ：
               <code className="rounded bg-slate-100 px-1">{"{名前}"}</code>{" "}
-              <code className="rounded bg-slate-100 px-1">{"{予約URL}"}</code>
+              <code className="rounded bg-slate-100 px-1">{"{予約URL}"}</code>{" "}
+              <code className="rounded bg-slate-100 px-1">{"{来場日}"}</code>{" "}
+              <code className="rounded bg-slate-100 px-1">{"{回数}"}</code>{" "}
+              <code className="rounded bg-slate-100 px-1">{"{残り}"}</code>
+              （{"{回数}"}=今月何回目 / {"{残り}"}=あとN回・フリーパス）
             </p>
             <textarea
               value={s.class_done_text ?? DEFAULT_CLASS_DONE_TEXT}

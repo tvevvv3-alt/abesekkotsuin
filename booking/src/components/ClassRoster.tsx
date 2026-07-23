@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadServices } from "@/lib/data";
-import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
+import { minToLabel, toDateStr } from "@/lib/booking";
 import type { ServiceWithSteps } from "@/lib/types";
 
 interface Row {
@@ -13,20 +13,37 @@ interface Row {
   patient_name: string | null;
   status: "booked" | "cancelled" | "done";
   line_user_id: string | null;
-  note: string | null;
+}
+type PassType = "month4" | "free";
+interface Member {
+  name: string;
+  pass_type: PassType;
+  quota: number;
 }
 
 export default function ClassRoster() {
   const supabase = useMemo(() => createClient(), []);
   const [classes, setClasses] = useState<ServiceWithSteps[]>([]);
   const [classId, setClassId] = useState<string>("");
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
   const [rows, setRows] = useState<Row[]>([]);
+  const [members, setMembers] = useState<Record<string, Member>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  // 表示範囲：過去14日〜先60日
-  const from = useMemo(() => toDateStr(addDays(new Date(), -14)), []);
-  const to = useMemo(() => toDateStr(addDays(new Date(), 60)), []);
+
+  const from = useMemo(() => toDateStr(month), [month]);
+  const to = useMemo(
+    () => toDateStr(new Date(month.getFullYear(), month.getMonth() + 1, 1)),
+    [month]
+  );
+  const isThisMonth = useMemo(() => {
+    const n = new Date();
+    return n.getFullYear() === month.getFullYear() && n.getMonth() === month.getMonth();
+  }, [month]);
 
   useEffect(() => {
     (async () => {
@@ -44,16 +61,22 @@ export default function ClassRoster() {
   const reload = useCallback(async () => {
     if (!classId) return;
     setLoading(true);
-    const { data } = await supabase
-      .from("appointments")
-      .select("id, date, start_min, patient_name, status, line_user_id, note")
-      .eq("service_id", classId)
-      .neq("status", "cancelled")
-      .gte("date", from)
-      .lte("date", to)
-      .order("date")
-      .order("start_min");
-    setRows((data as Row[]) ?? []);
+    const [{ data: ap }, { data: mem }] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select("id, date, start_min, patient_name, status, line_user_id")
+        .eq("service_id", classId)
+        .neq("status", "cancelled")
+        .gte("date", from)
+        .lt("date", to)
+        .order("date")
+        .order("start_min"),
+      supabase.from("class_members").select("name, pass_type, quota"),
+    ]);
+    setRows((ap as Row[]) ?? []);
+    const map: Record<string, Member> = {};
+    (mem ?? []).forEach((m: Member) => (map[m.name] = m));
+    setMembers(map);
     setLoading(false);
   }, [supabase, classId, from, to]);
 
@@ -61,23 +84,33 @@ export default function ClassRoster() {
     reload();
   }, [reload]);
 
-  // 日付ごとにまとめる
+  // 会員（氏名）ごとにまとめる
   const groups = useMemo(() => {
     const map = new Map<string, Row[]>();
     for (const r of rows) {
-      const arr = map.get(r.date) ?? [];
+      const key = (r.patient_name || "（未登録）").trim();
+      const arr = map.get(key) ?? [];
       arr.push(r);
-      map.set(r.date, arr);
+      map.set(key, arr);
     }
-    return Array.from(map.entries());
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "ja"));
   }, [rows]);
+
+  function passOf(name: string): Member {
+    return members[name] ?? { name, pass_type: "month4", quota: 4 };
+  }
+
+  async function setPass(name: string, pass_type: PassType) {
+    await supabase
+      .from("class_members")
+      .upsert({ name, pass_type, quota: 4 }, { onConflict: "name" });
+    setMembers((m) => ({ ...m, [name]: { name, pass_type, quota: 4 } }));
+  }
 
   async function finish(r: Row) {
     setBusy(r.id);
     setMsg(null);
-    // 予約を「終了(done)」に
     await supabase.from("appointments").update({ status: "done" }).eq("id", r.id);
-    // LINE送信（連携済みのみ）
     let note = "終了にしました";
     if (r.line_user_id) {
       try {
@@ -99,12 +132,14 @@ export default function ClassRoster() {
     reload();
   }
 
-  const todayStr = toDateStr(new Date());
+  const monthLabel = `${month.getFullYear()}年${month.getMonth() + 1}月`;
+  const btn =
+    "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h1 className="text-lg font-bold text-slate-800">体幹教室 予約一覧</h1>
+        <h1 className="text-lg font-bold text-slate-800">体幹教室 回数管理</h1>
         {classes.length > 1 && (
           <select
             value={classId}
@@ -118,6 +153,26 @@ export default function ClassRoster() {
             ))}
           </select>
         )}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+            className={btn}
+            aria-label="前の月"
+          >
+            ‹
+          </button>
+          <span className="min-w-[92px] text-center text-sm font-bold text-slate-700">
+            {monthLabel}
+            {isThisMonth && <span className="ml-1 text-[10px] text-blue-500">今月</span>}
+          </span>
+          <button
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+            className={btn}
+            aria-label="次の月"
+          >
+            ›
+          </button>
+        </div>
       </div>
 
       {msg && (
@@ -127,58 +182,78 @@ export default function ClassRoster() {
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : groups.length === 0 ? (
-        <p className="py-10 text-center text-sm text-slate-500">予約がありません。</p>
+        <p className="py-10 text-center text-sm text-slate-500">この月の予約はありません。</p>
       ) : (
-        <div className="space-y-4">
-          {groups.map(([date, list]) => {
-            const d = new Date(date + "T00:00:00");
-            const isToday = date === todayStr;
+        <div className="space-y-3">
+          {groups.map(([name, visits]) => {
+            const mem = passOf(name);
+            const count = visits.length;
+            const hasLine = visits.some((v) => v.line_user_id);
+            const remainLabel =
+              mem.pass_type === "free" ? "フリーパス" : `残り ${Math.max(0, mem.quota - count)}回`;
             return (
-              <div key={date} className="overflow-hidden rounded-xl border bg-white">
-                <div
-                  className={`flex items-center justify-between border-b px-4 py-2 text-sm font-bold ${
-                    isToday ? "bg-blue-50 text-blue-700" : "bg-slate-50 text-slate-700"
-                  }`}
-                >
-                  <span>
-                    {d.getMonth() + 1}/{d.getDate()}（{WEEKDAY_LABELS[d.getDay()]}）
-                    {isToday && " ・今日"}
+              <div key={name} className="overflow-hidden rounded-xl border bg-white">
+                <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-4 py-2.5">
+                  <span className="text-sm font-bold text-slate-800">{name}</span>
+                  {hasLine ? (
+                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">
+                      LINE
+                    </span>
+                  ) : (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">
+                      未連携
+                    </span>
+                  )}
+                  <select
+                    value={mem.pass_type}
+                    onChange={(e) => setPass(name, e.target.value as PassType)}
+                    className="rounded-md border border-slate-300 px-1.5 py-1 text-xs"
+                  >
+                    <option value="month4">月間パス(4回)</option>
+                    <option value="free">フリーパス</option>
+                  </select>
+                  <span className="ml-auto text-sm font-bold text-slate-700">
+                    今月 {count}回
+                    <span
+                      className={`ml-2 text-xs font-bold ${
+                        mem.pass_type === "free"
+                          ? "text-violet-600"
+                          : mem.quota - count <= 0
+                          ? "text-red-500"
+                          : "text-blue-600"
+                      }`}
+                    >
+                      {remainLabel}
+                    </span>
                   </span>
-                  <span className="text-xs font-normal text-slate-500">{list.length}名</span>
                 </div>
                 <ul className="divide-y">
-                  {list.map((r) => (
-                    <li key={r.id} className="flex items-center gap-3 px-4 py-2.5">
-                      <span className="w-12 shrink-0 text-sm font-bold text-slate-600">
-                        {minToLabel(r.start_min)}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
-                        {r.patient_name || "（未登録）"}
-                      </span>
-                      {r.line_user_id ? (
-                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">
-                          LINE
+                  {visits.map((r, i) => {
+                    const d = new Date(r.date + "T00:00:00");
+                    return (
+                      <li key={r.id} className="flex items-center gap-3 px-4 py-2">
+                        <span className="w-6 shrink-0 text-center text-[11px] font-bold text-slate-400">
+                          {i + 1}
                         </span>
-                      ) : (
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">
-                          未連携
+                        <span className="w-24 shrink-0 text-sm text-slate-600">
+                          {d.getMonth() + 1}/{d.getDate()} {minToLabel(r.start_min)}
                         </span>
-                      )}
-                      {r.status === "done" ? (
-                        <span className="w-24 shrink-0 text-right text-xs font-bold text-slate-400">
-                          済
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => finish(r)}
-                          disabled={busy === r.id}
-                          className="w-24 shrink-0 rounded-lg bg-blue-600 py-1.5 text-xs font-bold text-white active:bg-blue-700 disabled:bg-slate-300"
-                        >
-                          {busy === r.id ? "処理中…" : "終了"}
-                        </button>
-                      )}
-                    </li>
-                  ))}
+                        {r.status === "done" ? (
+                          <span className="ml-auto text-xs font-bold text-slate-400">
+                            {r.line_user_id ? "✅ 送信済" : "済"}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => finish(r)}
+                            disabled={busy === r.id}
+                            className="ml-auto rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white active:bg-blue-700 disabled:bg-slate-300"
+                          >
+                            {busy === r.id ? "処理中…" : "終了＋LINE"}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );
@@ -187,7 +262,8 @@ export default function ClassRoster() {
       )}
 
       <p className="mt-3 text-[11px] text-slate-400">
-        「終了」を押すと予約を終了にし、LINE連携済みの方へお礼＋次回予約の案内を送ります。
+        予約が入ると自動で一覧に反映されます。「終了＋LINE」で来場日・今月何回目・残り回数を
+        LINEで通知します（フリーパスは無制限）。パス種別は氏名ごとに保存されます。
       </p>
     </div>
   );
