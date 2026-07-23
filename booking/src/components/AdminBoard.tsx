@@ -319,6 +319,28 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
     return ranges;
   }
 
+  // 体幹教室（クラス）の勤務外グレー＝どの担当者も勤務していない時間（昼休み・開店前後）
+  function classOffRanges(): Array<[number, number]> {
+    const iv = daySchedules
+      .map((s) => [s.start_min, s.end_min] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+    const merged: Array<[number, number]> = [];
+    for (const [a, b] of iv) {
+      const last = merged[merged.length - 1];
+      if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+      else merged.push([a, b]);
+    }
+    const ranges: Array<[number, number]> = [];
+    let cursor = minMin;
+    for (const [a, b] of merged) {
+      if (a > cursor) ranges.push([cursor, a]);
+      cursor = Math.max(cursor, b);
+    }
+    if (cursor < maxMin) ranges.push([cursor, maxMin]);
+    if (merged.length === 0) ranges.push([minMin, maxMin]);
+    return ranges;
+  }
+
   // 当該担当者に効く休診（院全体 or 個別）をバンド化
   function closureBands(staffId: string): ClosureBand[] {
     return closures
@@ -676,7 +698,7 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
                 height={height}
                 yFor={yFor}
                 ticks={ticks}
-                offRanges={[]}
+                offRanges={classOffRanges()}
                 closureBands={closures
                   .filter(
                     (c) =>
