@@ -650,10 +650,12 @@ export default function CalendarView({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setPop(null)} />
           <div
-            className="fixed z-50 w-44 -translate-x-1/2 rounded-xl border bg-white p-2 shadow-xl"
+            className="fixed z-50 max-h-[80vh] w-44 -translate-x-1/2 overflow-auto rounded-xl border bg-white p-2 shadow-xl"
             style={{
               left: Math.min(Math.max(pop.x, 100), window.innerWidth - 100),
-              top: Math.min(pop.y + 6, window.innerHeight - 130),
+              ...(pop.y > window.innerHeight * 0.55
+                ? { bottom: Math.max(8, window.innerHeight - pop.y + 6) }
+                : { top: pop.y + 6 }),
             }}
           >
             <div className="mb-1 text-center text-[11px] text-slate-500">

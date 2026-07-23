@@ -762,10 +762,13 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setPop(null)} />
           <div
-            className="fixed z-50 w-56 -translate-x-1/2 rounded-xl border bg-white p-3 shadow-xl"
+            className="fixed z-50 max-h-[80vh] w-56 -translate-x-1/2 overflow-auto rounded-xl border bg-white p-3 shadow-xl"
             style={{
               left: Math.min(Math.max(pop.x, 130), window.innerWidth - 130),
-              top: Math.min(pop.y + 8, window.innerHeight - 150),
+              // 画面下寄りでタップしたら上向きに出す（見切れ防止）
+              ...(pop.y > window.innerHeight * 0.55
+                ? { bottom: Math.max(8, window.innerHeight - pop.y + 8) }
+                : { top: pop.y + 8 }),
             }}
           >
             <div className="mb-2 text-center text-xs text-slate-500">

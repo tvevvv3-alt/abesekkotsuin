@@ -135,6 +135,30 @@ export default function WeekCalendar({
         !acceptsDate(win, dateStr) ||
         (isToday && !sameDayOk);
 
+      // 時間外予約：順次解放。最も早い「予約可能な枠」だけ◯、あとは✕。
+      // 休診枠は checkAvailability が不可を返すので✕のまま（＝スキップして次が開く）。
+      let activeAh: number | null = null;
+      if (afterHours && !isPastDay && !dayBlocked && daySchedules.length > 0) {
+        const ahCtx: DayContext = {
+          date: dateStr,
+          weekday,
+          schedules: daySchedules,
+          closures: dayClosures.filter(
+            (c) => c.service_id === null && (c.staff_id === null || c.staff_id === staffId)
+          ),
+          staffSteps: dayApptSteps.filter((a) => a.uses_staff && a.staff_id === staffId),
+          equipmentSteps: dayApptSteps.filter((a) => a.equipment_id !== null),
+          equipmentById,
+        };
+        for (const t of rows) {
+          if (isToday && t <= nowMin) continue;
+          if (checkAvailability(serviceSteps, staffId, t, ahCtx, undefined, true).ok) {
+            activeAh = t;
+            break;
+          }
+        }
+      }
+
       return rows.map((t): Cell => {
         // 過去の日付・過ぎた時間・最終受付超過・未公開などは予約不可
         if (isPastDay || (isToday && t <= nowMin)) return { kind: "off" };
@@ -181,6 +205,11 @@ export default function WeekCalendar({
           if (r.state === "closed") return { kind: "class-closed" };
           if (r.state === "full") return { kind: "class-full" };
           return { kind: "class-ok", remaining: r.remaining };
+        }
+
+        // 時間外は順次解放：activeAh（最も早い予約可能枠）だけ◯、あとは✕
+        if (afterHours) {
+          return t === activeAh ? { kind: "ok" } : { kind: "busy" };
         }
 
         const ctx: DayContext = {
