@@ -130,7 +130,15 @@ function apptSegments(a: ApptWithSteps): Seg[] {
   return out;
 }
 
-export default function CalendarView({ todaySignal }: { todaySignal?: number }) {
+export default function CalendarView({
+  start,
+  days,
+  onStartChange,
+}: {
+  start: string;
+  days: number;
+  onStartChange: (d: string) => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
@@ -138,9 +146,6 @@ export default function CalendarView({ todaySignal }: { todaySignal?: number }) 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
-  const [days, setDays] = useState(3);
-  const [dayMenu, setDayMenu] = useState(false);
-  const [start, setStart] = useState<string>(toDateStr(new Date()));
   const [zoom, setZoom] = useState(1);
 
   const gridRef = useRef<HTMLDivElement>(null);
@@ -393,30 +398,11 @@ export default function CalendarView({ todaySignal }: { todaySignal?: number }) 
     if (pendingDir.current) {
       const d = pendingDir.current;
       pendingDir.current = 0;
-      setStart((cur) => toDateStr(addDays(new Date(cur + "T00:00:00"), d)));
+      onStartChange(toDateStr(addDays(new Date(start + "T00:00:00"), d)));
     } else {
       animating.current = false;
     }
   }
-  // 即時移動（今日・日付・日数変更）：中央へ即リセットして左端＝指定日に
-  function jump(newStart: string) {
-    drag.current = null;
-    pendingDir.current = 0;
-    animating.current = false;
-    applyTransform(1, 0, false);
-    setStart(newStart);
-  }
-
-  // 親（トグル横）の「今日」ボタンから呼ばれる（初回は無視）
-  const firstToday = useRef(true);
-  useEffect(() => {
-    if (firstToday.current) {
-      firstToday.current = false;
-      return;
-    }
-    setStart(toDateStr(new Date()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaySignal]);
 
   const hours: number[] = [];
   for (let t = Math.ceil(VIEW_START / 60) * 60; t <= VIEW_END; t += 60) hours.push(t);
@@ -598,48 +584,7 @@ export default function CalendarView({ todaySignal }: { todaySignal?: number }) 
 
   return (
     <div>
-      {/* 操作バー：日付とビュー日数だけ（前後=スワイプ / 拡大縮小=ピンチ） */}
-      <div className="mb-2 flex items-center gap-1.5">
-        <input
-          type="date"
-          value={start}
-          onChange={(e) => e.target.value && jump(e.target.value)}
-          className="rounded-lg border border-slate-300 px-1.5 py-1.5 text-xs text-slate-600"
-        />
-        <div className="ml-auto flex items-center gap-1.5">
-          <div className="relative">
-            <button
-              onClick={() => setDayMenu((v) => !v)}
-              className="flex h-8 items-center gap-0.5 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-600 active:bg-slate-100"
-            >
-              {days}日 <span className="text-[9px]">▾</span>
-            </button>
-            {dayMenu && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setDayMenu(false)} />
-                <div className="absolute right-0 z-50 mt-1 w-20 overflow-hidden rounded-lg border bg-white shadow-lg">
-                  {[1, 3, 4, 7].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => {
-                        setDays(n);
-                        setDayMenu(false);
-                      }}
-                      className={`block w-full px-3 py-2 text-left text-sm ${
-                        days === n ? "bg-blue-600 font-bold text-white" : "text-slate-600 active:bg-slate-100"
-                      }`}
-                    >
-                      {n}日
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* カレンダー本体 */}
+      {/* カレンダー本体（ツールバーは親のAdminScheduleに統合） */}
       <div className="overflow-hidden rounded-xl border bg-white">
         {/* 固定ヘッダー（横スライド） */}
         <div className="flex border-b">
