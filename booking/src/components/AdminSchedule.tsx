@@ -50,14 +50,14 @@ export default function AdminSchedule() {
             カレンダー
           </button>
         </div>
+        <button onClick={() => shift(-1)} className={arrowCls} aria-label="前へ">
+          ‹
+        </button>
         <button
           onClick={() => setCurDate(toDateStr(new Date()))}
           className="shrink-0 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700"
         >
           今日
-        </button>
-        <button onClick={() => shift(-1)} className={arrowCls} aria-label="前へ">
-          ‹
         </button>
         <button onClick={() => shift(1)} className={arrowCls} aria-label="次へ">
           ›

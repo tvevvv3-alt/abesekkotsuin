@@ -535,22 +535,23 @@ export default function AdminBoard({ date }: { date: string }) {
 
   return (
     <div>
-      {/* 日付表示＋予約追加（前後・今日は上部の共通ツールバー） */}
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-bold text-slate-700">
+      {/* 日付（中央）＋ヒント（左）＋予約追加（右）を1段に（前後・今日は上部の共通ツールバー） */}
+      <div className="mb-2 grid grid-cols-3 items-center gap-2">
+        <p className="min-w-0 truncate text-xs text-slate-400">
+          空き時間を上下ドラッグ →「予約追加」か「休診」
+        </p>
+        <span className="text-center text-sm font-bold text-slate-700">
           {dObj.getMonth() + 1}/{dObj.getDate()}（{WEEKDAY_LABELS[dObj.getDay()]}）
         </span>
-        <button
-          onClick={() => setModal({ mode: "add" })}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white active:bg-blue-700"
-        >
-          ＋ 予約追加
-        </button>
+        <div className="flex justify-end">
+          <button
+            onClick={() => setModal({ mode: "add" })}
+            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700"
+          >
+            ＋ 予約追加
+          </button>
+        </div>
       </div>
-
-      <p className="mb-2 text-xs text-slate-400">
-        空き時間を上下にドラッグ → 「予約を追加」か「休診にする」を選べます。
-      </p>
 
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>

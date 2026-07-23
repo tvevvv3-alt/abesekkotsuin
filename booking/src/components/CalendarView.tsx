@@ -432,15 +432,15 @@ export default function CalendarView({
       // 指を離した勢い(速度)に合わせてアニメ時間を決める → ドラッグから慣性でスッと流れる
       if (delta === 0) {
         const remain = Math.abs(dx);
-        const dur = Math.max(90, Math.min(150, remain / Math.max(Math.abs(vx), 2.0)));
+        const dur = Math.max(50, Math.min(90, remain / Math.max(Math.abs(vx), 3.0)));
         applyTransform(1, 0, true, dur); // 戻し
       } else {
         const targetPx = -delta * colW;
         const remain = Math.abs(targetPx - dx); // 残り距離
-        const speed = Math.max(Math.abs(vx), 1.8); // px/ms（かなり速めに流す）
-        const dur = Math.max(100, Math.min(220, remain / speed));
+        const speed = Math.max(Math.abs(vx), 3.0); // px/ms（ほぼ即切り替え）
+        const dur = Math.max(50, Math.min(110, remain / speed));
         pendingDir.current = delta;
-        applyTransform(1, targetPx, true, dur); // スナップ先の日までパッと流す
+        applyTransform(1, targetPx, true, dur); // スナップ先の日へほぼ即切り替え
       }
     }
   }
