@@ -308,7 +308,8 @@ export default function CalendarView({
   // 3ページの横トラックを直接操作（React再描画なしで滑らかに）。idx: 0=前/1=今/2=次
   const applyTransform = useCallback((idx: number, px: number, animate: boolean) => {
     const tf = `translateX(calc(${(-idx * 100) / 3}% + ${px}px))`;
-    const tr = animate ? "transform .28s cubic-bezier(.22,0,.24,1)" : "none";
+    // なめらかに減速してスナップ（easeOutQuint 風）
+    const tr = animate ? "transform .38s cubic-bezier(.22,1,.36,1)" : "none";
     [headerTrackRef.current, gridTrackRef.current].forEach((el) => {
       if (!el) return;
       el.style.transition = tr;
