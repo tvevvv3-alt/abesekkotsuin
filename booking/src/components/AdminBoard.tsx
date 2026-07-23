@@ -319,25 +319,32 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
     return ranges;
   }
 
-  // 体幹教室（クラス）の勤務外グレー＝どの担当者も勤務していない時間（昼休み・開店前後）
-  function classOffRanges(): Array<[number, number]> {
-    const iv = daySchedules
-      .map((s) => [s.start_min, s.end_min] as [number, number])
-      .sort((a, b) => a[0] - b[0]);
-    const merged: Array<[number, number]> = [];
-    for (const [a, b] of iv) {
-      const last = merged[merged.length - 1];
-      if (last && a <= last[1]) last[1] = Math.max(last[1], b);
-      else merged.push([a, b]);
+  // 体幹教室（クラス）の勤務外グレー＝開始枠（17:00/18:00/19:30など）以外はすべてグレー。
+  // 開け閉めは手動（予約可能にする／休診にする）で行う。
+  function classOffRanges(cls: ServiceWithSteps): Array<[number, number]> {
+    const starts = (cls.class_starts ?? "")
+      .split(",")
+      .map((x) => parseInt(x.trim(), 10))
+      .filter((n) => !isNaN(n))
+      .sort((a, b) => a - b);
+    // 開始枠が未設定なら終日グレー（手動で開ける）
+    if (starts.length === 0) return [[minMin, maxMin]];
+    const dur = Math.max(30, cls.steps.reduce((s, st) => s + st.duration_min, 0));
+    const windows: Array<[number, number]> = [];
+    for (const s of starts) {
+      const w: [number, number] = [s, s + dur];
+      const last = windows[windows.length - 1];
+      if (last && w[0] <= last[1]) last[1] = Math.max(last[1], w[1]);
+      else windows.push(w);
     }
+    // 開始枠ウィンドウの「すき間」をグレーにする
     const ranges: Array<[number, number]> = [];
     let cursor = minMin;
-    for (const [a, b] of merged) {
-      if (a > cursor) ranges.push([cursor, a]);
+    for (const [a, b] of windows) {
+      if (a > cursor) ranges.push([cursor, Math.min(a, maxMin)]);
       cursor = Math.max(cursor, b);
     }
     if (cursor < maxMin) ranges.push([cursor, maxMin]);
-    if (merged.length === 0) ranges.push([minMin, maxMin]);
     return ranges;
   }
 
@@ -698,7 +705,7 @@ export default function AdminBoard({ todaySignal }: { todaySignal?: number }) {
                 height={height}
                 yFor={yFor}
                 ticks={ticks}
-                offRanges={classOffRanges()}
+                offRanges={classOffRanges(cls)}
                 closureBands={closures
                   .filter(
                     (c) =>
