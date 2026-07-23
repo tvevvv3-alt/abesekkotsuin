@@ -172,14 +172,13 @@ export function checkAvailability(
     if (!inShift) return { ok: false, reason: "勤務時間外" };
   }
 
-  // ④ 休診（院全体 or 当該担当者。終日 or 時間帯）
+  // ④ 院全体休診（終日/時間帯）は予約全体をブロック。
+  //    担当者個別の休みは、担当者を使う工程だけを下の工程ループでブロックする
+  //    （全身通電の通電は機器のみ＝担当者を使わないので、担当者休みの影響を受けない）
   for (const c of ctx.closures) {
-    if (c.staff_id !== null && c.staff_id !== staffId) continue;
+    if (c.staff_id !== null) continue; // 院全体のみ
     const allDay = c.start_min === null;
-    if (
-      allDay ||
-      overlap(c.start_min as number, c.end_min as number, startMin, endMin)
-    ) {
+    if (allDay || overlap(c.start_min as number, c.end_min as number, startMin, endMin)) {
       return { ok: false, reason: "休診" };
     }
   }
@@ -188,6 +187,14 @@ export function checkAvailability(
   for (const iv of intervals) {
     // ① 担当者を使う工程：担当者が空いているか
     if (iv.step.uses_staff) {
+      // 担当者個別の休み：担当者を使う工程だけブロック
+      for (const c of ctx.closures) {
+        if (c.staff_id !== staffId) continue;
+        const allDay = c.start_min === null;
+        if (allDay || overlap(c.start_min as number, c.end_min as number, iv.start, iv.end)) {
+          return { ok: false, reason: "休診" };
+        }
+      }
       const busy = ctx.staffSteps.some(
         (a) =>
           a.staff_id === staffId &&

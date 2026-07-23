@@ -91,12 +91,14 @@ begin
     end if;
   end if;
 
-  -- ④ 休診でない（管理者予約=p_ignore_closures のときは飛ばす）
+  -- ④ 院全体休診（終日/時間帯）は予約全体をブロック。
+  --    担当者「個別」の休みは、担当者を使う工程（施術など）だけを工程ループでブロックする
+  --    （全身通電の通電は機器のみで担当者を使わないため、担当者休みの影響を受けない）
   if not p_ignore_closures and exists (
     select 1 from closures c
      where c.date = p_date
        and c.service_id is null
-       and (c.staff_id is null or c.staff_id = p_staff_id)
+       and c.staff_id is null
        and (
          (c.start_min is null)
          or (c.start_min < v_end and c.end_min > p_start_min)
@@ -113,6 +115,16 @@ begin
     s_end   := v_cursor + step.duration_min;
 
     if step.uses_staff then
+      -- 担当者個別の休み：担当者を使う工程だけブロック
+      if not p_ignore_closures and exists (
+        select 1 from closures c
+         where c.date = p_date
+           and c.service_id is null
+           and c.staff_id = p_staff_id
+           and ((c.start_min is null) or (c.start_min < s_end and c.end_min > s_start))
+      ) then
+        return jsonb_build_object('ok', false, 'reason', '休診');
+      end if;
       if exists (
         select 1 from appointment_steps a
         join appointments ap on ap."id" = a.appointment_id and ap.status = 'booked'
