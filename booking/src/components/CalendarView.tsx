@@ -487,7 +487,7 @@ export default function CalendarView() {
                   ev.stopPropagation();
                   setNoteModal({ mode: "edit", note: it.note });
                 }}
-                className="absolute flex items-center justify-center overflow-hidden rounded-[4px] px-0.5 text-center shadow-sm"
+                className="absolute flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
                 style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
                 <span
@@ -495,6 +495,7 @@ export default function CalendarView() {
                   style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                 >
                   {it.note.text}
+                  <span className="ml-1 font-normal opacity-90">{minToLabel(it.s)}</span>
                 </span>
               </button>
             );
@@ -521,7 +522,7 @@ export default function CalendarView() {
                 return (
                   <div
                     key={i}
-                    className="absolute inset-x-0 flex items-center justify-center overflow-hidden rounded-[4px] px-0.5 text-center shadow-sm"
+                    className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
                     style={{
                       top: segTop,
                       height: segH,
@@ -534,6 +535,7 @@ export default function CalendarView() {
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
                       {a.patient_name || "（未登録）"}
+                      <span className="ml-1 font-normal opacity-90">{minToLabel(sg.s)}</span>
                     </span>
                   </div>
                 );
