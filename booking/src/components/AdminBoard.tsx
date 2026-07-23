@@ -196,7 +196,7 @@ export default function AdminBoard({ date }: { date: string }) {
   const reload = useCallback(async () => {
     setLoading(true);
     const [{ data: aData }, { data: sData }, cl, op] = await Promise.all([
-      supabase.from("appointments").select("*").eq("date", date).eq("status", "booked"),
+      supabase.from("appointments").select("*").eq("date", date).neq("status", "cancelled"),
       supabase.from("appointment_steps").select("*").eq("date", date),
       loadClosures(supabase, [date]),
       loadOpenings(supabase, [date]),
@@ -625,9 +625,15 @@ export default function AdminBoard({ date }: { date: string }) {
                           left: `calc(${lane * w}% + 2px)`,
                           width: `calc(${w}% - 4px)`,
                           background: "transparent",
+                          opacity: appt.status === "done" ? 0.5 : undefined,
                         }}
                         title={`${minToLabel(appt.start_min)} ${appt.patient_name ?? ""}`}
                       >
+                        {appt.status === "done" && (
+                          <span className="absolute right-0.5 top-0.5 z-30 rounded bg-white/90 px-1 text-[9px] font-bold text-slate-600">
+                            済
+                          </span>
+                        )}
                         {segs.map((sg, i) => (
                           <div
                             key={i}
@@ -711,9 +717,10 @@ export default function AdminBoard({ date }: { date: string }) {
                         key={a.id}
                         onClick={() => setModal({ mode: "edit", appt: a })}
                         className="block w-full truncate text-left text-[10px] font-medium text-white hover:underline"
-                        style={{ textShadow: TEXT_SHADOW }}
+                        style={{ textShadow: TEXT_SHADOW, opacity: a.status === "done" ? 0.6 : 1 }}
                       >
                         {a.patient_name || "（未登録）"}
+                        {a.status === "done" && " ✓済"}
                       </button>
                     ))}
                   </div>

@@ -244,6 +244,27 @@ export default function AdminBookingModal({
     onDone();
   }
 
+  // 体幹教室の「終了」→ 予約を終了(done)にし、LINE連携済みならお礼＋次回案内を送信
+  async function finishClass() {
+    if (!appt) return;
+    setBusy(true);
+    setError(null);
+    await supabase.from("appointments").update({ status: "done" }).eq("id", appt.id);
+    try {
+      const res = await fetch("/api/class/done", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId: appt.id }),
+      });
+      const j = (await res.json()) as { ok: boolean; reason?: string };
+      if (!j.ok && j.reason !== "noline") setError(`LINE未送信: ${j.reason ?? "?"}`);
+    } catch {
+      setError("LINE送信エラー");
+    }
+    setBusy(false);
+    onDone();
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-4 sm:rounded-2xl">
@@ -448,7 +469,7 @@ export default function AdminBookingModal({
           <p className="mb-2 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-600">{error}</p>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {mode === "edit" && (
             <button
               onClick={cancelAppt}
@@ -458,10 +479,21 @@ export default function AdminBookingModal({
               キャンセル予約
             </button>
           )}
+          {mode === "edit" && isClass && (
+            <button
+              onClick={finishClass}
+              disabled={busy}
+              className="ml-auto rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300"
+            >
+              {busy ? "処理中…" : "終了＋LINE"}
+            </button>
+          )}
           <button
             onClick={save}
             disabled={busy || startMin === null}
-            className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white disabled:bg-slate-300"
+            className={`${
+              mode === "edit" && isClass ? "" : "ml-auto"
+            } rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white disabled:bg-slate-300`}
           >
             {busy ? "保存中…" : mode === "add" ? "予約する" : "変更を保存"}
           </button>

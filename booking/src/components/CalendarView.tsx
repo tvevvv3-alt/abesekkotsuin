@@ -207,7 +207,7 @@ export default function CalendarView({
   const reload = useCallback(async () => {
     if (allDates.length === 0) return;
     const [{ data: aData }, { data: sData }, nt] = await Promise.all([
-      supabase.from("appointments").select("*").in("date", allDates).eq("status", "booked"),
+      supabase.from("appointments").select("*").in("date", allDates).neq("status", "cancelled"),
       supabase.from("appointment_steps").select("*").in("date", allDates),
       loadCalendarNotes(supabase, allDates),
     ]);
@@ -307,9 +307,10 @@ export default function CalendarView({
   );
   // 3ページの横トラックを直接操作（React再描画なしで滑らかに）。idx: 0=前/1=今/2=次
   const applyTransform = useCallback((idx: number, px: number, animate: boolean) => {
-    const tf = `translateX(calc(${(-idx * 100) / 3}% + ${px}px))`;
+    // translate3d でGPU合成にのせてカクつきを防ぐ
+    const tf = `translate3d(calc(${(-idx * 100) / 3}% + ${px}px), 0, 0)`;
     // なめらかに減速してスナップ（easeOutQuint 風）
-    const tr = animate ? "transform .38s cubic-bezier(.22,1,.36,1)" : "none";
+    const tr = animate ? "transform .4s cubic-bezier(.22,1,.36,1)" : "none";
     [headerTrackRef.current, gridTrackRef.current].forEach((el) => {
       if (!el) return;
       el.style.transition = tr;
@@ -328,7 +329,7 @@ export default function CalendarView({
   const drag = useRef<{ x: number; y: number; axis: null | "h" | "v" } | null>(null);
   const swipedRef = useRef(false);
 
-  function onTouchStart(e: React.TouchEvent) {
+  function onTouchStart(e: TouchEvent) {
     if (e.touches.length === 2) {
       drag.current = null;
       const [a, b] = [e.touches[0], e.touches[1]];
@@ -343,7 +344,7 @@ export default function CalendarView({
       drag.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, axis: null };
     }
   }
-  function onTouchMove(e: React.TouchEvent) {
+  function onTouchMove(e: TouchEvent) {
     if (pinch.current && e.touches.length === 2) {
       e.preventDefault();
       const [a, b] = [e.touches[0], e.touches[1]];
@@ -358,19 +359,23 @@ export default function CalendarView({
     const dx = t.clientX - d.x;
     const dy = t.clientY - d.y;
     if (d.axis === null) {
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) d.axis = "h";
-      else if (Math.abs(dy) > 6) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 5) d.axis = "h";
+      else if (Math.abs(dy) > 5) {
         d.axis = "v"; // 縦はネイティブスクロールに任せる
         drag.current = null;
         return;
+      } else {
+        return; // まだ方向が決まっていない
       }
     }
     if (d.axis === "h") {
+      // ネイティブの縦スクロール／ラバーバンドを止めて指に追従（カクつき防止）
+      e.preventDefault();
       const max = (gridRef.current?.clientWidth || 320) - GUTTER; // 一度に動かせるのは最大1ページ
       applyTransform(1, Math.max(-max, Math.min(max, dx)), false); // 指に追従（再描画なし）
     }
   }
-  function onTouchEnd(e: React.TouchEvent) {
+  function onTouchEnd(e: TouchEvent) {
     if (pinch.current) {
       if (e.touches.length < 2) pinch.current = null;
       return;
@@ -393,6 +398,27 @@ export default function CalendarView({
       }
     }
   }
+  // 最新のハンドラを保持（ネイティブリスナーを付け替えずに済むように）
+  const touchHandlers = useRef({ onTouchStart, onTouchMove, onTouchEnd });
+  touchHandlers.current = { onTouchStart, onTouchMove, onTouchEnd };
+  // ネイティブの非パッシブ touchmove を登録（preventDefault を効かせるため）
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const ts = (e: TouchEvent) => touchHandlers.current.onTouchStart(e);
+    const tm = (e: TouchEvent) => touchHandlers.current.onTouchMove(e);
+    const te = (e: TouchEvent) => touchHandlers.current.onTouchEnd(e);
+    el.addEventListener("touchstart", ts, { passive: true });
+    el.addEventListener("touchmove", tm, { passive: false });
+    el.addEventListener("touchend", te, { passive: true });
+    el.addEventListener("touchcancel", te, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", ts);
+      el.removeEventListener("touchmove", tm);
+      el.removeEventListener("touchend", te);
+      el.removeEventListener("touchcancel", te);
+    };
+  }, []);
   // スライド完了 → 実データを delta 日ぶん進める（start変更でlayout effectが中央へ即リセット）
   function onSlideEnd(e: React.TransitionEvent) {
     if (e.propertyName !== "transform") return;
@@ -488,6 +514,7 @@ export default function CalendarView({
           const a = it.appt;
           const col = colorFor(a);
           const segs = apptSegments(a);
+          const done = a.status === "done";
           return (
             <button
               key={a.id}
@@ -496,9 +523,14 @@ export default function CalendarView({
                 setModal({ mode: "edit", appt: a });
               }}
               className="absolute"
-              style={{ ...style, background: "transparent" }}
+              style={{ ...style, background: "transparent", opacity: done ? 0.5 : undefined }}
               title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
             >
+              {done && (
+                <span className="absolute right-0.5 top-0.5 z-10 rounded bg-white/90 px-1 text-[9px] font-bold text-slate-600">
+                  済
+                </span>
+              )}
               {segs.map((sg, i) => {
                 const segTop = yFor(sg.s) - top;
                 const segH = yFor(sg.e) - yFor(sg.s);
@@ -604,11 +636,8 @@ export default function CalendarView({
         {/* 時間グリッド（縦スクロール＋ピンチ／横スライド） */}
         <div
           ref={gridRef}
-          className="relative overflow-y-auto overflow-x-hidden"
+          className="relative overflow-y-auto overflow-x-hidden overscroll-x-none"
           style={{ height: "calc(100dvh - 190px)", touchAction: "pan-y" }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
         >
           <div className="flex" style={{ height: gridH }}>
             {/* 左：時間軸 */}
