@@ -651,6 +651,83 @@ export default function AdminBoard({ date }: { date: string }) {
               );
             })}
 
+
+            {/* 定員制クラス列（体幹教室）：予約人数 N/定員 を表示 */}
+            {classServices.map((cls) => {
+              const ctx: ColCtx = { serviceId: cls.id, canClose: true };
+              return (
+              <Column
+                key={cls.id}
+                header={cls.name}
+                subHeader={`定員${cls.capacity}名`}
+                headerColor={CLASS_COLOR}
+                height={height}
+                yFor={yFor}
+                ticks={ticks}
+                offRanges={classOffRanges(cls)}
+                closureBands={closures
+                  .filter(
+                    (c) =>
+                      (c.staff_id === null && c.service_id === null) ||
+                      c.service_id === cls.id
+                  )
+                  .map((c) => ({
+                    id: c.id,
+                    start: c.start_min ?? minMin,
+                    end: c.end_min ?? maxMin,
+                    reason: c.reason,
+                  }))}
+                onClosureClick={removeClosure}
+                openingBands={classOpeningBands(cls.id)}
+                onOpeningClick={removeOpening}
+                band={bandFor(ctx)}
+                onPointerDownTrack={(e) => beginDrag(ctx, e)}
+                onPointerMoveTrack={moveDrag}
+                onPointerUpTrack={endDrag}
+                onPointerCancelTrack={cancelDrag}
+              >
+                {classGroups(cls.id).map((g, i) => (
+                  <div
+                    key={i}
+                    className="absolute left-0.5 right-0.5 z-20 rounded-[4px] px-1 py-1 shadow-sm"
+                    style={{
+                      top: yFor(g.start),
+                      minHeight: yFor(g.end) - yFor(g.start) - 2,
+                      backgroundColor: CLASS_COLOR,
+                      border: "0.5px solid rgba(255,255,255,.95)",
+                    }}
+                  >
+                    <div className="mb-0.5 text-[11px] font-bold text-white" style={{ textShadow: TEXT_SHADOW }}>
+                      {g.list.length}/{cls.capacity}
+                      {g.list.length >= cls.capacity && (
+                        <span className="ml-1 rounded bg-white/25 px-1 text-[9px] text-white">満</span>
+                      )}
+                    </div>
+                    {g.list.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => setModal({ mode: "edit", appt: a })}
+                        className="flex w-full items-center gap-1 text-left text-[10px] font-medium text-white hover:underline"
+                        style={{ textShadow: TEXT_SHADOW }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {a.patient_name || "（未登録）"}
+                        </span>
+                        {a.status === "done" &&
+                          (a.line_user_id ? (
+                            <span className="shrink-0">✅</span>
+                          ) : (
+                            <span className="shrink-0 text-[9px] opacity-80">済</span>
+                          ))}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </Column>
+              );
+            })}
+
+
             {/* 川西整体院 専用列（予約管理用） */}
             {kawanishiService && (() => {
               const ctx: ColCtx = { serviceId: kawanishiService.id, canClose: true };
@@ -734,81 +811,6 @@ export default function AdminBoard({ date }: { date: string }) {
                 </Column>
               );
             })()}
-
-            {/* 定員制クラス列（体幹教室）：予約人数 N/定員 を表示 */}
-            {classServices.map((cls) => {
-              const ctx: ColCtx = { serviceId: cls.id, canClose: true };
-              return (
-              <Column
-                key={cls.id}
-                header={cls.name}
-                subHeader={`定員${cls.capacity}名`}
-                headerColor={CLASS_COLOR}
-                height={height}
-                yFor={yFor}
-                ticks={ticks}
-                offRanges={classOffRanges(cls)}
-                closureBands={closures
-                  .filter(
-                    (c) =>
-                      (c.staff_id === null && c.service_id === null) ||
-                      c.service_id === cls.id
-                  )
-                  .map((c) => ({
-                    id: c.id,
-                    start: c.start_min ?? minMin,
-                    end: c.end_min ?? maxMin,
-                    reason: c.reason,
-                  }))}
-                onClosureClick={removeClosure}
-                openingBands={classOpeningBands(cls.id)}
-                onOpeningClick={removeOpening}
-                band={bandFor(ctx)}
-                onPointerDownTrack={(e) => beginDrag(ctx, e)}
-                onPointerMoveTrack={moveDrag}
-                onPointerUpTrack={endDrag}
-                onPointerCancelTrack={cancelDrag}
-              >
-                {classGroups(cls.id).map((g, i) => (
-                  <div
-                    key={i}
-                    className="absolute left-0.5 right-0.5 z-20 rounded-[4px] px-1 py-1 shadow-sm"
-                    style={{
-                      top: yFor(g.start),
-                      minHeight: yFor(g.end) - yFor(g.start) - 2,
-                      backgroundColor: CLASS_COLOR,
-                      border: "0.5px solid rgba(255,255,255,.95)",
-                    }}
-                  >
-                    <div className="mb-0.5 text-[11px] font-bold text-white" style={{ textShadow: TEXT_SHADOW }}>
-                      {g.list.length}/{cls.capacity}
-                      {g.list.length >= cls.capacity && (
-                        <span className="ml-1 rounded bg-white/25 px-1 text-[9px] text-white">満</span>
-                      )}
-                    </div>
-                    {g.list.map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => setModal({ mode: "edit", appt: a })}
-                        className="flex w-full items-center gap-1 text-left text-[10px] font-medium text-white hover:underline"
-                        style={{ textShadow: TEXT_SHADOW }}
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          {a.patient_name || "（未登録）"}
-                        </span>
-                        {a.status === "done" &&
-                          (a.line_user_id ? (
-                            <span className="shrink-0">✅</span>
-                          ) : (
-                            <span className="shrink-0 text-[9px] opacity-80">済</span>
-                          ))}
-                      </button>
-                    ))}
-                  </div>
-                ))}
-              </Column>
-              );
-            })}
 
           </div>
         </div>
