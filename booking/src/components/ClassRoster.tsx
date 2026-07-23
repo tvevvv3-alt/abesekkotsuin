@@ -110,10 +110,16 @@ export default function ClassRoster() {
     if (sort === "name") {
       arr.sort((a, b) => a[0].localeCompare(b[0], "ja"));
     } else {
+      // 来院日順：直近の来院日が上（＝当日が最上部）／その日の時間が早い順
+      const keyOf = (visits: Row[]) => {
+        const latest = visits.reduce((m, v) => (v.date > m ? v.date : m), visits[0].date);
+        const t = Math.min(...visits.filter((v) => v.date === latest).map((v) => v.start_min));
+        return { latest, t };
+      };
       arr.sort((a, b) => {
-        const av = a[1][0];
-        const bv = b[1][0];
-        return av.date.localeCompare(bv.date) || av.start_min - bv.start_min;
+        const ka = keyOf(a[1]);
+        const kb = keyOf(b[1]);
+        return kb.latest.localeCompare(ka.latest) || ka.t - kb.t;
       });
     }
     return arr;
