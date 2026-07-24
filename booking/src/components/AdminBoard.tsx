@@ -571,7 +571,7 @@ export default function AdminBoard({ date }: { date: string }) {
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-white">
+        <div className="overflow-x-auto overscroll-x-contain rounded-xl border bg-white">
           <div className="flex w-full min-w-[420px]">
             {/* 時間ラベル列 */}
             <div className="w-12 shrink-0 border-r bg-slate-50">

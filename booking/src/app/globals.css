@@ -11,6 +11,8 @@ body {
   background: var(--bg);
   color: #0f172a;
   -webkit-tap-highlight-color: transparent;
+  /* ページ全体のバウンド(ラバーバンド)を止める */
+  overscroll-behavior: none;
 }
 
 /* スマホ優先。数字は等幅で崩れにくく */
