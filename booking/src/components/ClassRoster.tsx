@@ -31,6 +31,9 @@ export default function ClassRoster() {
   });
   const [rows, setRows] = useState<Row[]>([]);
   const [members, setMembers] = useState<Record<string, Member>>({});
+  const [purchases, setPurchases] = useState<
+    Record<string, { purchased: boolean; purchase_date: string | null }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -40,6 +43,10 @@ export default function ClassRoster() {
   const from = useMemo(() => toDateStr(month), [month]);
   const to = useMemo(
     () => toDateStr(new Date(month.getFullYear(), month.getMonth() + 1, 1)),
+    [month]
+  );
+  const ym = useMemo(
+    () => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`,
     [month]
   );
   const isThisMonth = useMemo(() => {
@@ -63,7 +70,7 @@ export default function ClassRoster() {
   const reload = useCallback(async () => {
     if (!classId) return;
     setLoading(true);
-    const [{ data: ap }, { data: mem }] = await Promise.all([
+    const [{ data: ap }, { data: mem }, { data: pur }] = await Promise.all([
       supabase
         .from("appointments")
         .select("id, date, start_min, patient_name, status, line_user_id")
@@ -74,13 +81,20 @@ export default function ClassRoster() {
         .order("date")
         .order("start_min"),
       supabase.from("class_members").select("name, pass_type, quota"),
+      supabase.from("class_purchases").select("name, purchased, purchase_date").eq("ym", ym),
     ]);
     setRows((ap as Row[]) ?? []);
     const map: Record<string, Member> = {};
     (mem ?? []).forEach((m: Member) => (map[m.name] = m));
     setMembers(map);
+    const pmap: Record<string, { purchased: boolean; purchase_date: string | null }> = {};
+    (pur ?? []).forEach(
+      (p: { name: string; purchased: boolean; purchase_date: string | null }) =>
+        (pmap[p.name] = { purchased: p.purchased, purchase_date: p.purchase_date })
+    );
+    setPurchases(pmap);
     setLoading(false);
-  }, [supabase, classId, from, to]);
+  }, [supabase, classId, from, to, ym]);
 
   useEffect(() => {
     reload();
@@ -130,6 +144,32 @@ export default function ClassRoster() {
       .from("class_members")
       .upsert({ name, pass_type, quota: 4 }, { onConflict: "name" });
     setMembers((m) => ({ ...m, [name]: { name, pass_type, quota: 4 } }));
+  }
+
+  function purchaseOf(name: string) {
+    return purchases[name] ?? { purchased: false, purchase_date: null };
+  }
+  async function savePurchase(
+    name: string,
+    next: { purchased: boolean; purchase_date: string | null }
+  ) {
+    setPurchases((p) => ({ ...p, [name]: next }));
+    await supabase
+      .from("class_purchases")
+      .upsert(
+        { name, ym, purchased: next.purchased, purchase_date: next.purchase_date },
+        { onConflict: "name,ym" }
+      );
+  }
+  function togglePurchased(name: string, checked: boolean) {
+    const cur = purchaseOf(name);
+    savePurchase(name, {
+      purchased: checked,
+      purchase_date: checked ? cur.purchase_date ?? toDateStr(new Date()) : cur.purchase_date,
+    });
+  }
+  function setPurchaseDate(name: string, date: string) {
+    savePurchase(name, { purchased: !!date, purchase_date: date || null });
   }
 
   async function finish(r: Row) {
@@ -253,7 +293,7 @@ export default function ClassRoster() {
               <table className="border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500">
-                    <th className="sticky left-0 z-10 w-[132px] min-w-[132px] max-w-[132px] border-b border-r bg-slate-50 px-2 py-1.5 text-left font-bold">
+                    <th className="sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-b border-r bg-slate-50 px-2 py-1.5 text-left font-bold">
                       会員
                     </th>
                     {Array.from({ length: maxVisits }).map((_, i) => (
@@ -272,7 +312,7 @@ export default function ClassRoster() {
                     const count = visits.length;
                     return (
                       <tr key={name} className="border-t">
-                        <td className="sticky left-0 z-10 w-[132px] min-w-[132px] max-w-[132px] border-r bg-white px-2 py-1.5 align-top">
+                        <td className="sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-r bg-white px-2 py-1.5 align-top">
                           <div className="truncate text-[13px] font-bold text-slate-800">{name}</div>
                           <div className="mt-0.5 flex items-center gap-1">
                             <select
@@ -295,6 +335,23 @@ export default function ClassRoster() {
                             >
                               {mem.pass_type === "free" ? "ﾌﾘｰ" : `残${Math.max(0, mem.quota - count)}`}
                             </span>
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                            <label className="flex shrink-0 items-center gap-0.5">
+                              <input
+                                type="checkbox"
+                                checked={purchaseOf(name).purchased}
+                                onChange={(e) => togglePurchased(name, e.target.checked)}
+                                className="h-3 w-3 accent-blue-600"
+                              />
+                              購入
+                            </label>
+                            <input
+                              type="date"
+                              value={purchaseOf(name).purchase_date ?? ""}
+                              onChange={(e) => setPurchaseDate(name, e.target.value)}
+                              className="min-w-0 flex-1 rounded border border-slate-300 px-0.5 py-0 text-[9px]"
+                            />
                           </div>
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
