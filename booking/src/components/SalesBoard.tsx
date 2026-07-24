@@ -27,11 +27,13 @@ interface Sale {
   burden: number; // 負担額（窓口負担）
   anchor_appointment_id?: string | null; // 物販をこの予約(購入者)の下に置く
   sort_order?: number | null; // 手動並び替え用
+  payment: "cash" | "cashless"; // 窓口徴収の支払方法
 }
 const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
   selfpay: 0,
   insurance: 0,
   burden: 0,
+  payment: "cash",
 });
 
 // レセコン取込の確認行（写真の1行＝patient1件ぶん）
@@ -124,7 +126,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, sort_order")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, sort_order, payment")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -213,8 +215,8 @@ export default function SalesBoard() {
   async function addManual(anchor?: string) {
     const { data } = await supabase
       .from("sales")
-      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, anchor_appointment_id: anchor ?? null })
-      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id")
+      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, payment: "cash", anchor_appointment_id: anchor ?? null })
+      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, payment")
       .single();
     if (data) setSales((prev) => [...prev, data as Sale]);
   }
@@ -232,6 +234,28 @@ export default function SalesBoard() {
   async function deleteManual(id: string) {
     setSales((prev) => prev.filter((s) => s.id !== id));
     await supabase.from("sales").delete().eq("id", id);
+  }
+  // 支払方法（現金⇄キャッシュレス）切替。予約行は無ければ会計を作成して保存。
+  async function toggleApptPayment(a: Appt) {
+    const cur = salesRef.current.find((x) => x.appointment_id === a.id) ?? apptVal(a);
+    const next: "cash" | "cashless" = cur.payment === "cashless" ? "cash" : "cashless";
+    setSales((prev) => {
+      const idx = prev.findIndex((s) => s.appointment_id === a.id);
+      if (idx >= 0) { const n = [...prev]; n[idx] = { ...n[idx], payment: next }; return n; }
+      return [...prev, { ...apptVal(a), id: "tmp-" + a.id, payment: next }];
+    });
+    await supabase.from("sales").upsert(
+      {
+        appointment_id: a.id, date: a.date, staff_id: cur.staff_id ?? defStaffId(a), patient_name: a.patient_name,
+        selfpay: cur.selfpay, insurance: cur.insurance, burden: cur.burden, payment: next,
+      },
+      { onConflict: "appointment_id" }
+    );
+  }
+  async function toggleManualPayment(m: Sale) {
+    const next: "cash" | "cashless" = m.payment === "cashless" ? "cash" : "cashless";
+    setManualLocal(m.id, { payment: next });
+    await supabase.from("sales").update({ payment: next }).eq("id", m.id);
   }
   async function saveTarget(staffId: string, man: number) {
     const yenv = Math.max(0, Math.round(man * 10000));
@@ -478,14 +502,18 @@ export default function SalesBoard() {
 
   // 当日の合計
   const daySum = useMemo(() => {
-    let sp = 0, ins = 0, bur = 0, cnt = 0;
+    let sp = 0, ins = 0, bur = 0, cnt = 0, cash = 0, cashless = 0;
+    const addPay = (s: Sale) => {
+      const p = s.selfpay + s.burden; // 窓口徴収
+      if (s.payment === "cashless") cashless += p; else cash += p;
+    };
     dayRows.forEach((a) => {
       const s = saleByAppt[a.id];
-      if (s) { sp += s.selfpay; ins += s.insurance; bur += s.burden; }
+      if (s) { sp += s.selfpay; ins += s.insurance; bur += s.burden; addPay(s); }
       cnt++;
     });
-    dayManual.forEach((s) => { sp += s.selfpay; ins += s.insurance; bur += s.burden; cnt++; });
-    return { sp, ins, bur, cnt, paid: sp + bur, gou: sp + ins };
+    dayManual.forEach((s) => { sp += s.selfpay; ins += s.insurance; bur += s.burden; addPay(s); cnt++; });
+    return { sp, ins, bur, cnt, cash, cashless, paid: sp + bur, gou: sp + ins };
   }, [dayRows, dayManual, saleByAppt]);
 
   // 保険外の担当バケット（1=阿部/2=澁谷/3=萩原・林/4=物販・その他）
@@ -494,13 +522,13 @@ export default function SalesBoard() {
     return { abe: find("阿部"), shibu: find("澁谷", "渋谷"), hagi: find("萩原"), haya: find("林") };
   }, [staff]);
 
-  type DayAgg = { cnt: number; shin: number; ins: number; bur: number; ho1: number; ho2: number; ho3: number; ho4: number; kawa: number };
-  // 日計表（月）：レセコン（茨木本院）と同じ並び＋川西整体院は独立列
+  type DayAgg = { cnt: number; shin: number; ins: number; bur: number; ho1: number; ho2: number; ho3: number; ho4: number; kawa: number; cash: number; cashless: number };
+  // 日計表（月）：レセコン（茨木本院）と同じ並び＋川西整体院は独立列＋現金/キャッシュレス
   const monthDaily = useMemo(() => {
     const map = new Map<string, DayAgg>();
     const get = (dt: string) => {
       let e = map.get(dt);
-      if (!e) { e = { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0, kawa: 0 }; map.set(dt, e); }
+      if (!e) { e = { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0, kawa: 0, cash: 0, cashless: 0 }; map.set(dt, e); }
       return e;
     };
     // 件数・新患（予約ベース／新患は当月内で初めて出た氏名を目安に。川西は本院レセコンから除外）
@@ -517,6 +545,9 @@ export default function SalesBoard() {
     // 金額（salesベース）：川西は独立集計、それ以外は合計額・負担額＋保険外1〜4に振り分け
     sales.forEach((s) => {
       const e = get(s.date);
+      // 窓口徴収(=保険外+負担額)の現金/キャッシュレス仕訳（全会計対象）
+      const pay = s.selfpay + s.burden;
+      if (s.payment === "cashless") e.cashless += pay; else e.cash += pay;
       if (kawa && s.staff_id === kawa.id) { e.kawa += s.selfpay + s.insurance; return; }
       e.ins += s.insurance;
       e.bur += s.burden;
@@ -533,8 +564,9 @@ export default function SalesBoard() {
         (acc, [, e]) => ({
           cnt: acc.cnt + e.cnt, shin: acc.shin + e.shin, ins: acc.ins + e.ins, bur: acc.bur + e.bur,
           ho1: acc.ho1 + e.ho1, ho2: acc.ho2 + e.ho2, ho3: acc.ho3 + e.ho3, ho4: acc.ho4 + e.ho4, kawa: acc.kawa + e.kawa,
+          cash: acc.cash + e.cash, cashless: acc.cashless + e.cashless,
         }),
-        { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0, kawa: 0 }
+        { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0, kawa: 0, cash: 0, cashless: 0 }
       ),
     [monthDaily]
   );
@@ -542,6 +574,13 @@ export default function SalesBoard() {
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
   const amt = "w-[68px] rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
+  const payBtn = (payment: "cash" | "cashless", onClick: () => void) => (
+    <button onClick={onClick}
+      className={`whitespace-nowrap rounded-md border px-1.5 py-1 text-[10px] font-bold ${payment === "cashless" ? "border-indigo-300 bg-indigo-50 text-indigo-600" : "border-slate-300 bg-slate-50 text-slate-500"}`}
+      title="現金／キャッシュレス切替">
+      {payment === "cashless" ? "💳レス" : "💴現金"}
+    </button>
+  );
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -657,6 +696,8 @@ export default function SalesBoard() {
                 <th className="px-2 py-2 text-right font-bold">保険外3<span className="font-normal">(萩原林)</span></th>
                 <th className="px-2 py-2 text-right font-bold">保険外4<span className="font-normal">(物販)</span></th>
                 {kawa && <th className="border-l-2 border-indigo-200 px-2 py-2 text-right font-bold text-indigo-700">川西<span className="font-normal">(整体)</span></th>}
+                <th className="border-l-2 border-emerald-200 px-2 py-2 text-right font-bold text-emerald-700">キャッシュレス</th>
+                <th className="px-2 py-2 text-right font-bold text-emerald-700">現金売上</th>
               </tr>
             </thead>
             <tbody className="divide-y tabnum">
@@ -675,6 +716,8 @@ export default function SalesBoard() {
                     <td className="px-2 py-1.5 text-right">{e.ho3.toLocaleString()}</td>
                     <td className="px-2 py-1.5 text-right">{e.ho4.toLocaleString()}</td>
                     {kawa && <td className="border-l-2 border-indigo-100 px-2 py-1.5 text-right font-medium text-indigo-700">{e.kawa.toLocaleString()}</td>}
+                    <td className="border-l-2 border-emerald-100 px-2 py-1.5 text-right text-emerald-700">{e.cashless.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right text-emerald-700">{e.cash.toLocaleString()}</td>
                   </tr>
                 );
               })}
@@ -692,6 +735,8 @@ export default function SalesBoard() {
                 <td className="px-2 py-2 text-right">{monthSum.ho3.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right">{monthSum.ho4.toLocaleString()}</td>
                 {kawa && <td className="border-l-2 border-indigo-200 px-2 py-2 text-right text-indigo-700">{monthSum.kawa.toLocaleString()}</td>}
+                <td className="border-l-2 border-emerald-200 px-2 py-2 text-right text-emerald-700">{monthSum.cashless.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right text-emerald-700">{monthSum.cash.toLocaleString()}</td>
               </tr>
             </tfoot>
           </table>
@@ -735,6 +780,7 @@ export default function SalesBoard() {
                   <th className="px-1 py-2 text-right font-bold">負担額</th>
                   <th className="px-1 py-2 text-right font-bold">入金額</th>
                   <th className="px-2 py-2 text-right font-bold">合計</th>
+                  <th className="px-1 py-2 text-center font-bold">支払</th>
                   <th className="px-1 py-2"></th>
                 </tr>
               </thead>
@@ -772,6 +818,7 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
+                          <td className="px-1 py-1 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
                           <td className="px-1 py-1 text-center">{grip(a.id)}</td>
                         </tr>
                       );
@@ -804,6 +851,7 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
+                          <td className="px-1 py-1 text-center">{payBtn(m.payment, () => toggleManualPayment(m))}</td>
                           <td className="whitespace-nowrap px-1 py-1 text-center">
                             {grip(m.id)}
                             <button onClick={() => deleteManual(m.id)} className="ml-1 text-[11px] font-bold text-red-400">削除</button>
@@ -814,7 +862,7 @@ export default function SalesBoard() {
                   )
                 )}
                 {dayItems.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-400">この日の予約はありません（物販/予約外は右上の＋から）。</td></tr>
+                  <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-slate-400">この日の予約はありません（物販/予約外は右上の＋から）。</td></tr>
                 )}
               </tbody>
               <tfoot>
@@ -826,9 +874,16 @@ export default function SalesBoard() {
                   <td className="px-1 py-2 text-right">{daySum.paid.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right">{daySum.gou.toLocaleString()}</td>
                   <td></td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
+          </div>
+          {/* 当日の入金内訳（窓口額計＝現金＋キャッシュレス） */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-white px-4 py-2 text-sm">
+            <span className="font-bold text-slate-700">窓口額計 <span className="tabnum text-slate-800">{yen(daySum.paid)}</span></span>
+            <span className="text-slate-500">💴 現金 <b className="tabnum text-slate-800">{yen(daySum.cash)}</b></span>
+            <span className="text-indigo-600">💳 キャッシュレス <b className="tabnum">{yen(daySum.cashless)}</b></span>
           </div>
         </div>
       )}
