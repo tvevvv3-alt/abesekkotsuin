@@ -293,17 +293,24 @@ export default function SalesBoard() {
       ⠿
     </span>
   );
+  // 担当スタッフのカラーで薄く色付け（#rrggbb に約9%のアルファを付与）
+  const tintFor = (staffId: string | null): string | undefined => {
+    const c = staff.find((s) => s.id === staffId)?.color;
+    return c && /^#[0-9a-f]{6}$/i.test(c) ? c + "18" : undefined;
+  };
   // ドラッグ中の行は「浮き上がって」指に追従、落とし先には青いライン
-  const rowStyle = (id: string): React.CSSProperties =>
-    dragId === id
-      ? {
-          transform: `translateY(${dragDy}px)`,
-          position: "relative",
-          zIndex: 30,
-          background: "#fff",
-          boxShadow: "0 12px 28px rgba(0,0,0,.20), inset 0 0 0 2px #60a5fa",
-        }
-      : {};
+  const rowStyle = (id: string, staffId: string | null): React.CSSProperties => {
+    if (dragId === id)
+      return {
+        transform: `translateY(${dragDy}px)`,
+        position: "relative",
+        zIndex: 30,
+        background: "#fff",
+        boxShadow: "0 12px 28px rgba(0,0,0,.20), inset 0 0 0 2px #60a5fa",
+      };
+    const t = tintFor(staffId);
+    return t ? { background: t } : {};
+  };
   const rowClass = (id: string, base = "") =>
     `${base} ${dragId ? "transition-none" : ""} ${
       dragId && dragId !== id && drop?.id === id
@@ -547,7 +554,7 @@ export default function SalesBoard() {
                       const s = apptVal(a);
                       return (
                         <tr key={a.id} ref={(el) => { rowRefs.current[a.id] = el; }}
-                          className={rowClass(a.id)} style={rowStyle(a.id)}>
+                          className={rowClass(a.id)} style={rowStyle(a.id, s.staff_id)}>
                           <td className="px-1 py-1">
                             <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
@@ -582,7 +589,7 @@ export default function SalesBoard() {
                       const m = it.m;
                       return (
                         <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
-                          className={rowClass(m.id, "bg-amber-50/40")} style={rowStyle(m.id)}>
+                          className={rowClass(m.id, "bg-amber-50/40")} style={rowStyle(m.id, m.staff_id)}>
                           <td className="px-1 py-1">
                             <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
