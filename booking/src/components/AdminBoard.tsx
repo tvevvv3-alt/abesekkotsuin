@@ -571,11 +571,14 @@ export default function AdminBoard({ date }: { date: string }) {
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-white">
+        <div
+          className="overflow-auto rounded-xl border bg-white"
+          style={{ maxHeight: "calc(100dvh - 150px)" }}
+        >
           <div className="flex w-full min-w-[420px]">
             {/* 時間ラベル列 */}
-            <div className="w-12 shrink-0 border-r bg-slate-50">
-              <div className="h-8 border-b" />
+            <div className="sticky left-0 z-20 w-12 shrink-0 border-r bg-slate-50">
+              <div className="sticky top-0 z-30 h-8 border-b bg-slate-50" />
               <div className="relative" style={{ height }}>
                 {ticks.map((t) => (
                   <div
@@ -975,7 +978,7 @@ function Column({
   return (
     <div className="min-w-[72px] flex-1 border-r last:border-r-0">
       <div
-        className="flex h-8 flex-col items-center justify-center border-b text-xs font-bold text-white"
+        className="sticky top-0 z-10 flex h-8 flex-col items-center justify-center border-b text-xs font-bold text-white"
         style={{ backgroundColor: headerColor }}
       >
         <span>{header}</span>
