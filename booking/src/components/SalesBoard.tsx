@@ -608,7 +608,7 @@ export default function SalesBoard() {
                       const m = it.m;
                       return (
                         <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
-                          className={rowClass(m.id, "bg-amber-50/40")} style={rowStyle(m.id, m.staff_id)}>
+                          className={rowClass(m.id)} style={rowStyle(m.id, m.staff_id)}>
                           <td className="px-1 py-1">
                             <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
