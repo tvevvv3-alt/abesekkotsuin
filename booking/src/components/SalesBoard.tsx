@@ -355,18 +355,19 @@ export default function SalesBoard() {
     return { abe: find("阿部"), shibu: find("澁谷", "渋谷"), hagi: find("萩原"), haya: find("林") };
   }, [staff]);
 
-  type DayAgg = { cnt: number; shin: number; ins: number; bur: number; ho1: number; ho2: number; ho3: number; ho4: number };
-  // 日計表（月）：レセコンと同じ並び（件数・新患・合計額・負担額・入金額・保険外1〜4）
+  type DayAgg = { cnt: number; shin: number; ins: number; bur: number; ho1: number; ho2: number; ho3: number; ho4: number; kawa: number };
+  // 日計表（月）：レセコン（茨木本院）と同じ並び＋川西整体院は独立列
   const monthDaily = useMemo(() => {
     const map = new Map<string, DayAgg>();
     const get = (dt: string) => {
       let e = map.get(dt);
-      if (!e) { e = { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0 }; map.set(dt, e); }
+      if (!e) { e = { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0, kawa: 0 }; map.set(dt, e); }
       return e;
     };
-    // 件数・新患（予約ベース／新患は当月内で初めて出た氏名を目安に）
+    // 件数・新患（予約ベース／新患は当月内で初めて出た氏名を目安に。川西は本院レセコンから除外）
     const seen = new Set<string>();
     [...appts]
+      .filter((a) => !(kawa && a.service_id === kawa.id))
       .sort((a, b) => a.date.localeCompare(b.date) || a.start_min - b.start_min)
       .forEach((a) => {
         const e = get(a.date);
@@ -374,9 +375,10 @@ export default function SalesBoard() {
         const nm = (a.patient_name || "").trim();
         if (nm && !seen.has(nm)) { seen.add(nm); e.shin++; }
       });
-    // 金額（salesベース）：合計額=保険総額 / 負担額 / 保険外は担当で1〜4に振り分け
+    // 金額（salesベース）：川西は独立集計、それ以外は合計額・負担額＋保険外1〜4に振り分け
     sales.forEach((s) => {
       const e = get(s.date);
+      if (kawa && s.staff_id === kawa.id) { e.kawa += s.selfpay + s.insurance; return; }
       e.ins += s.insurance;
       e.bur += s.burden;
       if (s.staff_id && s.staff_id === bucket.abe) e.ho1 += s.selfpay;
@@ -385,15 +387,15 @@ export default function SalesBoard() {
       else e.ho4 += s.selfpay;
     });
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [appts, sales, bucket]);
+  }, [appts, sales, bucket, kawa]);
   const monthSum = useMemo(
     () =>
       monthDaily.reduce(
         (acc, [, e]) => ({
           cnt: acc.cnt + e.cnt, shin: acc.shin + e.shin, ins: acc.ins + e.ins, bur: acc.bur + e.bur,
-          ho1: acc.ho1 + e.ho1, ho2: acc.ho2 + e.ho2, ho3: acc.ho3 + e.ho3, ho4: acc.ho4 + e.ho4,
+          ho1: acc.ho1 + e.ho1, ho2: acc.ho2 + e.ho2, ho3: acc.ho3 + e.ho3, ho4: acc.ho4 + e.ho4, kawa: acc.kawa + e.kawa,
         }),
-        { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0 }
+        { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0, kawa: 0 }
       ),
     [monthDaily]
   );
@@ -428,8 +430,8 @@ export default function SalesBoard() {
         <div className="mb-2 flex flex-wrap items-baseline gap-x-3 text-sm">
           <span className="font-bold text-slate-700">{monthLabel} 当月</span>
           <span className="text-slate-500">保険 <b className="tabnum text-slate-700">{yen(monthSum.ins)}</b></span>
-          <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSp)}</b></span>
-          <span className="ml-auto font-bold text-slate-800">総売上 {yen(monthSp + monthSum.ins)}</span>
+          <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSp + monthSum.kawa)}</b></span>
+          <span className="ml-auto font-bold text-slate-800">総売上 {yen(monthSp + monthSum.kawa + monthSum.ins)}</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {assignees.map((s) => {
@@ -491,6 +493,7 @@ export default function SalesBoard() {
                 <th className="px-2 py-2 text-right font-bold">保険外2<span className="font-normal">(澁谷)</span></th>
                 <th className="px-2 py-2 text-right font-bold">保険外3<span className="font-normal">(萩原林)</span></th>
                 <th className="px-2 py-2 text-right font-bold">保険外4<span className="font-normal">(物販)</span></th>
+                {kawa && <th className="border-l-2 border-indigo-200 px-2 py-2 text-right font-bold text-indigo-700">川西<span className="font-normal">(整体)</span></th>}
               </tr>
             </thead>
             <tbody className="divide-y tabnum">
@@ -508,6 +511,7 @@ export default function SalesBoard() {
                     <td className="px-2 py-1.5 text-right">{e.ho2.toLocaleString()}</td>
                     <td className="px-2 py-1.5 text-right">{e.ho3.toLocaleString()}</td>
                     <td className="px-2 py-1.5 text-right">{e.ho4.toLocaleString()}</td>
+                    {kawa && <td className="border-l-2 border-indigo-100 px-2 py-1.5 text-right font-medium text-indigo-700">{e.kawa.toLocaleString()}</td>}
                   </tr>
                 );
               })}
@@ -524,6 +528,7 @@ export default function SalesBoard() {
                 <td className="px-2 py-2 text-right">{monthSum.ho2.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right">{monthSum.ho3.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right">{monthSum.ho4.toLocaleString()}</td>
+                {kawa && <td className="border-l-2 border-indigo-200 px-2 py-2 text-right text-indigo-700">{monthSum.kawa.toLocaleString()}</td>}
               </tr>
             </tfoot>
           </table>
