@@ -253,15 +253,13 @@ export default function ClassRoster() {
               <table className="border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500">
-                    <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-2 text-left font-bold">
-                      名前
+                    <th className="sticky left-0 z-10 w-[132px] min-w-[132px] max-w-[132px] border-b border-r bg-slate-50 px-2 py-1.5 text-left font-bold">
+                      会員
                     </th>
-                    <th className="border-b px-2 py-2 font-bold">種類</th>
-                    <th className="whitespace-nowrap border-b px-2 py-2 font-bold">今月</th>
                     {Array.from({ length: maxVisits }).map((_, i) => (
                       <th
                         key={i}
-                        className="whitespace-nowrap border-b border-l px-2 py-2 text-center font-bold"
+                        className="whitespace-nowrap border-b border-l px-2 py-1.5 text-center font-bold"
                       >
                         {i + 1}回目
                       </th>
@@ -272,42 +270,32 @@ export default function ClassRoster() {
                   {shown.map(([name, visits]) => {
                     const mem = passOf(name);
                     const count = visits.length;
-                    const hasLine = visits.some((v) => v.line_user_id);
                     return (
                       <tr key={name} className="border-t">
-                        <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-800">{name}</span>
-                            {hasLine && (
-                              <span className="rounded bg-green-100 px-1 text-[9px] font-bold text-green-700">
-                                LINE
-                              </span>
-                            )}
+                        <td className="sticky left-0 z-10 w-[132px] min-w-[132px] max-w-[132px] border-r bg-white px-2 py-1.5 align-top">
+                          <div className="truncate text-[13px] font-bold text-slate-800">{name}</div>
+                          <div className="mt-0.5 flex items-center gap-1">
+                            <select
+                              value={mem.pass_type}
+                              onChange={(e) => setPass(name, e.target.value as PassType)}
+                              className="rounded border border-slate-300 px-0.5 py-0 text-[10px]"
+                            >
+                              <option value="month4">月4</option>
+                              <option value="free">ﾌﾘｰ</option>
+                            </select>
+                            <span className="text-[11px] font-bold text-slate-700">{count}</span>
+                            <span
+                              className={`text-[10px] font-bold ${
+                                mem.pass_type === "free"
+                                  ? "text-violet-600"
+                                  : mem.quota - count <= 0
+                                  ? "text-red-500"
+                                  : "text-blue-600"
+                              }`}
+                            >
+                              {mem.pass_type === "free" ? "ﾌﾘｰ" : `残${Math.max(0, mem.quota - count)}`}
+                            </span>
                           </div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <select
-                            value={mem.pass_type}
-                            onChange={(e) => setPass(name, e.target.value as PassType)}
-                            className="rounded border border-slate-300 px-1 py-0.5 text-[11px]"
-                          >
-                            <option value="month4">月4回</option>
-                            <option value="free">フリー</option>
-                          </select>
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-2 text-center">
-                          <span className="font-bold text-slate-700">{count}</span>
-                          <span
-                            className={`ml-1 ${
-                              mem.pass_type === "free"
-                                ? "text-violet-600"
-                                : mem.quota - count <= 0
-                                ? "text-red-500"
-                                : "text-blue-600"
-                            }`}
-                          >
-                            {mem.pass_type === "free" ? "フリー" : `/残${Math.max(0, mem.quota - count)}`}
-                          </span>
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
                           const v = visits[i];
