@@ -556,7 +556,7 @@ export default function CalendarView({
                 style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
                 <span
-                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-medium text-white`}
+                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-normal text-white`}
                   style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                 >
                   {it.note.text}
@@ -602,7 +602,7 @@ export default function CalendarView({
                     }}
                   >
                     <span
-                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-medium text-white`}
+                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-normal text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
                       {a.patient_name || "（未登録）"}

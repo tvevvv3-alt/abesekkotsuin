@@ -202,7 +202,7 @@ export default function ClassRoster() {
     "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
 
   return (
-    <div>
+    <div className="mx-auto max-w-4xl">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-bold text-slate-800">体幹教室 回数管理</h1>
         {classes.length > 1 && (
