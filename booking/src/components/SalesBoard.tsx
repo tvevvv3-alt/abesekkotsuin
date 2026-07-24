@@ -184,6 +184,12 @@ export default function SalesBoard() {
       sales.reduce((sum, s) => (s.staff_id === staffId ? sum + total(s) : sum), 0),
     [sales]
   );
+  // 担当ごとの自費（保険外）月計
+  const spByStaff = useCallback(
+    (staffId: string | null) =>
+      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + s.selfpay : sum), 0),
+    [sales]
+  );
 
   const yen = (n: number) => "¥" + n.toLocaleString();
   const d = new Date(date + "T00:00:00");
@@ -393,6 +399,21 @@ export default function SalesBoard() {
               </tr>
             </tfoot>
           </table>
+          {/* 保険外3（萩原・林）の内訳（月計） */}
+          {(bucket.hagi || bucket.haya) && (() => {
+            const hg = spByStaff(bucket.hagi);
+            const hy = spByStaff(bucket.haya);
+            const hgName = staff.find((s) => s.id === bucket.hagi)?.name ?? "萩原";
+            const hyName = staff.find((s) => s.id === bucket.haya)?.name ?? "林";
+            return (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t bg-slate-50 px-3 py-2 text-sm">
+                <span className="font-bold text-slate-600">保険外3 内訳（月計）</span>
+                <span className="text-slate-500">{hgName} <b className="tabnum text-slate-800">{yen(hg)}</b></span>
+                <span className="text-slate-500">{hyName} <b className="tabnum text-slate-800">{yen(hy)}</b></span>
+                <span className="ml-auto font-bold text-slate-700">計 <span className="tabnum">{yen(hg + hy)}</span></span>
+              </div>
+            );
+          })()}
         </div>
       ) : (
         /* ===== 日別入力 ===== */
