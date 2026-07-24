@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { loadAllStaff } from "@/lib/data";
+import { loadAllStaff, loadServices } from "@/lib/data";
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import type { Staff } from "@/lib/types";
+
+const KAWANISHI_COLOR = "#3F51B5"; // 川西整体院のカラー（ボード/カレンダーに合わせる）
 
 interface Appt {
   id: string;
   date: string;
   start_min: number;
   staff_id: string | null;
+  service_id: string | null;
   patient_name: string | null;
 }
 interface Sale {
@@ -36,6 +39,7 @@ export default function SalesBoard() {
   const [view, setView] = useState<"day" | "month">("day");
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [kawa, setKawa] = useState<{ id: string; name: string; color: string } | null>(null);
   const [appts, setAppts] = useState<Appt[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const salesRef = useRef(sales);
@@ -56,12 +60,14 @@ export default function SalesBoard() {
 
   useEffect(() => {
     (async () => {
-      const st = await loadAllStaff(supabase);
+      const [st, sv] = await Promise.all([loadAllStaff(supabase), loadServices(supabase)]);
       const vis = st.filter((s) => s.admin_visible && s.status !== "retired");
       setStaff(vis);
       const t: Record<string, number> = {};
       vis.forEach((s) => (t[s.id] = (s as unknown as { sales_target?: number }).sales_target ?? 0));
       setTargets(t);
+      const kw = sv.find((s) => s.category === "川西整体院");
+      if (kw) setKawa({ id: kw.id, name: kw.name, color: KAWANISHI_COLOR });
     })();
   }, [supabase]);
 
@@ -70,7 +76,7 @@ export default function SalesBoard() {
     const [{ data: ap }, { data: sl }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, date, start_min, staff_id, patient_name")
+        .select("id, date, start_min, staff_id, service_id, patient_name")
         .neq("status", "cancelled")
         .gte("date", monthStart)
         .lt("date", monthEnd)
@@ -100,6 +106,17 @@ export default function SalesBoard() {
   }, [sales]);
   const manualSales = useMemo(() => sales.filter((s) => !s.appointment_id), [sales]);
 
+  // 担当の選択肢（実スタッフ＋川西整体院）。realはスタッフ表に目標を持てる人。
+  const assignees = useMemo(() => {
+    const base = staff.map((s) => ({ id: s.id, name: s.name, color: s.color || "#64748b", real: true }));
+    return kawa ? [...base, { id: kawa.id, name: kawa.name, color: kawa.color, real: false }] : base;
+  }, [staff, kawa]);
+  // 川西の予約は担当を「川西整体院」に自動割当
+  const defStaffId = useCallback(
+    (a: Appt) => (kawa && a.service_id === kawa.id ? kawa.id : a.staff_id),
+    [kawa]
+  );
+
   // --- 予約行の編集（担当・自費・合計額・負担額） ---
   function apptVal(a: Appt): Sale {
     return (
@@ -107,7 +124,7 @@ export default function SalesBoard() {
         id: "tmp-" + a.id,
         appointment_id: a.id,
         date: a.date,
-        staff_id: a.staff_id,
+        staff_id: defStaffId(a),
         patient_name: a.patient_name,
         ...zeroSale(),
       }
@@ -127,7 +144,7 @@ export default function SalesBoard() {
           id: "tmp-" + a.id,
           appointment_id: a.id,
           date: a.date,
-          staff_id: a.staff_id,
+          staff_id: defStaffId(a),
           patient_name: a.patient_name,
           ...zeroSale(),
           [field]: val,
@@ -141,7 +158,7 @@ export default function SalesBoard() {
       {
         appointment_id: a.id,
         date: a.date,
-        staff_id: s.staff_id ?? a.staff_id,
+        staff_id: s.staff_id ?? defStaffId(a),
         patient_name: a.patient_name,
         selfpay: s.selfpay,
         insurance: s.insurance,
@@ -226,7 +243,7 @@ export default function SalesBoard() {
       const cur = salesRef.current.find((s) => s.appointment_id === a.id);
       await supabase.from("sales").upsert(
         {
-          appointment_id: a.id, date: a.date, staff_id: cur?.staff_id ?? a.staff_id, patient_name: a.patient_name,
+          appointment_id: a.id, date: a.date, staff_id: cur?.staff_id ?? defStaffId(a), patient_name: a.patient_name,
           selfpay: cur?.selfpay ?? 0, insurance: cur?.insurance ?? 0, burden: cur?.burden ?? 0, sort_order: ord,
         },
         { onConflict: "appointment_id" }
@@ -295,7 +312,7 @@ export default function SalesBoard() {
   );
   // 担当スタッフのカラーで薄く色付け（#rrggbb に約9%のアルファを付与）
   const tintFor = (staffId: string | null): string | undefined => {
-    const c = staff.find((s) => s.id === staffId)?.color;
+    const c = assignees.find((s) => s.id === staffId)?.color;
     return c && /^#[0-9a-f]{6}$/i.test(c) ? c + "18" : undefined;
   };
   // ドラッグ中の行は「浮き上がって」指に追従、落とし先には青いライン
@@ -415,21 +432,23 @@ export default function SalesBoard() {
           <span className="ml-auto font-bold text-slate-800">総売上 {yen(monthSp + monthSum.ins)}</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          {staff.map((s) => {
+          {assignees.map((s) => {
             const tot = staffTotal(s.id);
             const target = targets[s.id] ?? 0;
             const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
             return (
               <div key={s.id} className="rounded-lg border p-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color || "#64748b" }} />
+                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
                   <span className="text-sm font-bold text-slate-800">{s.name}</span>
-                  <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
-                    目標
-                    <input type="number" min={0} value={target ? target / 10000 : ""} placeholder="0"
-                      onChange={(e) => saveTarget(s.id, parseFloat(e.target.value || "0"))}
-                      className="w-14 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]" />万
-                  </span>
+                  {s.real && (
+                    <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
+                      目標
+                      <input type="number" min={0} value={target ? target / 10000 : ""} placeholder="0"
+                        onChange={(e) => saveTarget(s.id, parseFloat(e.target.value || "0"))}
+                        className="w-14 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]" />万
+                    </span>
+                  )}
                 </div>
                 <div className="mt-1 flex items-baseline gap-2">
                   <span className="text-base font-bold tabnum text-slate-800">{yen(tot)}</span>
@@ -437,7 +456,7 @@ export default function SalesBoard() {
                 </div>
                 {target > 0 && (
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: s.color || "#3b82f6" }} />
+                    <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: s.color }} />
                   </div>
                 )}
               </div>
@@ -559,7 +578,7 @@ export default function SalesBoard() {
                             <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
                               <option value="">-</option>
-                              {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                              {assignees.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
                             </select>
                           </td>
                           <td className="whitespace-nowrap px-2 py-1">
@@ -594,7 +613,7 @@ export default function SalesBoard() {
                             <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
                               <option value="">物販</option>
-                              {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                              {assignees.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
                             </select>
                           </td>
                           <td className="px-2 py-1">
