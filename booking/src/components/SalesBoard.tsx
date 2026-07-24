@@ -22,6 +22,7 @@ interface Sale {
   selfpay: number; // 保険外（自費）
   insurance: number; // 合計額（保険総額）
   burden: number; // 負担額（窓口負担）
+  anchor_appointment_id?: string | null; // 物販をこの予約(購入者)の下に置く
 }
 const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
   selfpay: 0,
@@ -71,7 +72,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -146,11 +147,11 @@ export default function SalesBoard() {
   }
 
   // --- 手動行（物販・予約外） ---
-  async function addManual() {
+  async function addManual(anchor?: string) {
     const { data } = await supabase
       .from("sales")
-      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0 })
-      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden")
+      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, anchor_appointment_id: anchor ?? null })
+      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id")
       .single();
     if (data) setSales((prev) => [...prev, data as Sale]);
   }
@@ -194,6 +195,16 @@ export default function SalesBoard() {
     return aps;
   }, [appts, date]);
   const dayManual = useMemo(() => manualSales.filter((s) => s.date === date), [manualSales, date]);
+  // 予約行の直後に、その購入者(anchor)に紐づく物販行を差し込んだ並び
+  const dayItems = useMemo(() => {
+    const items: ({ kind: "appt"; a: Appt } | { kind: "manual"; m: Sale })[] = [];
+    dayRows.forEach((a) => {
+      items.push({ kind: "appt", a });
+      dayManual.filter((m) => m.anchor_appointment_id === a.id).forEach((m) => items.push({ kind: "manual", m }));
+    });
+    dayManual.filter((m) => !m.anchor_appointment_id).forEach((m) => items.push({ kind: "manual", m }));
+    return items;
+  }, [dayRows, dayManual]);
 
   // 当日の合計
   const daySum = useMemo(() => {
@@ -207,29 +218,55 @@ export default function SalesBoard() {
     return { sp, ins, bur, cnt, paid: sp + bur, gou: sp + ins };
   }, [dayRows, dayManual, saleByAppt]);
 
-  // 日計表（月）：日ごとの合計
+  // 保険外の担当バケット（1=阿部/2=澁谷/3=萩原・林/4=物販・その他）
+  const bucket = useMemo(() => {
+    const find = (...kw: string[]) => staff.find((s) => kw.some((k) => s.name.includes(k)))?.id ?? null;
+    return { abe: find("阿部"), shibu: find("澁谷", "渋谷"), hagi: find("萩原"), haya: find("林") };
+  }, [staff]);
+
+  type DayAgg = { cnt: number; shin: number; ins: number; bur: number; ho1: number; ho2: number; ho3: number; ho4: number };
+  // 日計表（月）：レセコンと同じ並び（件数・新患・合計額・負担額・入金額・保険外1〜4）
   const monthDaily = useMemo(() => {
-    const map = new Map<string, { sp: number; ins: number; bur: number; cnt: number }>();
-    const add = (dt: string, s: { selfpay: number; insurance: number; burden: number }) => {
-      const e = map.get(dt) ?? { sp: 0, ins: 0, bur: 0, cnt: 0 };
-      e.sp += s.selfpay; e.ins += s.insurance; e.bur += s.burden; e.cnt++;
-      map.set(dt, e);
+    const map = new Map<string, DayAgg>();
+    const get = (dt: string) => {
+      let e = map.get(dt);
+      if (!e) { e = { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0 }; map.set(dt, e); }
+      return e;
     };
-    // 予約（自費入力があってもなくても件数に数える）
-    appts.forEach((a) => {
-      const s = saleByAppt[a.id] ?? { selfpay: 0, insurance: 0, burden: 0 };
-      add(a.date, s);
+    // 件数・新患（予約ベース／新患は当月内で初めて出た氏名を目安に）
+    const seen = new Set<string>();
+    [...appts]
+      .sort((a, b) => a.date.localeCompare(b.date) || a.start_min - b.start_min)
+      .forEach((a) => {
+        const e = get(a.date);
+        e.cnt++;
+        const nm = (a.patient_name || "").trim();
+        if (nm && !seen.has(nm)) { seen.add(nm); e.shin++; }
+      });
+    // 金額（salesベース）：合計額=保険総額 / 負担額 / 保険外は担当で1〜4に振り分け
+    sales.forEach((s) => {
+      const e = get(s.date);
+      e.ins += s.insurance;
+      e.bur += s.burden;
+      if (s.staff_id && s.staff_id === bucket.abe) e.ho1 += s.selfpay;
+      else if (s.staff_id && s.staff_id === bucket.shibu) e.ho2 += s.selfpay;
+      else if (s.staff_id && (s.staff_id === bucket.hagi || s.staff_id === bucket.haya)) e.ho3 += s.selfpay;
+      else e.ho4 += s.selfpay;
     });
-    manualSales.forEach((s) => add(s.date, s));
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [appts, saleByAppt, manualSales]);
+  }, [appts, sales, bucket]);
   const monthSum = useMemo(
-    () => monthDaily.reduce(
-      (acc, [, e]) => ({ sp: acc.sp + e.sp, ins: acc.ins + e.ins, bur: acc.bur + e.bur, cnt: acc.cnt + e.cnt }),
-      { sp: 0, ins: 0, bur: 0, cnt: 0 }
-    ),
+    () =>
+      monthDaily.reduce(
+        (acc, [, e]) => ({
+          cnt: acc.cnt + e.cnt, shin: acc.shin + e.shin, ins: acc.ins + e.ins, bur: acc.bur + e.bur,
+          ho1: acc.ho1 + e.ho1, ho2: acc.ho2 + e.ho2, ho3: acc.ho3 + e.ho3, ho4: acc.ho4 + e.ho4,
+        }),
+        { cnt: 0, shin: 0, ins: 0, bur: 0, ho1: 0, ho2: 0, ho3: 0, ho4: 0 }
+      ),
     [monthDaily]
   );
+  const monthSp = monthSum.ho1 + monthSum.ho2 + monthSum.ho3 + monthSum.ho4;
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
   const amt = "w-[68px] rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
@@ -260,8 +297,8 @@ export default function SalesBoard() {
         <div className="mb-2 flex flex-wrap items-baseline gap-x-3 text-sm">
           <span className="font-bold text-slate-700">{monthLabel} 当月</span>
           <span className="text-slate-500">保険 <b className="tabnum text-slate-700">{yen(monthSum.ins)}</b></span>
-          <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSum.sp)}</b></span>
-          <span className="ml-auto font-bold text-slate-800">総売上 {yen(monthSum.sp + monthSum.ins)}</span>
+          <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSp)}</b></span>
+          <span className="ml-auto font-bold text-slate-800">総売上 {yen(monthSp + monthSum.ins)}</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {staff.map((s) => {
@@ -305,18 +342,21 @@ export default function SalesBoard() {
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : view === "month" ? (
-        /* ===== 日計表（月） ===== */
+        /* ===== 日計表（月）: レセコンと同じ並び ===== */
         <div className="overflow-x-auto rounded-xl border bg-white">
-          <table className="w-full text-sm">
+          <table className="w-full whitespace-nowrap text-sm">
             <thead className="bg-slate-50 text-[11px] text-slate-500">
               <tr>
                 <th className="px-2 py-2 text-left font-bold">日付</th>
                 <th className="px-2 py-2 text-right font-bold">件数</th>
-                <th className="px-2 py-2 text-right font-bold">保険外</th>
+                <th className="px-2 py-2 text-right font-bold">新患</th>
                 <th className="px-2 py-2 text-right font-bold">合計額</th>
                 <th className="px-2 py-2 text-right font-bold">負担額</th>
                 <th className="px-2 py-2 text-right font-bold">入金額</th>
-                <th className="px-2 py-2 text-right font-bold">合計</th>
+                <th className="px-2 py-2 text-right font-bold">保険外1<span className="font-normal">(阿部)</span></th>
+                <th className="px-2 py-2 text-right font-bold">保険外2<span className="font-normal">(澁谷)</span></th>
+                <th className="px-2 py-2 text-right font-bold">保険外3<span className="font-normal">(萩原林)</span></th>
+                <th className="px-2 py-2 text-right font-bold">保険外4<span className="font-normal">(物販)</span></th>
               </tr>
             </thead>
             <tbody className="divide-y tabnum">
@@ -326,11 +366,14 @@ export default function SalesBoard() {
                   <tr key={dt} className="cursor-pointer hover:bg-blue-50" onClick={() => { setDate(dt); setView("day"); }}>
                     <td className="px-2 py-1.5 text-left">{dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）</td>
                     <td className="px-2 py-1.5 text-right">{e.cnt}</td>
-                    <td className="px-2 py-1.5 text-right">{e.sp.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.shin}</td>
                     <td className="px-2 py-1.5 text-right">{e.ins.toLocaleString()}</td>
                     <td className="px-2 py-1.5 text-right">{e.bur.toLocaleString()}</td>
-                    <td className="px-2 py-1.5 text-right">{(e.sp + e.bur).toLocaleString()}</td>
-                    <td className="px-2 py-1.5 text-right font-bold">{(e.sp + e.ins).toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.bur.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.ho1.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.ho2.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.ho3.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.ho4.toLocaleString()}</td>
                   </tr>
                 );
               })}
@@ -339,11 +382,14 @@ export default function SalesBoard() {
               <tr className="border-t-2 bg-amber-50 font-bold tabnum">
                 <td className="px-2 py-2 text-left">月計</td>
                 <td className="px-2 py-2 text-right">{monthSum.cnt}</td>
-                <td className="px-2 py-2 text-right">{monthSum.sp.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.shin}</td>
                 <td className="px-2 py-2 text-right">{monthSum.ins.toLocaleString()}</td>
                 <td className="px-2 py-2 text-right">{monthSum.bur.toLocaleString()}</td>
-                <td className="px-2 py-2 text-right">{(monthSum.sp + monthSum.bur).toLocaleString()}</td>
-                <td className="px-2 py-2 text-right">{(monthSum.sp + monthSum.ins).toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.bur.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.ho1.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.ho2.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.ho3.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.ho4.toLocaleString()}</td>
               </tr>
             </tfoot>
           </table>
@@ -353,7 +399,7 @@ export default function SalesBoard() {
         <div>
           <div className="mb-1 flex items-center">
             <span className="text-sm font-bold text-slate-700">{d.getMonth() + 1}/{d.getDate()}（{WEEKDAY_LABELS[d.getDay()]}）</span>
-            <button onClick={addManual} className="ml-auto rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販/予約外</button>
+            <button onClick={() => addManual()} className="ml-auto rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販/予約外</button>
           </div>
           <div className="overflow-x-auto rounded-xl border bg-white">
             <table className="w-full text-sm">
@@ -370,67 +416,79 @@ export default function SalesBoard() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {dayRows.map((a) => {
-                  const s = apptVal(a);
-                  return (
-                    <tr key={a.id}>
-                      <td className="px-1 py-1">
-                        <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
-                          className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
-                          <option value="">-</option>
-                          {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-                        </select>
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1">
-                        <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
-                        <span className="ml-1 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
-                      </td>
-                      <td className="px-1 py-1 text-right">
-                        <input type="number" min={0} placeholder="0" value={s.selfpay || ""}
-                          onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
-                      </td>
-                      <td className="px-1 py-1 text-right">
-                        <input type="number" min={0} placeholder="0" value={s.insurance || ""}
-                          onChange={(e) => setApptField(a, "insurance", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
-                      </td>
-                      <td className="px-1 py-1 text-right">
-                        <input type="number" min={0} placeholder="0" value={s.burden || ""}
-                          onChange={(e) => setApptField(a, "burden", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
-                      </td>
-                      <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
-                      <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
-                      <td></td>
-                    </tr>
-                  );
-                })}
-                {dayManual.map((m) => (
-                  <tr key={m.id} className="bg-amber-50/40">
-                    <td className="px-1 py-1">
-                      <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
-                        className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
-                        <option value="">物販</option>
-                        {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-2 py-1">
-                      <input value={m.patient_name ?? ""} placeholder="品目/名前" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
-                        className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
-                    </td>
-                    <td className="px-1 py-1 text-right">
-                      <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
-                    </td>
-                    <td className="px-1 py-1 text-right">
-                      <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
-                    </td>
-                    <td className="px-1 py-1 text-right">
-                      <input type="number" min={0} placeholder="0" value={m.burden || ""} onChange={(e) => setManualLocal(m.id, { burden: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
-                    </td>
-                    <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
-                    <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
-                    <td className="px-1 py-1 text-right"><button onClick={() => deleteManual(m.id)} className="text-[11px] font-bold text-red-400">削除</button></td>
-                  </tr>
-                ))}
-                {dayRows.length === 0 && dayManual.length === 0 && (
+                {dayItems.map((it) =>
+                  it.kind === "appt" ? (
+                    (() => {
+                      const a = it.a;
+                      const s = apptVal(a);
+                      return (
+                        <tr key={a.id}>
+                          <td className="px-1 py-1">
+                            <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
+                              className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
+                              <option value="">-</option>
+                              {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-1">
+                            <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
+                            <span className="ml-1 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
+                          </td>
+                          <td className="px-1 py-1 text-right">
+                            <input type="number" min={0} placeholder="0" value={s.selfpay || ""}
+                              onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
+                          </td>
+                          <td className="px-1 py-1 text-right">
+                            <input type="number" min={0} placeholder="0" value={s.insurance || ""}
+                              onChange={(e) => setApptField(a, "insurance", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
+                          </td>
+                          <td className="px-1 py-1 text-right">
+                            <input type="number" min={0} placeholder="0" value={s.burden || ""}
+                              onChange={(e) => setApptField(a, "burden", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
+                          </td>
+                          <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
+                          <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
+                          <td className="px-1 py-1 text-center">
+                            <button onClick={() => addManual(a.id)} title="この人の下に物販を追加"
+                              className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 active:bg-amber-200">＋物販</button>
+                          </td>
+                        </tr>
+                      );
+                    })()
+                  ) : (
+                    (() => {
+                      const m = it.m;
+                      return (
+                        <tr key={m.id} className="bg-amber-50/40">
+                          <td className="px-1 py-1">
+                            <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
+                              className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
+                              <option value="">物販</option>
+                              {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-2 py-1">
+                            <input value={m.patient_name ?? ""} placeholder="品目/名前" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
+                              className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
+                          </td>
+                          <td className="px-1 py-1 text-right">
+                            <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                          </td>
+                          <td className="px-1 py-1 text-right">
+                            <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                          </td>
+                          <td className="px-1 py-1 text-right">
+                            <input type="number" min={0} placeholder="0" value={m.burden || ""} onChange={(e) => setManualLocal(m.id, { burden: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                          </td>
+                          <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
+                          <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
+                          <td className="px-1 py-1 text-right"><button onClick={() => deleteManual(m.id)} className="text-[11px] font-bold text-red-400">削除</button></td>
+                        </tr>
+                      );
+                    })()
+                  )
+                )}
+                {dayItems.length === 0 && (
                   <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-400">この日の予約はありません（物販/予約外は右上の＋から）。</td></tr>
                 )}
               </tbody>
