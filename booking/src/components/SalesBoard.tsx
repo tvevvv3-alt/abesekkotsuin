@@ -19,22 +19,25 @@ interface Sale {
   date: string;
   staff_id: string | null;
   patient_name: string | null;
-  selfpay: number;
+  selfpay: number; // 保険外（自費）
+  insurance: number; // 合計額（保険総額）
+  burden: number; // 負担額（窓口負担）
 }
-interface Daily {
-  insurance_total: number;
-  burden: number;
-}
+const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
+  selfpay: 0,
+  insurance: 0,
+  burden: 0,
+});
 
 export default function SalesBoard() {
   const supabase = useMemo(() => createClient(), []);
+  const [view, setView] = useState<"day" | "month">("day");
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [staff, setStaff] = useState<Staff[]>([]);
   const [appts, setAppts] = useState<Appt[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const salesRef = useRef(sales);
   salesRef.current = sales;
-  const [daily, setDaily] = useState<Record<string, Daily>>({});
   const [targets, setTargets] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
@@ -57,32 +60,23 @@ export default function SalesBoard() {
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [{ data: ap }, { data: sl }, { data: dl }] = await Promise.all([
+    const [{ data: ap }, { data: sl }] = await Promise.all([
       supabase
         .from("appointments")
         .select("id, date, start_min, staff_id, patient_name")
         .neq("status", "cancelled")
         .gte("date", monthStart)
         .lt("date", monthEnd)
+        .order("date")
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay")
-        .gte("date", monthStart)
-        .lt("date", monthEnd),
-      supabase
-        .from("sales_daily")
-        .select("date, insurance_total, burden")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
     setAppts((ap as Appt[]) ?? []);
     setSales((sl as Sale[]) ?? []);
-    const dm: Record<string, Daily> = {};
-    (dl ?? []).forEach((d: { date: string; insurance_total: number; burden: number }) => {
-      dm[d.date] = { insurance_total: d.insurance_total, burden: d.burden };
-    });
-    setDaily(dm);
     setLoading(false);
   }, [supabase, monthStart, monthEnd]);
 
@@ -90,7 +84,6 @@ export default function SalesBoard() {
     reload();
   }, [reload]);
 
-  // 予約に紐づく自費（appointment_id→sale）
   const saleByAppt = useMemo(() => {
     const m: Record<string, Sale> = {};
     sales.forEach((s) => {
@@ -100,13 +93,25 @@ export default function SalesBoard() {
   }, [sales]);
   const manualSales = useMemo(() => sales.filter((s) => !s.appointment_id), [sales]);
 
-  // --- 予約行の自費を保存（appointment_idでupsert） ---
-  function setApptSelfpayLocal(a: Appt, val: number) {
+  // --- 予約行の編集（担当・自費・合計額・負担額） ---
+  function apptVal(a: Appt): Sale {
+    return (
+      saleByAppt[a.id] ?? {
+        id: "tmp-" + a.id,
+        appointment_id: a.id,
+        date: a.date,
+        staff_id: a.staff_id,
+        patient_name: a.patient_name,
+        ...zeroSale(),
+      }
+    );
+  }
+  function setApptField(a: Appt, field: "selfpay" | "insurance" | "burden" | "staff_id", val: number | string | null) {
     setSales((prev) => {
       const idx = prev.findIndex((s) => s.appointment_id === a.id);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], selfpay: val };
+        next[idx] = { ...next[idx], [field]: val };
         return next;
       }
       return [
@@ -117,33 +122,35 @@ export default function SalesBoard() {
           date: a.date,
           staff_id: a.staff_id,
           patient_name: a.patient_name,
-          selfpay: val,
-        },
+          ...zeroSale(),
+          [field]: val,
+        } as Sale,
       ];
     });
   }
   async function persistAppt(a: Appt) {
-    const s = salesRef.current.find((x) => x.appointment_id === a.id);
+    const s = salesRef.current.find((x) => x.appointment_id === a.id) ?? apptVal(a);
     await supabase.from("sales").upsert(
       {
         appointment_id: a.id,
         date: a.date,
-        staff_id: a.staff_id,
+        staff_id: s.staff_id ?? a.staff_id,
         patient_name: a.patient_name,
-        selfpay: s?.selfpay ?? 0,
-        insurance: 0,
+        selfpay: s.selfpay,
+        insurance: s.insurance,
+        burden: s.burden,
       },
       { onConflict: "appointment_id" }
     );
     reload();
   }
 
-  // --- 手動行（物販・その他） ---
+  // --- 手動行（物販・予約外） ---
   async function addManual() {
     const { data } = await supabase
       .from("sales")
-      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0 })
-      .select("id, appointment_id, date, staff_id, patient_name, selfpay")
+      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0 })
+      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden")
       .single();
     if (data) setSales((prev) => [...prev, data as Sale]);
   }
@@ -155,26 +162,12 @@ export default function SalesBoard() {
     if (!s) return;
     await supabase
       .from("sales")
-      .update({ staff_id: s.staff_id, patient_name: s.patient_name, selfpay: s.selfpay })
+      .update({ staff_id: s.staff_id, patient_name: s.patient_name, selfpay: s.selfpay, insurance: s.insurance, burden: s.burden })
       .eq("id", id);
   }
   async function deleteManual(id: string) {
     setSales((prev) => prev.filter((s) => s.id !== id));
     await supabase.from("sales").delete().eq("id", id);
-  }
-
-  // --- レセコン日計 ---
-  function setDailyLocal(field: keyof Daily, val: number) {
-    setDaily((prev) => {
-      const cur = prev[date] ?? { insurance_total: 0, burden: 0 };
-      return { ...prev, [date]: { ...cur, [field]: val } };
-    });
-  }
-  async function persistDaily() {
-    const d = daily[date] ?? { insurance_total: 0, burden: 0 };
-    await supabase
-      .from("sales_daily")
-      .upsert({ date, insurance_total: d.insurance_total, burden: d.burden }, { onConflict: "date" });
   }
   async function saveTarget(staffId: string, man: number) {
     const yenv = Math.max(0, Math.round(man * 10000));
@@ -183,73 +176,98 @@ export default function SalesBoard() {
   }
 
   // --- 集計 ---
-  const selfpayByStaff = useCallback(
+  const total = (s: { selfpay: number; insurance: number }) => s.selfpay + s.insurance; // 合計
+  const paid = (s: { selfpay: number; burden: number }) => s.selfpay + s.burden; // 入金額
+  const staffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + s.selfpay : sum), 0),
+      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + total(s) : sum), 0),
     [sales]
   );
-  const selfpayTotal = useMemo(() => sales.reduce((s, x) => s + x.selfpay, 0), [sales]);
-  const insuranceMonth = useMemo(
-    () => Object.values(daily).reduce((s, d) => s + d.insurance_total, 0),
-    [daily]
-  );
-
-  const dayAppts = useMemo(() => appts.filter((a) => a.date === date), [appts, date]);
-  const dayManual = useMemo(() => manualSales.filter((s) => s.date === date), [manualSales, date]);
 
   const yen = (n: number) => "¥" + n.toLocaleString();
   const d = new Date(date + "T00:00:00");
   const monthLabel = `${d.getFullYear()}年${d.getMonth() + 1}月`;
-  const dl = daily[date] ?? { insurance_total: 0, burden: 0 };
-  const btn =
-    "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
-  const amt = "w-24 rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
+
+  // 当日の行（予約＋手動）
+  const dayRows = useMemo(() => {
+    const aps = appts.filter((a) => a.date === date);
+    return aps;
+  }, [appts, date]);
+  const dayManual = useMemo(() => manualSales.filter((s) => s.date === date), [manualSales, date]);
+
+  // 当日の合計
+  const daySum = useMemo(() => {
+    let sp = 0, ins = 0, bur = 0, cnt = 0;
+    dayRows.forEach((a) => {
+      const s = saleByAppt[a.id];
+      if (s) { sp += s.selfpay; ins += s.insurance; bur += s.burden; }
+      cnt++;
+    });
+    dayManual.forEach((s) => { sp += s.selfpay; ins += s.insurance; bur += s.burden; cnt++; });
+    return { sp, ins, bur, cnt, paid: sp + bur, gou: sp + ins };
+  }, [dayRows, dayManual, saleByAppt]);
+
+  // 日計表（月）：日ごとの合計
+  const monthDaily = useMemo(() => {
+    const map = new Map<string, { sp: number; ins: number; bur: number; cnt: number }>();
+    const add = (dt: string, s: { selfpay: number; insurance: number; burden: number }) => {
+      const e = map.get(dt) ?? { sp: 0, ins: 0, bur: 0, cnt: 0 };
+      e.sp += s.selfpay; e.ins += s.insurance; e.bur += s.burden; e.cnt++;
+      map.set(dt, e);
+    };
+    // 予約（自費入力があってもなくても件数に数える）
+    appts.forEach((a) => {
+      const s = saleByAppt[a.id] ?? { selfpay: 0, insurance: 0, burden: 0 };
+      add(a.date, s);
+    });
+    manualSales.forEach((s) => add(s.date, s));
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [appts, saleByAppt, manualSales]);
+  const monthSum = useMemo(
+    () => monthDaily.reduce(
+      (acc, [, e]) => ({ sp: acc.sp + e.sp, ins: acc.ins + e.ins, bur: acc.bur + e.bur, cnt: acc.cnt + e.cnt }),
+      { sp: 0, ins: 0, bur: 0, cnt: 0 }
+    ),
+    [monthDaily]
+  );
+
+  const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
+  const amt = "w-[68px] rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-5xl">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-bold text-slate-800">個別売上</h1>
+        <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5">
+          {([["day", "日別入力"], ["month", "日計表(月)"]] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setView(v)}
+              className={`rounded px-2 py-1 text-[11px] font-bold ${view === v ? "bg-blue-600 text-white" : "text-slate-600"}`}>
+              {l}
+            </button>
+          ))}
+        </div>
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => setDate(toDateStr(addDays(d, -1)))} className={btn} aria-label="前の日">
-            ‹
-          </button>
-          <button
-            onClick={() => setDate(toDateStr(new Date()))}
-            className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700"
-          >
-            今日
-          </button>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="rounded-md border border-slate-300 px-1 py-1 text-[12px] text-slate-600"
-          />
-          <button onClick={() => setDate(toDateStr(addDays(d, 1)))} className={btn} aria-label="次の日">
-            ›
-          </button>
+          <button onClick={() => setDate(toDateStr(addDays(d, view === "month" ? -31 : -1)))} className={btn}>‹</button>
+          <button onClick={() => setDate(toDateStr(new Date()))} className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">今日</button>
+          <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)}
+            className="rounded-md border border-slate-300 px-1 py-1 text-[12px] text-slate-600" />
+          <button onClick={() => setDate(toDateStr(addDays(d, view === "month" ? 31 : 1)))} className={btn}>›</button>
         </div>
       </div>
 
-      {/* 当月サマリー */}
+      {/* 当月サマリー（担当ごとの総売上＝自費＋保険 vs 目標） */}
       <div className="mb-4 rounded-xl border bg-white p-3">
-        <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+        <div className="mb-2 flex flex-wrap items-baseline gap-x-3 text-sm">
           <span className="font-bold text-slate-700">{monthLabel} 当月</span>
-          <span className="text-slate-500">
-            保険合計 <b className="tabnum text-slate-700">{yen(insuranceMonth)}</b>
-          </span>
-          <span className="text-slate-500">
-            自費合計 <b className="tabnum text-slate-700">{yen(selfpayTotal)}</b>
-          </span>
-          <span className="ml-auto font-bold text-slate-800">
-            総売上 {yen(insuranceMonth + selfpayTotal)}
-          </span>
+          <span className="text-slate-500">保険 <b className="tabnum text-slate-700">{yen(monthSum.ins)}</b></span>
+          <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSum.sp)}</b></span>
+          <span className="ml-auto font-bold text-slate-800">総売上 {yen(monthSum.sp + monthSum.ins)}</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {staff.map((s) => {
-            const total = selfpayByStaff(s.id);
+            const tot = staffTotal(s.id);
             const target = targets[s.id] ?? 0;
-            const pct = target > 0 ? Math.round((total / target) * 1000) / 10 : 0;
+            const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
             return (
               <div key={s.id} className="rounded-lg border p-2">
                 <div className="flex items-center gap-1.5">
@@ -257,24 +275,14 @@ export default function SalesBoard() {
                   <span className="text-sm font-bold text-slate-800">{s.name}</span>
                   <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
                     目標
-                    <input
-                      type="number"
-                      min={0}
-                      value={target ? target / 10000 : ""}
+                    <input type="number" min={0} value={target ? target / 10000 : ""} placeholder="0"
                       onChange={(e) => saveTarget(s.id, parseFloat(e.target.value || "0"))}
-                      className="w-14 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]"
-                      placeholder="0"
-                    />
-                    万
+                      className="w-14 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]" />万
                   </span>
                 </div>
                 <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-base font-bold tabnum text-slate-800">{yen(total)}</span>
-                  {target > 0 && (
-                    <span className={`text-xs font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>
-                      {pct}%
-                    </span>
-                  )}
+                  <span className="text-base font-bold tabnum text-slate-800">{yen(tot)}</span>
+                  {target > 0 && <span className={`text-xs font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>{pct}%</span>}
                 </div>
                 {target > 0 && (
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -289,128 +297,163 @@ export default function SalesBoard() {
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
               <span className="text-sm font-bold text-slate-800">物販・その他</span>
             </div>
-            <div className="mt-1 text-base font-bold tabnum text-slate-800">{yen(selfpayByStaff(null))}</div>
+            <div className="mt-1 text-base font-bold tabnum text-slate-800">{yen(staffTotal(null))}</div>
           </div>
         </div>
       </div>
 
-      {/* レセコン日計（保険側） */}
-      <div className="mb-3 rounded-xl border bg-white p-3">
-        <div className="mb-2 text-sm font-bold text-slate-700">
-          {d.getMonth() + 1}/{d.getDate()}（{WEEKDAY_LABELS[d.getDay()]}）レセコン日計（保険）
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
-          <label className="flex items-center gap-1">
-            合計額（保険総額）
-            <input type="number" min={0} value={dl.insurance_total || ""} placeholder="0"
-              onChange={(e) => setDailyLocal("insurance_total", parseInt(e.target.value || "0", 10))}
-              onBlur={persistDaily} className={amt} />
-          </label>
-          <label className="flex items-center gap-1">
-            負担額／入金額
-            <input type="number" min={0} value={dl.burden || ""} placeholder="0"
-              onChange={(e) => setDailyLocal("burden", parseInt(e.target.value || "0", 10))}
-              onBlur={persistDaily} className={amt} />
-          </label>
-        </div>
-      </div>
-
-      {/* その日の自費入力（予約から自動） */}
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
+      ) : view === "month" ? (
+        /* ===== 日計表（月） ===== */
+        <div className="overflow-x-auto rounded-xl border bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-[11px] text-slate-500">
+              <tr>
+                <th className="px-2 py-2 text-left font-bold">日付</th>
+                <th className="px-2 py-2 text-right font-bold">件数</th>
+                <th className="px-2 py-2 text-right font-bold">保険外</th>
+                <th className="px-2 py-2 text-right font-bold">合計額</th>
+                <th className="px-2 py-2 text-right font-bold">負担額</th>
+                <th className="px-2 py-2 text-right font-bold">入金額</th>
+                <th className="px-2 py-2 text-right font-bold">合計</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y tabnum">
+              {monthDaily.map(([dt, e]) => {
+                const dd = new Date(dt + "T00:00:00");
+                return (
+                  <tr key={dt} className="cursor-pointer hover:bg-blue-50" onClick={() => { setDate(dt); setView("day"); }}>
+                    <td className="px-2 py-1.5 text-left">{dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）</td>
+                    <td className="px-2 py-1.5 text-right">{e.cnt}</td>
+                    <td className="px-2 py-1.5 text-right">{e.sp.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.ins.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{e.bur.toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right">{(e.sp + e.bur).toLocaleString()}</td>
+                    <td className="px-2 py-1.5 text-right font-bold">{(e.sp + e.ins).toLocaleString()}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 bg-amber-50 font-bold tabnum">
+                <td className="px-2 py-2 text-left">月計</td>
+                <td className="px-2 py-2 text-right">{monthSum.cnt}</td>
+                <td className="px-2 py-2 text-right">{monthSum.sp.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.ins.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{monthSum.bur.toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{(monthSum.sp + monthSum.bur).toLocaleString()}</td>
+                <td className="px-2 py-2 text-right">{(monthSum.sp + monthSum.ins).toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {staff.map((s) => {
-            const list = dayAppts.filter((a) => a.staff_id === s.id);
-            if (list.length === 0) return null;
-            const sub = list.reduce((sum, a) => sum + (saleByAppt[a.id]?.selfpay ?? 0), 0);
-            return (
-              <div key={s.id} className="overflow-hidden rounded-xl border bg-white">
-                <div className="flex items-center gap-1.5 border-b bg-slate-50 px-3 py-2">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color || "#64748b" }} />
-                  <span className="text-sm font-bold text-slate-800">{s.name}</span>
-                  <span className="ml-auto text-sm font-bold tabnum text-slate-700">自費 {yen(sub)}</span>
-                </div>
-                <table className="w-full text-sm">
-                  <tbody className="divide-y">
-                    {list.map((a) => (
-                      <tr key={a.id}>
-                        <td className="px-3 py-1.5">
-                          <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
-                          <span className="ml-2 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
-                        </td>
-                        <td className="px-3 py-1.5 text-right">
-                          <input type="number" min={0} placeholder="0"
-                            value={saleByAppt[a.id]?.selfpay || ""}
-                            onChange={(e) => setApptSelfpayLocal(a, parseInt(e.target.value || "0", 10))}
-                            onBlur={() => persistAppt(a)}
-                            className={amt} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
-
-          {/* 手動追加（物販・その他・予約外） */}
-          <div className="overflow-hidden rounded-xl border bg-white">
-            <div className="flex items-center gap-1.5 border-b bg-slate-50 px-3 py-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span className="text-sm font-bold text-slate-800">手動追加（物販・予約外）</span>
-              <button onClick={addManual} className="ml-auto rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">
-                ＋ 追加
-              </button>
-            </div>
-            {dayManual.length === 0 ? (
-              <p className="px-3 py-3 text-[12px] text-slate-400">物販や予約に無い売上は「＋追加」で入力できます。</p>
-            ) : (
-              <table className="w-full text-sm">
-                <tbody className="divide-y">
-                  {dayManual.map((m) => (
-                    <tr key={m.id}>
-                      <td className="px-2 py-1.5">
-                        <select
-                          value={m.staff_id ?? ""}
-                          onChange={(e) => { setManualLocal(m.id, { staff_id: e.target.value || null }); }}
-                          onBlur={() => persistManual(m.id)}
-                          className="rounded border border-slate-300 px-1 py-1 text-xs"
-                        >
-                          <option value="">物販/その他</option>
-                          {staff.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
+        /* ===== 日別入力 ===== */
+        <div>
+          <div className="mb-1 flex items-center">
+            <span className="text-sm font-bold text-slate-700">{d.getMonth() + 1}/{d.getDate()}（{WEEKDAY_LABELS[d.getDay()]}）</span>
+            <button onClick={addManual} className="ml-auto rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販/予約外</button>
+          </div>
+          <div className="overflow-x-auto rounded-xl border bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-[11px] text-slate-500">
+                <tr>
+                  <th className="px-1 py-2 text-left font-bold">担当</th>
+                  <th className="px-2 py-2 text-left font-bold">名前</th>
+                  <th className="px-1 py-2 text-right font-bold">保険外</th>
+                  <th className="px-1 py-2 text-right font-bold">合計額</th>
+                  <th className="px-1 py-2 text-right font-bold">負担額</th>
+                  <th className="px-1 py-2 text-right font-bold">入金額</th>
+                  <th className="px-2 py-2 text-right font-bold">合計</th>
+                  <th className="px-1 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {dayRows.map((a) => {
+                  const s = apptVal(a);
+                  return (
+                    <tr key={a.id}>
+                      <td className="px-1 py-1">
+                        <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
+                          className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
+                          <option value="">-</option>
+                          {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
                         </select>
                       </td>
-                      <td className="px-1 py-1.5">
-                        <input value={m.patient_name ?? ""} placeholder="品目/名前"
-                          onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })}
-                          onBlur={() => persistManual(m.id)}
-                          className="w-full rounded border border-slate-300 px-1 py-1 text-sm" />
+                      <td className="whitespace-nowrap px-2 py-1">
+                        <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
+                        <span className="ml-1 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
                       </td>
-                      <td className="px-1 py-1.5 text-right">
-                        <input type="number" min={0} placeholder="0" value={m.selfpay || ""}
-                          onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })}
-                          onBlur={() => persistManual(m.id)}
-                          className="w-20 rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum" />
+                      <td className="px-1 py-1 text-right">
+                        <input type="number" min={0} placeholder="0" value={s.selfpay || ""}
+                          onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
                       </td>
-                      <td className="px-2 py-1.5 text-right">
-                        <button onClick={() => deleteManual(m.id)} className="text-xs font-bold text-red-400">削除</button>
+                      <td className="px-1 py-1 text-right">
+                        <input type="number" min={0} placeholder="0" value={s.insurance || ""}
+                          onChange={(e) => setApptField(a, "insurance", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
                       </td>
+                      <td className="px-1 py-1 text-right">
+                        <input type="number" min={0} placeholder="0" value={s.burden || ""}
+                          onChange={(e) => setApptField(a, "burden", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
+                      </td>
+                      <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
+                      <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
+                      <td></td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  );
+                })}
+                {dayManual.map((m) => (
+                  <tr key={m.id} className="bg-amber-50/40">
+                    <td className="px-1 py-1">
+                      <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
+                        className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
+                        <option value="">物販</option>
+                        {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1">
+                      <input value={m.patient_name ?? ""} placeholder="品目/名前" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
+                        className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
+                    </td>
+                    <td className="px-1 py-1 text-right">
+                      <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                    </td>
+                    <td className="px-1 py-1 text-right">
+                      <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                    </td>
+                    <td className="px-1 py-1 text-right">
+                      <input type="number" min={0} placeholder="0" value={m.burden || ""} onChange={(e) => setManualLocal(m.id, { burden: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                    </td>
+                    <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
+                    <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
+                    <td className="px-1 py-1 text-right"><button onClick={() => deleteManual(m.id)} className="text-[11px] font-bold text-red-400">削除</button></td>
+                  </tr>
+                ))}
+                {dayRows.length === 0 && dayManual.length === 0 && (
+                  <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-400">この日の予約はありません（物販/予約外は右上の＋から）。</td></tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 bg-amber-50 font-bold tabnum">
+                  <td className="px-2 py-2 text-left" colSpan={2}>計 {daySum.cnt}件</td>
+                  <td className="px-1 py-2 text-right">{daySum.sp.toLocaleString()}</td>
+                  <td className="px-1 py-2 text-right">{daySum.ins.toLocaleString()}</td>
+                  <td className="px-1 py-2 text-right">{daySum.bur.toLocaleString()}</td>
+                  <td className="px-1 py-2 text-right">{daySum.paid.toLocaleString()}</td>
+                  <td className="px-2 py-2 text-right">{daySum.gou.toLocaleString()}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
       )}
 
       <p className="mt-3 text-[11px] text-slate-400">
-        名前・担当はその日の予約から自動表示。各人の自費（保険外）を入力すると担当ごとに集計され、
-        当月の達成率が出ます。保険側（合計額・負担額）はレセコンの日計を1日1回入力してください。
-        物販や予約外の売上は「手動追加」から。目標は担当ごとに万円で保存されます。
+        名前・担当は予約から自動。各人に 保険外(自費)・合計額(保険総額)・負担額 を入力すると、
+        入金額(=自費+負担額)・合計(=自費+合計額) と日計・月計が自動集計されます。物販や予約外は
+        「＋物販/予約外」から。担当ごとの合計(自費+保険)で当月の達成率が出ます。
       </p>
     </div>
   );
