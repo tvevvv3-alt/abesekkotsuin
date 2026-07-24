@@ -23,6 +23,7 @@ interface Sale {
   insurance: number; // 合計額（保険総額）
   burden: number; // 負担額（窓口負担）
   anchor_appointment_id?: string | null; // 物販をこの予約(購入者)の下に置く
+  sort_order?: number | null; // 手動並び替え用
 }
 const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
   selfpay: 0,
@@ -72,7 +73,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, sort_order")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -201,16 +202,41 @@ export default function SalesBoard() {
     return aps;
   }, [appts, date]);
   const dayManual = useMemo(() => manualSales.filter((s) => s.date === date), [manualSales, date]);
-  // 予約行の直後に、その購入者(anchor)に紐づく物販行を差し込んだ並び
+  // 並び順（sort_orderで手動入れ替え可。既定は予約=時刻順、物販=末尾）
   const dayItems = useMemo(() => {
-    const items: ({ kind: "appt"; a: Appt } | { kind: "manual"; m: Sale })[] = [];
-    dayRows.forEach((a) => {
-      items.push({ kind: "appt", a });
-      dayManual.filter((m) => m.anchor_appointment_id === a.id).forEach((m) => items.push({ kind: "manual", m }));
-    });
-    dayManual.filter((m) => !m.anchor_appointment_id).forEach((m) => items.push({ kind: "manual", m }));
+    const items = [
+      ...dayRows.map((a, i) => ({ kind: "appt" as const, a, ord: saleByAppt[a.id]?.sort_order ?? a.start_min * 1000 + i })),
+      ...dayManual.map((m, i) => ({ kind: "manual" as const, m, ord: m.sort_order ?? 9_000_000 + i })),
+    ];
+    items.sort((x, y) => x.ord - y.ord);
     return items;
-  }, [dayRows, dayManual]);
+  }, [dayRows, dayManual, saleByAppt]);
+
+  async function setItemOrder(it: { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }, ord: number) {
+    if (it.kind === "manual") {
+      setSales((prev) => prev.map((s) => (s.id === it.m.id ? { ...s, sort_order: ord } : s)));
+      await supabase.from("sales").update({ sort_order: ord }).eq("id", it.m.id);
+    } else {
+      const a = it.a;
+      const cur = salesRef.current.find((s) => s.appointment_id === a.id);
+      await supabase.from("sales").upsert(
+        {
+          appointment_id: a.id, date: a.date, staff_id: cur?.staff_id ?? a.staff_id, patient_name: a.patient_name,
+          selfpay: cur?.selfpay ?? 0, insurance: cur?.insurance ?? 0, burden: cur?.burden ?? 0, sort_order: ord,
+        },
+        { onConflict: "appointment_id" }
+      );
+    }
+  }
+  async function moveItem(index: number, dir: -1 | 1) {
+    const list = dayItems;
+    const j = index + dir;
+    if (j < 0 || j >= list.length) return;
+    const A = list[index];
+    const B = list[j];
+    await Promise.all([setItemOrder(A, B.ord), setItemOrder(B, A.ord)]);
+    reload();
+  }
 
   // 当日の合計
   const daySum = useMemo(() => {
@@ -439,7 +465,7 @@ export default function SalesBoard() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {dayItems.map((it) =>
+                {dayItems.map((it, index) =>
                   it.kind === "appt" ? (
                     (() => {
                       const a = it.a;
@@ -471,9 +497,9 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
-                          <td className="px-1 py-1 text-center">
-                            <button onClick={() => addManual(a.id)} title="この人の下に物販を追加"
-                              className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 active:bg-amber-200">＋物販</button>
+                          <td className="whitespace-nowrap px-1 py-1 text-center">
+                            <button onClick={() => moveItem(index, -1)} disabled={index === 0} className="px-1 text-slate-400 disabled:opacity-25" title="上へ">▲</button>
+                            <button onClick={() => moveItem(index, 1)} disabled={index === dayItems.length - 1} className="px-1 text-slate-400 disabled:opacity-25" title="下へ">▼</button>
                           </td>
                         </tr>
                       );
@@ -505,7 +531,11 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
-                          <td className="px-1 py-1 text-right"><button onClick={() => deleteManual(m.id)} className="text-[11px] font-bold text-red-400">削除</button></td>
+                          <td className="whitespace-nowrap px-1 py-1 text-center">
+                            <button onClick={() => moveItem(index, -1)} disabled={index === 0} className="px-1 text-slate-400 disabled:opacity-25" title="上へ">▲</button>
+                            <button onClick={() => moveItem(index, 1)} disabled={index === dayItems.length - 1} className="px-1 text-slate-400 disabled:opacity-25" title="下へ">▼</button>
+                            <button onClick={() => deleteManual(m.id)} className="ml-1 text-[11px] font-bold text-red-400">削除</button>
+                          </td>
                         </tr>
                       );
                     })()
