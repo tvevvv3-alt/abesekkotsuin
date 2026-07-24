@@ -571,7 +571,10 @@ export default function AdminBoard({ date }: { date: string }) {
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-white">
+        <div
+          className="overflow-auto overscroll-contain rounded-xl border bg-white"
+          style={{ maxHeight: "calc(100dvh - 200px)" }}
+        >
           <div className="flex w-full">
             {/* 時間ラベル列 */}
             <div className="w-12 shrink-0 border-r bg-slate-50">
@@ -643,7 +646,7 @@ export default function AdminBoard({ date }: { date: string }) {
                         {segs.map((sg, i) => (
                           <div
                             key={i}
-                            className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
+                            className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                             style={{
                               top: yFor(sg.s) - cardTop,
                               height: yFor(sg.e) - yFor(sg.s),
@@ -705,7 +708,7 @@ export default function AdminBoard({ date }: { date: string }) {
                 {classGroups(cls.id).map((g, i) => (
                   <div
                     key={i}
-                    className="absolute left-0.5 right-0.5 z-20 rounded-[4px] px-1 py-1 shadow-sm"
+                    className="absolute left-0.5 right-0.5 z-20 rounded-[4px] px-1 py-1"
                     style={{
                       top: yFor(g.start),
                       minHeight: yFor(g.end) - yFor(g.start) - 2,
@@ -803,7 +806,7 @@ export default function AdminBoard({ date }: { date: string }) {
                           </span>
                         )}
                         <div
-                          className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left shadow-sm"
+                          className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                           style={{
                             top: 0,
                             height: yFor(botSnap) - cardTop - 2,

@@ -42,6 +42,9 @@ export default function SalesBoard() {
   salesRef.current = sales;
   const [targets, setTargets] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   const monthStart = useMemo(() => date.slice(0, 8) + "01", [date]);
   const monthEnd = useMemo(() => {
@@ -228,15 +231,60 @@ export default function SalesBoard() {
       );
     }
   }
-  async function moveItem(index: number, dir: -1 | 1) {
-    const list = dayItems;
-    const j = index + dir;
-    if (j < 0 || j >= list.length) return;
-    const A = list[index];
-    const B = list[j];
-    await Promise.all([setItemOrder(A, B.ord), setItemOrder(B, A.ord)]);
+  const itemId = (it: { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }) => (it.kind === "appt" ? it.a.id : it.m.id);
+  // ドラッグ＆ドロップ並び替え（マウス・タッチ両対応）
+  function onDragStart(e: React.PointerEvent, id: string) {
+    setDragId(id);
+    setDrop({ id, after: false });
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+  }
+  function onDragMove(e: React.PointerEvent) {
+    if (!dragId) return;
+    const y = e.clientY;
+    let best: { id: string; after: boolean } | null = null;
+    for (const it of dayItems) {
+      const id = itemId(it);
+      const el = rowRefs.current[id];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (y < r.top) { best = { id, after: false }; break; }
+      if (y <= r.bottom) { best = { id, after: y > r.top + r.height / 2 }; break; }
+      best = { id, after: true };
+    }
+    if (best && (best.id !== drop?.id || best.after !== drop?.after)) setDrop(best);
+  }
+  async function onDragEnd() {
+    const cur = dragId;
+    const dr = drop;
+    setDragId(null);
+    setDrop(null);
+    if (!cur) return;
+    const ids = dayItems.map(itemId).filter((x) => x !== cur);
+    if (dr && dr.id !== cur) {
+      let idx = ids.indexOf(dr.id);
+      if (idx < 0) idx = ids.length;
+      else if (dr.after) idx += 1;
+      ids.splice(idx, 0, cur);
+    } else {
+      ids.splice(dayItems.map(itemId).indexOf(cur), 0, cur);
+    }
+    const byId: Record<string, { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }> = {};
+    dayItems.forEach((it) => { byId[itemId(it)] = it; });
+    await Promise.all(ids.map((id, i) => (byId[id] ? setItemOrder(byId[id], i * 10) : Promise.resolve())));
     reload();
   }
+  const grip = (id: string) => (
+    <span
+      onPointerDown={(e) => onDragStart(e, id)}
+      onPointerMove={onDragMove}
+      onPointerUp={onDragEnd}
+      onPointerCancel={onDragEnd}
+      className="inline-flex cursor-grab touch-none select-none px-1.5 py-1 text-base leading-none text-slate-300 active:cursor-grabbing"
+      title="ドラッグで並び替え"
+    >
+      ⠿
+    </span>
+  );
 
   // 当日の合計
   const daySum = useMemo(() => {
@@ -465,13 +513,14 @@ export default function SalesBoard() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {dayItems.map((it, index) =>
+                {dayItems.map((it) =>
                   it.kind === "appt" ? (
                     (() => {
                       const a = it.a;
                       const s = apptVal(a);
                       return (
-                        <tr key={a.id}>
+                        <tr key={a.id} ref={(el) => { rowRefs.current[a.id] = el; }}
+                          className={`${dragId === a.id ? "opacity-40" : ""} ${drop?.id === a.id ? (drop.after ? "shadow-[inset_0_-2px_0_0_#3b82f6]" : "shadow-[inset_0_2px_0_0_#3b82f6]") : ""}`}>
                           <td className="px-1 py-1">
                             <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
@@ -497,10 +546,7 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
-                          <td className="whitespace-nowrap px-1 py-1 text-center">
-                            <button onClick={() => moveItem(index, -1)} disabled={index === 0} className="px-1 text-slate-400 disabled:opacity-25" title="上へ">▲</button>
-                            <button onClick={() => moveItem(index, 1)} disabled={index === dayItems.length - 1} className="px-1 text-slate-400 disabled:opacity-25" title="下へ">▼</button>
-                          </td>
+                          <td className="px-1 py-1 text-center">{grip(a.id)}</td>
                         </tr>
                       );
                     })()
@@ -508,7 +554,8 @@ export default function SalesBoard() {
                     (() => {
                       const m = it.m;
                       return (
-                        <tr key={m.id} className="bg-amber-50/40">
+                        <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
+                          className={`bg-amber-50/40 ${dragId === m.id ? "opacity-40" : ""} ${drop?.id === m.id ? (drop.after ? "shadow-[inset_0_-2px_0_0_#3b82f6]" : "shadow-[inset_0_2px_0_0_#3b82f6]") : ""}`}>
                           <td className="px-1 py-1">
                             <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
@@ -532,8 +579,7 @@ export default function SalesBoard() {
                           <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
                           <td className="whitespace-nowrap px-1 py-1 text-center">
-                            <button onClick={() => moveItem(index, -1)} disabled={index === 0} className="px-1 text-slate-400 disabled:opacity-25" title="上へ">▲</button>
-                            <button onClick={() => moveItem(index, 1)} disabled={index === dayItems.length - 1} className="px-1 text-slate-400 disabled:opacity-25" title="下へ">▼</button>
+                            {grip(m.id)}
                             <button onClick={() => deleteManual(m.id)} className="ml-1 text-[11px] font-bold text-red-400">削除</button>
                           </td>
                         </tr>
