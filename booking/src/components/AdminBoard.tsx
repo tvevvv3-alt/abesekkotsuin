@@ -175,6 +175,28 @@ export default function AdminBoard({ date }: { date: string }) {
     { ctx: ColCtx; x: number; y: number; startMin: number; mouse: boolean } | null
   >(null);
 
+  // ボード枠の高さを「自分の上端〜画面下端」ぴったりに合わせ、ページ側のスクロールを無くす
+  // （カレンダーと同じ“枠内だけスクロール”に統一。二度スクロール問題の解消）
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const [boardMaxH, setBoardMaxH] = useState<number | null>(null);
+  useEffect(() => {
+    const measure = () => {
+      const el = boardScrollRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      setBoardMaxH(Math.max(260, vh - top - 12));
+    };
+    measure();
+    const vv = window.visualViewport;
+    window.addEventListener("resize", measure);
+    vv?.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      vv?.removeEventListener("resize", measure);
+    };
+  }, [loading]);
+
   // マスタ（初回）
   useEffect(() => {
     (async () => {
@@ -572,8 +594,9 @@ export default function AdminBoard({ date }: { date: string }) {
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : (
         <div
+          ref={boardScrollRef}
           className="overflow-auto overscroll-contain rounded-xl border bg-white"
-          style={{ maxHeight: "calc(100dvh - 200px)" }}
+          style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : "calc(100dvh - 200px)" }}
         >
           <div className="flex w-full">
             {/* 時間ラベル列 */}

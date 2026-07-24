@@ -43,6 +43,8 @@ export default function SalesBoard() {
   const [targets, setTargets] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dragDy, setDragDy] = useState(0);
+  const dragStartY = useRef(0);
   const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
@@ -235,11 +237,14 @@ export default function SalesBoard() {
   // ドラッグ＆ドロップ並び替え（マウス・タッチ両対応）
   function onDragStart(e: React.PointerEvent, id: string) {
     setDragId(id);
+    setDragDy(0);
+    dragStartY.current = e.clientY;
     setDrop({ id, after: false });
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
   }
   function onDragMove(e: React.PointerEvent) {
     if (!dragId) return;
+    setDragDy(e.clientY - dragStartY.current);
     const y = e.clientY;
     let best: { id: string; after: boolean } | null = null;
     for (const it of dayItems) {
@@ -257,6 +262,7 @@ export default function SalesBoard() {
     const cur = dragId;
     const dr = drop;
     setDragId(null);
+    setDragDy(0);
     setDrop(null);
     if (!cur) return;
     const ids = dayItems.map(itemId).filter((x) => x !== cur);
@@ -279,12 +285,33 @@ export default function SalesBoard() {
       onPointerMove={onDragMove}
       onPointerUp={onDragEnd}
       onPointerCancel={onDragEnd}
-      className="inline-flex cursor-grab touch-none select-none px-1.5 py-1 text-base leading-none text-slate-300 active:cursor-grabbing"
+      className={`inline-flex cursor-grab touch-none select-none rounded-md border px-1.5 py-1 text-lg leading-none active:cursor-grabbing ${
+        dragId === id ? "border-blue-400 bg-blue-50 text-blue-500" : "border-slate-200 text-slate-400 active:bg-slate-100"
+      }`}
       title="ドラッグで並び替え"
     >
       ⠿
     </span>
   );
+  // ドラッグ中の行は「浮き上がって」指に追従、落とし先には青いライン
+  const rowStyle = (id: string): React.CSSProperties =>
+    dragId === id
+      ? {
+          transform: `translateY(${dragDy}px)`,
+          position: "relative",
+          zIndex: 30,
+          background: "#fff",
+          boxShadow: "0 12px 28px rgba(0,0,0,.20), inset 0 0 0 2px #60a5fa",
+        }
+      : {};
+  const rowClass = (id: string, base = "") =>
+    `${base} ${dragId ? "transition-none" : ""} ${
+      dragId && dragId !== id && drop?.id === id
+        ? drop.after
+          ? "shadow-[inset_0_-3px_0_0_#3b82f6]"
+          : "shadow-[inset_0_3px_0_0_#3b82f6]"
+        : ""
+    }`;
 
   // 当日の合計
   const daySum = useMemo(() => {
@@ -520,7 +547,7 @@ export default function SalesBoard() {
                       const s = apptVal(a);
                       return (
                         <tr key={a.id} ref={(el) => { rowRefs.current[a.id] = el; }}
-                          className={`${dragId === a.id ? "opacity-40" : ""} ${drop?.id === a.id ? (drop.after ? "shadow-[inset_0_-2px_0_0_#3b82f6]" : "shadow-[inset_0_2px_0_0_#3b82f6]") : ""}`}>
+                          className={rowClass(a.id)} style={rowStyle(a.id)}>
                           <td className="px-1 py-1">
                             <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
@@ -555,7 +582,7 @@ export default function SalesBoard() {
                       const m = it.m;
                       return (
                         <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
-                          className={`bg-amber-50/40 ${dragId === m.id ? "opacity-40" : ""} ${drop?.id === m.id ? (drop.after ? "shadow-[inset_0_-2px_0_0_#3b82f6]" : "shadow-[inset_0_2px_0_0_#3b82f6]") : ""}`}>
+                          className={rowClass(m.id, "bg-amber-50/40")} style={rowStyle(m.id)}>
                           <td className="px-1 py-1">
                             <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
                               className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
