@@ -276,6 +276,12 @@ export default function SalesBoard() {
     setSales((prev) => prev.filter((s) => s.id !== id));
     await supabase.from("sales").delete().eq("id", id);
   }
+  // 予約(患者)行に入力した売上を削除（予約自体は消さない。金額・担当がリセットされる）
+  async function deleteApptSale(a: Appt) {
+    if (!confirm(`${a.patient_name || "この患者"} の売上入力を削除しますか？`)) return;
+    setSales((prev) => prev.filter((s) => s.appointment_id !== a.id));
+    await supabase.from("sales").delete().eq("appointment_id", a.id);
+  }
   // 支払方法（現金⇄キャッシュレス）切替。予約行は無ければ会計を作成して保存。
   async function toggleApptPayment(a: Appt) {
     const cur = salesRef.current.find((x) => x.appointment_id === a.id) ?? apptVal(a);
@@ -807,7 +813,7 @@ export default function SalesBoard() {
             className="ml-auto rounded-md border border-emerald-600 px-2 py-1 text-[11px] font-bold text-emerald-700 active:bg-emerald-50 disabled:opacity-40">
             {csvBusy ? "取込中…" : "📄 レセコンCSV取込"}
           </button>
-          <input ref={csvRef} type="file" accept=".csv,text/csv" className="hidden"
+          <input ref={csvRef} type="file" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickCsv(f); e.target.value = ""; }} />
         </div>
         {csvMsg && <p className="mb-1 text-[11px] text-emerald-700">{csvMsg}</p>}
@@ -949,7 +955,10 @@ export default function SalesBoard() {
                           <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
                           <td className="px-1 py-1 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
-                          <td className="px-1 py-1 text-center">{grip(a.id)}</td>
+                          <td className="whitespace-nowrap px-1 py-1 text-center">
+                            {grip(a.id)}
+                            {saleByAppt[a.id] && <button onClick={() => deleteApptSale(a)} className="ml-1 text-[11px] font-bold text-red-400">削除</button>}
+                          </td>
                         </tr>
                       );
                     })()
