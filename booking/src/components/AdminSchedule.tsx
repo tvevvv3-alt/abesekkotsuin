@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminBoard from "./AdminBoard";
 import CalendarView from "./CalendarView";
 import { addDays, toDateStr } from "@/lib/booking";
@@ -69,8 +70,15 @@ export default function AdminSchedule() {
           className="min-w-0 rounded-md border border-slate-300 px-1 py-1 text-[11px] text-slate-600"
         />
 
+        <Link
+          href="/admin/sales"
+          className="ml-auto flex shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white active:bg-emerald-700"
+        >
+          💰 個別売上
+        </Link>
+
         {view === "calendar" && (
-          <div className="relative ml-auto shrink-0">
+          <div className="relative shrink-0">
             <button
               onClick={() => setDayMenu((v) => !v)}
               className="flex h-7 items-center gap-0.5 rounded-md border border-slate-300 bg-white px-2 text-[11px] font-bold text-slate-600 active:bg-slate-100"
