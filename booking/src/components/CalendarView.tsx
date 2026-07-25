@@ -76,19 +76,13 @@ function segColor(hex: string, tone: "light" | "dark"): string {
   let g = parseInt(n.slice(2, 4), 16);
   let b = parseInt(n.slice(4, 6), 16);
   if ([r, g, b].some(isNaN)) return hex;
-  const L = 0.299 * r + 0.587 * g + 0.114 * b;
-  if (L > 150) {
-    const f = 150 / L; // 黄色など明るい色は暗くして白文字を読めるように
-    r *= f;
-    g *= f;
-    b *= f;
-  }
-  if (tone === "light") {
-    const a = 0.3; // 通電は少しだけ薄く（白文字が読める範囲）
-    r += (255 - r) * a;
-    g += (255 - g) * a;
-    b += (255 - b) * a;
-  }
+  // 施術（濃）＝ヘッダーと同じ原色でそろえる
+  if (tone === "dark") return `rgb(${r},${g},${b})`;
+  // 通電（薄）＝原色を白寄りに薄める（見やすさ優先）
+  const a = 0.42;
+  r += (255 - r) * a;
+  g += (255 - g) * a;
+  b += (255 - b) * a;
   return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
