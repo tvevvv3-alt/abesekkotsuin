@@ -67,27 +67,6 @@ function downscaleImage(file: File, maxDim: number, quality: number): Promise<st
 }
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 
-// レセコンCSV（Shift-JIS）を行×列に分解
-function parseCsv(text: string): string[][] {
-  return text
-    .split(/\r?\n/)
-    .filter((l) => l.trim().length > 0)
-    .map((line) => {
-      const out: string[] = [];
-      let cur = "";
-      let q = false;
-      for (let i = 0; i < line.length; i++) {
-        const c = line[i];
-        if (c === '"') q = !q;
-        else if (c === "," && !q) { out.push(cur); cur = ""; }
-        else cur += c;
-      }
-      out.push(cur);
-      return out;
-    });
-}
-type ResecoDay = { count: number; shinken: number; insurance: number; burden: number; selfpayTotal: number; window: number };
-
 export default function SalesBoard() {
   const supabase = useMemo(() => createClient(), []);
   const [view, setView] = useState<"day" | "month">("day");
@@ -116,11 +95,6 @@ export default function SalesBoard() {
   const [ocrNotes, setOcrNotes] = useState<string[]>([]);
   const [ocrRetail, setOcrRetail] = useState<OcrRetailRow[]>([]);
   const [ocrSaving, setOcrSaving] = useState(false);
-  // レセコン月次CSV（日計表の合計を自動反映）
-  const [reseco, setReseco] = useState<Record<string, ResecoDay>>({});
-  const csvRef = useRef<HTMLInputElement | null>(null);
-  const [csvBusy, setCsvBusy] = useState(false);
-  const [csvMsg, setCsvMsg] = useState<string | null>(null);
 
   const monthStart = useMemo(() => date.slice(0, 8) + "01", [date]);
   const monthEnd = useMemo(() => {
@@ -162,17 +136,6 @@ export default function SalesBoard() {
     ]);
     setAppts((ap as Appt[]) ?? []);
     setSales((sl as Sale[]) ?? []);
-    // レセコン月次CSV（テーブル未作成でもエラーは無視）
-    const { data: rc } = await supabase
-      .from("reseco_daily")
-      .select("date, count, shinken, insurance, burden, selfpay_total, window_total")
-      .gte("date", monthStart)
-      .lt("date", monthEnd);
-    const rm: Record<string, ResecoDay> = {};
-    (rc as { date: string; count: number; shinken: number; insurance: number; burden: number; selfpay_total: number; window_total: number }[] | null)?.forEach((r) => {
-      rm[r.date] = { count: r.count, shinken: r.shinken, insurance: r.insurance, burden: r.burden, selfpayTotal: r.selfpay_total, window: r.window_total };
-    });
-    setReseco(rm);
     setLoading(false);
   }, [supabase, monthStart, monthEnd]);
 
@@ -315,41 +278,6 @@ export default function SalesBoard() {
     await supabase.from("settings").update({ clinic_sales_target: yenv }).eq("id", 1);
   }
 
-  // --- レセコン月次CSV取込（日計表の合計を自動反映） ---
-  async function onPickCsv(file: File) {
-    setCsvBusy(true);
-    setCsvMsg(null);
-    try {
-      const buf = await file.arrayBuffer();
-      let text = new TextDecoder("shift_jis").decode(buf);
-      if (!text.includes("日付") && !text.includes("合計額")) text = new TextDecoder("utf-8").decode(buf);
-      const rows = parseCsv(text);
-      if (rows.length < 2) { setCsvMsg("CSVが空です"); return; }
-      const header = rows[0].map((h) => h.replace(/["']/g, "").trim());
-      const idx = (name: string) => header.findIndex((h) => h === name);
-      const iDate = idx("日付"), iCnt = idx("件数"), iShin = idx("初検件数"), iIns = idx("合計額"), iBur = idx("負担額"), iSelf = idx("保険外金額"), iWin = idx("窓口徴収額計");
-      if (iDate < 0 || iIns < 0 || iBur < 0) { setCsvMsg("日計表のCSVではないようです（列が見つかりません）"); return; }
-      const num = (row: string[], i: number) => (i >= 0 ? parseInt((row[i] || "0").replace(/[^0-9-]/g, ""), 10) || 0 : 0);
-      const ups: { date: string; count: number; shinken: number; insurance: number; burden: number; selfpay_total: number; window_total: number }[] = [];
-      for (let r = 1; r < rows.length; r++) {
-        const row = rows[r];
-        const dt = (row[iDate] || "").replace(/["']/g, "").trim().replace(/\//g, "-");
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(dt)) continue;
-        ups.push({ date: dt, count: num(row, iCnt), shinken: num(row, iShin), insurance: num(row, iIns), burden: num(row, iBur), selfpay_total: num(row, iSelf), window_total: num(row, iWin) });
-      }
-      if (!ups.length) { setCsvMsg("取り込める日付行がありませんでした"); return; }
-      const { error } = await supabase.from("reseco_daily").upsert(ups, { onConflict: "date" });
-      if (error) { setCsvMsg("保存に失敗しました（reseco_daily テーブルが未作成かも）"); return; }
-      setCsvMsg(`${ups.length}日分を取り込みました（合計額・負担額・件数など）`);
-      const first = ups[0].date;
-      if (first.slice(0, 7) === date.slice(0, 7)) reload();
-      else setDate(first);
-    } catch {
-      setCsvMsg("CSVの読み込みに失敗しました");
-    } finally {
-      setCsvBusy(false);
-    }
-  }
 
   // --- レセコン写真の取込 ---
   function bestMatchAppt(name: string): string {
@@ -695,16 +623,8 @@ export default function SalesBoard() {
       else if (s.staff_id && (s.staff_id === bucket.hagi || s.staff_id === bucket.haya)) e.ho3 += s.selfpay;
       else e.ho4 += s.selfpay;
     });
-    // レセコンCSVがある日は 件数・初検・合計額・負担額 をCSVの値で上書き（正）
-    Object.entries(reseco).forEach(([dt, rc]) => {
-      const e = get(dt);
-      e.cnt = rc.count;
-      e.shin = rc.shinken;
-      e.ins = rc.insurance;
-      e.bur = rc.burden;
-    });
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [appts, sales, bucket, kawa, reseco]);
+  }, [appts, sales, bucket, kawa]);
   const monthSum = useMemo(
     () =>
       monthDaily.reduce(
@@ -833,20 +753,11 @@ export default function SalesBoard() {
         <div>
         <div className="mb-1 flex items-center gap-2">
           <span className="text-sm font-bold text-slate-700">{monthLabel} 日計表</span>
-          <div className="ml-auto flex items-center gap-2">
-            <button onClick={exportKeiriCsv}
-              className="rounded-md border border-slate-400 px-2 py-1 text-[11px] font-bold text-slate-600 active:bg-slate-100">
-              ⬇️ 経理用CSV
-            </button>
-            <button onClick={() => csvRef.current?.click()} disabled={csvBusy}
-              className="rounded-md border border-emerald-600 px-2 py-1 text-[11px] font-bold text-emerald-700 active:bg-emerald-50 disabled:opacity-40">
-              {csvBusy ? "取込中…" : "📄 レセコンCSV取込"}
-            </button>
-          </div>
-          <input ref={csvRef} type="file" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickCsv(f); e.target.value = ""; }} />
+          <button onClick={exportKeiriCsv}
+            className="ml-auto rounded-md border border-slate-400 px-2 py-1 text-[11px] font-bold text-slate-600 active:bg-slate-100">
+            ⬇️ 経理用CSV
+          </button>
         </div>
-        {csvMsg && <p className="mb-1 text-[11px] text-emerald-700">{csvMsg}</p>}
         <div className="overflow-x-auto rounded-xl border bg-white">
           <table className="w-full whitespace-nowrap text-sm">
             <thead className="bg-slate-50 text-[11px] text-slate-500">
