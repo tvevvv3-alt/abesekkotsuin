@@ -601,7 +601,7 @@ export default function AdminBoard({ date }: { date: string }) {
           <div className="flex w-full">
             {/* 時間ラベル列 */}
             <div className="w-12 shrink-0 border-r bg-slate-50">
-              <div className="h-8 border-b" />
+              <div className="sticky top-0 z-30 h-8 border-b bg-slate-50" />
               <div className="relative" style={{ height }}>
                 {ticks.map((t) => (
                   <div
@@ -1001,7 +1001,7 @@ function Column({
   return (
     <div className="min-w-0 flex-1 border-r last:border-r-0">
       <div
-        className="flex h-8 flex-col items-center justify-center border-b text-xs font-bold text-white"
+        className="sticky top-0 z-30 flex h-8 flex-col items-center justify-center border-b text-xs font-bold text-white"
         style={{ backgroundColor: headerColor }}
       >
         <span>{header}</span>
