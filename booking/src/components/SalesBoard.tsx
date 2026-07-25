@@ -39,6 +39,8 @@ const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | 
 // レセコン取込の確認行（写真の1行＝patient1件ぶん）
 type OcrReviewRow = { name: string; insurance: number; burden: number; selfpay: number; note?: string | null; apptId: string };
 type OcrTotals = { count: number | null; insurance: number | null; burden: number | null; selfpay: number | null };
+// 手書きメモから拾った物販（患者の保険外から分離して物販行にする）
+type OcrRetailRow = { name: string; item: string; amount: number; on: boolean };
 
 // アップロード前にブラウザ側で縮小（Vercelの本文上限とAPIコストを抑える）
 function downscaleImage(file: File, maxDim: number, quality: number): Promise<string> {
@@ -90,6 +92,7 @@ export default function SalesBoard() {
   const [ocrRows, setOcrRows] = useState<OcrReviewRow[]>([]);
   const [ocrTotals, setOcrTotals] = useState<OcrTotals | null>(null);
   const [ocrNotes, setOcrNotes] = useState<string[]>([]);
+  const [ocrRetail, setOcrRetail] = useState<OcrRetailRow[]>([]);
   const [ocrSaving, setOcrSaving] = useState(false);
 
   const monthStart = useMemo(() => date.slice(0, 8) + "01", [date]);
@@ -284,6 +287,7 @@ export default function SalesBoard() {
     setOcrError(null);
     setOcrRows([]);
     setOcrNotes([]);
+    setOcrRetail([]);
     setOcrTotals(null);
     setOcrOpen(true);
     setOcrBusy(true);
@@ -297,7 +301,12 @@ export default function SalesBoard() {
       const j = (await res.json()) as {
         ok: boolean;
         reason?: string;
-        result?: { rows: { name?: string; insurance?: number | null; burden?: number | null; selfpay?: number | null; note?: string | null }[]; totals: OcrTotals; notes?: string[] };
+        result?: {
+          rows: { name?: string; insurance?: number | null; burden?: number | null; selfpay?: number | null; note?: string | null }[];
+          totals: OcrTotals;
+          notes?: string[];
+          retail?: { name?: string | null; item?: string | null; amount?: number | null }[];
+        };
       };
       if (!j.ok || !j.result) {
         setOcrError(
@@ -322,6 +331,10 @@ export default function SalesBoard() {
       setOcrRows(rows);
       setOcrTotals(j.result.totals ?? null);
       setOcrNotes(j.result.notes ?? []);
+      const retail: OcrRetailRow[] = (j.result.retail || [])
+        .filter((x) => (Number(x.amount) || 0) > 0)
+        .map((x) => ({ name: x.name || "", item: x.item || "物販", amount: Number(x.amount) || 0, on: true }));
+      setOcrRetail(retail);
     } catch {
       setOcrError("画像の処理に失敗しました。");
     } finally {
@@ -331,16 +344,30 @@ export default function SalesBoard() {
   function setOcrRow(i: number, patch: Partial<OcrReviewRow>) {
     setOcrRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
+  function setOcrRetailRow(i: number, patch: Partial<OcrRetailRow>) {
+    setOcrRetail((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
   async function saveOcr() {
     setOcrSaving(true);
+    const activeRetail = ocrRetail.filter((r) => r.on && r.amount > 0);
+    // 物販は患者の保険外に含まれて印字されるので、氏名一致で保険外から差し引く（二重計上防止）
+    const retailByName = new Map<string, number>();
+    activeRetail.forEach((r) => {
+      const k = normName(r.name);
+      if (k) retailByName.set(k, (retailByName.get(k) ?? 0) + r.amount);
+    });
     // 同じ予約にマッチした複数行（保険＋自費など）は合算
     const byAppt = new Map<string, { insurance: number; burden: number; selfpay: number }>();
     ocrRows.forEach((r) => {
       if (!r.apptId) return;
+      let sp = r.selfpay || 0;
+      const k = normName(r.name);
+      const cut = retailByName.get(k) ?? 0;
+      if (cut > 0) { const use = Math.min(cut, sp); sp -= use; retailByName.set(k, cut - use); }
       const cur = byAppt.get(r.apptId) ?? { insurance: 0, burden: 0, selfpay: 0 };
       cur.insurance += r.insurance || 0;
       cur.burden += r.burden || 0;
-      cur.selfpay += r.selfpay || 0;
+      cur.selfpay += sp;
       byAppt.set(r.apptId, cur);
     });
     const ups = Array.from(byAppt.entries()).map(([apptId, v]) => {
@@ -356,9 +383,17 @@ export default function SalesBoard() {
       };
     });
     if (ups.length) await supabase.from("sales").upsert(ups, { onConflict: "appointment_id" });
+    // 物販行を挿入（担当なし＝物販バケット）
+    if (activeRetail.length) {
+      const inserts = activeRetail.map((r) => ({
+        date, staff_id: null, patient_name: `${r.name} ${r.item}`.trim(), selfpay: r.amount, insurance: 0, burden: 0, payment: "cash" as const,
+      }));
+      await supabase.from("sales").insert(inserts);
+    }
     setOcrSaving(false);
     setOcrOpen(false);
     setOcrRows([]);
+    setOcrRetail([]);
     reload();
   }
 
@@ -766,7 +801,7 @@ export default function SalesBoard() {
               <button onClick={() => fileRef.current?.click()} className="rounded-md border border-blue-600 px-2 py-1 text-[11px] font-bold text-blue-600 active:bg-blue-50">📷 レセコン取込</button>
               <button onClick={() => addManual()} className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販/予約外</button>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickReseko(f); e.target.value = ""; }} />
           </div>
           <div className="overflow-x-auto rounded-xl border bg-white">
@@ -941,6 +976,21 @@ export default function SalesBoard() {
                       </div>
                     );
                   })()}
+                  {ocrRetail.length > 0 && (
+                    <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50/60 p-2">
+                      <div className="mb-1 text-[12px] font-bold text-amber-800">🛍 物販として登録 <span className="font-normal text-amber-600">（保険外から差し引いて物販行に）</span></div>
+                      <div className="space-y-1.5">
+                        {ocrRetail.map((r, i) => (
+                          <div key={i} className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">
+                            <input type="checkbox" checked={r.on} onChange={(e) => setOcrRetailRow(i, { on: e.target.checked })} className="h-4 w-4" />
+                            <input value={r.name} onChange={(e) => setOcrRetailRow(i, { name: e.target.value })} placeholder="氏名" className="w-24 rounded border border-slate-300 px-1 py-0.5" />
+                            <input value={r.item} onChange={(e) => setOcrRetailRow(i, { item: e.target.value })} placeholder="品目" className="w-24 rounded border border-slate-300 px-1 py-0.5" />
+                            <input type="number" value={r.amount || ""} onChange={(e) => setOcrRetailRow(i, { amount: parseInt(e.target.value || "0", 10) })} className="w-20 rounded border border-slate-300 px-1 py-0.5 text-right tabnum" />円
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {ocrRows.map((r, i) => (
                       <div key={i} className="rounded-lg border p-2">
@@ -966,9 +1016,12 @@ export default function SalesBoard() {
               )}
             </div>
             <div className="flex items-center gap-2 border-t px-4 py-3">
-              <span className="text-[11px] text-slate-400">{ocrRows.filter((r) => r.apptId).length}件を予約に反映</span>
+              <span className="text-[11px] text-slate-400">
+                予約 {ocrRows.filter((r) => r.apptId).length}件
+                {ocrRetail.filter((r) => r.on && r.amount > 0).length > 0 && ` ・物販 ${ocrRetail.filter((r) => r.on && r.amount > 0).length}件`}
+              </span>
               <button onClick={() => !ocrSaving && setOcrOpen(false)} className="ml-auto rounded-lg border px-3 py-1.5 text-sm text-slate-500">キャンセル</button>
-              <button onClick={saveOcr} disabled={ocrBusy || ocrSaving || ocrRows.every((r) => !r.apptId)}
+              <button onClick={saveOcr} disabled={ocrBusy || ocrSaving || (ocrRows.every((r) => !r.apptId) && ocrRetail.every((r) => !r.on || r.amount <= 0))}
                 className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700 disabled:opacity-40">
                 {ocrSaving ? "保存中…" : "保存"}
               </button>

@@ -23,11 +23,15 @@ const PROMPT = `これは日本の接骨院のレセコンの写真です。次�
 写真内の手書きメモ（付箋・ペン書き）もすべて読み取り、notes 配列に原文のまま入れる。
 （例:「山本将大 2つとってる（保険と自費）」「物販 ○○」など。仕分けの手掛かりになるもの）。
 特定の患者に関するメモなら、その患者行の note にも入れる。
+手書きメモに「物販」を示すもの（氏名＋金額＋品目。例:「中村仁郎 20,600 マット」「今西啓子 5,640 サポーター」）があれば、
+retail 配列に {name(氏名), item(品目。マット等。不明ならnull), amount(金額。整数)} として入れる。
+（物販はレセコン上その患者の保険外に含めて印字されることがあるため、retail はその内訳）。
 出力はJSONのみ（前後に文章やコードフェンスを付けない）。形式:
-{"rows":[{"no":1,"name":"吉田 来実","insurance":2495,"burden":500,"selfpay":4400,"note":null}],"totals":{"count":39,"insurance":10643,"burden":1650,"selfpay":254040},"notes":["山本将大 2つとってる（保険と自費）"]}`;
+{"rows":[{"no":1,"name":"吉田 来実","insurance":2495,"burden":500,"selfpay":4400,"note":null}],"totals":{"count":39,"insurance":10643,"burden":1650,"selfpay":254040},"notes":["中村仁郎 20,600 マット"],"retail":[{"name":"中村仁郎","item":"マット","amount":20600}]}`;
 
 type OcrRow = { no?: number | null; name: string; insurance: number | null; burden: number | null; selfpay: number | null; note?: string | null };
-type OcrResult = { rows: OcrRow[]; totals: { count: number | null; insurance: number | null; burden: number | null; selfpay: number | null }; notes?: string[] };
+type OcrRetail = { name?: string | null; item?: string | null; amount?: number | null };
+type OcrResult = { rows: OcrRow[]; totals: { count: number | null; insurance: number | null; burden: number | null; selfpay: number | null }; notes?: string[]; retail?: OcrRetail[] };
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
