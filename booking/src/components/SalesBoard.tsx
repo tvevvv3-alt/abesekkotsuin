@@ -15,6 +15,8 @@ interface Appt {
   start_min: number;
   staff_id: string | null;
   service_id: string | null;
+  service_name: string | null;
+  patient_id: string | null;
   patient_name: string | null;
 }
 interface Sale {
@@ -67,6 +69,27 @@ function downscaleImage(file: File, maxDim: number, quality: number): Promise<st
 }
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 
+// 自費の自動計算
+type SelfPrices = { p30f: number; p30r: number; p60f: number; p60r: number };
+type SelfOptions = { tsuden_ippan: number; tsuden_gakusei: number; jikangai_ippan: number; jikangai_gakusei: number; student_max_age: number };
+const DEFAULT_OPTIONS: SelfOptions = { tsuden_ippan: 3300, tsuden_gakusei: 2750, jikangai_ippan: 2750, jikangai_gakusei: 550, student_max_age: 22 };
+// HP掲載の既定料金（名前で割り当て。林・その他は萩原と同額）
+function defaultPrices(name: string): SelfPrices {
+  if (name.includes("阿部")) return { p30f: 7700, p30r: 5500, p60f: 13200, p60r: 11000 };
+  if (name.includes("澁谷") || name.includes("渋谷")) return { p30f: 7150, p30r: 4950, p60f: 12100, p60r: 10000 };
+  return { p30f: 6600, p30r: 4400, p60f: 11000, p60r: 8800 };
+}
+const JIKANGAI_MIN = 1230; // 20:30〜 は時間外加算
+// 生年月日(YYYY-MM-DD)と基準日から満年齢
+function ageAt(birth: string | null | undefined, onDate: string): number | null {
+  if (!birth || !/^\d{4}-\d{2}-\d{2}/.test(birth)) return null;
+  const [by, bm, bd] = birth.slice(0, 10).split("-").map(Number);
+  const [y, m, d] = onDate.split("-").map(Number);
+  let a = y - by;
+  if (m < bm || (m === bm && d < bd)) a--;
+  return a >= 0 && a < 130 ? a : null;
+}
+
 export default function SalesBoard() {
   const supabase = useMemo(() => createClient(), []);
   const [view, setView] = useState<"day" | "month">("day");
@@ -80,6 +103,13 @@ export default function SalesBoard() {
   const [targets, setTargets] = useState<Record<string, number>>({});
   const [clinicTarget, setClinicTarget] = useState(0);
   const [loading, setLoading] = useState(true);
+  // 自費の自動計算
+  const [prices, setPrices] = useState<Record<string, SelfPrices>>({});
+  const [options, setOptions] = useState<SelfOptions>(DEFAULT_OPTIONS);
+  const [birth, setBirth] = useState<Record<string, string>>({}); // patient_id -> birth_date
+  const [shin, setShin] = useState<Record<string, boolean>>({}); // appt_id -> 初診
+  const [gaku, setGaku] = useState<Record<string, boolean>>({}); // appt_id -> 学生(上書き)
+  const [priceOpen, setPriceOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragDy, setDragDy] = useState(0);
   const dragStartY = useRef(0);
@@ -112,8 +142,19 @@ export default function SalesBoard() {
       setTargets(t);
       const kw = sv.find((s) => s.category === "川西整体院");
       if (kw) setKawa({ id: kw.id, name: kw.name, color: KAWANISHI_COLOR });
-      const { data: cfg } = await supabase.from("settings").select("clinic_sales_target").eq("id", 1).maybeSingle();
-      if (cfg) setClinicTarget((cfg as { clinic_sales_target?: number }).clinic_sales_target ?? 0);
+      const { data: cfg } = await supabase.from("settings").select("clinic_sales_target, self_options").eq("id", 1).maybeSingle();
+      if (cfg) {
+        setClinicTarget((cfg as { clinic_sales_target?: number }).clinic_sales_target ?? 0);
+        const so = (cfg as { self_options?: Partial<SelfOptions> }).self_options;
+        if (so) setOptions({ ...DEFAULT_OPTIONS, ...so });
+      }
+      // スタッフ毎の料金（未設定は名前から既定値）
+      const pm: Record<string, SelfPrices> = {};
+      vis.forEach((s) => {
+        const sp = (s as unknown as { self_prices?: Partial<SelfPrices> }).self_prices;
+        pm[s.id] = { ...defaultPrices(s.name), ...(sp || {}) };
+      });
+      setPrices(pm);
     })();
   }, [supabase]);
 
@@ -122,7 +163,7 @@ export default function SalesBoard() {
     const [{ data: ap }, { data: sl }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, date, start_min, staff_id, service_id, patient_name")
+        .select("id, date, start_min, staff_id, service_id, service_name, patient_id, patient_name")
         .neq("status", "cancelled")
         .gte("date", monthStart)
         .lt("date", monthEnd)
@@ -136,6 +177,16 @@ export default function SalesBoard() {
     ]);
     setAppts((ap as Appt[]) ?? []);
     setSales((sl as Sale[]) ?? []);
+    // 患者の生年月日（学生/一般の判定用）
+    const pids = Array.from(new Set(((ap as Appt[]) ?? []).map((a) => a.patient_id).filter((x): x is string => !!x)));
+    if (pids.length) {
+      const { data: pts } = await supabase.from("patients").select("id, birth_date").in("id", pids);
+      const bm: Record<string, string> = {};
+      (pts as { id: string; birth_date: string | null }[] | null)?.forEach((p) => { if (p.birth_date) bm[p.id] = p.birth_date; });
+      setBirth(bm);
+    } else {
+      setBirth({});
+    }
     setLoading(false);
   }, [supabase, monthStart, monthEnd]);
 
@@ -276,6 +327,62 @@ export default function SalesBoard() {
     const yenv = Math.max(0, Math.round(man * 10000));
     setClinicTarget(yenv);
     await supabase.from("settings").update({ clinic_sales_target: yenv }).eq("id", 1);
+  }
+
+  // --- 自費の自動計算（担当×メニュー×初診/再診×学生/一般） ---
+  const is60 = (a: Appt) => /60分|６０分/.test(a.service_name || "");
+  const hasTsuden = (a: Appt) => /通電/.test(a.service_name || "");
+  const isFirst = (a: Appt) => shin[a.id] ?? false; // 既定＝再診
+  const isStudentAppt = (a: Appt) => {
+    if (a.id in gaku) return gaku[a.id];
+    const age = a.patient_id ? ageAt(birth[a.patient_id], a.date) : null;
+    return age != null && age <= options.student_max_age;
+  };
+  const suggestSelf = (a: Appt): number => {
+    if (kawa && a.service_id === kawa.id) return 0; // 川西は別料金
+    const staffId = a.staff_id;
+    if (!staffId || !prices[staffId]) return 0;
+    const p = prices[staffId];
+    const first = isFirst(a);
+    const base = is60(a) ? (first ? p.p60f : p.p60r) : (first ? p.p30f : p.p30r);
+    const student = isStudentAppt(a);
+    const tsu = hasTsuden(a) ? (student ? options.tsuden_gakusei : options.tsuden_ippan) : 0;
+    const late = a.start_min >= JIKANGAI_MIN ? (student ? options.jikangai_gakusei : options.jikangai_ippan) : 0;
+    return base + tsu + late;
+  };
+  // 当日の予約に、まだ自費が入っていない行だけ自動入力（既入力は上書きしない）
+  async function autofillSelf() {
+    const rows = dayRows.filter((a) => {
+      if (kawa && a.service_id === kawa.id) return false;
+      const s = saleByAppt[a.id];
+      return !(s && s.selfpay > 0);
+    });
+    const ups = rows
+      .map((a) => {
+        const s = saleByAppt[a.id];
+        return {
+          appointment_id: a.id, date: a.date, staff_id: a.staff_id ?? defStaffId(a), patient_name: a.patient_name,
+          selfpay: suggestSelf(a), insurance: s?.insurance ?? 0, burden: s?.burden ?? 0, payment: s?.payment ?? "cash",
+        };
+      })
+      .filter((u) => u.selfpay > 0);
+    if (!ups.length) return;
+    await supabase.from("sales").upsert(ups, { onConflict: "appointment_id" });
+    reload();
+  }
+  // 料金設定の編集
+  function setPrice(staffId: string, key: keyof SelfPrices, val: number) {
+    setPrices((prev) => ({ ...prev, [staffId]: { ...prev[staffId], [key]: val } }));
+  }
+  function setOpt(key: keyof SelfOptions, val: number) {
+    setOptions((prev) => ({ ...prev, [key]: val }));
+  }
+  async function persistPrices() {
+    await Promise.all([
+      ...Object.entries(prices).map(([id, p]) => supabase.from("staff").update({ self_prices: p }).eq("id", id)),
+      supabase.from("settings").update({ self_options: options }).eq("id", 1),
+    ]);
+    setPriceOpen(false);
   }
 
 
@@ -837,9 +944,11 @@ export default function SalesBoard() {
       ) : (
         /* ===== 日別入力 ===== */
         <div>
-          <div className="mb-1 flex items-center gap-2">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="text-sm font-bold text-slate-700">{d.getMonth() + 1}/{d.getDate()}（{WEEKDAY_LABELS[d.getDay()]}）</span>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <button onClick={autofillSelf} className="rounded-md bg-amber-500 px-2 py-1 text-[11px] font-bold text-white active:bg-amber-600" title="担当×メニュー×初診/再診×学生/一般から自費を自動入力（入力済みは上書きしません）">⚡ 自費 自動入力</button>
+              <button onClick={() => setPriceOpen(true)} className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100">料金設定</button>
               <button onClick={() => fileRef.current?.click()} className="rounded-md border border-blue-600 px-2 py-1 text-[11px] font-bold text-blue-600 active:bg-blue-50">📷 レセコン取込</button>
               <button onClick={() => addManual()} className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販/予約外</button>
             </div>
@@ -878,11 +987,25 @@ export default function SalesBoard() {
                             </select>
                           </td>
                           <td className="whitespace-nowrap px-2 py-1">
-                            <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
-                            <span className="ml-1 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
+                            <div>
+                              <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
+                              <span className="ml-1 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
+                            </div>
+                            {!(kawa && a.service_id === kawa.id) && (
+                              <div className="mt-0.5 flex items-center gap-1">
+                                <button onClick={() => setShin((m) => ({ ...m, [a.id]: !isFirst(a) }))}
+                                  className={`rounded border px-1 py-0.5 text-[9px] font-bold ${isFirst(a) ? "border-rose-300 bg-rose-50 text-rose-600" : "border-slate-200 text-slate-400"}`}>
+                                  {isFirst(a) ? "初診" : "再診"}
+                                </button>
+                                <button onClick={() => setGaku((m) => ({ ...m, [a.id]: !isStudentAppt(a) }))}
+                                  className={`rounded border px-1 py-0.5 text-[9px] font-bold ${isStudentAppt(a) ? "border-sky-300 bg-sky-50 text-sky-600" : "border-slate-200 text-slate-400"}`}>
+                                  {isStudentAppt(a) ? "学生" : "一般"}
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td className="px-1 py-1 text-right">
-                            <input type="number" min={0} placeholder="0" value={s.selfpay || ""}
+                            <input type="number" min={0} placeholder={suggestSelf(a) ? String(suggestSelf(a)) : "0"} value={s.selfpay || ""}
                               onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
                           </td>
                           <td className="px-1 py-1 text-right">
@@ -974,6 +1097,69 @@ export default function SalesBoard() {
         「＋物販/予約外」から。担当ごとの合計(自費+保険)で当月の達成率が出ます。レセコンの日計表は
         「📷 レセコン取込」で写真から自動入力できます（担当は予約から自動）。
       </p>
+
+      {/* 料金設定（自費の自動計算） */}
+      {priceOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setPriceOpen(false)} />
+          <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-2xl bg-white sm:rounded-2xl">
+            <div className="flex items-center gap-2 border-b px-4 py-3">
+              <span className="text-base font-bold text-slate-800">料金設定（自費の自動計算）</span>
+              <button onClick={() => setPriceOpen(false)} className="ml-auto text-slate-400">✕</button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-[11px] text-slate-500">
+                    <tr>
+                      <th className="px-2 py-2 text-left font-bold">担当</th>
+                      <th className="px-1 py-2 text-right font-bold">30分 初診</th>
+                      <th className="px-1 py-2 text-right font-bold">30分 再診</th>
+                      <th className="px-1 py-2 text-right font-bold">60分 初診</th>
+                      <th className="px-1 py-2 text-right font-bold">60分 再診</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {staff.map((s) => {
+                      const p = prices[s.id] ?? defaultPrices(s.name);
+                      const cell = (key: keyof SelfPrices) => (
+                        <td className="px-1 py-1 text-right">
+                          <input type="number" min={0} value={p[key] || ""} onChange={(e) => setPrice(s.id, key, parseInt(e.target.value || "0", 10))}
+                            className="w-20 rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum" />
+                        </td>
+                      );
+                      return (
+                        <tr key={s.id}>
+                          <td className="whitespace-nowrap px-2 py-1 font-bold text-slate-700">{s.name}</td>
+                          {cell("p30f")}{cell("p30r")}{cell("p60f")}{cell("p60r")}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4">
+                <div className="mb-1 text-sm font-bold text-slate-700">オプション加算</div>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-[12px] text-slate-600">
+                  {([["tsuden_ippan", "全身通電 一般"], ["tsuden_gakusei", "全身通電 学生"], ["jikangai_ippan", "時間外 一般"], ["jikangai_gakusei", "時間外 学生"], ["student_max_age", "学生とみなす年齢(以下)"]] as const).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-1">
+                      {label}
+                      <input type="number" min={0} value={options[key] || ""} onChange={(e) => setOpt(key, parseInt(e.target.value || "0", 10))}
+                        className="w-20 rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum" />
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400">時間外は20:30以降の予約に自動加算。通電は「全身通電」を含むメニューに自動加算。学生/一般は生年月日から自動判定（各行で切替可）。</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 border-t px-4 py-3">
+              <span className="text-[11px] text-slate-400">名前・担当は予約から自動。金額は「⚡自費 自動入力」で反映。</span>
+              <button onClick={() => setPriceOpen(false)} className="ml-auto rounded-lg border px-3 py-1.5 text-sm text-slate-500">閉じる</button>
+              <button onClick={persistPrices} className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700">保存</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* レセコン取込：確認画面 */}
       {ocrOpen && (
