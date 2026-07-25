@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff, loadServices } from "@/lib/data";
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -620,6 +621,9 @@ export default function SalesBoard() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Link href="/admin" className="flex shrink-0 items-center gap-1 rounded-md bg-slate-600 px-2 py-1 text-[11px] font-bold text-white active:bg-slate-700">
+          ← 予約一覧
+        </Link>
         <h1 className="text-lg font-bold text-slate-800">個別売上</h1>
         <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5">
           {([["day", "日別入力"], ["month", "日計表(月)"]] as const).map(([v, l]) => (
