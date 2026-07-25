@@ -477,6 +477,30 @@ export default function SalesBoard() {
     reload();
   }
 
+  // --- 経理用：日毎の現金/キャッシュレス内訳をCSV書き出し ---
+  function exportKeiriCsv() {
+    const header = ["日付", "件数", "合計額", "負担額", "保険外", "窓口額計", "キャッシュレス", "現金売上", "総売上"];
+    const lines = [header.join(",")];
+    monthDaily.forEach(([dt, e]) => {
+      const selfpay = e.ho1 + e.ho2 + e.ho3 + e.ho4 + e.kawa;
+      const win = e.cash + e.cashless;
+      const uriage = e.ins + selfpay;
+      lines.push([dt.replace(/-/g, "/"), e.cnt, e.ins, e.bur, selfpay, win, e.cashless, e.cash, uriage].join(","));
+    });
+    const totSelf = monthSum.ho1 + monthSum.ho2 + monthSum.ho3 + monthSum.ho4 + monthSum.kawa;
+    lines.push(["月計", monthSum.cnt, monthSum.ins, monthSum.bur, totSelf, monthSum.cash + monthSum.cashless, monthSum.cashless, monthSum.cash, monthSum.ins + totSelf].join(","));
+    const csv = "﻿" + lines.join("\r\n"); // Excelで文字化けしないようBOM付き
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `現金キャッシュレス内訳_${monthStart.slice(0, 7)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // --- 集計 ---
   const total = (s: { selfpay: number; insurance: number }) => s.selfpay + s.insurance; // 合計
   const paid = (s: { selfpay: number; burden: number }) => s.selfpay + s.burden; // 入金額
@@ -809,10 +833,16 @@ export default function SalesBoard() {
         <div>
         <div className="mb-1 flex items-center gap-2">
           <span className="text-sm font-bold text-slate-700">{monthLabel} 日計表</span>
-          <button onClick={() => csvRef.current?.click()} disabled={csvBusy}
-            className="ml-auto rounded-md border border-emerald-600 px-2 py-1 text-[11px] font-bold text-emerald-700 active:bg-emerald-50 disabled:opacity-40">
-            {csvBusy ? "取込中…" : "📄 レセコンCSV取込"}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={exportKeiriCsv}
+              className="rounded-md border border-slate-400 px-2 py-1 text-[11px] font-bold text-slate-600 active:bg-slate-100">
+              ⬇️ 経理用CSV
+            </button>
+            <button onClick={() => csvRef.current?.click()} disabled={csvBusy}
+              className="rounded-md border border-emerald-600 px-2 py-1 text-[11px] font-bold text-emerald-700 active:bg-emerald-50 disabled:opacity-40">
+              {csvBusy ? "取込中…" : "📄 レセコンCSV取込"}
+            </button>
+          </div>
           <input ref={csvRef} type="file" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickCsv(f); e.target.value = ""; }} />
         </div>
