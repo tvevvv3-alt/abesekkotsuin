@@ -15,6 +15,7 @@ import {
   loadSettings,
   loadStaffServices,
 } from "@/lib/data";
+import { DEFAULT_OPTIONS, defaultPrices, menuPrices, type SelfPrices, type SelfOptions } from "@/lib/pricing";
 import type {
   AppointmentStep,
   BookingWindow,
@@ -340,6 +341,15 @@ export default function BookingWizard() {
   }, [service, links, allStaff]);
 
   const selectedStaff = allStaff.find((s) => s.id === staffId) || null;
+
+  // 担当×メニューの自費料金（担当プロフィール下に表示）。料金設定(self_prices)から算出。
+  const staffMenuPrice = useMemo(() => {
+    if (!service || isClass || !selectedStaff) return null;
+    const sp = (selectedStaff as unknown as { self_prices?: Partial<SelfPrices> }).self_prices;
+    const p: SelfPrices = { ...defaultPrices(selectedStaff.name), ...(sp || {}) };
+    const opt: SelfOptions = { ...DEFAULT_OPTIONS, ...((settings as unknown as { self_options?: Partial<SelfOptions> })?.self_options || {}) };
+    return menuPrices(service.name, p, opt);
+  }, [service, isClass, selectedStaff, settings]);
 
   // ---- マスタ読み込み ----
   useEffect(() => {
@@ -903,6 +913,29 @@ export default function BookingWizard() {
                   </p>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* 担当×メニューの料金表 */}
+          {!isClass && selectedStaff && staffMenuPrice && (
+            <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-2 text-xs font-bold text-slate-700">
+                料金 <span className="font-normal text-slate-400">（{service?.patient_name || service?.name}）</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const).map(([label, ippan, gakusei]) => (
+                  <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-2 text-center">
+                    <div className="text-[10px] text-slate-400">{label}</div>
+                    <div className="text-base font-bold text-slate-800">¥{ippan.toLocaleString()}</div>
+                    {staffMenuPrice.studentDiffers && (
+                      <div className="text-[10px] text-slate-500">学生 ¥{gakusei.toLocaleString()}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
+                税込。20:30以降は時間外加算あり。ケガの内容により健康保険が適用される場合は窓口負担が変わります。
+              </p>
             </div>
           )}
 

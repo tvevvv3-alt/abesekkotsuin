@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff, loadServices } from "@/lib/data";
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import type { Staff } from "@/lib/types";
+import { DEFAULT_OPTIONS, defaultPrices, ageAt, JIKANGAI_MIN, menuIs60, menuHasTsuden, type SelfPrices, type SelfOptions } from "@/lib/pricing";
 
 const KAWANISHI_COLOR = "#3F51B5"; // 川西整体院のカラー（ボード/カレンダーに合わせる）
 
@@ -68,27 +69,6 @@ function downscaleImage(file: File, maxDim: number, quality: number): Promise<st
   });
 }
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
-
-// 自費の自動計算
-type SelfPrices = { p30f: number; p30r: number; p60f: number; p60r: number };
-type SelfOptions = { tsuden_ippan: number; tsuden_gakusei: number; jikangai_ippan: number; jikangai_gakusei: number; student_max_age: number };
-const DEFAULT_OPTIONS: SelfOptions = { tsuden_ippan: 3300, tsuden_gakusei: 2750, jikangai_ippan: 2750, jikangai_gakusei: 550, student_max_age: 22 };
-// HP掲載の既定料金（名前で割り当て。林・その他は萩原と同額）
-function defaultPrices(name: string): SelfPrices {
-  if (name.includes("阿部")) return { p30f: 7700, p30r: 5500, p60f: 13200, p60r: 11000 };
-  if (name.includes("澁谷") || name.includes("渋谷")) return { p30f: 7150, p30r: 4950, p60f: 12100, p60r: 10000 };
-  return { p30f: 6600, p30r: 4400, p60f: 11000, p60r: 8800 };
-}
-const JIKANGAI_MIN = 1230; // 20:30〜 は時間外加算
-// 生年月日(YYYY-MM-DD)と基準日から満年齢
-function ageAt(birth: string | null | undefined, onDate: string): number | null {
-  if (!birth || !/^\d{4}-\d{2}-\d{2}/.test(birth)) return null;
-  const [by, bm, bd] = birth.slice(0, 10).split("-").map(Number);
-  const [y, m, d] = onDate.split("-").map(Number);
-  let a = y - by;
-  if (m < bm || (m === bm && d < bd)) a--;
-  return a >= 0 && a < 130 ? a : null;
-}
 
 export default function SalesBoard() {
   const supabase = useMemo(() => createClient(), []);
@@ -330,8 +310,8 @@ export default function SalesBoard() {
   }
 
   // --- 自費の自動計算（担当×メニュー×初診/再診×学生/一般） ---
-  const is60 = (a: Appt) => /60分|６０分/.test(a.service_name || "");
-  const hasTsuden = (a: Appt) => /通電/.test(a.service_name || "");
+  const is60 = (a: Appt) => menuIs60(a.service_name);
+  const hasTsuden = (a: Appt) => menuHasTsuden(a.service_name);
   const isFirst = (a: Appt) => shin[a.id] ?? false; // 既定＝再診
   const isStudentAppt = (a: Appt) => {
     if (a.id in gaku) return gaku[a.id];
