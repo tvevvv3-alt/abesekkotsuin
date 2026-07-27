@@ -166,6 +166,7 @@ export default function BookingWizard() {
   const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
   const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false); // 担当プロフィールの詳細開閉
   const [windows, setWindows] = useState<BookingWindow[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loadingMaster, setLoadingMaster] = useState(true);
@@ -835,12 +836,6 @@ export default function BookingWizard() {
       {step === 2 && service && (
         <Section
           title="担当者・日時を選ぶ"
-          right={!isClass && staffMenuPrice ? (
-            <div className="text-right leading-tight">
-              <div className="text-[11px] text-slate-500">初診 <b className="text-sm text-slate-800">¥{staffMenuPrice.initialIppan.toLocaleString()}</b></div>
-              <div className="text-[11px] text-slate-500">再診 <b className="text-sm text-slate-800">¥{staffMenuPrice.repeatIppan.toLocaleString()}</b></div>
-            </div>
-          ) : undefined}
           onBack={() => {
             // 時間外導線から来た場合は、元のメニューの日時選択に戻す
             if (fromServiceId) {
@@ -894,12 +889,12 @@ export default function BookingWizard() {
             </div>
           )}
 
-          {/* スタッフ紹介＋料金（コンパクト） */}
+          {/* スタッフ紹介（既定は閉じる。「詳細」で紹介文を開く） */}
           {!isClass && selectedStaff && (
-            <div className="mb-2 flex gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
-              <StaffAvatar staff={selectedStaff} size={46} />
-              <div className="min-w-0">
-                <div className="leading-snug text-slate-800">
+            <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center gap-3">
+                <StaffAvatar staff={selectedStaff} size={46} />
+                <div className="min-w-0 flex-1 leading-snug text-slate-800">
                   <span className="font-bold">
                     {selectedStaff.display_name || selectedStaff.name}
                   </span>
@@ -909,25 +904,44 @@ export default function BookingWizard() {
                     </span>
                   )}
                 </div>
-                {selectedStaff.bio ? (
-                  <p className="mt-0.5 line-clamp-3 text-[11px] leading-snug text-slate-600">
-                    {selectedStaff.bio}
-                  </p>
-                ) : (
-                  <p className="mt-0.5 text-[11px] text-slate-400">
-                    {selectedStaff.clinic || ""}
-                  </p>
+                {selectedStaff.bio && (
+                  <button
+                    onClick={() => setProfileOpen((o) => !o)}
+                    className="shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 active:bg-slate-100"
+                  >
+                    {profileOpen ? "閉じる ▲" : "詳細 ▼"}
+                  </button>
                 )}
               </div>
+              {profileOpen && selectedStaff.bio && (
+                <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
+                  {selectedStaff.bio}
+                </p>
+              )}
             </div>
           )}
 
-          {/* 料金の注記（金額は上部に表示） */}
+          {/* 担当×メニューの料金表 */}
           {!isClass && selectedStaff && staffMenuPrice && (
-            <p className="mb-2 text-[10px] leading-snug text-slate-400">
-              {staffMenuPrice.studentDiffers && `学生：初診¥${staffMenuPrice.initialGakusei.toLocaleString()}／再診¥${staffMenuPrice.repeatGakusei.toLocaleString()}。`}
-              2ヶ月以内（例：最終8/9→10月末日）は再診料金です。怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。
-            </p>
+            <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-2 text-xs font-bold text-slate-700">
+                料金 <span className="font-normal text-slate-400">（{service?.patient_name || service?.name}）</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const).map(([label, ippan, gakusei]) => (
+                  <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-2 text-center">
+                    <div className="text-[10px] text-slate-400">{label}</div>
+                    <div className="text-base font-bold text-slate-800">¥{ippan.toLocaleString()}</div>
+                    {staffMenuPrice.studentDiffers && (
+                      <div className="text-[10px] text-slate-500">学生 ¥{gakusei.toLocaleString()}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] leading-snug text-slate-400">
+                2ヶ月以内（例：最終8/9→10月末日）は再診料金です。怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。
+              </p>
+            </div>
           )}
 
           {/* 週切替（今週より前へは戻れない） */}
