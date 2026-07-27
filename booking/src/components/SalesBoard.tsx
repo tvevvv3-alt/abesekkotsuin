@@ -87,8 +87,10 @@ export default function SalesBoard() {
   const [prices, setPrices] = useState<Record<string, SelfPrices>>({});
   const [options, setOptions] = useState<SelfOptions>(DEFAULT_OPTIONS);
   const [birth, setBirth] = useState<Record<string, string>>({}); // patient_id -> birth_date
-  const [shin, setShin] = useState<Record<string, boolean>>({}); // appt_id -> 初診
+  const [shin, setShin] = useState<Record<string, boolean>>({}); // appt_id -> 初診(手動上書き)
   const [gaku, setGaku] = useState<Record<string, boolean>>({}); // appt_id -> 学生(上書き)
+  const [lastVisit, setLastVisit] = useState<Record<string, string>>({}); // 患者キー -> 前回来院日
+  const [lastVisitReady, setLastVisitReady] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragDy, setDragDy] = useState(0);
@@ -312,7 +314,21 @@ export default function SalesBoard() {
   // --- 自費の自動計算（担当×メニュー×初診/再診×学生/一般） ---
   const is60 = (a: Appt) => menuIs60(a.service_name);
   const hasTsuden = (a: Appt) => menuHasTsuden(a.service_name);
-  const isFirst = (a: Appt) => shin[a.id] ?? false; // 既定＝再診
+  // 患者キー（患者ID優先、無ければ氏名）／月差
+  const pkey = (a: { patient_id: string | null; patient_name: string | null }) => a.patient_id || "n:" + normName(a.patient_name);
+  const monthGap = (from: string, to: string) => {
+    const [fy, fm] = from.slice(0, 7).split("-").map(Number);
+    const [ty, tm] = to.slice(0, 7).split("-").map(Number);
+    return ty * 12 + tm - (fy * 12 + fm);
+  };
+  // 初診の自動判定：最終来院月＋2ヶ月の末日まで再診、それ以降は初診（＝月差3以上）。手動トグルが優先。
+  const autoFirst = (a: Appt): boolean => {
+    if (!lastVisitReady) return false; // 判定前は安全側で再診
+    const last = lastVisit[pkey(a)];
+    if (!last) return true; // 初来院＝初診
+    return monthGap(last, a.date) >= 3;
+  };
+  const isFirst = (a: Appt) => shin[a.id] ?? autoFirst(a);
   const isStudentAppt = (a: Appt) => {
     if (a.id in gaku) return gaku[a.id];
     const age = a.patient_id ? ageAt(birth[a.patient_id], a.date) : null;
@@ -540,6 +556,34 @@ export default function SalesBoard() {
     const aps = appts.filter((a) => a.date === date);
     return aps;
   }, [appts, date]);
+
+  // 当日の患者ごとの「前回来院日」（初診/再診の自動判定用）
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLastVisitReady(false);
+      if (!dayRows.length) { setLastVisit({}); setLastVisitReady(true); return; }
+      const pids = Array.from(new Set(dayRows.map((a) => a.patient_id).filter((x): x is string => !!x)));
+      const names = Array.from(new Set(dayRows.filter((a) => !a.patient_id).map((a) => (a.patient_name || "").trim()).filter(Boolean)));
+      const map: Record<string, string> = {};
+      const consume = (rows: { patient_id: string | null; patient_name: string | null; date: string }[] | null) => {
+        (rows || []).forEach((r) => {
+          const k = r.patient_id || "n:" + normName(r.patient_name);
+          if (!map[k] || r.date > map[k]) map[k] = r.date; // 最新の前回来院日
+        });
+      };
+      if (pids.length) {
+        const { data } = await supabase.from("appointments").select("patient_id, patient_name, date").in("patient_id", pids).lt("date", date).neq("status", "cancelled");
+        consume(data as never);
+      }
+      if (names.length) {
+        const { data } = await supabase.from("appointments").select("patient_id, patient_name, date").in("patient_name", names).lt("date", date).neq("status", "cancelled");
+        consume(data as never);
+      }
+      if (alive) { setLastVisit(map); setLastVisitReady(true); }
+    })();
+    return () => { alive = false; };
+  }, [dayRows, date, supabase]);
   const dayManual = useMemo(() => manualSales.filter((s) => s.date === date), [manualSales, date]);
   // 並び順（sort_orderで手動入れ替え可。既定は予約=時刻順、物販=末尾）
   const dayItems = useMemo(() => {
@@ -981,6 +1025,11 @@ export default function SalesBoard() {
                                   className={`rounded border px-1 py-0.5 text-[9px] font-bold ${isStudentAppt(a) ? "border-sky-300 bg-sky-50 text-sky-600" : "border-slate-200 text-slate-400"}`}>
                                   {isStudentAppt(a) ? "学生" : "一般"}
                                 </button>
+                                {(() => {
+                                  const last = lastVisit[pkey(a)];
+                                  if (last) { const dd = new Date(last + "T00:00:00"); return <span className="text-[9px] text-slate-400">前回{dd.getMonth() + 1}/{dd.getDate()}</span>; }
+                                  return lastVisitReady ? <span className="text-[9px] font-bold text-rose-400">初来院</span> : null;
+                                })()}
                               </div>
                             )}
                           </td>
