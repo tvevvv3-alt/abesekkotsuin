@@ -894,14 +894,21 @@ export default function BookingWizard() {
             <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center gap-3">
                 <StaffAvatar staff={selectedStaff} size={46} />
-                <div className="min-w-0 flex-1 leading-snug text-slate-800">
-                  <span className="font-bold">
-                    {selectedStaff.display_name || selectedStaff.name}
-                  </span>
-                  {selectedStaff.role && (
-                    <span className="ml-1.5 text-[11px]" style={{ color: GOLD }}>
-                      {selectedStaff.role}
+                <div className="min-w-0 flex-1">
+                  <div className="leading-snug text-slate-800">
+                    <span className="font-bold">
+                      {selectedStaff.display_name || selectedStaff.name}
                     </span>
+                    {selectedStaff.role && (
+                      <span className="ml-1.5 text-[11px]" style={{ color: GOLD }}>
+                        {selectedStaff.role}
+                      </span>
+                    )}
+                  </div>
+                  {selectedStaff.bio && !profileOpen && (
+                    <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">
+                      {selectedStaff.bio}
+                    </p>
                   )}
                 </div>
                 {selectedStaff.bio && (
