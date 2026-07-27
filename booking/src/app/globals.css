@@ -27,3 +27,15 @@ body {
 .scroll-x {
   -webkit-overflow-scrolling: touch;
 }
+
+/* 数値入力の上下矢印（スピナー）を非表示（手入力優先） */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
