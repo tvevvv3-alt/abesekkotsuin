@@ -835,6 +835,12 @@ export default function BookingWizard() {
       {step === 2 && service && (
         <Section
           title="担当者・日時を選ぶ"
+          right={!isClass && staffMenuPrice ? (
+            <div className="text-right leading-tight">
+              <div className="text-[11px] text-slate-500">初診 <b className="text-sm text-slate-800">¥{staffMenuPrice.initialIppan.toLocaleString()}</b></div>
+              <div className="text-[11px] text-slate-500">再診 <b className="text-sm text-slate-800">¥{staffMenuPrice.repeatIppan.toLocaleString()}</b></div>
+            </div>
+          ) : undefined}
           onBack={() => {
             // 時間外導線から来た場合は、元のメニューの日時選択に戻す
             if (fromServiceId) {
@@ -904,7 +910,7 @@ export default function BookingWizard() {
                   )}
                 </div>
                 {selectedStaff.bio ? (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-600">
+                  <p className="mt-0.5 line-clamp-3 text-[11px] leading-snug text-slate-600">
                     {selectedStaff.bio}
                   </p>
                 ) : (
@@ -916,18 +922,12 @@ export default function BookingWizard() {
             </div>
           )}
 
-          {/* 担当×メニューの料金 */}
+          {/* 料金の注記（金額は上部に表示） */}
           {!isClass && selectedStaff && staffMenuPrice && (
-            <div className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className="text-xs font-bold text-slate-700">料金</span>
-                <span className="text-sm text-slate-500">初診 <b className="text-slate-800">¥{staffMenuPrice.initialIppan.toLocaleString()}</b>{staffMenuPrice.studentDiffers && <span className="text-[10px] text-slate-400">（学生¥{staffMenuPrice.initialGakusei.toLocaleString()}）</span>}</span>
-                <span className="text-sm text-slate-500">再診 <b className="text-slate-800">¥{staffMenuPrice.repeatIppan.toLocaleString()}</b>{staffMenuPrice.studentDiffers && <span className="text-[10px] text-slate-400">（学生¥{staffMenuPrice.repeatGakusei.toLocaleString()}）</span>}</span>
-              </div>
-              <p className="mt-1 text-[10px] leading-snug text-slate-400">
-                2ヶ月以内（例：最終8/9→10月末日）は再診料金です。怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。
-              </p>
-            </div>
+            <p className="mb-2 text-[10px] leading-snug text-slate-400">
+              {staffMenuPrice.studentDiffers && `学生：初診¥${staffMenuPrice.initialGakusei.toLocaleString()}／再診¥${staffMenuPrice.repeatGakusei.toLocaleString()}。`}
+              2ヶ月以内（例：最終8/9→10月末日）は再診料金です。怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。
+            </p>
           )}
 
           {/* 週切替（今週より前へは戻れない） */}
@@ -1447,14 +1447,16 @@ function Section({
   title,
   children,
   onBack,
+  right,
 }: {
   title: string;
   children: React.ReactNode;
   onBack?: () => void;
+  right?: React.ReactNode;
 }) {
   return (
     <section className="px-4 py-4">
-      {(title || onBack) && (
+      {(title || onBack || right) && (
         <div className="mb-3 flex items-center gap-3">
           {onBack && (
             <button
@@ -1465,6 +1467,7 @@ function Section({
             </button>
           )}
           {title && <h2 className="text-base font-bold text-slate-800">{title}</h2>}
+          {right && <div className="ml-auto shrink-0">{right}</div>}
         </div>
       )}
       {children}
