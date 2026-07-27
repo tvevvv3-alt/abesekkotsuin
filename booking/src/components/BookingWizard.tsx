@@ -888,27 +888,27 @@ export default function BookingWizard() {
             </div>
           )}
 
-          {/* スタッフ紹介（担当者を選ぶと名前の下に顔写真＋紹介文） */}
+          {/* スタッフ紹介＋料金（コンパクト） */}
           {!isClass && selectedStaff && (
-            <div className="mb-3 flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <StaffAvatar staff={selectedStaff} />
+            <div className="mb-2 flex gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+              <StaffAvatar staff={selectedStaff} size={46} />
               <div className="min-w-0">
                 <div className="leading-snug text-slate-800">
                   <span className="font-bold">
                     {selectedStaff.display_name || selectedStaff.name}
                   </span>
                   {selectedStaff.role && (
-                    <span className="ml-2 text-[11px]" style={{ color: GOLD }}>
+                    <span className="ml-1.5 text-[11px]" style={{ color: GOLD }}>
                       {selectedStaff.role}
                     </span>
                   )}
                 </div>
                 {selectedStaff.bio ? (
-                  <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-600">
+                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-600">
                     {selectedStaff.bio}
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-0.5 text-[11px] text-slate-400">
                     {selectedStaff.clinic || ""}
                   </p>
                 )}
@@ -916,24 +916,15 @@ export default function BookingWizard() {
             </div>
           )}
 
-          {/* 担当×メニューの料金表 */}
+          {/* 担当×メニューの料金 */}
           {!isClass && selectedStaff && staffMenuPrice && (
-            <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-2 text-xs font-bold text-slate-700">
-                料金 <span className="font-normal text-slate-400">（{service?.patient_name || service?.name}）</span>
+            <div className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <span className="text-xs font-bold text-slate-700">料金</span>
+                <span className="text-sm text-slate-500">初診 <b className="text-slate-800">¥{staffMenuPrice.initialIppan.toLocaleString()}</b>{staffMenuPrice.studentDiffers && <span className="text-[10px] text-slate-400">（学生¥{staffMenuPrice.initialGakusei.toLocaleString()}）</span>}</span>
+                <span className="text-sm text-slate-500">再診 <b className="text-slate-800">¥{staffMenuPrice.repeatIppan.toLocaleString()}</b>{staffMenuPrice.studentDiffers && <span className="text-[10px] text-slate-400">（学生¥{staffMenuPrice.repeatGakusei.toLocaleString()}）</span>}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const).map(([label, ippan, gakusei]) => (
-                  <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-2 text-center">
-                    <div className="text-[10px] text-slate-400">{label}</div>
-                    <div className="text-base font-bold text-slate-800">¥{ippan.toLocaleString()}</div>
-                    {staffMenuPrice.studentDiffers && (
-                      <div className="text-[10px] text-slate-500">学生 ¥{gakusei.toLocaleString()}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
+              <p className="mt-1 text-[10px] leading-snug text-slate-400">
                 2ヶ月以内（例：最終8/9→10月末日）は再診料金です。怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。
               </p>
             </div>
