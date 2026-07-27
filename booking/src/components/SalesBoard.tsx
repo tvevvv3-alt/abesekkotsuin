@@ -1015,9 +1015,6 @@ export default function SalesBoard() {
                               <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
                               <span className="ml-1 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
                             </div>
-                            {a.service_name && (
-                              <div className="max-w-[160px] truncate text-[10px] text-slate-500">{a.service_name}</div>
-                            )}
                             {!(kawa && a.service_id === kawa.id) && (
                               <div className="mt-0.5 flex items-center gap-1">
                                 <button onClick={() => setShin((m) => ({ ...m, [a.id]: !isFirst(a) }))}
