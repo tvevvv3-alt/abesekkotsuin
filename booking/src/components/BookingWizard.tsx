@@ -934,7 +934,7 @@ export default function BookingWizard() {
                 ))}
               </div>
               <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
-                税込。前回ご来院から2ヶ月以内は再診料金です。20:30以降は時間外加算あり。ケガの内容により健康保険が適用される場合は窓口負担が変わります。
+                2ヶ月以内（例：最終8/9→10月末日）は再診料金です。怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。
               </p>
             </div>
           )}
