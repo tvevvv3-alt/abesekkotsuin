@@ -6,6 +6,7 @@ import {
   buildApptInfo,
   buildConfirmText,
   lineMessagingConfigured,
+  myPageFooter,
   pushText,
 } from "@/lib/line";
 
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
   // 確認メッセージ（未送信のときだけ）
   if (lineMessagingConfigured() && !appt.confirm_sent_at) {
     const info = await buildApptInfo(admin, appt);
-    const r = await pushText(userId, buildConfirmText(info));
+    const r = await pushText(userId, buildConfirmText(info) + myPageFooter());
     if (r.ok) {
       await admin
         .from("appointments")

@@ -16,6 +16,30 @@ export function lineLoginConfigured(): boolean {
   );
 }
 
+// 予約確認・変更・キャンセルページ（LIFF）へのリンク行。未設定なら空。
+export function myPageFooter(): string {
+  const id = process.env.NEXT_PUBLIC_LIFF_ID;
+  return id ? `\n\n▼ご予約の確認・変更・キャンセル\nhttps://liff.line.me/${id}/my` : "";
+}
+
+// LIFFのid_tokenを検証し、本人のLINEユーザーID(sub)を返す。失敗時null。
+export async function verifyLineUser(idToken: string): Promise<string | null> {
+  const clientId = process.env.LINE_LOGIN_CHANNEL_ID;
+  if (!clientId || !idToken) return null;
+  try {
+    const vr = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ id_token: idToken, client_id: clientId }),
+    });
+    if (!vr.ok) return null;
+    const claims = (await vr.json()) as { sub?: string };
+    return claims.sub || null;
+  } catch {
+    return null;
+  }
+}
+
 // "YYYY-MM-DD" + 分 → "7/23（木）10:00"
 export function fmtDateTime(dateStr: string, startMin: number): string {
   const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));

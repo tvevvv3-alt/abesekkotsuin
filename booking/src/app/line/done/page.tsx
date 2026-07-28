@@ -57,10 +57,13 @@ export default function LineDonePage({
         </>
       )}
       <a
-        href="/"
+        href="/my"
         className="mt-8 rounded-xl px-6 py-3 text-sm font-bold text-white"
         style={{ backgroundColor: NAVY, border: `1px solid ${GOLD}` }}
       >
+        予約の確認・変更・キャンセル
+      </a>
+      <a href="/" className="mt-3 text-sm font-bold" style={{ color: NAVY }}>
         予約トップへ戻る
       </a>
     </div>

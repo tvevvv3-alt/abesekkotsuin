@@ -167,6 +167,8 @@ export default function BookingWizard() {
   const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [profileOpen, setProfileOpen] = useState(false); // 担当プロフィールの詳細開閉
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null); // 変更元の予約ID（成功後にキャンセル）
+  const [preApplied, setPreApplied] = useState(false); // URLパラメータ（変更導線）の初期反映済みか
   const [windows, setWindows] = useState<BookingWindow[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loadingMaster, setLoadingMaster] = useState(true);
@@ -492,6 +494,25 @@ export default function BookingWizard() {
     setSelected(null);
   }
 
+  // 変更（リスケ）導線：/?svc=&stf=&resched= で来たらメニュー・担当を引き継いで日時選択へ
+  useEffect(() => {
+    if (preApplied) return;
+    if (!services.length || !allStaff.length) return; // マスタ読み込み待ち
+    const sp = new URLSearchParams(window.location.search);
+    const svc = sp.get("svc");
+    const stf = sp.get("stf");
+    const resched = sp.get("resched");
+    if (svc && services.find((s) => s.id === svc)) {
+      const cat = services.find((s) => s.id === svc)?.category;
+      setClinic(cat === "川西整体院" ? "kawanishi" : "ibaraki");
+      pickService(svc);
+      if (stf) setStaffId(stf);
+      if (resched) setRescheduleId(resched);
+    }
+    setPreApplied(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services, allStaff, links, preApplied]);
+
   function pickService(id: string, from: string | null = null) {
     // 新規受付停止メニュー（体幹教室など）も、既存会員の予約用にタップ可。
     // 「新規停止」は表示で案内する。
@@ -577,6 +598,19 @@ export default function BookingWizard() {
       setSavedList(merged);
       localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(merged));
       setLastAppointmentId(res.appointment_id ?? null);
+      // 変更（リスケ）で来た場合：新しい予約が取れたので、元の予約をキャンセル
+      if (rescheduleId && liffIdToken && res.appointment_id) {
+        try {
+          await fetch("/api/my/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: liffIdToken, appointmentId: rescheduleId }),
+          });
+        } catch {
+          /* 元予約の取消に失敗しても新規予約は成立している */
+        }
+        setRescheduleId(null);
+      }
       // ① LINE内（リッチメニュー経由）なら、タップ0回で自動連携＋確認送信
       if (liffIdToken && res.appointment_id) {
         setLinkedViaLiff(true);
