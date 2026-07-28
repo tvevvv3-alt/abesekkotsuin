@@ -1003,6 +1003,7 @@ export default function BookingWizard() {
               windows={windows}
               selected={selected}
               onSelect={onSelectSlot}
+              accentColor={!isClass ? selectedStaff?.color : null}
             />
           )}
 
@@ -1051,6 +1052,7 @@ export default function BookingWizard() {
                     windows={windows}
                     selected={selected}
                     onSelect={selectAfterHours}
+                    accentColor={selectedStaff?.color}
                   />
                 </div>
               )}

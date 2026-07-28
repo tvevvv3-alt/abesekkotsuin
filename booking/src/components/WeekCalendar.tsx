@@ -45,6 +45,7 @@ interface Props {
   windows?: BookingWindow[]; // 月別公開設定
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
+  accentColor?: string | null; // 担当カラー（空き○の色分け）
 }
 
 // セル表示の種類
@@ -76,8 +77,10 @@ export default function WeekCalendar({
   windows = [],
   selected,
   onSelect,
+  accentColor,
 }: Props) {
   const isClass = isClassService(capacity);
+  const accent = accentColor && /^#[0-9a-f]{6}$/i.test(accentColor) ? accentColor : null;
   const windowByMonth = useMemo(
     () => Object.fromEntries(windows.map((w) => [w.year_month, w])) as Record<string, BookingWindow>,
     [windows]
@@ -340,10 +343,19 @@ export default function WeekCalendar({
                       <button
                         type="button"
                         onClick={() => onSelect(ds, t)}
+                        style={
+                          accent
+                            ? isSel
+                              ? { backgroundColor: accent, color: "#fff" }
+                              : { backgroundColor: accent + "20", color: accent }
+                            : undefined
+                        }
                         className={`flex h-9 w-full items-center justify-center rounded-md font-bold transition ${
                           cell.kind === "class-ok" ? "text-xs" : "text-base"
                         } ${
-                          isSel
+                          accent
+                            ? "active:opacity-80"
+                            : isSel
                             ? "bg-blue-600 text-white"
                             : "bg-blue-50 text-blue-600 active:bg-blue-100"
                         }`}
