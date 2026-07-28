@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   loadAllServices,
@@ -42,6 +42,12 @@ export default function ServicesAdmin() {
   // 編集中メニューの料金 { staffId: {ini, rep} }
   const [priceMap, setPriceMap] = useState<Record<string, { ini: string; rep: string }>>({});
   const [loading, setLoading] = useState(true);
+  // メニューのドラッグ並び替え
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragDy, setDragDy] = useState(0);
+  const dragStartY = useRef(0);
+  const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [editing, setEditing] = useState<ServiceWithSteps | "new" | null>(null);
   const [name, setName] = useState("");
@@ -272,6 +278,51 @@ export default function ServicesAdmin() {
     reload();
   }
 
+  // --- メニューのドラッグ並び替え ---
+  function onDragStart(e: React.PointerEvent, id: string) {
+    setDragId(id);
+    setDragDy(0);
+    dragStartY.current = e.clientY;
+    setDrop({ id, after: false });
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+  }
+  function onDragMove(e: React.PointerEvent) {
+    if (!dragId) return;
+    setDragDy(e.clientY - dragStartY.current);
+    const y = e.clientY;
+    let best: { id: string; after: boolean } | null = null;
+    for (const s of services) {
+      const el = rowRefs.current[s.id];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (y < r.top) { best = { id: s.id, after: false }; break; }
+      if (y <= r.bottom) { best = { id: s.id, after: y > r.top + r.height / 2 }; break; }
+      best = { id: s.id, after: true };
+    }
+    if (best && (best.id !== drop?.id || best.after !== drop?.after)) setDrop(best);
+  }
+  async function onDragEnd() {
+    const cur = dragId;
+    const dr = drop;
+    setDragId(null);
+    setDragDy(0);
+    setDrop(null);
+    if (!cur) return;
+    const ids = services.map((s) => s.id).filter((x) => x !== cur);
+    if (dr && dr.id !== cur) {
+      let idx = ids.indexOf(dr.id);
+      if (idx < 0) idx = ids.length;
+      else if (dr.after) idx += 1;
+      ids.splice(idx, 0, cur);
+    } else {
+      ids.splice(services.map((s) => s.id).indexOf(cur), 0, cur);
+    }
+    const byId = Object.fromEntries(services.map((s) => [s.id, s]));
+    const reordered = ids.map((id) => byId[id]);
+    setServices(reordered);
+    await Promise.all(reordered.map((s, i) => supabase.from("services").update({ sort_order: i + 1 }).eq("id", s.id)));
+  }
+
   if (loading) return <p className="py-8 text-center text-sm text-slate-500">読み込み中…</p>;
 
   return (
@@ -290,9 +341,22 @@ export default function ServicesAdmin() {
         {services.map((s) => (
           <div
             key={s.id}
-            className={`rounded-xl border bg-white p-3 ${s.published ? "" : "opacity-50"}`}
+            ref={(el) => { rowRefs.current[s.id] = el; }}
+            className={`rounded-xl border bg-white p-3 ${s.published ? "" : "opacity-50"} ${dragId && dragId !== s.id && drop?.id === s.id ? (drop.after ? "shadow-[inset_0_-3px_0_0_#3b82f6]" : "shadow-[inset_0_3px_0_0_#3b82f6]") : ""}`}
+            style={dragId === s.id ? { transform: `translateY(${dragDy}px)`, position: "relative", zIndex: 30, background: "#fff", boxShadow: "0 12px 28px rgba(0,0,0,.18)" } : undefined}
           >
-            <div className="flex items-start justify-between">
+            <div className="flex items-start gap-2">
+              <span
+                onPointerDown={(e) => onDragStart(e, s.id)}
+                onPointerMove={onDragMove}
+                onPointerUp={onDragEnd}
+                onPointerCancel={onDragEnd}
+                className="mt-0.5 shrink-0 cursor-grab touch-none select-none rounded border border-slate-200 px-1.5 py-1 text-base leading-none text-slate-400 active:cursor-grabbing"
+                title="ドラッグで並び替え"
+              >
+                ⠿
+              </span>
+            <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
               <div>
                 <div className="font-bold text-slate-800">
                   {s.name}{" "}
@@ -345,6 +409,7 @@ export default function ServicesAdmin() {
                   削除
                 </button>
               </div>
+            </div>
             </div>
           </div>
         ))}
