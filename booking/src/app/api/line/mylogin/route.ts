@@ -15,11 +15,10 @@ export async function GET(req: NextRequest) {
   }
   const params = new URLSearchParams({
     response_type: "code",
-    client_id: process.env.LINE_LOGIN_CHANNEL_ID!,
+    client_id: process.env.LINE_LOGIN_CHANNEL_ID || "",
     redirect_uri: `${base}/api/line/callback`,
     state: signState("my"),
     scope: "openid profile",
-    bot_prompt: "aggressive",
   });
   return NextResponse.redirect(`https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`);
 }
