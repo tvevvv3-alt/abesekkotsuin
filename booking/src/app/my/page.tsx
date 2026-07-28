@@ -26,18 +26,19 @@ function fmt(date: string, startMin: number) {
   return `${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）${hh}:${mm}`;
 }
 
+const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID || "";
+
 export default function MyReservationsPage() {
-  const [state, setState] = useState<"loading" | "ready" | "noliff" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "noliff" | "needline" | "error">("loading");
   const [idToken, setIdToken] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-    if (!liffId) { setState("noliff"); return; }
+    if (!LIFF_ID) { setState("noliff"); return; }
     let alive = true;
     (async () => {
-      const w = window as unknown as { liff?: { init: (c: { liffId: string }) => Promise<void>; isLoggedIn: () => boolean; login: () => void; getIDToken: () => string | null } };
+      const w = window as unknown as { liff?: { init: (c: { liffId: string }) => Promise<void>; isLoggedIn: () => boolean; getIDToken: () => string | null } };
       if (!w.liff) {
         await new Promise<void>((res, rej) => {
           const s = document.createElement("script");
@@ -48,10 +49,11 @@ export default function MyReservationsPage() {
         });
       }
       const liff = w.liff!;
-      await liff.init({ liffId });
-      if (!liff.isLoggedIn()) { liff.login(); return; }
-      const token = liff.getIDToken();
-      if (!token) { setState("error"); return; }
+      await liff.init({ liffId: LIFF_ID });
+      // liff.login() は access.line.me で400になりやすいので呼ばない。
+      // LINE内で開けば自動ログイン済み → idTokenが取れる。取れなければ案内。
+      const token = liff.isLoggedIn() ? liff.getIDToken() : null;
+      if (!token) { if (alive) setState("needline"); return; }
       const r = await fetch("/api/my/list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,7 +62,7 @@ export default function MyReservationsPage() {
       if (!alive) return;
       setIdToken(token);
       if (r.ok) { setItems(r.items); setState("ready"); } else setState("error");
-    })().catch(() => { if (alive) setState("error"); });
+    })().catch(() => { if (alive) setState("needline"); });
     return () => { alive = false; };
   }, []);
 
@@ -93,6 +95,19 @@ export default function MyReservationsPage() {
       <div className="mx-auto max-w-md px-4 py-4">
         {state === "loading" && <p className="py-16 text-center text-sm text-slate-500">読み込み中…</p>}
         {state === "noliff" && <p className="py-16 text-center text-sm text-slate-500">LINEからお開きください。</p>}
+        {state === "needline" && (
+          <div className="rounded-xl border bg-white p-6 text-center text-sm text-slate-600">
+            ご予約の確認・変更・キャンセルは<br /><b>LINEアプリ</b>からお開きください。
+            {LIFF_ID && (
+              <div className="mt-4">
+                <a href={`https://liff.line.me/${LIFF_ID}/my`} className="inline-block rounded-lg px-5 py-2.5 text-sm font-bold text-white" style={{ background: "#06C755" }}>
+                  LINEで開く
+                </a>
+              </div>
+            )}
+            <p className="mt-3 text-[11px] text-slate-400">LINEの予約確認メッセージ内のリンクからも開けます。</p>
+          </div>
+        )}
         {state === "error" && (
           <p className="py-16 text-center text-sm text-slate-500">
             予約情報を取得できませんでした。<br />LINEからお開きいただくか、時間をおいて再度お試しください。
