@@ -891,7 +891,10 @@ export default function BookingWizard() {
 
           {/* スタッフ紹介（既定は閉じる。「詳細」で紹介文を開く） */}
           {!isClass && selectedStaff && (
-            <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div
+              onClick={() => { if (selectedStaff.bio) setProfileOpen((o) => !o); }}
+              className={`mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 ${selectedStaff.bio ? "cursor-pointer select-none active:bg-slate-100" : ""}`}
+            >
               <div className="flex items-center gap-3">
                 <StaffAvatar staff={selectedStaff} size={46} />
                 <div className="min-w-0 flex-1">
@@ -912,12 +915,9 @@ export default function BookingWizard() {
                   )}
                 </div>
                 {selectedStaff.bio && (
-                  <button
-                    onClick={() => setProfileOpen((o) => !o)}
-                    className="shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 active:bg-slate-100"
-                  >
+                  <span className="shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-bold text-slate-600">
                     {profileOpen ? "閉じる ▲" : "詳細 ▼"}
-                  </button>
+                  </span>
                 )}
               </div>
               {profileOpen && selectedStaff.bio && (
