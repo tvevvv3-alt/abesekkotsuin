@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyLineUser, lineMessagingConfigured, pushText, fmtDateTime } from "@/lib/line";
+import { verifyState } from "@/lib/line-state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,8 @@ export async function POST(req: NextRequest) {
   }
   if (!appointmentId) return NextResponse.json({ ok: false, reason: "bad" }, { status: 400 });
 
-  const userId = await verifyLineUser(idToken);
+  const cookieUid = (() => { const c = req.cookies.get("line_uid")?.value; return c ? verifyState(c) : null; })();
+  const userId = cookieUid || (idToken ? await verifyLineUser(idToken) : null);
   if (!userId) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
 
   const admin = createAdminClient();

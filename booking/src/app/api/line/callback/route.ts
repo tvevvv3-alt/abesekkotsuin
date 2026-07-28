@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyState } from "@/lib/line-state";
+import { signState, verifyState } from "@/lib/line-state";
 import { getBaseUrl } from "@/lib/url";
 import {
   buildApptInfo,
@@ -53,6 +53,19 @@ export async function GET(req: NextRequest) {
     return done("?error=decode");
   }
   if (!userId) return done("?error=nouser");
+
+  // 「予約確認ページ（/my）」用ログイン：予約に紐付けず、本人Cookieを発行して /my へ
+  if (appointmentId === "my") {
+    const res = NextResponse.redirect(`${base}/my`);
+    res.cookies.set("line_uid", signState(userId), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+    return res;
+  }
 
   const admin = createAdminClient();
   if (!admin) return done("?error=server");

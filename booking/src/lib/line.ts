@@ -16,10 +16,10 @@ export function lineLoginConfigured(): boolean {
   );
 }
 
-// 予約確認・変更・キャンセルページ（LIFF）へのリンク行。未設定なら空。
+// 予約確認・変更・キャンセルページへのリンク行。
 export function myPageFooter(): string {
-  const id = process.env.NEXT_PUBLIC_LIFF_ID;
-  return id ? `\n\n▼ご予約の確認・変更・キャンセル\nhttps://liff.line.me/${id}/my` : "";
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/+$/, "");
+  return `\n\n▼ご予約の確認・変更・キャンセル\n${site}/my`;
 }
 
 // LIFFのid_tokenを検証し、本人のLINEユーザーID(sub)を返す。失敗時null。
