@@ -17,6 +17,7 @@ import {
 } from "@/lib/data";
 import { DEFAULT_OPTIONS, defaultPrices, menuPrices, type SelfPrices, type SelfOptions } from "@/lib/pricing";
 import MyStatusBanner from "@/components/MyStatusBanner";
+import { TraBadge, TraLoading } from "@/components/TraLogo";
 import type {
   AppointmentStep,
   BookingWindow,
@@ -69,23 +70,6 @@ const NAVY = "#0f1f40";
 const GOLD = "#c9a24b";
 
 // TRA 円形ロゴバッジ（公式ロゴ準拠のSVG再現）
-function TraBadge({ size = 168 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 200 200" width={size} height={size} role="img" aria-label="TRA 阿部接骨院 大阪茨木">
-      <circle cx="100" cy="100" r="98" fill={NAVY} />
-      <circle cx="100" cy="100" r="93" fill="none" stroke={GOLD} strokeWidth="2.5" />
-      <text x="100" y="84" textAnchor="middle" fontSize="50" fontWeight="800" fill="#fff" fontFamily="Arial, sans-serif" letterSpacing="1">TR</text>
-      <text x="139" y="84" textAnchor="middle" fontSize="50" fontWeight="800" fill="#fff" fontFamily="Arial, sans-serif">A</text>
-      <line x1="120" y1="86" x2="150" y2="58" stroke={GOLD} strokeWidth="4.5" strokeLinecap="round" />
-      <text x="100" y="103" textAnchor="middle" fontSize="9.6" fill="#fff" fontFamily="Arial, sans-serif" letterSpacing="1.2">TOTAL RECOVERYTATION ABE</text>
-      <polyline points="52,119 79,119 85,110 91,130 97,113 103,119 148,119" fill="none" stroke={GOLD} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <text x="100" y="141" textAnchor="middle" fontSize="16.5" fontWeight="700" fill={GOLD} fontFamily="Arial, sans-serif" letterSpacing="2.5">ABESEKKOTSUIN</text>
-      <text x="100" y="162" textAnchor="middle" fontSize="17" fontWeight="700" fill="#fff" letterSpacing="4">阿部接骨院</text>
-      <text x="100" y="179" textAnchor="middle" fontSize="10" fill={GOLD} letterSpacing="3">大阪茨木</text>
-    </svg>
-  );
-}
-
 // スタッフのアバター（顔写真 or 頭文字）
 function StaffAvatar({ staff, size = 60 }: { staff: Staff; size?: number }) {
   if (staff.image_path) {
@@ -691,7 +675,7 @@ export default function BookingWizard() {
 
   // ---- 画面 ----
   if (loadingMaster) {
-    return <Centered>読み込み中…</Centered>;
+    return <TraLoading logoUrl={settings?.logo_url} />;
   }
   if (masterError) {
     return (

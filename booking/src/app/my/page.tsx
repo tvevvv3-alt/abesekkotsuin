@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { KindBadge } from "@/components/MyStatusBanner";
+import { TraLoading } from "@/components/TraLogo";
 
 const NAVY = "#0f1f40";
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
@@ -98,7 +99,7 @@ export default function MyReservationsPage() {
         <span className="font-bold">ご予約の確認・変更・キャンセル</span>
       </header>
       <div className="mx-auto max-w-md px-4 py-4">
-        {state === "loading" && <p className="py-16 text-center text-sm text-slate-500">読み込み中…</p>}
+        {state === "loading" && <TraLoading size={96} />}
         {state === "needlogin" && (
           <div className="rounded-xl border bg-white p-6 text-center text-sm text-slate-600">
             ご予約の確認・変更・キャンセルには<br />LINEログインが必要です。

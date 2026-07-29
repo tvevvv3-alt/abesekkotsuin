@@ -28,6 +28,16 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ローディング中のロゴ回転 */
+@keyframes tra-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tra-spin {
+  animation: tra-spin 1.3s linear infinite;
+}
+
 /* 数値入力の上下矢印（スピナー）を非表示（手入力優先） */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
