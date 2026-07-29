@@ -13,12 +13,26 @@ export async function GET(req: NextRequest) {
   if (!lineLoginConfigured()) {
     return NextResponse.redirect(`${base}/my?e=notconfigured`);
   }
+  const clientId = process.env.LINE_LOGIN_CHANNEL_ID || "";
+  const redirectUri = `${base}/api/line/callback`;
   const params = new URLSearchParams({
     response_type: "code",
-    client_id: process.env.LINE_LOGIN_CHANNEL_ID || "",
-    redirect_uri: `${base}/api/line/callback`,
+    client_id: clientId,
+    redirect_uri: redirectUri,
     state: signState("my"),
     scope: "openid profile",
   });
-  return NextResponse.redirect(`https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`);
+  const authorizeUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
+  // 診断用：?debug=1 で送信内容を確認（channel IDは非機密）
+  if (req.nextUrl.searchParams.get("debug") === "1") {
+    return NextResponse.json({
+      base,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      client_id_set: Boolean(clientId),
+      scope: "openid profile",
+      authorizeUrl,
+    });
+  }
+  return NextResponse.redirect(authorizeUrl);
 }
