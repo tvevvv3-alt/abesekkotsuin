@@ -28,19 +28,34 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ローディング中のロゴ回転（コインのように裏表＝Y軸で回す） */
+/* ローディング中のロゴ回転（コインのように裏表＝Y軸で回す。表＝ロゴ / 裏＝白） */
 @keyframes tra-spin {
   from {
-    transform: perspective(600px) rotateY(0deg);
+    transform: rotateY(0deg);
   }
   to {
-    transform: perspective(600px) rotateY(360deg);
+    transform: rotateY(360deg);
   }
 }
-.tra-spin {
-  animation: tra-spin 1.2s linear infinite;
+.tra-coin {
+  position: relative;
   transform-style: preserve-3d;
+  animation: tra-spin 1.2s linear infinite;
   will-change: transform;
+}
+.tra-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+/* 裏面：白（薄い金の縁でコイン感を残す） */
+.tra-back {
+  transform: rotateY(180deg);
+  background: #ffffff;
+  border: 2px solid #c9a24b;
 }
 
 /* 数値入力の上下矢印（スピナー）を非表示（手入力優先） */

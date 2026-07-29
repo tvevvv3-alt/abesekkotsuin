@@ -31,18 +31,23 @@ export function TraLoading({
   size?: number;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-5 p-8 text-center">
-      <div className="tra-spin" style={{ width: size, height: size }}>
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logoUrl}
-            alt="Total Recoverytation Abe"
-            className="h-full w-full rounded-full object-cover"
-          />
-        ) : (
-          <TraBadge size={size} />
-        )}
+    <div className="flex min-h-screen flex-col items-center justify-center gap-5 p-8 text-center [perspective:800px]">
+      <div className="tra-coin" style={{ width: size, height: size }}>
+        {/* 表：ロゴ */}
+        <div className="tra-face">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt="Total Recoverytation Abe"
+              className="h-full w-full rounded-full object-cover"
+            />
+          ) : (
+            <TraBadge size={size} />
+          )}
+        </div>
+        {/* 裏：白 */}
+        <div className="tra-face tra-back" />
       </div>
       <p className="text-sm text-slate-500">{label}</p>
     </div>

@@ -36,6 +36,13 @@ export default function MyReservationsPage() {
   const [idToken, setIdToken] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // 読み込みが早く終わっても最低1.8秒はロゴを回す
+  const [minSpin, setMinSpin] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinSpin(false), 1800);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -99,8 +106,8 @@ export default function MyReservationsPage() {
         <span className="font-bold">ご予約の確認・変更・キャンセル</span>
       </header>
       <div className="mx-auto max-w-md px-4 py-4">
-        {state === "loading" && <TraLoading size={96} />}
-        {state === "needlogin" && (
+        {(state === "loading" || minSpin) && <TraLoading size={96} />}
+        {!minSpin && state === "needlogin" && (
           <div className="rounded-xl border bg-white p-6 text-center text-sm text-slate-600">
             ご予約の確認・変更・キャンセルには<br />LINEログインが必要です。
             <div className="mt-4">
@@ -110,12 +117,12 @@ export default function MyReservationsPage() {
             </div>
           </div>
         )}
-        {state === "error" && (
+        {!minSpin && state === "error" && (
           <p className="py-16 text-center text-sm text-slate-500">
             予約情報を取得できませんでした。<br />LINEからお開きいただくか、時間をおいて再度お試しください。
           </p>
         )}
-        {state === "ready" && items.length === 0 && (
+        {!minSpin && state === "ready" && items.length === 0 && (
           <div className="rounded-xl border bg-white p-6 text-center text-sm text-slate-500">
             今後のご予約はありません。
             <div className="mt-3">
@@ -123,7 +130,7 @@ export default function MyReservationsPage() {
             </div>
           </div>
         )}
-        {state === "ready" && items.length > 0 && (
+        {!minSpin && state === "ready" && items.length > 0 && (
           <div className="space-y-3">
             {items.map((it) => (
               <div key={it.id} className="rounded-xl border bg-white p-3">

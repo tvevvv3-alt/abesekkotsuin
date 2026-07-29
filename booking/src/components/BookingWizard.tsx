@@ -158,6 +158,8 @@ export default function BookingWizard() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loadingMaster, setLoadingMaster] = useState(true);
   const [masterError, setMasterError] = useState<string | null>(null);
+  // 読み込みが早く終わっても、最低この時間はロゴを回す（一瞬で消えてチラつくのを防ぐ）
+  const [minSpin, setMinSpin] = useState(true);
 
   // 院（拠点）選択。空なら院選択トップを表示。
   const [clinic, setClinic] = useState<ClinicId>("");
@@ -338,6 +340,12 @@ export default function BookingWizard() {
     const opt: SelfOptions = { ...DEFAULT_OPTIONS, ...((settings as unknown as { self_options?: Partial<SelfOptions> })?.self_options || {}) };
     return menuPrices(service.name, p, opt);
   }, [service, isClass, selectedStaff, settings]);
+
+  // ---- ローディングロゴの最低表示時間（1.8秒） ----
+  useEffect(() => {
+    const t = setTimeout(() => setMinSpin(false), 1800);
+    return () => clearTimeout(t);
+  }, []);
 
   // ---- マスタ読み込み ----
   useEffect(() => {
@@ -674,9 +682,6 @@ export default function BookingWizard() {
   }
 
   // ---- 画面 ----
-  if (loadingMaster) {
-    return <TraLoading logoUrl={settings?.logo_url} />;
-  }
   if (masterError) {
     return (
       <Centered>
@@ -684,6 +689,9 @@ export default function BookingWizard() {
         <p className="mt-1 text-xs text-slate-500">{masterError}</p>
       </Centered>
     );
+  }
+  if (loadingMaster || minSpin) {
+    return <TraLoading logoUrl={settings?.logo_url} />;
   }
 
   // ===== 院選択トップ（ブランド） =====
