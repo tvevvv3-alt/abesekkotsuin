@@ -23,24 +23,26 @@ export async function GET(req: NextRequest) {
     scope: "openid profile",
   });
   const authorizeUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
-  // 診断用：?probe=1 で複数スコープを試し、どれが通る/弾かれるか比較
+  // 診断用：?probe=1。getBaseUrl版と、ハードコード期待値版で authorize を叩いて比較。
   if (req.nextUrl.searchParams.get("probe") === "1") {
-    const tryScope = async (scope: string) => {
-      const p = new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: redirectUri, state: signState("my"), scope });
+    const EXPECT = "https://abesekkotsuin.vercel.app/api/line/callback";
+    const tryUri = async (uri: string) => {
+      const p = new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: uri, state: signState("my"), scope: "openid profile" });
       try {
         const resp = await fetch(`https://access.line.me/oauth2/v2.1/authorize?${p.toString()}`, { redirect: "manual" });
-        return { scope, status: resp.status, location: resp.headers.get("location") };
+        return { status: resp.status, location: resp.headers.get("location") };
       } catch (e) {
-        return { scope, error: String(e).slice(0, 200) };
+        return { error: String(e).slice(0, 200) };
       }
     };
-    const results = await Promise.all([tryScope("openid profile"), tryScope("profile"), tryScope("openid")]);
-    // host がスクショで自動マスクされるので Base64 でも出す（復号して実値を確認）
+    const [dynamic, hardcoded] = await Promise.all([tryUri(redirectUri), tryUri(EXPECT)]);
     return NextResponse.json({
-      redirect_uri_b64: Buffer.from(redirectUri).toString("base64"),
+      match_expected: redirectUri === EXPECT,
       redirect_uri_len: redirectUri.length,
+      expect_len: EXPECT.length,
       client_id: clientId,
-      results,
+      dynamic_result: dynamic,   // getBaseUrl由来
+      hardcoded_result: hardcoded, // 期待値固定
     });
   }
   // 診断用：?debug=1 で送信内容を確認（channel IDは非機密）
