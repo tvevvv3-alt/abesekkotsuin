@@ -90,6 +90,20 @@ export const DEFAULT_MORNING_TEXT = DEFAULT_EVE_TEXT.replace(
   "【本日のご予約のお知らせ】"
 );
 
+// キャンセル完了メッセージの既定テンプレート（管理画面で上書き可能）
+export const DEFAULT_CANCEL_TEXT = [
+  "【キャンセル完了】",
+  "",
+  "■院　　：{院}",
+  "■メニュー：{メニュー}",
+  "■日時　：{日時}",
+  "■担当　：{担当}",
+  "",
+  "ご予約をキャンセルしました。",
+  "またのご利用をお待ちしております。",
+  `― ${CLINIC_LABEL}`,
+].join("\n");
+
 // 体幹教室「終了」時に送るお礼メッセージの既定テンプレート（管理画面で上書き可能）
 export const DEFAULT_CLASS_DONE_TEXT = [
   "本日は体幹教室へのご参加ありがとうございました！（{来場日}）",
@@ -112,12 +126,18 @@ export function renderClassDone(
     remaining?: string;
   }
 ): string {
-  return tpl
+  const out = tpl
     .split("{名前}").join((vals.name ?? "").trim())
     .split("{予約URL}").join(vals.url)
     .split("{来場日}").join(vals.visitDate ?? "")
     .split("{回数}").join(vals.nth != null ? String(vals.nth) : "")
     .split("{残り}").join(vals.remaining ?? "");
+  // {残り}が空（フリーパス等）で行末に区切り（・／、や全角空白）が残ったら除去。
+  // 半角スラッシュはURL保護のため残す。
+  return out
+    .split("\n")
+    .map((line) => line.replace(/[　・･／、][ 　]*$/u, "").replace(/[ 　]+$/u, ""))
+    .join("\n");
 }
 
 // テンプレートに予約情報を差し込む。値が空の「ラベル：」行は自動で消す。
@@ -137,6 +157,11 @@ export function renderMessage(tpl: string, i: ApptInfo): string {
 
 export function buildConfirmText(i: ApptInfo): string {
   return renderMessage(DEFAULT_CONFIRM_TEXT, i);
+}
+
+// キャンセル完了メッセージ（tpl未指定なら既定）
+export function buildCancelText(i: ApptInfo, tpl?: string | null): string {
+  return renderMessage(tpl?.trim() || DEFAULT_CANCEL_TEXT, i);
 }
 
 export function buildReminderText(i: ApptInfo, when: "eve" | "morning"): string {

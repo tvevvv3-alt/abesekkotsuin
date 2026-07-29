@@ -72,10 +72,11 @@ export async function POST(req: NextRequest) {
       .select("pass_type, quota")
       .eq("name", appt.patient_name)
       .maybeSingle();
-    if (mem?.pass_type === "free") remaining = "フリーパス";
+    // フリーパスは今月何回目のみ（残回数なし）。月パスは残り回数を表示。
+    if (mem?.pass_type === "free") remaining = "";
     else {
       const quota = mem?.quota ?? 4;
-      remaining = `あと${Math.max(0, quota - nth)}回`;
+      remaining = `残り${Math.max(0, quota - nth)}回`;
     }
   }
   const visitDate = `${m}月${Number(appt.date.slice(8, 10))}日`;

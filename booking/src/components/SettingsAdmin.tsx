@@ -6,6 +6,7 @@ import { loadSettings } from "@/lib/data";
 import type { ClinicBranding, Settings } from "@/lib/types";
 import { labelToMin, minToLabel } from "@/lib/booking";
 import {
+  DEFAULT_CANCEL_TEXT,
   DEFAULT_CLASS_DONE_TEXT,
   DEFAULT_CONFIRM_TEXT,
   DEFAULT_EVE_TEXT,
@@ -45,6 +46,7 @@ export default function SettingsAdmin() {
       logo_url: s.logo_url,
       clinics: s.clinics,
       confirm_text: s.confirm_text,
+      cancel_text: s.cancel_text,
       remind_eve_enabled: s.remind_eve_enabled,
       remind_eve_hour: s.remind_eve_hour,
       remind_eve_text: s.remind_eve_text,
@@ -374,6 +376,16 @@ export default function SettingsAdmin() {
             className="mb-3 w-full rounded-md border px-2 py-1.5 font-mono text-xs"
           />
 
+          <label className="mb-1 block text-[11px] font-bold text-slate-500">
+            キャンセル完了メッセージ
+          </label>
+          <textarea
+            value={s.cancel_text ?? DEFAULT_CANCEL_TEXT}
+            onChange={(e) => up({ cancel_text: e.target.value })}
+            rows={7}
+            className="mb-3 w-full rounded-md border px-2 py-1.5 font-mono text-xs"
+          />
+
           <div className="mb-3 rounded-lg border bg-white p-2.5">
             <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
               <input
@@ -445,7 +457,7 @@ export default function SettingsAdmin() {
               <code className="rounded bg-slate-100 px-1">{"{来場日}"}</code>{" "}
               <code className="rounded bg-slate-100 px-1">{"{回数}"}</code>{" "}
               <code className="rounded bg-slate-100 px-1">{"{残り}"}</code>
-              （{"{回数}"}=今月何回目 / {"{残り}"}=あとN回・フリーパス）
+              （{"{回数}"}=今月何回目 / {"{残り}"}=残りN回。フリーパスは空欄）
             </p>
             <textarea
               value={s.class_done_text ?? DEFAULT_CLASS_DONE_TEXT}

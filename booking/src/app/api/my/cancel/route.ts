@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyLineUser, lineMessagingConfigured, pushText, fmtDateTime } from "@/lib/line";
+import { verifyLineUser, lineMessagingConfigured, pushText, buildApptInfo, buildCancelText } from "@/lib/line";
 import { verifyState } from "@/lib/line-state";
 
 export const runtime = "nodejs";
@@ -28,16 +28,17 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, line_user_id, status, date, start_min, service_name")
+    .select("id, line_user_id, status, date, start_min, service_name, service_id, staff_id")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return NextResponse.json({ ok: false, reason: "notfound" }, { status: 404 });
   if (appt.line_user_id !== userId) return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
   if (appt.status !== "booked") return NextResponse.json({ ok: false, reason: "already" });
 
-  // 締切チェック（設定のキャンセル締切時間）
-  const { data: cfg } = await admin.from("settings").select("cancel_deadline_hours").eq("id", 1).maybeSingle();
+  // 締切チェック（設定のキャンセル締切時間）＋キャンセル完了メッセージ本文
+  const { data: cfg } = await admin.from("settings").select("cancel_deadline_hours, cancel_text").eq("id", 1).maybeSingle();
   const cancelH = (cfg as { cancel_deadline_hours?: number } | null)?.cancel_deadline_hours ?? 0;
+  const cancelTpl = (cfg as { cancel_text?: string | null } | null)?.cancel_text ?? null;
   const hh = String(Math.floor(appt.start_min / 60)).padStart(2, "0");
   const mm = String(appt.start_min % 60).padStart(2, "0");
   const apptMs = Date.parse(`${appt.date}T${hh}:${mm}:00+09:00`);
@@ -53,7 +54,14 @@ export async function POST(req: NextRequest) {
   // 本人へキャンセル確認をLINE通知（任意・失敗しても成功扱い）
   if (lineMessagingConfigured()) {
     try {
-      await pushText(userId, `【キャンセル完了】\n${fmtDateTime(appt.date, appt.start_min)}\n${appt.service_name || ""}\nのご予約をキャンセルしました。またのご利用をお待ちしております。`);
+      const info = await buildApptInfo(admin, {
+        service_id: appt.service_id ?? null,
+        staff_id: appt.staff_id ?? null,
+        date: appt.date,
+        start_min: appt.start_min,
+        service_name: appt.service_name ?? null,
+      });
+      await pushText(userId, buildCancelText(info, cancelTpl));
     } catch {
       /* noop */
     }
