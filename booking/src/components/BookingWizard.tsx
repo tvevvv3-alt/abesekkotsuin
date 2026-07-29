@@ -16,6 +16,7 @@ import {
   loadStaffServices,
 } from "@/lib/data";
 import { DEFAULT_OPTIONS, defaultPrices, menuPrices, type SelfPrices, type SelfOptions } from "@/lib/pricing";
+import MyStatusBanner from "@/components/MyStatusBanner";
 import type {
   AppointmentStep,
   BookingWindow,
@@ -723,6 +724,7 @@ export default function BookingWizard() {
           <p className="mt-5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>
         <div className="px-5 py-7">
+          <MyStatusBanner />
           <h2 className="mb-4 text-center text-sm font-bold text-slate-700">
             ご予約の院をお選びください
           </h2>

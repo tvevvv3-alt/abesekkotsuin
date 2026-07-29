@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { KindBadge } from "@/components/MyStatusBanner";
 
 const NAVY = "#0f1f40";
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
@@ -15,6 +16,7 @@ interface Item {
   staff_color: string | null;
   service_name: string | null;
   clinic: string;
+  kind: "class" | "kawanishi" | "care";
   canCancel: boolean;
   canChange: boolean;
 }
@@ -125,7 +127,7 @@ export default function MyReservationsPage() {
             {items.map((it) => (
               <div key={it.id} className="rounded-xl border bg-white p-3">
                 <div className="flex items-center gap-2">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: it.staff_color || "#64748b" }} />
+                  <KindBadge kind={it.kind} />
                   <span className="text-[11px] text-slate-400">{it.clinic}</span>
                 </div>
                 <div className="mt-1 text-lg font-bold text-slate-800">{fmt(it.date, it.start_min)}</div>

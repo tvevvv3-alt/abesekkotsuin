@@ -34,13 +34,13 @@ export async function POST(req: NextRequest) {
       .order("start_min"),
     admin.from("settings").select("cancel_deadline_hours, change_deadline_hours").eq("id", 1).maybeSingle(),
     admin.from("staff").select("id, name, display_name, color"),
-    admin.from("services").select("id, category"),
+    admin.from("services").select("id, category, capacity"),
   ]);
 
   const cancelH = (cfg as { cancel_deadline_hours?: number } | null)?.cancel_deadline_hours ?? 0;
   const changeH = (cfg as { change_deadline_hours?: number } | null)?.change_deadline_hours ?? 0;
   const staffMap = new Map((staffRows || []).map((s) => [s.id as string, s]));
-  const catMap = new Map((svcRows || []).map((s) => [s.id as string, s.category as string]));
+  const svcMap = new Map((svcRows || []).map((s) => [s.id as string, s]));
   const now = Date.now();
 
   const items = (appts || []).map((a) => {
@@ -49,7 +49,11 @@ export async function POST(req: NextRequest) {
     const apptMs = Date.parse(`${a.date}T${hh}:${mm}:00+09:00`);
     const hoursUntil = (apptMs - now) / 3_600_000;
     const st = a.staff_id ? staffMap.get(a.staff_id) : null;
-    const cat = a.service_id ? catMap.get(a.service_id) : null;
+    const sv = a.service_id ? svcMap.get(a.service_id) : null;
+    const cat = (sv?.category as string) || "";
+    // 種別：定員制クラス（capacity>1）は体幹教室として扱う
+    const kind: "class" | "kawanishi" | "care" =
+      cat === "川西整体院" ? "kawanishi" : (sv && (sv.capacity as number) > 1) || cat === "体幹教室" ? "class" : "care";
     return {
       id: a.id,
       date: a.date,
@@ -60,6 +64,7 @@ export async function POST(req: NextRequest) {
       staff_color: st?.color ?? null,
       service_name: a.service_name,
       clinic: cat === "川西整体院" ? "川西整体院" : "茨木本院",
+      kind,
       canCancel: hoursUntil >= cancelH,
       canChange: hoursUntil >= changeH,
     };
