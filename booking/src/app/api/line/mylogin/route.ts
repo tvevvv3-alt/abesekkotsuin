@@ -35,7 +35,13 @@ export async function GET(req: NextRequest) {
       }
     };
     const results = await Promise.all([tryScope("openid profile"), tryScope("profile"), tryScope("openid")]);
-    return NextResponse.json({ redirect_uri: redirectUri, client_id: clientId, results });
+    // host がスクショで自動マスクされるので Base64 でも出す（復号して実値を確認）
+    return NextResponse.json({
+      redirect_uri_b64: Buffer.from(redirectUri).toString("base64"),
+      redirect_uri_len: redirectUri.length,
+      client_id: clientId,
+      results,
+    });
   }
   // 診断用：?debug=1 で送信内容を確認（channel IDは非機密）
   if (req.nextUrl.searchParams.get("debug") === "1") {
