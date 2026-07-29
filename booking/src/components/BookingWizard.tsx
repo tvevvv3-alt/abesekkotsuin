@@ -598,13 +598,15 @@ export default function BookingWizard() {
       setSavedList(merged);
       localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(merged));
       setLastAppointmentId(res.appointment_id ?? null);
-      // 変更（リスケ）で来た場合：新しい予約が取れたので、元の予約をキャンセル
-      if (rescheduleId && liffIdToken && res.appointment_id) {
+      // 変更（リスケ）で来た場合：新しい予約が取れたので、元の予約をキャンセル。
+      // LIFF内なら idToken、/my からのCookieログインなら line_uid Cookie で本人確認される
+      // （/api/my/cancel は Cookie を優先して読むので idToken 空でも可）。
+      if (rescheduleId && res.appointment_id) {
         try {
           await fetch("/api/my/cancel", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: liffIdToken, appointmentId: rescheduleId }),
+            body: JSON.stringify({ idToken: liffIdToken || "", appointmentId: rescheduleId }),
           });
         } catch {
           /* 元予約の取消に失敗しても新規予約は成立している */
