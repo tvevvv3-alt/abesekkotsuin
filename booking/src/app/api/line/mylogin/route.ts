@@ -23,6 +23,22 @@ export async function GET(req: NextRequest) {
     scope: "openid profile",
   });
   const authorizeUrl = `https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`;
+  // 診断用：?probe=1 でサーバー側からauthorizeを叩き、LINEの実レスポンスを表示
+  if (req.nextUrl.searchParams.get("probe") === "1") {
+    try {
+      const resp = await fetch(authorizeUrl, { redirect: "manual" });
+      const body = await resp.text().catch(() => "");
+      return NextResponse.json({
+        status: resp.status,
+        location: resp.headers.get("location"),
+        bodySnippet: body.slice(0, 700),
+        redirect_uri: redirectUri,
+        client_id: clientId,
+      });
+    } catch (e) {
+      return NextResponse.json({ error: String(e).slice(0, 300) });
+    }
+  }
   // 診断用：?debug=1 で送信内容を確認（channel IDは非機密）
   if (req.nextUrl.searchParams.get("debug") === "1") {
     return NextResponse.json({
