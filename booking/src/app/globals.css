@@ -28,14 +28,19 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ローディング中のロゴ回転 */
+/* ローディング中のロゴ回転（コインのように裏表＝Y軸で回す） */
 @keyframes tra-spin {
+  from {
+    transform: perspective(600px) rotateY(0deg);
+  }
   to {
-    transform: rotate(360deg);
+    transform: perspective(600px) rotateY(360deg);
   }
 }
 .tra-spin {
-  animation: tra-spin 1.3s linear infinite;
+  animation: tra-spin 1.2s linear infinite;
+  transform-style: preserve-3d;
+  will-change: transform;
 }
 
 /* 数値入力の上下矢印（スピナー）を非表示（手入力優先） */
