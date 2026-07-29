@@ -728,7 +728,7 @@ export default function BookingWizard() {
           <h2 className="mb-4 text-center text-sm font-bold text-slate-700">
             ご予約の院をお選びください
           </h2>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             {clinicList.map((c) => (
               <button
                 key={c.id}
@@ -736,11 +736,11 @@ export default function BookingWizard() {
                   setClinic(c.id);
                   setCategory("all");
                 }}
-                className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition active:scale-[.99] active:bg-slate-50"
+                className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-5 text-center shadow-sm transition active:scale-[.98] active:bg-slate-50"
               >
                 {c.logo_url ? (
                   <span
-                    className="block h-12 w-12 shrink-0 overflow-hidden rounded-full"
+                    className="block h-16 w-16 shrink-0 overflow-hidden rounded-full"
                     style={{ border: `1.5px solid ${GOLD}` }}
                   >
                     <img
@@ -754,17 +754,16 @@ export default function BookingWizard() {
                   </span>
                 ) : (
                   <span
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-3xl"
                     style={{ backgroundColor: "#f4edda", border: `1.5px solid ${GOLD}` }}
                   >
                     {c.icon}
                   </span>
                 )}
-                <span className="min-w-0 flex-1">
+                <span className="block">
                   <span className="block font-bold text-slate-800">{c.name}</span>
-                  <span className="mt-0.5 block text-xs text-slate-500">{c.sub}</span>
+                  <span className="mt-1 block text-[11px] leading-snug text-slate-500">{c.sub}</span>
                 </span>
-                <span style={{ color: GOLD }}>›</span>
               </button>
             ))}
           </div>
