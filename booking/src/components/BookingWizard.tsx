@@ -335,11 +335,24 @@ export default function BookingWizard() {
   // 担当×メニューの自費料金（担当プロフィール下に表示）。料金設定(self_prices)から算出。
   const staffMenuPrice = useMemo(() => {
     if (!service || isClass || !selectedStaff) return null;
+    // 川西整体院は独立料金（30/60・通電・学生の計算はしない）。
+    // メニュー料金(service_prices)を優先し、未設定なら既定 12000/10000。
+    if (service.category === "川西整体院") {
+      const ini = selectedPrice?.initial_price ?? 12000;
+      const rep = selectedPrice?.repeat_price ?? 10000;
+      return {
+        initialIppan: ini,
+        initialGakusei: ini,
+        repeatIppan: rep,
+        repeatGakusei: rep,
+        studentDiffers: false,
+      };
+    }
     const sp = (selectedStaff as unknown as { self_prices?: Partial<SelfPrices> }).self_prices;
     const p: SelfPrices = { ...defaultPrices(selectedStaff.name), ...(sp || {}) };
     const opt: SelfOptions = { ...DEFAULT_OPTIONS, ...((settings as unknown as { self_options?: Partial<SelfOptions> })?.self_options || {}) };
     return menuPrices(service.name, p, opt);
-  }, [service, isClass, selectedStaff, settings]);
+  }, [service, isClass, selectedStaff, settings, selectedPrice]);
 
   // ---- ローディングロゴの最低表示時間（1.8秒） ----
   useEffect(() => {
@@ -975,7 +988,8 @@ export default function BookingWizard() {
                 ))}
               </div>
               <p className="mt-1.5 text-[10px] leading-snug text-slate-400">
-                2ヶ月以内（例：最終8/9→10月末日）は再診料金です。怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。
+                2ヶ月以内（例：最終8/9→10月末日）は再診料金です。
+                {service?.category !== "川西整体院" && "怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。"}
               </p>
             </div>
           )}
