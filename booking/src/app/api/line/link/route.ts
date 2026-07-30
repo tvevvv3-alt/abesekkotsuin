@@ -4,7 +4,6 @@ import {
   buildApptInfo,
   DEFAULT_CONFIRM_TEXT,
   lineMessagingConfigured,
-  myPageFooter,
   pushText,
   renderMessage,
 } from "@/lib/line";
@@ -72,7 +71,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   const info = await buildApptInfo(admin, appt, (s?.clinics as never) ?? null);
   const tpl = s?.confirm_text?.trim() || DEFAULT_CONFIRM_TEXT;
-  const r = await pushText(userId, renderMessage(tpl, info) + myPageFooter());
+  const r = await pushText(userId, renderMessage(tpl, info));
   if (r.ok) {
     await admin
       .from("appointments")

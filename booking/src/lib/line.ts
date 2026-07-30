@@ -16,12 +16,6 @@ export function lineLoginConfigured(): boolean {
   );
 }
 
-// 予約確認・変更・キャンセルページへのリンク行。
-export function myPageFooter(): string {
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/+$/, "");
-  return `\n\n▼ご予約の確認・変更・キャンセル\n${site}/my`;
-}
-
 // LIFFのid_tokenを検証し、本人のLINEユーザーID(sub)を返す。失敗時null。
 export async function verifyLineUser(idToken: string): Promise<string | null> {
   const clientId = process.env.LINE_LOGIN_CHANNEL_ID;
