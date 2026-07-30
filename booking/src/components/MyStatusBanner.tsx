@@ -89,8 +89,28 @@ export default function MyStatusBanner() {
     return () => { alive = false; };
   }, []);
 
-  // 読み込み中は何も出さない（トップの表示をチラつかせない）
-  if (state === "loading") return null;
+  // 読み込み中もヘッダー＋スケルトンで場所を先に確保（後から出てカードがズレるのを防ぐ）
+  if (state === "loading") {
+    return (
+      <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between px-4 py-2.5 text-white" style={{ background: NAVY }}>
+          <span className="text-sm font-bold">現在のご予約</span>
+          <span className="text-xs font-bold" style={{ color: GOLD }}>確認・変更 ›</span>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {[0, 1].map((i) => (
+            <div key={i} className="px-4 py-2.5">
+              <div className="flex items-center gap-2">
+                <span className="h-4 w-14 animate-pulse rounded-md bg-slate-200" />
+                <span className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+              </div>
+              <div className="mt-1.5 h-3 w-40 animate-pulse rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // 未ログイン：確認ボタンだけ常設
   if (state === "out") {
