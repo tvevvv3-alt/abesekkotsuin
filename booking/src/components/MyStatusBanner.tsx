@@ -20,6 +20,7 @@ interface Item {
   staff_name: string | null;
   staff_color: string | null;
   service_name: string | null;
+  patient_name: string | null;
   clinic: string;
   kind: Kind;
 }
@@ -165,6 +166,11 @@ export default function MyStatusBanner() {
               <span className="text-sm font-bold text-slate-800">
                 {fmt(it.date, it.start_min)}
               </span>
+              {it.patient_name && (
+                <span className="ml-auto shrink-0 text-[11px] font-bold text-slate-600">
+                  {it.patient_name}様
+                </span>
+              )}
             </div>
             <div className="mt-0.5 truncate text-[11px] text-slate-500">
               {it.service_name}

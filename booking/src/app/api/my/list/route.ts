@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       staff_name: st ? (st.display_name || st.name) : null,
       staff_color: st?.color ?? null,
       service_name: a.service_name,
+      patient_name: a.patient_name ?? null,
       clinic: cat === "川西整体院" ? "川西整体院" : "茨木本院",
       kind,
       canCancel: hoursUntil >= cancelH,

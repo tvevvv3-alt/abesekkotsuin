@@ -16,6 +16,7 @@ interface Item {
   staff_name: string | null;
   staff_color: string | null;
   service_name: string | null;
+  patient_name: string | null;
   clinic: string;
   kind: "class" | "kawanishi" | "care";
   canCancel: boolean;
@@ -137,6 +138,11 @@ export default function MyReservationsPage() {
                 <div className="flex items-center gap-2">
                   <KindBadge kind={it.kind} />
                   <span className="text-[11px] text-slate-400">{it.clinic}</span>
+                  {it.patient_name && (
+                    <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                      {it.patient_name}様
+                    </span>
+                  )}
                 </div>
                 <div className="mt-1 text-lg font-bold text-slate-800">{fmt(it.date, it.start_min)}</div>
                 <div className="text-sm text-slate-600">
@@ -170,7 +176,7 @@ export default function MyReservationsPage() {
               </div>
             ))}
             <div className="pt-1 text-center">
-              <a href="/" className="text-sm font-bold text-blue-600">＋ 新しく予約する</a>
+              <a href="/" className="text-sm font-bold text-blue-600">予約メニューへ</a>
             </div>
           </div>
         )}
