@@ -696,13 +696,20 @@ export default function SalesBoard() {
       ⠿
     </span>
   );
-  // 担当スタッフのカラーで薄く色付け（#rrggbb に約9%のアルファを付与）
-  const tintFor = (staffId: string | null): string | undefined => {
+  // 担当スタッフのカラー（#rrggbb）。担当セルの色分けに使う。
+  const colorOf = (staffId: string | null): string | null => {
     const c = assignees.find((s) => s.id === staffId)?.color;
-    return c && /^#[0-9a-f]{6}$/i.test(c) ? c + "18" : undefined;
+    return c && /^#[0-9a-f]{6}$/i.test(c) ? c : null;
+  };
+  // 担当セル（左端）の色付きバッジ風 select
+  const assigneeSelectStyle = (staffId: string | null): React.CSSProperties => {
+    const c = colorOf(staffId);
+    return c
+      ? { backgroundColor: c, color: "#fff", borderColor: c }
+      : { backgroundColor: "#f1f5f9", color: "#64748b", borderColor: "#e2e8f0" };
   };
   // ドラッグ中の行は「浮き上がって」指に追従、落とし先には青いライン
-  const rowStyle = (id: string, staffId: string | null): React.CSSProperties => {
+  const rowStyle = (id: string): React.CSSProperties => {
     if (dragId === id)
       return {
         transform: `translateY(${dragDy}px)`,
@@ -711,8 +718,7 @@ export default function SalesBoard() {
         background: "#fff",
         boxShadow: "0 12px 28px rgba(0,0,0,.20), inset 0 0 0 2px #60a5fa",
       };
-    const t = tintFor(staffId);
-    return t ? { background: t } : {};
+    return {};
   };
   const rowClass = (id: string, base = "") =>
     `${base} ${dragId ? "transition-none" : ""} ${
@@ -825,7 +831,7 @@ export default function SalesBoard() {
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
-  const amt = "w-[68px] rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
+  const amt = "w-[68px] rounded border border-slate-300 px-1 py-0.5 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
   const payBtn = (payment: "cash" | "cashless", onClick: () => void) => (
     <button onClick={onClick}
       className={`whitespace-nowrap rounded-md border px-1.5 py-1 text-[10px] font-bold ${payment === "cashless" ? "border-indigo-300 bg-indigo-50 text-indigo-600" : "border-slate-300 bg-slate-50 text-slate-500"}`}
@@ -1133,32 +1139,32 @@ export default function SalesBoard() {
                       const s = apptVal(a);
                       return (
                         <tr key={a.id} ref={(el) => { rowRefs.current[a.id] = el; }}
-                          className={rowClass(a.id)} style={rowStyle(a.id, s.staff_id)}>
-                          <td className="px-1 py-1">
+                          className={rowClass(a.id)} style={rowStyle(a.id)}>
+                          <td className="px-1 py-0.5">
                             <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
-                              className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
-                              <option value="">-</option>
-                              {assignees.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                              className="rounded border px-1 py-1 text-[11px] font-bold" style={assigneeSelectStyle(s.staff_id)}>
+                              <option value="" style={{ color: "#0f172a", background: "#fff" }}>-</option>
+                              {assignees.map((st) => <option key={st.id} value={st.id} style={{ color: "#0f172a", background: "#fff" }}>{st.name}</option>)}
                             </select>
                           </td>
-                          <td className="whitespace-nowrap px-2 py-1">
-                            <div>
+                          <td className="whitespace-nowrap px-2 py-0.5">
+                            <div className="flex items-center gap-1.5">
                               <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
-                              <span className="ml-1 text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
+                              <span className="text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
+                              {!(kawa && a.service_id === kawa.id) && (
+                                <>
+                                  <button onClick={() => setGaku((m) => ({ ...m, [a.id]: !isStudentAppt(a) }))}
+                                    className={`rounded border px-1 py-0.5 text-[9px] font-bold ${isStudentAppt(a) ? "border-sky-300 bg-sky-50 text-sky-600" : "border-slate-200 text-slate-400"}`}>
+                                    {isStudentAppt(a) ? "学生" : "一般"}
+                                  </button>
+                                  {(() => {
+                                    const last = lastVisit[pkey(a)];
+                                    if (last) { const dd = new Date(last + "T00:00:00"); return <span className="text-[9px] text-slate-400">前回{dd.getMonth() + 1}/{dd.getDate()}</span>; }
+                                    return null;
+                                  })()}
+                                </>
+                              )}
                             </div>
-                            {!(kawa && a.service_id === kawa.id) && (
-                              <div className="mt-0.5 flex items-center gap-1">
-                                <button onClick={() => setGaku((m) => ({ ...m, [a.id]: !isStudentAppt(a) }))}
-                                  className={`rounded border px-1 py-0.5 text-[9px] font-bold ${isStudentAppt(a) ? "border-sky-300 bg-sky-50 text-sky-600" : "border-slate-200 text-slate-400"}`}>
-                                  {isStudentAppt(a) ? "学生" : "一般"}
-                                </button>
-                                {(() => {
-                                  const last = lastVisit[pkey(a)];
-                                  if (last) { const dd = new Date(last + "T00:00:00"); return <span className="text-[9px] text-slate-400">前回{dd.getMonth() + 1}/{dd.getDate()}</span>; }
-                                  return null;
-                                })()}
-                              </div>
-                            )}
                           </td>
                           <td className="px-1 py-1 text-right">
                             <input type="number" min={0} placeholder={suggestSelf(a) ? String(suggestSelf(a)) : "0"} value={s.selfpay || ""}
@@ -1187,15 +1193,16 @@ export default function SalesBoard() {
                       const m = it.m;
                       return (
                         <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
-                          className={rowClass(m.id)} style={rowStyle(m.id, m.staff_id)}>
-                          <td className="px-1 py-1">
+                          className={rowClass(m.id)} style={rowStyle(m.id)}>
+                          <td className="px-1 py-0.5">
                             <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
-                              className="rounded border border-slate-200 px-0.5 py-1 text-[11px]">
-                              <option value="">物販</option>
-                              {assignees.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                              className="rounded border px-1 py-1 text-[11px] font-bold"
+                              style={m.staff_id ? assigneeSelectStyle(m.staff_id) : { backgroundColor: "#f59e0b", color: "#fff", borderColor: "#f59e0b" }}>
+                              <option value="" style={{ color: "#0f172a", background: "#fff" }}>物販</option>
+                              {assignees.map((st) => <option key={st.id} value={st.id} style={{ color: "#0f172a", background: "#fff" }}>{st.name}</option>)}
                             </select>
                           </td>
-                          <td className="px-2 py-1">
+                          <td className="px-2 py-0.5">
                             <input value={m.patient_name ?? ""} placeholder="品目/名前" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
                               className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
                           </td>
