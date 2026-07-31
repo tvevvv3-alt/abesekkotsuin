@@ -16,6 +16,8 @@ create table if not exists public.new_patients (
   kawanishi    boolean not null default false, -- 川西院
   created_at   timestamptz not null default now()
 );
+-- カルテ番号（1番左）。後から追加しても安全。
+alter table public.new_patients add column if not exists chart_no text not null default '';
 create index if not exists new_patients_date_idx on public.new_patients (date);
 alter table public.new_patients enable row level security;
 drop policy if exists new_patients_staff_all on public.new_patients;

@@ -7,6 +7,7 @@ import { toDateStr } from "@/lib/booking";
 
 interface NP {
   id: string;
+  chart_no: string;
   date: string;
   insurance: string;
   name: string;
@@ -20,7 +21,7 @@ interface NP {
   kawanishi: boolean;
 }
 
-const COLS = "id, date, insurance, name, kana, existing_no, category, referrer, area_code, area, taikan, kawanishi";
+const COLS = "id, chart_no, date, insurance, name, kana, existing_no, category, referrer, area_code, area, taikan, kawanishi";
 const AREA_CODES = ["", "茨", "高", "摂", "他"];
 
 export default function NewPatientBoard() {
@@ -103,6 +104,7 @@ export default function NewPatientBoard() {
         <table className="w-full min-w-[1040px] text-sm">
           <thead className="bg-slate-50 text-[11px] text-slate-500">
             <tr>
+              <th className="px-1 py-2 text-left font-bold">カルテ番号</th>
               <th className="px-1 py-2 text-left font-bold">日付</th>
               <th className="px-1 py-2 text-left font-bold">保険種別</th>
               <th className="px-1 py-2 text-left font-bold">氏名</th>
@@ -118,12 +120,13 @@ export default function NewPatientBoard() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={11} className="px-2 py-8 text-center text-sm text-slate-400">読み込み中…</td></tr>
+              <tr><td colSpan={12} className="px-2 py-8 text-center text-sm text-slate-400">読み込み中…</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={11} className="px-2 py-8 text-center text-sm text-slate-400">この月の新患はありません。「＋新患を追加」から入力してください。</td></tr>
+              <tr><td colSpan={12} className="px-2 py-8 text-center text-sm text-slate-400">この月の新患はありません。「＋新患を追加」から入力してください。</td></tr>
             ) : (
               rows.map((r) => (
                 <tr key={r.id}>
+                  <td className="px-1 py-1"><input value={r.chart_no} placeholder="番号" onChange={(e) => setLocal(r.id, { chart_no: e.target.value })} onBlur={() => persist(r.id)} className={`${inp} w-[72px] font-bold`} /></td>
                   <td className="px-1 py-1"><input type="date" value={r.date} onChange={(e) => e.target.value && setLocal(r.id, { date: e.target.value })} onBlur={() => persist(r.id)} className="rounded border border-slate-300 px-1 py-1 text-[12px]" /></td>
                   <td className="px-1 py-1"><input value={r.insurance} placeholder="自費/組合家族" onChange={(e) => setLocal(r.id, { insurance: e.target.value })} onBlur={() => persist(r.id)} className={`${inp} w-[92px]`} /></td>
                   <td className="px-1 py-1"><input value={r.name} placeholder="氏名" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${inp} w-[96px]`} /></td>
