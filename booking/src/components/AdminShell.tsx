@@ -31,22 +31,37 @@ function OperatorAvatar({
   );
 }
 
+// 院内システムの左メニュー（親＋子のグループ構造）。
 // 営業時間・予約公開設定は「基本設定」内から開くのでサイドバーには出さない。
-const DEFAULT_NAV = [
+type NavItem = { href?: string; label: string; icon?: string; soon?: boolean; children?: NavItem[] };
+const DEFAULT_NAV: NavItem[] = [
   { href: "/admin", label: "予約一覧", icon: "🗓️" },
   { href: "/admin/class", label: "体幹教室", icon: "🤸" },
-  { href: "/admin/sales", label: "個別売上", icon: "💰" },
+  {
+    href: "/admin/patients", label: "患者管理", icon: "👥", children: [
+      { href: "/admin/new-patients", label: "新患名簿" },
+      { label: "問診票", soon: true },
+      { label: "回数券", soon: true },
+      { label: "体幹評価", soon: true },
+      { label: "カルテ（将来）", soon: true },
+    ],
+  },
+  {
+    href: "/admin/staff", label: "スタッフ管理", icon: "🧑‍⚕️", children: [
+      { label: "シフト", soon: true },
+      { href: "/admin/sales", label: "売上（個別）" },
+    ],
+  },
   { href: "/admin/retail", label: "物販", icon: "🛍️" },
-  { href: "/admin/rental", label: "レンタル", icon: "🔁" },
+  { href: "/admin/rental", label: "レンタル", icon: "🎒" },
+  { href: "/admin/sales", label: "売上", icon: "📈" },
   { href: "/admin/closures", label: "休日・休診登録", icon: "🚫" },
-  { href: "/admin/new-patients", label: "新患名簿", icon: "🆕" },
-  { href: "/admin/patients", label: "患者管理", icon: "👥" },
-  { href: "/admin/staff", label: "スタッフ管理", icon: "🧑‍⚕️" },
   { href: "/admin/services", label: "施術メニュー管理", icon: "📋" },
   { href: "/admin/equipment", label: "機器管理", icon: "🔌" },
-  { href: "/admin/settings", label: "基本設定", icon: "⚙️" },
+  { href: "/admin/settings", label: "設定", icon: "⚙️" },
 ];
-const NAV_ORDER_KEY = "admin_nav_order_v1";
+const navId = (n: NavItem) => n.href ?? "grp:" + n.label;
+const NAV_ORDER_KEY = "admin_nav_order_v2";
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -92,53 +107,80 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
-  // 保存済みの並び順を反映（未知/新規項目は既定順で末尾に追加）
+  // 保存済みの並び順を反映（上位項目のみ。未知/新規項目は既定順で末尾に追加）
   const nav = useMemo(() => {
-    const byHref = new Map(DEFAULT_NAV.map((n) => [n.href, n]));
-    const out: typeof DEFAULT_NAV = [];
-    order.forEach((h) => { const n = byHref.get(h); if (n) { out.push(n); byHref.delete(h); } });
-    DEFAULT_NAV.forEach((n) => { if (byHref.has(n.href)) out.push(n); });
+    const byId = new Map(DEFAULT_NAV.map((n) => [navId(n), n]));
+    const out: NavItem[] = [];
+    order.forEach((id) => { const n = byId.get(id); if (n) { out.push(n); byId.delete(id); } });
+    DEFAULT_NAV.forEach((n) => { if (byId.has(navId(n))) out.push(n); });
     return out;
   }, [order]);
 
   const reorder = (from: number, to: number) => {
-    const arr = nav.map((n) => n.href);
+    const arr = nav.map(navId);
     const [x] = arr.splice(from, 1);
     arr.splice(to, 0, x);
     setOrder(arr);
     try { localStorage.setItem(NAV_ORDER_KEY, JSON.stringify(arr)); } catch { /* noop */ }
   };
 
+  const linkClass = (href: string) =>
+    `flex flex-1 items-center gap-2.5 rounded-lg px-2 py-2.5 text-sm font-medium ${
+      isActive(href) ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"
+    }`;
+
+  const renderChild = (c: NavItem) =>
+    c.soon || !c.href ? (
+      <div key={navId(c)} className="flex items-center gap-2 rounded-lg px-2 py-1.5 pl-8 text-[13px] text-slate-300">
+        <span className="text-slate-300">└</span>
+        {c.label}
+        <span className="ml-auto rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-400">準備中</span>
+      </div>
+    ) : (
+      <Link
+        key={navId(c)}
+        href={c.href}
+        onClick={() => setOpen(false)}
+        className={`flex items-center gap-2 rounded-lg px-2 py-1.5 pl-8 text-[13px] font-medium ${
+          isActive(c.href) ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-100"
+        }`}
+      >
+        <span className="text-slate-300">└</span>
+        {c.label}
+      </Link>
+    );
+
   const navList = (
-    <nav className="flex flex-col gap-1 p-3">
+    <nav className="flex flex-col gap-0.5 p-3">
       {nav.map((n, i) => (
-        <div
-          key={n.href}
-          onDragOver={(e) => { e.preventDefault(); }}
-          onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== i) reorder(dragIdx, i); setDragIdx(null); }}
-          className={`flex items-center rounded-lg ${dragIdx === i ? "opacity-40" : ""}`}
-        >
-          <span
-            draggable
-            onDragStart={() => setDragIdx(i)}
-            onDragEnd={() => setDragIdx(null)}
-            className="cursor-grab select-none px-1 text-sm text-slate-300 hover:text-slate-500 active:cursor-grabbing"
-            title="ドラッグで並び替え"
+        <div key={navId(n)}>
+          <div
+            onDragOver={(e) => { e.preventDefault(); }}
+            onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== i) reorder(dragIdx, i); setDragIdx(null); }}
+            className={`flex items-center rounded-lg ${dragIdx === i ? "opacity-40" : ""}`}
           >
-            ⠿
-          </span>
-          <Link
-            href={n.href}
-            onClick={() => setOpen(false)}
-            className={`flex flex-1 items-center gap-2.5 rounded-lg px-2 py-2.5 text-sm font-medium ${
-              isActive(n.href)
-                ? "bg-blue-600 text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <span className="text-base">{n.icon}</span>
-            {n.label}
-          </Link>
+            <span
+              draggable
+              onDragStart={() => setDragIdx(i)}
+              onDragEnd={() => setDragIdx(null)}
+              className="cursor-grab select-none px-1 text-sm text-slate-300 hover:text-slate-500 active:cursor-grabbing"
+              title="ドラッグで並び替え"
+            >
+              ⠿
+            </span>
+            {n.href ? (
+              <Link href={n.href} onClick={() => setOpen(false)} className={linkClass(n.href)}>
+                <span className="text-base">{n.icon}</span>
+                {n.label}
+              </Link>
+            ) : (
+              <span className="flex flex-1 items-center gap-2.5 px-2 py-2.5 text-sm font-bold text-slate-700">
+                <span className="text-base">{n.icon}</span>
+                {n.label}
+              </span>
+            )}
+          </div>
+          {n.children && <div className="mb-1">{n.children.map(renderChild)}</div>}
         </div>
       ))}
     </nav>
