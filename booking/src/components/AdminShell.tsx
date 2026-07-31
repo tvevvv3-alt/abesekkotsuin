@@ -31,7 +31,8 @@ function OperatorAvatar({
   );
 }
 
-const NAV = [
+// 営業時間・予約公開設定は「基本設定」内から開くのでサイドバーには出さない。
+const DEFAULT_NAV = [
   { href: "/admin", label: "予約一覧", icon: "🗓️" },
   { href: "/admin/class", label: "体幹教室", icon: "🤸" },
   { href: "/admin/sales", label: "個別売上", icon: "💰" },
@@ -43,10 +44,9 @@ const NAV = [
   { href: "/admin/staff", label: "スタッフ管理", icon: "🧑‍⚕️" },
   { href: "/admin/services", label: "施術メニュー管理", icon: "📋" },
   { href: "/admin/equipment", label: "機器管理", icon: "🔌" },
-  { href: "/admin/hours", label: "営業時間", icon: "🕐" },
-  { href: "/admin/publish", label: "予約公開設定", icon: "📢" },
   { href: "/admin/settings", label: "基本設定", icon: "⚙️" },
 ];
+const NAV_ORDER_KEY = "admin_nav_order_v1";
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -56,9 +56,15 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [operator, setOp] = useState<Operator | null>(null);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [order, setOrder] = useState<string[]>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   useEffect(() => {
     setOp(getOperator());
+    try {
+      const s = localStorage.getItem(NAV_ORDER_KEY);
+      if (s) setOrder(JSON.parse(s) as string[]);
+    } catch { /* noop */ }
     (async () => {
       try {
         const st = await loadStaff(supabase, false);
@@ -86,22 +92,54 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
+  // 保存済みの並び順を反映（未知/新規項目は既定順で末尾に追加）
+  const nav = useMemo(() => {
+    const byHref = new Map(DEFAULT_NAV.map((n) => [n.href, n]));
+    const out: typeof DEFAULT_NAV = [];
+    order.forEach((h) => { const n = byHref.get(h); if (n) { out.push(n); byHref.delete(h); } });
+    DEFAULT_NAV.forEach((n) => { if (byHref.has(n.href)) out.push(n); });
+    return out;
+  }, [order]);
+
+  const reorder = (from: number, to: number) => {
+    const arr = nav.map((n) => n.href);
+    const [x] = arr.splice(from, 1);
+    arr.splice(to, 0, x);
+    setOrder(arr);
+    try { localStorage.setItem(NAV_ORDER_KEY, JSON.stringify(arr)); } catch { /* noop */ }
+  };
+
   const navList = (
     <nav className="flex flex-col gap-1 p-3">
-      {NAV.map((n) => (
-        <Link
+      {nav.map((n, i) => (
+        <div
           key={n.href}
-          href={n.href}
-          onClick={() => setOpen(false)}
-          className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
-            isActive(n.href)
-              ? "bg-blue-600 text-white"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDrop={(e) => { e.preventDefault(); if (dragIdx !== null && dragIdx !== i) reorder(dragIdx, i); setDragIdx(null); }}
+          className={`flex items-center rounded-lg ${dragIdx === i ? "opacity-40" : ""}`}
         >
-          <span className="text-base">{n.icon}</span>
-          {n.label}
-        </Link>
+          <span
+            draggable
+            onDragStart={() => setDragIdx(i)}
+            onDragEnd={() => setDragIdx(null)}
+            className="cursor-grab select-none px-1 text-sm text-slate-300 hover:text-slate-500 active:cursor-grabbing"
+            title="ドラッグで並び替え"
+          >
+            ⠿
+          </span>
+          <Link
+            href={n.href}
+            onClick={() => setOpen(false)}
+            className={`flex flex-1 items-center gap-2.5 rounded-lg px-2 py-2.5 text-sm font-medium ${
+              isActive(n.href)
+                ? "bg-blue-600 text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <span className="text-base">{n.icon}</span>
+            {n.label}
+          </Link>
+        </div>
       ))}
     </nav>
   );

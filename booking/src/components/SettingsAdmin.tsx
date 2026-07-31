@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { loadSettings } from "@/lib/data";
 import type { ClinicBranding, Settings } from "@/lib/types";
@@ -118,6 +119,25 @@ export default function SettingsAdmin() {
   return (
     <div className="max-w-lg">
       <h1 className="mb-3 text-lg font-bold text-slate-800">基本設定</h1>
+
+      {/* 営業時間・予約公開設定への導線（サイドバーから移動） */}
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <Link href="/admin/hours" className="flex items-center gap-2 rounded-xl border bg-white p-3 shadow-sm active:bg-slate-50">
+          <span className="text-lg">🕐</span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-slate-800">営業時間</span>
+            <span className="block text-[11px] text-slate-400">曜日ごとの受付時間</span>
+          </span>
+        </Link>
+        <Link href="/admin/publish" className="flex items-center gap-2 rounded-xl border bg-white p-3 shadow-sm active:bg-slate-50">
+          <span className="text-lg">📢</span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-slate-800">予約公開設定</span>
+            <span className="block text-[11px] text-slate-400">月ごとの公開・受付</span>
+          </span>
+        </Link>
+      </div>
+
       <div className="space-y-4 rounded-xl border bg-white p-4">
         <Row label="予約開始時刻の単位">
           <div className="flex gap-2">
