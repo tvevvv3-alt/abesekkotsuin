@@ -1212,7 +1212,7 @@ export default function SalesBoard() {
                           <td className="px-1 py-0.5">
                             <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
                               className="rounded border px-1 py-1 text-[11px] font-bold"
-                              style={m.staff_id ? assigneeSelectStyle(m.staff_id) : { backgroundColor: "#f59e0b", color: "#fff", borderColor: "#f59e0b" }}>
+                              style={m.staff_id ? assigneeSelectStyle(m.staff_id) : { backgroundColor: "#64748b", color: "#fff", borderColor: "#64748b" }}>
                               <option value="" style={{ color: "#0f172a", background: "#fff" }}>物販</option>
                               {assignees.map((st) => <option key={st.id} value={st.id} style={{ color: "#0f172a", background: "#fff" }}>{st.name}</option>)}
                             </select>

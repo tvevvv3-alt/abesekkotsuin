@@ -72,7 +72,8 @@ export default function RetailBoard() {
 
   // ---- 商品マスタ ----
   async function addProduct() {
-    const { data } = await supabase.from("products").insert({ name: "", cost: 0, price: 0, sort_order: products.length }).select("id, name, cost, price, sort_order, active").single();
+    const { data, error } = await supabase.from("products").insert({ name: "", cost: 0, price: 0, sort_order: products.length }).select("id, name, cost, price, sort_order, active").single();
+    if (error) { alert("商品を追加できませんでした：\n" + error.message + "\n（migration_retail_rental.sql を実行済みかご確認ください）"); return; }
     if (data) setProducts((p) => [...p, data as Product]);
   }
   function setProductLocal(id: string, patch: Partial<Product>) {
@@ -91,11 +92,12 @@ export default function RetailBoard() {
 
   // ---- 物販売上 ----
   async function addSale() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("sales")
       .insert({ date, product_id: null, qty: 1, selfpay: 0, cost: 0, staff_id: null, patient_name: "", insurance: 0, burden: 0, payment: "cash" })
       .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id")
       .single();
+    if (error) { alert("物販を追加できませんでした：\n" + error.message + "\n（sales に product_id/qty/cost 列があるかご確認ください）"); return; }
     if (data) setSales((s) => [...s, data as RSale]);
   }
   function setSaleLocal(id: string, patch: Partial<RSale>) {

@@ -62,11 +62,12 @@ export default function RentalBoard() {
   const colorOf = (id: string | null) => assignees.find((a) => a.id === id)?.color ?? null;
 
   async function addRental() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("rentals")
       .insert({ date, patient_name: "", item: "", fee: 0, staff_id: null, due_date: null, returned_on: null, sale_id: null })
       .select("id, date, patient_name, item, fee, staff_id, due_date, returned_on, sale_id")
       .single();
+    if (error) { alert("レンタルを追加できませんでした：\n" + error.message + "\n（migration_retail_rental.sql を実行済みかご確認ください）"); return; }
     if (data) setRentals((r) => [...r, data as Rental]);
   }
   function setLocal(id: string, patch: Partial<Rental>) {
