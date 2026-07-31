@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff, loadServices } from "@/lib/data";
@@ -72,7 +72,7 @@ const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g,
 
 export default function SalesBoard() {
   const supabase = useMemo(() => createClient(), []);
-  const [view, setView] = useState<"day" | "month">("day");
+  const [view, setView] = useState<"day" | "month" | "year">("day");
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [staff, setStaff] = useState<Staff[]>([]);
   const [kawa, setKawa] = useState<{ id: string; name: string; color: string } | null>(null);
@@ -174,6 +174,27 @@ export default function SalesBoard() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // 年間ビュー用：その年の売上を丸ごと取得（月別集計に使う）
+  const [yearSales, setYearSales] = useState<Sale[]>([]);
+  const [yearLoading, setYearLoading] = useState(false);
+  const year = useMemo(() => date.slice(0, 4), [date]);
+  useEffect(() => {
+    if (view !== "year") return;
+    let alive = true;
+    (async () => {
+      setYearLoading(true);
+      const { data } = await supabase
+        .from("sales")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, sort_order, payment")
+        .gte("date", `${year}-01-01`)
+        .lte("date", `${year}-12-31`);
+      if (!alive) return;
+      setYearSales((data as Sale[]) ?? []);
+      setYearLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [view, year, supabase]);
 
   const saleByAppt = useMemo(() => {
     const m: Record<string, Sale> = {};
@@ -549,6 +570,11 @@ export default function SalesBoard() {
   const yen = (n: number) => "¥" + n.toLocaleString();
   const d = new Date(date + "T00:00:00");
   const monthLabel = `${d.getFullYear()}年${d.getMonth() + 1}月`;
+  // ‹ › の移動幅：日=1日 / 月=1ヶ月 / 年=1年
+  const stepDate = (dir: number) => {
+    if (view === "year") { const nd = new Date(d); nd.setFullYear(nd.getFullYear() + dir); setDate(toDateStr(nd)); }
+    else setDate(toDateStr(addDays(d, dir * (view === "month" ? 31 : 1))));
+  };
 
   // 当日の行（予約＋手動）
   const dayRows = useMemo(() => {
@@ -769,6 +795,35 @@ export default function SalesBoard() {
   );
   const monthSp = monthSum.ho1 + monthSum.ho2 + monthSum.ho3 + monthSum.ho4;
 
+  // 年間集計：担当×月の 保険(insurance)/自費(selfpay)、川西院、物販・その他。
+  const yearData = useMemo(() => {
+    const rows = staff.map((s) => ({
+      id: s.id,
+      name: s.name,
+      color: s.color || "#64748b",
+      hoken: new Array(12).fill(0) as number[],
+      jihi: new Array(12).fill(0) as number[],
+    }));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const kawaM = new Array(12).fill(0) as number[]; // 川西院（自費+保険）
+    const busM = new Array(12).fill(0) as number[]; // 物販・その他（担当なし）
+    yearSales.forEach((s) => {
+      const m = Number(s.date.slice(5, 7)) - 1;
+      if (m < 0 || m > 11) return;
+      if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
+      const r = s.staff_id ? byId.get(s.staff_id) : undefined;
+      if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay; }
+      else busM[m] += s.selfpay + s.insurance;
+    });
+    const perMonth = (fn: (m: number) => number) => new Array(12).fill(0).map((_, m) => fn(m));
+    const hokenTotal = perMonth((m) => rows.reduce((x, r) => x + r.hoken[m], 0));
+    const jihiTotal = perMonth((m) => rows.reduce((x, r) => x + r.jihi[m], 0));
+    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + kawaM[m]);
+    const busKomi = perMonth((m) => sougou[m] + busM[m]);
+    return { rows, kawaM, busM, hokenTotal, jihiTotal, sougou, busKomi };
+  }, [yearSales, staff, kawa]);
+  const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
+
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
   const amt = "w-[68px] rounded border border-slate-300 px-1 py-1 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
   const payBtn = (payment: "cash" | "cashless", onClick: () => void) => (
@@ -787,7 +842,7 @@ export default function SalesBoard() {
         </Link>
         <h1 className="text-lg font-bold text-slate-800">個別売上</h1>
         <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5">
-          {([["day", "日別入力"], ["month", "日計表(月)"]] as const).map(([v, l]) => (
+          {([["day", "日別入力"], ["month", "日計表(月)"], ["year", "年間"]] as const).map(([v, l]) => (
             <button key={v} onClick={() => setView(v)}
               className={`rounded px-2 py-1 text-[11px] font-bold ${view === v ? "bg-blue-600 text-white" : "text-slate-600"}`}>
               {l}
@@ -795,15 +850,16 @@ export default function SalesBoard() {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => setDate(toDateStr(addDays(d, view === "month" ? -31 : -1)))} className={btn}>‹</button>
+          <button onClick={() => stepDate(-1)} className={btn}>‹</button>
           <button onClick={() => setDate(toDateStr(new Date()))} className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">今日</button>
           <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)}
             className="rounded-md border border-slate-300 px-1 py-1 text-[12px] text-slate-600" />
-          <button onClick={() => setDate(toDateStr(addDays(d, view === "month" ? 31 : 1)))} className={btn}>›</button>
+          <button onClick={() => stepDate(1)} className={btn}>›</button>
         </div>
       </div>
 
-      {/* 当月サマリー（担当ごとの総売上＝自費＋保険 vs 目標） */}
+      {/* 当月サマリー（担当ごとの総売上＝自費＋保険 vs 目標）。年間ビューでは非表示。 */}
+      {view !== "year" && (
       <div className="mb-4 rounded-xl border bg-white p-3">
         {(() => {
           const clinicTotal = monthSp + monthSum.kawa + monthSum.ins;
@@ -875,8 +931,84 @@ export default function SalesBoard() {
           </div>
         </div>
       </div>
+      )}
 
-      {loading ? (
+      {view === "year" ? (
+        /* ===== 年間一覧（担当×月：保険/自費/総計＋総合計） ===== */
+        yearLoading ? (
+          <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border bg-white p-2">
+            <div className="mb-1 px-1 text-sm font-bold text-slate-700">{year}年 個別売上 年間</div>
+            <table className="min-w-[760px] w-full border-collapse text-[11px]">
+              <thead>
+                <tr className="border-b bg-slate-50 text-slate-500">
+                  <th className="px-1 py-1.5 text-left" colSpan={2}>担当</th>
+                  {Array.from({ length: 12 }, (_, m) => (
+                    <th key={m} className="px-1 py-1.5 text-right font-bold">{m + 1}月</th>
+                  ))}
+                  <th className="px-1.5 py-1.5 text-right font-bold text-slate-700">年間</th>
+                </tr>
+              </thead>
+              <tbody>
+                {yearData.rows.map((r) => {
+                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m]);
+                  const cell = (v: number, bold = false) => (
+                    <td className={`px-1 py-0.5 text-right tabnum ${v ? "text-slate-700" : "text-slate-300"} ${bold ? "font-bold" : ""}`}>{v.toLocaleString()}</td>
+                  );
+                  return (
+                    <Fragment key={r.id}>
+                      <tr className="border-t" style={{ backgroundColor: r.color + "10" }}>
+                        <td rowSpan={3} className="px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: r.color + "22" }}>
+                          <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: r.color }} />{r.name}
+                        </td>
+                        <td className="whitespace-nowrap px-1 py-0.5 text-slate-400">保険</td>
+                        {r.hoken.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
+                        {cell(sum12(r.hoken), true)}
+                      </tr>
+                      <tr style={{ backgroundColor: r.color + "10" }}>
+                        <td className="whitespace-nowrap px-1 py-0.5 text-slate-400">自費</td>
+                        {r.jihi.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
+                        {cell(sum12(r.jihi), true)}
+                      </tr>
+                      <tr className="border-b" style={{ backgroundColor: r.color + "10" }}>
+                        <td className="whitespace-nowrap px-1 py-0.5 font-bold text-slate-600">総計</td>
+                        {sokei.map((v, m) => <Fragment key={m}>{cell(v, true)}</Fragment>)}
+                        {cell(sum12(sokei), true)}
+                      </tr>
+                    </Fragment>
+                  );
+                })}
+                {/* 集計行 */}
+                {(() => {
+                  const aggRow = (label: string, arr: number[], cls: string) => (
+                    <tr className={`border-t ${cls}`}>
+                      <td colSpan={2} className="whitespace-nowrap px-1.5 py-1 font-bold">{label}</td>
+                      {arr.map((v, m) => (
+                        <td key={m} className={`px-1 py-1 text-right tabnum font-bold ${v ? "" : "opacity-40"}`}>{v.toLocaleString()}</td>
+                      ))}
+                      <td className="px-1.5 py-1 text-right tabnum font-bold">{sum12(arr).toLocaleString()}</td>
+                    </tr>
+                  );
+                  return (
+                    <>
+                      {aggRow("保険総計", yearData.hokenTotal, "bg-slate-50 text-slate-600")}
+                      {aggRow("自費総計", yearData.jihiTotal, "bg-slate-50 text-slate-600")}
+                      {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700")}
+                      {aggRow("総合計", yearData.sougou, "bg-amber-50 text-amber-800")}
+                      {aggRow("物販", yearData.busM, "bg-slate-50 text-slate-600")}
+                      {aggRow("物販込総計", yearData.busKomi, "bg-amber-100 text-amber-900")}
+                    </>
+                  );
+                })()}
+              </tbody>
+            </table>
+            <p className="mt-2 px-1 text-[11px] text-slate-400">
+              保険＝合計額（保険総額）／自費＝保険外／総計＝自費＋保険。川西院は自費＋保険。物販・その他は担当なしの入力分。‹ › で年を移動できます。
+            </p>
+          </div>
+        )
+      ) : loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : view === "month" ? (
         /* ===== 日計表（月）: レセコンと同じ並び ===== */
