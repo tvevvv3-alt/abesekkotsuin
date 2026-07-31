@@ -27,9 +27,10 @@ interface Sale {
   date: string;
   staff_id: string | null;
   patient_name: string | null;
-  selfpay: number; // 保険外（自費）
+  selfpay: number; // 保険外（自費）＝物販では販売価格
   insurance: number; // 合計額（保険総額）
   burden: number; // 負担額（窓口負担）
+  cost: number; // 仕入れ（原価）。物販のみ。スタッフ売上は selfpay−cost（粗利）で計上
   anchor_appointment_id?: string | null; // 物販をこの予約(購入者)の下に置く
   sort_order?: number | null; // 手動並び替え用
   payment: "cash" | "cashless"; // 窓口徴収の支払方法
@@ -38,6 +39,7 @@ const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | 
   selfpay: 0,
   insurance: 0,
   burden: 0,
+  cost: 0,
   payment: "cash",
 });
 
@@ -156,7 +158,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, sort_order, payment")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, sort_order, payment")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -190,7 +192,7 @@ export default function SalesBoard() {
       setYearLoading(true);
       const { data } = await supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, sort_order, payment")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, sort_order, payment")
         .gte("date", `${year}-01-01`)
         .lte("date", `${year}-12-31`);
       if (!alive) return;
@@ -279,8 +281,8 @@ export default function SalesBoard() {
   async function addManual(anchor?: string) {
     const { data } = await supabase
       .from("sales")
-      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, payment: "cash", anchor_appointment_id: anchor ?? null })
-      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, anchor_appointment_id, payment")
+      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, cost: 0, payment: "cash", anchor_appointment_id: anchor ?? null })
+      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, payment")
       .single();
     if (data) setSales((prev) => [...prev, data as Sale]);
   }
@@ -292,7 +294,7 @@ export default function SalesBoard() {
     if (!s) return;
     await supabase
       .from("sales")
-      .update({ staff_id: s.staff_id, patient_name: s.patient_name, selfpay: s.selfpay, insurance: s.insurance, burden: s.burden })
+      .update({ staff_id: s.staff_id, patient_name: s.patient_name, selfpay: s.selfpay, insurance: s.insurance, burden: s.burden, cost: s.cost ?? 0 })
       .eq("id", id);
   }
   async function deleteManual(id: string) {
@@ -560,11 +562,13 @@ export default function SalesBoard() {
   }
 
   // --- 集計 ---
-  const total = (s: { selfpay: number; insurance: number }) => s.selfpay + s.insurance; // 合計
+  const total = (s: { selfpay: number; insurance: number }) => s.selfpay + s.insurance; // 合計（販売価格ベース）
   const paid = (s: { selfpay: number; burden: number }) => s.selfpay + s.burden; // 入金額
+  // スタッフ売上に計上する額：物販は販売価格−仕入れ（粗利）。通常施術は cost=0 で変化なし。
+  const staffAmt = (s: { selfpay: number; insurance: number; cost?: number }) => total(s) - (s.cost ?? 0);
   const staffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + total(s) : sum), 0),
+      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + staffAmt(s) : sum), 0),
     [sales]
   );
   // 担当ごとの自費（保険外）月計
@@ -824,11 +828,12 @@ export default function SalesBoard() {
     yearSales.forEach((s) => {
       const m = Number(s.date.slice(5, 7)) - 1;
       if (m < 0 || m > 11) return;
-      if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
-      if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
+      const c = s.cost ?? 0; // 物販の仕入れ（粗利計上のため差し引く）
+      if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance - c; return; }
+      if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance - c; return; }
       const r = s.staff_id ? byId.get(s.staff_id) : undefined;
-      if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay; }
-      else busM[m] += s.selfpay + s.insurance;
+      if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay - c; }
+      else busM[m] += s.selfpay + s.insurance - c;
     });
     const perMonth = (fn: (m: number) => number) => new Array(12).fill(0).map((_, m) => fn(m));
     const hokenTotal = perMonth((m) => rows.reduce((x, r) => x + r.hoken[m], 0));
@@ -1216,8 +1221,12 @@ export default function SalesBoard() {
                             <input value={m.patient_name ?? ""} placeholder="品目/名前" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
                               className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
                           </td>
-                          <td className="px-1 py-1 text-right">
-                            <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                          <td className="px-1 py-0.5 text-right">
+                            <div className="flex flex-col items-end gap-0.5">
+                              <input type="number" min={0} placeholder="販売" value={m.selfpay || ""} title="販売価格" onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                              <input type="number" min={0} placeholder="仕入" value={m.cost || ""} title="仕入れ(原価)。スタッフ売上は販売−仕入の粗利で計上" onChange={(e) => setManualLocal(m.id, { cost: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)}
+                                className="w-[68px] rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-right text-[11px] tabnum focus:border-amber-400 focus:outline-none" />
+                            </div>
                           </td>
                           <td className="px-1 py-1 text-right">
                             <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
