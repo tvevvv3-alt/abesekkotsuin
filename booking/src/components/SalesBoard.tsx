@@ -9,6 +9,7 @@ import type { Staff } from "@/lib/types";
 import { DEFAULT_OPTIONS, defaultPrices, ageAt, JIKANGAI_MIN, menuIs60, menuHasTsuden, type SelfPrices, type SelfOptions } from "@/lib/pricing";
 
 const KAWANISHI_COLOR = "#3F51B5"; // 川西整体院のカラー（ボード/カレンダーに合わせる）
+const TAIKAN_COLOR = "#EF6C00"; // 体幹教室のカラー（カレンダーに合わせるオレンジ）
 
 interface Appt {
   id: string;
@@ -76,6 +77,7 @@ export default function SalesBoard() {
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [staff, setStaff] = useState<Staff[]>([]);
   const [kawa, setKawa] = useState<{ id: string; name: string; color: string } | null>(null);
+  const [taikan, setTaikan] = useState<{ id: string; name: string; color: string } | null>(null);
   const [appts, setAppts] = useState<Appt[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const salesRef = useRef(sales);
@@ -123,6 +125,8 @@ export default function SalesBoard() {
       setTargets(t);
       const kw = sv.find((s) => s.category === "川西整体院");
       if (kw) setKawa({ id: kw.id, name: kw.name, color: KAWANISHI_COLOR });
+      const tk = sv.find((s) => s.category === "体幹教室" || (s.capacity ?? 0) > 1);
+      if (tk) setTaikan({ id: tk.id, name: "体幹教室", color: TAIKAN_COLOR });
       const { data: cfg } = await supabase.from("settings").select("clinic_sales_target, self_options").eq("id", 1).maybeSingle();
       if (cfg) {
         setClinicTarget((cfg as { clinic_sales_target?: number }).clinic_sales_target ?? 0);
@@ -208,8 +212,11 @@ export default function SalesBoard() {
   // 担当の選択肢（実スタッフ＋川西整体院）。realはスタッフ表に目標を持てる人。
   const assignees = useMemo(() => {
     const base = staff.map((s) => ({ id: s.id, name: s.name, color: s.color || "#64748b", real: true }));
-    return kawa ? [...base, { id: kawa.id, name: kawa.name, color: kawa.color, real: false }] : base;
-  }, [staff, kawa]);
+    const extra: { id: string; name: string; color: string; real: boolean }[] = [];
+    if (kawa) extra.push({ id: kawa.id, name: kawa.name, color: kawa.color, real: false });
+    if (taikan) extra.push({ id: taikan.id, name: taikan.name, color: taikan.color, real: false });
+    return [...base, ...extra];
+  }, [staff, kawa, taikan]);
   // 川西の予約は担当を「川西整体院」に自動割当
   const defStaffId = useCallback(
     (a: Appt) => (kawa && a.service_id === kawa.id ? kawa.id : a.staff_id),
@@ -812,11 +819,13 @@ export default function SalesBoard() {
     }));
     const byId = new Map(rows.map((r) => [r.id, r]));
     const kawaM = new Array(12).fill(0) as number[]; // 川西院（自費+保険）
+    const taikanM = new Array(12).fill(0) as number[]; // 体幹教室（自費+保険）
     const busM = new Array(12).fill(0) as number[]; // 物販・その他（担当なし）
     yearSales.forEach((s) => {
       const m = Number(s.date.slice(5, 7)) - 1;
       if (m < 0 || m > 11) return;
       if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
+      if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
       const r = s.staff_id ? byId.get(s.staff_id) : undefined;
       if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay; }
       else busM[m] += s.selfpay + s.insurance;
@@ -824,10 +833,10 @@ export default function SalesBoard() {
     const perMonth = (fn: (m: number) => number) => new Array(12).fill(0).map((_, m) => fn(m));
     const hokenTotal = perMonth((m) => rows.reduce((x, r) => x + r.hoken[m], 0));
     const jihiTotal = perMonth((m) => rows.reduce((x, r) => x + r.jihi[m], 0));
-    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + kawaM[m]);
+    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + kawaM[m] + taikanM[m]);
     const busKomi = perMonth((m) => sougou[m] + busM[m]);
-    return { rows, kawaM, busM, hokenTotal, jihiTotal, sougou, busKomi };
-  }, [yearSales, staff, kawa]);
+    return { rows, kawaM, taikanM, busM, hokenTotal, jihiTotal, sougou, busKomi };
+  }, [yearSales, staff, kawa, taikan]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
@@ -1001,6 +1010,7 @@ export default function SalesBoard() {
                       {aggRow("保険総計", yearData.hokenTotal, "bg-slate-50 text-slate-600")}
                       {aggRow("自費総計", yearData.jihiTotal, "bg-slate-50 text-slate-600")}
                       {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700")}
+                      {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700")}
                       {aggRow("総合計", yearData.sougou, "bg-amber-50 text-amber-800")}
                       {aggRow("物販", yearData.busM, "bg-slate-50 text-slate-600")}
                       {aggRow("物販込総計", yearData.busKomi, "bg-amber-100 text-amber-900")}
