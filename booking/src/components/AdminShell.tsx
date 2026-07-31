@@ -38,6 +38,7 @@ const NAV = [
   { href: "/admin/retail", label: "物販", icon: "🛍️" },
   { href: "/admin/rental", label: "レンタル", icon: "🔁" },
   { href: "/admin/closures", label: "休日・休診登録", icon: "🚫" },
+  { href: "/admin/new-patients", label: "新患名簿", icon: "🆕" },
   { href: "/admin/patients", label: "患者管理", icon: "👥" },
   { href: "/admin/staff", label: "スタッフ管理", icon: "🧑‍⚕️" },
   { href: "/admin/services", label: "施術メニュー管理", icon: "📋" },
