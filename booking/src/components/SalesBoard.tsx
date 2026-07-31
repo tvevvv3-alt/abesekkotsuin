@@ -87,7 +87,6 @@ export default function SalesBoard() {
   const [prices, setPrices] = useState<Record<string, SelfPrices>>({});
   const [options, setOptions] = useState<SelfOptions>(DEFAULT_OPTIONS);
   const [birth, setBirth] = useState<Record<string, string>>({}); // patient_id -> birth_date
-  const [shin, setShin] = useState<Record<string, boolean>>({}); // appt_id -> 初診(手動上書き)
   const [gaku, setGaku] = useState<Record<string, boolean>>({}); // appt_id -> 学生(上書き)
   const [lastVisit, setLastVisit] = useState<Record<string, string>>({}); // 患者キー -> 前回来院日
   const [lastVisitReady, setLastVisitReady] = useState(false);
@@ -321,14 +320,14 @@ export default function SalesBoard() {
     const [ty, tm] = to.slice(0, 7).split("-").map(Number);
     return ty * 12 + tm - (fy * 12 + fm);
   };
-  // 初診の自動判定：最終来院月＋2ヶ月の末日まで再診、それ以降は初診（＝月差3以上）。手動トグルが優先。
+  // 初診の自動判定：最終来院月＋2ヶ月の末日まで再診、それ以降は初診（＝月差3以上）。
   const autoFirst = (a: Appt): boolean => {
     if (!lastVisitReady) return false; // 判定前は安全側で再診
     const last = lastVisit[pkey(a)];
     if (!last) return true; // 初来院＝初診
     return monthGap(last, a.date) >= 3;
   };
-  const isFirst = (a: Appt) => shin[a.id] ?? autoFirst(a);
+  const isFirst = (a: Appt) => autoFirst(a);
   const isStudentAppt = (a: Appt) => {
     if (a.id in gaku) return gaku[a.id];
     const age = a.patient_id ? ageAt(birth[a.patient_id], a.date) : null;
@@ -1017,10 +1016,6 @@ export default function SalesBoard() {
                             </div>
                             {!(kawa && a.service_id === kawa.id) && (
                               <div className="mt-0.5 flex items-center gap-1">
-                                <button onClick={() => setShin((m) => ({ ...m, [a.id]: !isFirst(a) }))}
-                                  className={`rounded border px-1 py-0.5 text-[9px] font-bold ${isFirst(a) ? "border-rose-300 bg-rose-50 text-rose-600" : "border-slate-200 text-slate-400"}`}>
-                                  {isFirst(a) ? "初診" : "再診"}
-                                </button>
                                 <button onClick={() => setGaku((m) => ({ ...m, [a.id]: !isStudentAppt(a) }))}
                                   className={`rounded border px-1 py-0.5 text-[9px] font-bold ${isStudentAppt(a) ? "border-sky-300 bg-sky-50 text-sky-600" : "border-slate-200 text-slate-400"}`}>
                                   {isStudentAppt(a) ? "学生" : "一般"}
@@ -1028,7 +1023,7 @@ export default function SalesBoard() {
                                 {(() => {
                                   const last = lastVisit[pkey(a)];
                                   if (last) { const dd = new Date(last + "T00:00:00"); return <span className="text-[9px] text-slate-400">前回{dd.getMonth() + 1}/{dd.getDate()}</span>; }
-                                  return lastVisitReady ? <span className="text-[9px] font-bold text-rose-400">初来院</span> : null;
+                                  return null;
                                 })()}
                               </div>
                             )}
