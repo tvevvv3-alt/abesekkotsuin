@@ -612,12 +612,25 @@ export default function BookingWizard() {
           await fetch("/api/my/cancel", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: liffIdToken || "", appointmentId: rescheduleId }),
+            body: JSON.stringify({ idToken: liffIdToken || "", appointmentId: rescheduleId, silent: true }),
           });
         } catch {
           /* 元予約の取消に失敗しても新規予約は成立している */
         }
         setRescheduleId(null);
+        // 変更後の新しい予約について、本人へ確認メッセージを送信（Cookie/idTokenで本人確認）。
+        // ここで完結させ、OAuth再ログインへは飛ばさない。
+        try {
+          await fetch("/api/my/confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: liffIdToken || "", appointmentId: res.appointment_id }),
+          });
+        } catch {
+          /* 確認送信に失敗しても予約自体は成立している */
+        }
+        setStep(5);
+        return;
       }
       // ① LINE内（リッチメニュー経由）なら、タップ0回で自動連携＋確認送信
       if (liffIdToken && res.appointment_id) {

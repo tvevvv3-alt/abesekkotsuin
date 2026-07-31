@@ -10,10 +10,12 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   let idToken = "";
   let appointmentId = "";
+  let silent = false; // 変更（リスケ）での旧予約取消はキャンセル通知を出さない
   try {
-    const b = (await req.json()) as { idToken?: string; appointmentId?: string };
+    const b = (await req.json()) as { idToken?: string; appointmentId?: string; silent?: boolean };
     idToken = b.idToken || "";
     appointmentId = b.appointmentId || "";
+    silent = Boolean(b.silent);
   } catch {
     /* noop */
   }
@@ -51,8 +53,8 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, reason: "db", detail: error.message }, { status: 500 });
   await admin.from("appointment_steps").delete().eq("appointment_id", appointmentId);
 
-  // 本人へキャンセル確認をLINE通知（任意・失敗しても成功扱い）
-  if (lineMessagingConfigured()) {
+  // 本人へキャンセル確認をLINE通知（任意・失敗しても成功扱い）。silent時は送らない。
+  if (!silent && lineMessagingConfigured()) {
     try {
       const info = await buildApptInfo(admin, {
         service_id: appt.service_id ?? null,
