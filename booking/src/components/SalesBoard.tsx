@@ -650,6 +650,22 @@ export default function SalesBoard() {
     }
   }
   const itemId = (it: { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }) => (it.kind === "appt" ? it.a.id : it.m.id);
+  // 入力欄・ボタン・セレクトの上ではドラッグを開始しない（編集を優先）
+  function isInteractiveTarget(t: EventTarget | null): boolean {
+    let el = t as HTMLElement | null;
+    while (el) {
+      const tag = el.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || tag === "BUTTON" || tag === "OPTION" || tag === "A" || tag === "LABEL" || el.isContentEditable) return true;
+      el = el.parentElement;
+    }
+    return false;
+  }
+  // 行のどこでもドラッグで並び替え（入力欄以外）
+  function onRowPointerDown(e: React.PointerEvent, id: string) {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (isInteractiveTarget(e.target)) return;
+    onDragStart(e, id);
+  }
   // ドラッグ＆ドロップ並び替え（マウス・タッチ両対応）
   function onDragStart(e: React.PointerEvent, id: string) {
     setDragId(id);
@@ -695,20 +711,13 @@ export default function SalesBoard() {
     await Promise.all(ids.map((id, i) => (byId[id] ? setItemOrder(byId[id], i * 10) : Promise.resolve())));
     reload();
   }
-  const grip = (id: string) => (
-    <span
-      onPointerDown={(e) => onDragStart(e, id)}
-      onPointerMove={onDragMove}
-      onPointerUp={onDragEnd}
-      onPointerCancel={onDragEnd}
-      className={`inline-flex cursor-grab touch-none select-none rounded-md border px-1.5 py-1 text-lg leading-none active:cursor-grabbing ${
-        dragId === id ? "border-blue-400 bg-blue-50 text-blue-500" : "border-slate-200 text-slate-400 active:bg-slate-100"
-      }`}
-      title="ドラッグで並び替え"
-    >
-      ⠿
-    </span>
-  );
+  // 行に付けるドラッグ用ハンドラ（行のどこでも掴める）
+  const dragHandlers = (id: string) => ({
+    onPointerDown: (e: React.PointerEvent) => onRowPointerDown(e, id),
+    onPointerMove: onDragMove,
+    onPointerUp: onDragEnd,
+    onPointerCancel: onDragEnd,
+  });
   // 担当スタッフのカラー（#rrggbb）。担当セルの色分けに使う。
   const colorOf = (staffId: string | null): string | null => {
     const c = assignees.find((s) => s.id === staffId)?.color;
@@ -1154,8 +1163,8 @@ export default function SalesBoard() {
                       const a = it.a;
                       const s = apptVal(a);
                       return (
-                        <tr key={a.id} ref={(el) => { rowRefs.current[a.id] = el; }}
-                          className={rowClass(a.id)} style={rowStyle(a.id)}>
+                        <tr key={a.id} ref={(el) => { rowRefs.current[a.id] = el; }} {...dragHandlers(a.id)}
+                          className={rowClass(a.id, "cursor-grab select-none active:cursor-grabbing")} style={rowStyle(a.id)}>
                           <td className="px-1 py-0.5">
                             <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
                               className="rounded border px-1 py-1 text-[11px] font-bold" style={assigneeSelectStyle(s.staff_id)}>
@@ -1198,8 +1207,7 @@ export default function SalesBoard() {
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
                           <td className="px-1 py-1 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
                           <td className="whitespace-nowrap px-1 py-1 text-center">
-                            {grip(a.id)}
-                            {saleByAppt[a.id] && <button onClick={() => deleteApptSale(a)} className="ml-1 text-[11px] font-bold text-red-400">削除</button>}
+                            {saleByAppt[a.id] && <button onClick={() => deleteApptSale(a)} className="text-[11px] font-bold text-red-400">削除</button>}
                           </td>
                         </tr>
                       );
@@ -1208,8 +1216,8 @@ export default function SalesBoard() {
                     (() => {
                       const m = it.m;
                       return (
-                        <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
-                          className={rowClass(m.id)} style={rowStyle(m.id)}>
+                        <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }} {...dragHandlers(m.id)}
+                          className={rowClass(m.id, "cursor-grab select-none active:cursor-grabbing")} style={rowStyle(m.id)}>
                           <td className="px-1 py-0.5">
                             <select value={m.staff_id ?? ""} onChange={(e) => { const sid = e.target.value || null; setManualLocal(m.id, { staff_id: sid, retail: !sid }); }} onBlur={() => persistManual(m.id)}
                               className="rounded border px-1 py-1 text-[11px] font-bold"
@@ -1235,8 +1243,7 @@ export default function SalesBoard() {
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
                           <td className="px-1 py-1 text-center">{payBtn(m.payment, () => toggleManualPayment(m))}</td>
                           <td className="whitespace-nowrap px-1 py-1 text-center">
-                            {grip(m.id)}
-                            <button onClick={() => deleteManual(m.id)} className="ml-1 text-[11px] font-bold text-red-400">削除</button>
+                            <button onClick={() => deleteManual(m.id)} className="text-[11px] font-bold text-red-400">削除</button>
                           </td>
                         </tr>
                       );
