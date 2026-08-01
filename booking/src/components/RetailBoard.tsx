@@ -61,7 +61,7 @@ export default function RetailBoard() {
     const { data } = await supabase
       .from("sales")
       .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id")
-      .not("product_id", "is", null)
+      .or("product_id.not.is.null,retail.is.true")
       .gte("date", monthStart)
       .lt("date", monthEnd)
       .order("date");
@@ -94,7 +94,7 @@ export default function RetailBoard() {
   async function addSale() {
     const { data, error } = await supabase
       .from("sales")
-      .insert({ date, product_id: null, qty: 1, selfpay: 0, cost: 0, staff_id: null, patient_name: "", insurance: 0, burden: 0, payment: "cash" })
+      .insert({ date, product_id: null, qty: 1, selfpay: 0, cost: 0, staff_id: null, patient_name: "", insurance: 0, burden: 0, payment: "cash", retail: true })
       .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id")
       .single();
     if (error) { alert("物販を追加できませんでした：\n" + error.message + "\n（sales に product_id/qty/cost 列があるかご確認ください）"); return; }

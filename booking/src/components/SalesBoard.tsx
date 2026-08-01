@@ -34,6 +34,7 @@ interface Sale {
   anchor_appointment_id?: string | null; // 物販をこの予約(購入者)の下に置く
   sort_order?: number | null; // 手動並び替え用
   payment: "cash" | "cashless"; // 窓口徴収の支払方法
+  retail?: boolean; // 物販（物販ページにも表示）
 }
 const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
   selfpay: 0,
@@ -41,6 +42,7 @@ const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | 
   burden: 0,
   cost: 0,
   payment: "cash",
+  retail: false,
 });
 
 // レセコン取込の確認行（写真の1行＝patient1件ぶん）
@@ -158,7 +160,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, sort_order, payment")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, anchor_appointment_id, sort_order, payment")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -281,8 +283,8 @@ export default function SalesBoard() {
   async function addManual(anchor?: string) {
     const { data } = await supabase
       .from("sales")
-      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, cost: 0, payment: "cash", anchor_appointment_id: anchor ?? null })
-      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, payment")
+      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, cost: 0, retail: true, payment: "cash", anchor_appointment_id: anchor ?? null })
+      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, anchor_appointment_id, payment")
       .single();
     if (data) setSales((prev) => [...prev, data as Sale]);
   }
@@ -294,7 +296,7 @@ export default function SalesBoard() {
     if (!s) return;
     await supabase
       .from("sales")
-      .update({ staff_id: s.staff_id, patient_name: s.patient_name, selfpay: s.selfpay, insurance: s.insurance, burden: s.burden, cost: s.cost ?? 0 })
+      .update({ staff_id: s.staff_id, patient_name: s.patient_name, selfpay: s.selfpay, insurance: s.insurance, burden: s.burden, cost: s.cost ?? 0, retail: s.retail ?? false })
       .eq("id", id);
   }
   async function deleteManual(id: string) {
@@ -564,11 +566,10 @@ export default function SalesBoard() {
   // --- 集計 ---
   const total = (s: { selfpay: number; insurance: number }) => s.selfpay + s.insurance; // 合計（販売価格ベース）
   const paid = (s: { selfpay: number; burden: number }) => s.selfpay + s.burden; // 入金額
-  // スタッフ売上に計上する額：物販は販売価格−仕入れ（粗利）。通常施術は cost=0 で変化なし。
-  const staffAmt = (s: { selfpay: number; insurance: number; cost?: number }) => total(s) - (s.cost ?? 0);
+  // 日計表は売上（販売そのまま）。粗利は物販ページで管理するのでここでは原価を引かない。
   const staffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + staffAmt(s) : sum), 0),
+      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + total(s) : sum), 0),
     [sales]
   );
   // 担当ごとの自費（保険外）月計
@@ -828,12 +829,11 @@ export default function SalesBoard() {
     yearSales.forEach((s) => {
       const m = Number(s.date.slice(5, 7)) - 1;
       if (m < 0 || m > 11) return;
-      const c = s.cost ?? 0; // 物販の仕入れ（粗利計上のため差し引く）
-      if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance - c; return; }
-      if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance - c; return; }
+      if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
+      if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
       const r = s.staff_id ? byId.get(s.staff_id) : undefined;
-      if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay - c; }
-      else busM[m] += s.selfpay + s.insurance - c;
+      if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay; }
+      else busM[m] += s.selfpay + s.insurance;
     });
     const perMonth = (fn: (m: number) => number) => new Array(12).fill(0).map((_, m) => fn(m));
     const hokenTotal = perMonth((m) => rows.reduce((x, r) => x + r.hoken[m], 0));
@@ -1210,7 +1210,7 @@ export default function SalesBoard() {
                         <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
                           className={rowClass(m.id)} style={rowStyle(m.id)}>
                           <td className="px-1 py-0.5">
-                            <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
+                            <select value={m.staff_id ?? ""} onChange={(e) => { const sid = e.target.value || null; setManualLocal(m.id, { staff_id: sid, retail: !sid }); }} onBlur={() => persistManual(m.id)}
                               className="rounded border px-1 py-1 text-[11px] font-bold"
                               style={m.staff_id ? assigneeSelectStyle(m.staff_id) : { backgroundColor: "#64748b", color: "#fff", borderColor: "#64748b" }}>
                               <option value="" style={{ color: "#0f172a", background: "#fff" }}>物販</option>
