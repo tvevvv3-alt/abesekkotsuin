@@ -1321,19 +1321,19 @@ export default function BookingWizard() {
           <button
             disabled={submitting}
             onClick={submit}
-            className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-300"
+            className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-400"
           >
-            {submitting
-              ? "予約中…"
-              : lineEnabled && !liffIdToken
-              ? "予約してLINEで受け取る"
-              : "この内容で予約する"}
+            {submitting ? "確定処理中…（画面が変わるまでお待ちください）" : "予約を確定する"}
           </button>
-          {(liffIdToken || lineEnabled) && (
+          {submitting ? (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-center text-[12px] font-bold text-amber-700">
+              ⚠️ 処理中です。LINEに移動するまで数秒かかります。<br />何度も押さないでお待ちください。
+            </p>
+          ) : (
             <p className="mt-2 text-center text-[11px] text-slate-500">
               {liffIdToken
                 ? "予約確認・リマインドをLINEにお届けします"
-                : "予約後、LINEに移動して連携します（予約確認・問診票・リマインドをLINEでお届け）"}
+                : "確定後、数秒でLINEに移動します（予約確認・問診票・リマインドをLINEでお届け）。ボタンは1回だけ押してください。"}
             </p>
           )}
         </Section>
