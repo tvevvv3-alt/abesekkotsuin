@@ -48,7 +48,7 @@ const DEFAULT_NAV: NavItem[] = [
   },
   {
     href: "/admin/staff", label: "スタッフ管理", icon: "🧑‍⚕️", children: [
-      { label: "シフト", soon: true },
+      { href: "/admin/shifts", label: "シフト" },
       { href: "/admin/sales", label: "売上（個別）" },
     ],
   },
