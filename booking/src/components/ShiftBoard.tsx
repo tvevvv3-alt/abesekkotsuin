@@ -38,7 +38,9 @@ const timeToMin = (t: string) => { const [h, m] = t.split(":").map(Number); retu
 const short = (m: number) => (m % 60 === 0 ? String(Math.floor(m / 60)) : `${Math.floor(m / 60)}:${pad(m % 60)}`);
 const range = (s: number | null, e: number | null) => (s == null ? "" : e == null ? `${short(s)}〜` : `${short(s)}-${short(e)}`);
 
-type Draft = Record<string, { on: boolean; start: string; end: string; clinic: boolean }>;
+type Seg = "all" | "am" | "pm";
+type Draft = Record<string, { on: boolean; seg: Seg; start: string; end: string; clinic: boolean }>;
+type Clip = { member_id: string; role: Member["role"]; seg: Seg; start_min: number | null; end_min: number | null; clinic: string | null };
 
 export default function ShiftBoard() {
   const supabase = useMemo(() => createClient(), []);
@@ -52,6 +54,7 @@ export default function ShiftBoard() {
   const [rosterOpen, setRosterOpen] = useState(false);
   const [edit, setEdit] = useState<string | null>(null); // 編集中の日付
   const [draft, setDraft] = useState<Draft>({});
+  const [clip, setClip] = useState<Clip[] | null>(null); // コピー中のシフト（貼り付けモード）
 
   const monthStart = useMemo(() => date.slice(0, 8) + "01", [date]);
   const monthEnd = useMemo(() => {
@@ -166,39 +169,73 @@ export default function ShiftBoard() {
     setDate(`${ny}-${pad(mm)}-01`);
   };
 
+  // 区分（終日/午前/午後）→ その日の営業時間の時間帯
+  const segTimes = (ds: string, seg: Seg): { start: number | null; end: number | null } => {
+    const b = bhByWd.get(new Date(ds + "T00:00:00").getDay());
+    if (seg === "am") return { start: b?.seg1_start ?? 600, end: b?.seg1_end ?? 780 };
+    if (seg === "pm") return { start: b?.seg2_start ?? 960, end: b?.seg2_end ?? 1230 };
+    return { start: null, end: null };
+  };
   function openDay(ds: string) {
     const day = shiftsByDate.get(ds) ?? [];
     const span = bhSpan(ds); // 営業時間ベースの既定
+    const split = bhByWd.get(new Date(ds + "T00:00:00").getDay())?.seg1_end ?? 780;
     const d: Draft = {};
     activeMembers.forEach((m) => {
       const sh = day.find((x) => x.member_id === m.id);
-      // 施術は時間不要（終日）。受付・学生は既定 or 営業時間帯。
       const isT = m.role === "therapist";
+      // 施術は終日/午前/午後の区分。受付・学生は時間帯。
+      let seg: Seg = "all";
+      if (isT && sh && sh.start_min != null) seg = sh.end_min != null && sh.end_min <= split ? "am" : "pm";
       const defStart = isT ? null : m.default_start != null ? m.default_start : span.start;
       const defEnd = isT ? null : m.default_end != null ? m.default_end : span.end;
       d[m.id] = {
         on: !!sh,
-        start: sh?.start_min != null ? minToTime(sh.start_min) : defStart != null ? minToTime(defStart) : "",
-        end: sh?.end_min != null ? minToTime(sh.end_min) : defEnd != null ? minToTime(defEnd) : "",
+        seg,
+        start: !isT && sh?.start_min != null ? minToTime(sh.start_min) : defStart != null ? minToTime(defStart) : "",
+        end: !isT && sh?.end_min != null ? minToTime(sh.end_min) : defEnd != null ? minToTime(defEnd) : "",
         clinic: sh?.clinic === "kawanishi",
       };
     });
     setDraft(d); setEdit(ds);
   }
+  function draftRows(ds: string) {
+    return activeMembers.filter((m) => draft[m.id]?.on).map((m) => {
+      const isT = m.role === "therapist";
+      const t = isT ? segTimes(ds, draft[m.id].seg) : { start: draft[m.id].start ? timeToMin(draft[m.id].start) : null, end: draft[m.id].end ? timeToMin(draft[m.id].end) : null };
+      return { date: ds, member_id: m.id, start_min: t.start, end_min: t.end, clinic: draft[m.id].clinic ? "kawanishi" : null };
+    });
+  }
   async function saveDay() {
     if (!edit) return;
     await supabase.from("shifts").delete().eq("date", edit);
-    const rows = activeMembers.filter((m) => draft[m.id]?.on).map((m) => {
-      const isT = m.role === "therapist"; // 施術は終日（時間なし）
+    const rows = draftRows(edit);
+    if (rows.length) await supabase.from("shifts").insert(rows);
+    setEdit(null); reload();
+  }
+  // この日のシフトをコピー（貼り付けモードへ）
+  function copyDay() {
+    if (!edit) return;
+    const rows: Clip[] = activeMembers.filter((m) => draft[m.id]?.on).map((m) => {
+      const isT = m.role === "therapist";
       return {
-        date: edit, member_id: m.id,
-        start_min: !isT && draft[m.id].start ? timeToMin(draft[m.id].start) : null,
-        end_min: !isT && draft[m.id].end ? timeToMin(draft[m.id].end) : null,
+        member_id: m.id, role: m.role, seg: isT ? draft[m.id].seg : "all",
+        start_min: isT ? null : draft[m.id].start ? timeToMin(draft[m.id].start) : null,
+        end_min: isT ? null : draft[m.id].end ? timeToMin(draft[m.id].end) : null,
         clinic: draft[m.id].clinic ? "kawanishi" : null,
       };
     });
+    setClip(rows); setEdit(null);
+  }
+  async function pasteTo(ds: string) {
+    if (!clip) return;
+    await supabase.from("shifts").delete().eq("date", ds);
+    const rows = clip.map((c) => {
+      const t = c.role === "therapist" ? segTimes(ds, c.seg) : { start: c.start_min, end: c.end_min };
+      return { date: ds, member_id: c.member_id, start_min: t.start, end_min: t.end, clinic: c.clinic };
+    });
     if (rows.length) await supabase.from("shifts").insert(rows);
-    setEdit(null); reload();
+    reload();
   }
 
   // 出勤日数（当月・メンバー別）
@@ -263,6 +300,13 @@ export default function ShiftBoard() {
         {activeMembers.length === 0 && <span className="text-slate-400">メンバー未登録。下の「メンバー設定」から追加してください。</span>}
       </div>
 
+      {clip && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+          <span className="font-bold text-amber-800">📋 貼り付けモード：日をタップで貼り付け（{clip.length}人分）</span>
+          <button onClick={() => setClip(null)} className="ml-auto rounded bg-amber-600 px-2 py-1 text-[11px] font-bold text-white active:bg-amber-700">終了</button>
+        </div>
+      )}
+
       {/* カレンダー（月グリッド） */}
       <div className="overflow-x-auto rounded-xl border bg-white">
         <div className="min-w-[720px]">
@@ -294,23 +338,23 @@ export default function ShiftBoard() {
                     if (it.m.role !== "therapist") { parttime.push(it); return; }
                     const { am, pm } = covFor(ds, dow, it.m.id, it.s);
                     if (am && pm) full.push(it);
-                    else if (am && !pm) partial.push({ ...it, label: "午後休診" }); // 午前のみ
-                    else if (!am && pm) partial.push({ ...it, label: "午前休診" }); // 午後のみ
+                    else if (am && !pm) partial.push({ ...it, label: "午前のみ" });
+                    else if (!am && pm) partial.push({ ...it, label: "午後のみ" });
                   });
                   const today = ds === toDateStr(new Date());
                   return (
-                    <button key={ds} onClick={() => inMonth && openDay(ds)} disabled={!inMonth}
-                      className={`min-h-[84px] border-b border-r p-1 text-left align-top ${!inMonth ? "bg-slate-50/60" : closed ? "bg-slate-100 active:bg-blue-50" : "bg-white active:bg-blue-50"}`}>
+                    <button key={ds} onClick={() => inMonth && (clip ? pasteTo(ds) : openDay(ds))} disabled={!inMonth}
+                      className={`min-h-[84px] border-b border-r p-1 text-left align-top ${!inMonth ? "bg-slate-50/60" : clip ? "bg-amber-50/50 active:bg-amber-100" : closed ? "bg-slate-100 active:bg-blue-50" : "bg-white active:bg-blue-50"}`}>
                       <div className="mb-0.5 flex items-center justify-between">
                         <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-600"}`}>{d.getDate()}{today && inMonth ? "・今日" : ""}</span>
                         {closed && <span className="text-[10px] font-bold text-rose-500">休診</span>}
                       </div>
                       {inMonth && !closed && (
                         <div className="flex flex-col gap-1">
-                          {/* 午前/午後だけの人（灰背景＋休診タグ） */}
+                          {/* 午前/午後だけの人（灰背景＋区分バッジ） */}
                           {partial.map(({ s, m, label }) => (
                             <span key={"p" + s.id} className="flex items-center gap-1 rounded bg-slate-200/70 px-1 py-0.5">
-                              <span className="text-[9px] font-bold text-rose-500">{label}</span>
+                              <span className="rounded px-1 text-[9px] font-bold text-white" style={{ backgroundColor: label === "午前のみ" ? "#0ea5e9" : "#f59e0b" }}>{label}</span>
                               <span className="truncate text-[11px] font-bold" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
                             </span>
                           ))}
@@ -435,7 +479,12 @@ export default function ShiftBoard() {
                       <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-6">
                         {m.role === "therapist" ? (
                           <>
-                            <span className="text-[11px] text-slate-400">終日（午前・午後の休みは休診登録で反映）</span>
+                            {(["all", "am", "pm"] as const).map((sg) => (
+                              <button key={sg} onClick={() => setDraft((p) => ({ ...p, [m.id]: { ...dr, seg: sg } }))}
+                                className={`rounded border px-2 py-1 text-[11px] font-bold ${dr.seg === sg ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-slate-600"}`}>
+                                {sg === "all" ? "終日" : sg === "am" ? "午前のみ" : "午後のみ"}
+                              </button>
+                            ))}
                             <label className="ml-1 flex items-center gap-1 text-[12px] text-slate-600">
                               <input type="checkbox" checked={dr.clinic} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, clinic: e.target.checked } }))} className="h-3.5 w-3.5" />
                               川西院
@@ -457,9 +506,10 @@ export default function ShiftBoard() {
               {activeMembers.length === 0 && <p className="py-4 text-center text-sm text-slate-400">先に「メンバー設定」から追加してください。</p>}
             </div>
             <div className="mt-4 flex items-center gap-2">
-              <p className="text-[11px] text-slate-400">施術は時間を空欄にすると「終日」。受付・学生は時間帯を入力。</p>
+              <button onClick={copyDay} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">📋 この日をコピー</button>
               <button onClick={saveDay} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700">保存</button>
             </div>
+            <p className="mt-1.5 text-[11px] text-slate-400">施術＝終日/午前のみ/午後のみ。受付・学生＝時間帯。「コピー」後に他の日をタップすると同じ内容を貼り付けます。</p>
           </div>
         </div>
       )}
