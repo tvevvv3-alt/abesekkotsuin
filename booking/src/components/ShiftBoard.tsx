@@ -133,24 +133,22 @@ export default function ShiftBoard() {
     return m;
   }, [shifts]);
 
-  // カレンダーの週（日〜土）。当月を含む週のみ。
-  const weeks = useMemo(() => {
+  // 当月の全日（縦リスト用）
+  const monthDays = useMemo(() => {
     const [y, m] = date.split("-").map(Number);
-    const first = new Date(y, m - 1, 1);
-    const start = new Date(y, m - 1, 1 - first.getDay());
     const last = new Date(y, m, 0).getDate();
-    const cells: Date[] = [];
-    for (let i = 0; i < 42; i++) cells.push(new Date(y, m - 1, 1 - first.getDay() + i));
-    void start;
-    const rows: Date[][] = [];
-    for (let i = 0; i < 42; i += 7) {
-      const wk = cells.slice(i, i + 7);
-      if (wk.some((d) => d.getMonth() === m - 1)) rows.push(wk);
-      if (wk[6].getMonth() === m - 1 && wk[6].getDate() === last) break;
-      if (wk[0].getMonth() === m - 1 && wk[0].getDate() > last) break;
-    }
-    return rows;
+    return Array.from({ length: last }, (_, i) => new Date(y, m - 1, i + 1));
   }, [date]);
+
+  // その日・そのメンバーが午前/午後どちらに出るか
+  const covFor = (ds: string, dow: number, memberId: string, s: Shift) => {
+    const split = bhByWd.get(dow)?.seg1_end ?? 780;
+    let am = s.start_min == null ? true : s.start_min < split;
+    let pm = s.start_min == null ? true : s.end_min == null || s.end_min > split;
+    (closuresByDate.get(ds) ?? []).forEach((c) => { if (c.start_min != null) { const l = closureLabel(c); if (l === "午前休診") am = false; if (l === "午後休診") pm = false; } });
+    (indivByDate.get(ds) ?? []).filter((x) => x.member.id === memberId).forEach((x) => { if (x.label === "午前休") am = false; if (x.label === "午後休") pm = false; });
+    return { am, pm };
+  };
 
   const gotoMonth = (dir: number) => {
     const [y, m] = date.split("-").map(Number);
@@ -255,91 +253,68 @@ export default function ShiftBoard() {
         {activeMembers.length === 0 && <span className="text-slate-400">メンバー未登録。下の「メンバー設定」から追加してください。</span>}
       </div>
 
-      {/* カレンダー */}
-      <div className="overflow-x-auto rounded-xl border bg-white">
-        <div className="min-w-[700px]">
-          <div className="grid grid-cols-7 border-b bg-slate-50 text-center text-[11px] font-bold">
-            {WD.map((w, i) => <div key={w} className={`py-1.5 ${i === 0 ? "text-rose-500" : i === 6 ? "text-blue-500" : "text-slate-500"}`}>{w}</div>)}
-          </div>
-          {loading ? (
-            <p className="py-10 text-center text-sm text-slate-400">読み込み中…</p>
-          ) : (
-            weeks.map((wk, wi) => (
-              <div key={wi} className="grid grid-cols-7">
-                {wk.map((d) => {
-                  const ds = toDateStr(d);
-                  const inMonth = ds.slice(0, 7) === date.slice(0, 7);
-                  const day = (shiftsByDate.get(ds) ?? []).map((s) => ({ s, m: memberById.get(s.member_id) })).filter((x) => x.m) as { s: Shift; m: Member }[];
-                  day.sort((a, b) => ROLE_ORDER[a.m.role] - ROLE_ORDER[b.m.role] || a.m.sort_order - b.m.sort_order);
-                  const dow = d.getDay();
-                  const wdClosed = bhByWd.get(dow)?.is_open === false;
-                  const dayCl = closuresByDate.get(ds) ?? [];
-                  const fullClosed = dayCl.some((c) => c.start_min == null);
-                  const partials = dayCl.filter((c) => c.start_min != null);
-                  const closed = inMonth && (wdClosed || fullClosed);
-                  const clinicAmOff = partials.some((c) => closureLabel(c) === "午前休診");
-                  const clinicPmOff = partials.some((c) => closureLabel(c) === "午後休診");
-                  const split = bhByWd.get(dow)?.seg1_end ?? 780; // 昼の境目
-                  const workingIds = new Set(day.map((x) => x.m.id));
-                  const offMembers = (indivByDate.get(ds) ?? []).filter((x) => !workingIds.has(x.member.id));
-                  // 午前/午後のどちらに出るか（時間＋院の午前/午後休診＋個人の午前/午後休を加味）
-                  const cov = (memberId: string, s: Shift) => {
-                    let am = s.start_min == null ? true : s.start_min < split;
-                    let pm = s.start_min == null ? true : s.end_min == null || s.end_min > split;
-                    if (clinicAmOff) am = false;
-                    if (clinicPmOff) pm = false;
-                    (indivByDate.get(ds) ?? []).filter((x) => x.member.id === memberId).forEach((x) => { if (x.label === "午前休") am = false; if (x.label === "午後休") pm = false; });
-                    return { am, pm };
-                  };
-                  return (
-                    <button key={ds} onClick={() => inMonth && openDay(ds)} disabled={!inMonth}
-                      className={`min-h-[76px] border-b border-r p-1 text-left align-top ${!inMonth ? "bg-slate-50/60" : closed ? "bg-slate-100 active:bg-blue-50" : "bg-white active:bg-blue-50"}`}>
-                      <div className="mb-0.5 flex items-center justify-between">
-                        <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-500"}`}>{d.getDate()}</span>
-                        {closed && <span className="text-[9px] font-bold text-rose-400">休診</span>}
-                      </div>
-                      {inMonth && !closed && (
-                        <div className="relative min-h-[48px]">
-                          {/* 縦割り（午前｜午後）の中心線 */}
-                          <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-slate-200" />
-                          {clinicAmOff && <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-slate-200/60" />}
-                          {clinicPmOff && <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-slate-200/60" />}
-                          <div className="relative z-10 flex flex-col gap-0.5">
-                            {(clinicAmOff || clinicPmOff) && (
-                              <span className={`text-[9px] font-bold text-rose-400 ${clinicPmOff && !clinicAmOff ? "self-end" : ""}`}>{clinicAmOff ? "午前休診" : "午後休診"}</span>
-                            )}
-                            {day.map(({ s, m }) => {
-                              const { am, pm } = cov(m.id, s);
-                              if (!am && !pm) return null;
-                              const w = am && pm ? "w-full" : "w-[48%]";
-                              const right = !am && pm;
-                              return m.role === "therapist" ? (
-                                <span key={s.id} className={`${w} ${right ? "ml-auto text-right" : ""} block truncate rounded px-1 text-[10px] font-bold leading-tight text-white`} style={{ backgroundColor: m.color }}>
-                                  {m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}
-                                </span>
-                              ) : (
-                                <span key={s.id} className={`${w} ${right ? "ml-auto text-right" : ""} block truncate text-[10px] font-bold leading-tight`} style={{ color: m.color }}>
-                                  {m.name} {range(s.start_min, s.end_min)}
-                                </span>
-                              );
-                            })}
-                            {offMembers.map((x, i) => (
-                              <span key={"i" + i} className="truncate text-[9px] font-bold text-rose-400 line-through decoration-rose-300">
-                                {x.member.name} {x.label}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))
-          )}
+      {/* シフト（縦：日付ごと｜横：午前/午後） */}
+      <div className="overflow-hidden rounded-xl border bg-white">
+        <div className="flex border-b bg-slate-50 text-[11px] font-bold text-slate-500">
+          <div className="w-16 shrink-0 px-2 py-1.5">日付</div>
+          <div className="flex-1 border-l px-2 py-1.5 text-center">午前</div>
+          <div className="flex-1 border-l px-2 py-1.5 text-center">午後</div>
         </div>
+        {loading ? (
+          <p className="py-10 text-center text-sm text-slate-400">読み込み中…</p>
+        ) : (
+          monthDays.map((d) => {
+            const ds = toDateStr(d);
+            const dow = d.getDay();
+            const day = (shiftsByDate.get(ds) ?? []).map((s) => ({ s, m: memberById.get(s.member_id) })).filter((x) => x.m) as { s: Shift; m: Member }[];
+            day.sort((a, b) => ROLE_ORDER[a.m.role] - ROLE_ORDER[b.m.role] || a.m.sort_order - b.m.sort_order);
+            const dayCl = closuresByDate.get(ds) ?? [];
+            const fullClosed = dayCl.some((c) => c.start_min == null);
+            const wdClosed = bhByWd.get(dow)?.is_open === false;
+            const closed = wdClosed || fullClosed;
+            const clinicAmOff = dayCl.some((c) => closureLabel(c) === "午前休診");
+            const clinicPmOff = dayCl.some((c) => closureLabel(c) === "午後休診");
+            const workingIds = new Set(day.map((x) => x.m.id));
+            const offMembers = (indivByDate.get(ds) ?? []).filter((x) => !workingIds.has(x.member.id));
+            const amList = day.filter(({ s, m }) => covFor(ds, dow, m.id, s).am);
+            const pmList = day.filter(({ s, m }) => covFor(ds, dow, m.id, s).pm);
+            const chip = ({ s, m }: { s: Shift; m: Member }) =>
+              m.role === "therapist" ? (
+                <span key={s.id} className="truncate rounded px-1.5 py-0.5 text-[11px] font-bold text-white" style={{ backgroundColor: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
+              ) : (
+                <span key={s.id} className="truncate text-[11px] font-bold" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+              );
+            const today = ds === toDateStr(new Date());
+            return (
+              <button key={ds} onClick={() => openDay(ds)}
+                className={`flex w-full items-stretch border-b text-left ${closed ? "bg-slate-100" : "bg-white"} active:bg-blue-50`}>
+                <div className={`flex w-16 shrink-0 flex-col justify-center px-2 py-2 ${dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-600"}`}>
+                  <span className="text-sm font-bold">{d.getMonth() + 1}/{d.getDate()}</span>
+                  <span className="text-[10px]">（{WD[dow]}）{today && <span className="ml-0.5 rounded bg-blue-600 px-1 text-[8px] text-white">今日</span>}</span>
+                </div>
+                {closed ? (
+                  <div className="flex flex-1 items-center border-l px-2 py-2 text-[12px] font-bold text-rose-400">休診</div>
+                ) : (
+                  <>
+                    <div className={`flex flex-1 flex-wrap content-start gap-1 border-l px-2 py-2 ${clinicAmOff ? "bg-slate-200/50" : ""}`}>
+                      {clinicAmOff && <span className="text-[11px] font-bold text-rose-400">午前休診</span>}
+                      {amList.map(chip)}
+                    </div>
+                    <div className={`flex flex-1 flex-wrap content-start gap-1 border-l px-2 py-2 ${clinicPmOff ? "bg-slate-200/50" : ""}`}>
+                      {clinicPmOff && <span className="text-[11px] font-bold text-rose-400">午後休診</span>}
+                      {pmList.map(chip)}
+                      {offMembers.map((x, i) => (
+                        <span key={"off" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </button>
+            );
+          })
+        )}
       </div>
-      <p className="mt-2 text-xs text-slate-400">日をタップして、その日の出勤メンバー・時間帯を編集します。施術スタッフは色チップ、受付・学生は時間帯付きで表示。</p>
+      <p className="mt-2 text-xs text-slate-400">日をタップして、その日の出勤メンバー・時間帯を編集します。左＝午前／右＝午後。終日の施術スタッフは両方に表示。</p>
 
       {/* メンバー設定 */}
       <div className="mt-4 rounded-xl border bg-white">
