@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { loadAppointmentSteps, loadSchedules } from "@/lib/data";
 import type {
   Appointment,
   AppointmentStep,
@@ -11,15 +10,7 @@ import type {
   ServiceWithSteps,
   Staff,
 } from "@/lib/types";
-import {
-  candidateStarts,
-  checkAvailability,
-  classSlot,
-  minToLabel,
-  toDateStr,
-  totalDuration,
-  type DayContext,
-} from "@/lib/booking";
+import { minToLabel } from "@/lib/booking";
 
 interface Props {
   mode: "add" | "edit";
@@ -68,8 +59,6 @@ export default function AdminBookingModal({
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState(appt?.note || "");
 
-  const [availStarts, setAvailStarts] = useState<number[]>([]);
-  const [loadingSlots, setLoadingSlots] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,79 +68,6 @@ export default function AdminBookingModal({
 
   const service = services.find((s) => s.id === serviceId) || null;
   const isClass = !!service && service.capacity > 1;
-  const equipmentById = useMemo(
-    () => Object.fromEntries(equipment.map((e) => [e.id, e])),
-    [equipment]
-  );
-
-  // ---- 空き時間を計算 ----
-  const recompute = useCallback(async () => {
-    if (!service) return;
-    if (!isClass && !staffId) return;
-    setLoadingSlots(true);
-    try {
-      const [sc, ap] = await Promise.all([
-        // クラスは営業時間（全担当者の勤務時間）を使う
-        loadSchedules(supabase, isClass ? undefined : staffId),
-        loadAppointmentSteps(supabase, [theDate]),
-      ]);
-      const [y, m, d] = theDate.split("-").map(Number);
-      const weekday = new Date(y, m - 1, d).getDay();
-      const daySchedules = sc.filter((s) => s.weekday === weekday);
-      const dur = totalDuration(service.steps);
-      const isAfter = !!(service as unknown as { after_hours?: boolean }).after_hours;
-      let cands = candidateStarts(daySchedules, dur);
-      if (isAfter) {
-        // 時間外予約は勤務時間に縛られない夜枠。20:30/21:00/21:30/22:00 を追加。
-        const late = [1230, 1260, 1290, 1320];
-        cands = [...new Set([...cands, ...late])].sort((a, b) => a - b);
-      }
-
-      // 管理画面は休診（枠の確保）を無視して予約可能にする（電話予約の確保枠に入れられるように）
-      let ok: number[];
-      if (isClass) {
-        ok = cands.filter(
-          (t) =>
-            classSlot(
-              service.id,
-              service.capacity,
-              service.steps,
-              t,
-              daySchedules,
-              [],
-              ap,
-              appt?.id
-            ).state === "ok"
-        );
-      } else {
-        const ctx: DayContext = {
-          date: theDate,
-          weekday,
-          schedules: daySchedules,
-          closures: [],
-          staffSteps: ap.filter((a) => a.uses_staff && a.staff_id === staffId),
-          equipmentSteps: ap.filter((a) => a.equipment_id !== null),
-          equipmentById: equipmentById as Record<string, Equipment>,
-        };
-        ok = cands.filter(
-          (t) => checkAvailability(service.steps, staffId, t, ctx, appt?.id, isAfter).ok
-        );
-      }
-      // 編集時、現在の開始時刻が候補に無ければ足す（同一時刻での再保存を許可）
-      if (appt && !ok.includes(appt.start_min) && theDate === appt.date) {
-        ok.push(appt.start_min);
-        ok.sort((a, b) => a - b);
-      }
-      setAvailStarts(ok);
-    } finally {
-      setLoadingSlots(false);
-    }
-  }, [supabase, service, isClass, staffId, theDate, equipmentById, appt]);
-
-  useEffect(() => {
-    recompute();
-    // 条件変更で選択リセット（編集の初期値は維持）
-  }, [recompute]);
 
   async function searchPatients() {
     const term = searchTerm.trim();
@@ -204,7 +120,6 @@ export default function AdminBookingModal({
         const res = data as { ok: boolean; reason?: string };
         if (!res.ok) {
           setError(res.reason || "予約不可");
-          await recompute();
           return;
         }
       } else if (appt) {
@@ -220,7 +135,6 @@ export default function AdminBookingModal({
         const res = data as { ok: boolean; reason?: string };
         if (!res.ok) {
           setError(res.reason || "変更不可");
-          await recompute();
           return;
         }
       }
@@ -379,10 +293,7 @@ export default function AdminBookingModal({
           <span className="mb-1 block text-xs font-medium text-slate-600">メニュー</span>
           <select
             value={serviceId}
-            onChange={(e) => {
-              setServiceId(e.target.value);
-              setStartMin(null);
-            }}
+            onChange={(e) => setServiceId(e.target.value)}
             className="w-full rounded-md border px-2 py-1.5 text-sm"
           >
             {services.map((s) => (
@@ -405,10 +316,7 @@ export default function AdminBookingModal({
               {staff.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => {
-                    setStaffId(s.id);
-                    setStartMin(null);
-                  }}
+                  onClick={() => setStaffId(s.id)}
                   className="rounded-md py-1.5 text-sm font-bold text-white"
                   style={{ backgroundColor: s.id === staffId ? s.color || "#334155" : "#cbd5e1" }}
                 >
@@ -425,40 +333,27 @@ export default function AdminBookingModal({
           <input
             type="date"
             value={theDate}
-            onChange={(e) => {
-              setTheDate(e.target.value);
-              setStartMin(null);
-            }}
+            onChange={(e) => setTheDate(e.target.value)}
             className="w-full rounded-md border px-2 py-1.5 text-sm"
           />
         </label>
 
-        {/* 時間（空き） */}
+        {/* 来院時刻（タップ位置で決定・あとからドラッグで変更可） */}
         <div className="mb-3">
-          <span className="mb-1 block text-xs font-medium text-slate-600">
-            来院時刻（空きのみ表示）
-          </span>
-          {loadingSlots ? (
-            <p className="py-2 text-sm text-slate-400">計算中…</p>
-          ) : availStarts.length === 0 ? (
-            <p className="py-2 text-sm text-slate-400">この日の空きはありません</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {availStarts.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setStartMin(t)}
-                  className={`rounded-md border px-2.5 py-1 text-sm tabnum ${
-                    startMin === t
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-slate-300 bg-white text-slate-700"
-                  }`}
-                >
-                  {minToLabel(t)}
-                </button>
-              ))}
-            </div>
-          )}
+          <span className="mb-1 block text-xs font-medium text-slate-600">来院時刻</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="time"
+              step={300}
+              value={startMin !== null ? minToLabel(startMin) : ""}
+              onChange={(e) => {
+                const [h, mm] = e.target.value.split(":").map(Number);
+                if (!isNaN(h)) setStartMin(h * 60 + (mm || 0));
+              }}
+              className="rounded-md border px-2 py-1.5 text-sm tabnum"
+            />
+            <span className="text-[11px] text-slate-400">時間外もOK・あとからドラッグで変更できます</span>
+          </div>
         </div>
 
         {/* 工程プレビュー */}
