@@ -192,6 +192,7 @@ export interface Settings {
   // LINE メッセージ設定（null は既定テンプレートを使用）
   confirm_text: string | null; // 予約確認メッセージの本文
   cancel_text: string | null; // キャンセル完了メッセージの本文
+  questionnaire_url: string | null; // 問診票（Googleフォーム等）リンク。メニュー「問診票」から開く
   remind_eve_enabled: boolean; // 前日リマインドを送るか
   remind_eve_hour: number; // 前日リマインドの送信時刻（JST 時, 0-23）
   remind_eve_text: string | null; // 前日リマインドの本文

@@ -48,6 +48,7 @@ export default function SettingsAdmin() {
       clinics: s.clinics,
       confirm_text: s.confirm_text,
       cancel_text: s.cancel_text,
+      questionnaire_url: s.questionnaire_url,
       remind_eve_enabled: s.remind_eve_enabled,
       remind_eve_hour: s.remind_eve_hour,
       remind_eve_text: s.remind_eve_text,
@@ -136,6 +137,18 @@ export default function SettingsAdmin() {
             <span className="block text-[11px] text-slate-400">月ごとの公開・受付</span>
           </span>
         </Link>
+      </div>
+
+      <div className="mb-4 rounded-xl border bg-white p-4">
+        <label className="block text-sm font-bold text-slate-700">問診票リンク（Googleフォーム等）</label>
+        <p className="mt-1 text-[11px] text-slate-500">左メニュー「患者管理 → 問診票」から新しいタブで開きます。空欄なら「準備中」表示。</p>
+        <input
+          value={s.questionnaire_url ?? ""}
+          onChange={(e) => up({ questionnaire_url: e.target.value })}
+          placeholder="https://docs.google.com/forms/d/…/viewform"
+          className="mt-2 w-full rounded-md border px-2 py-1.5 text-sm"
+        />
+        <p className="mt-1 text-[11px] text-slate-400">患者に入力してもらう場合は末尾が <code className="rounded bg-slate-100 px-1">/viewform</code> のURL、回答確認・編集用は <code className="rounded bg-slate-100 px-1">/edit</code> のURL。</p>
       </div>
 
       <div className="space-y-4 rounded-xl border bg-white p-4">

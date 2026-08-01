@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { loadStaff } from "@/lib/data";
+import { loadStaff, loadSettings } from "@/lib/data";
 import type { Staff } from "@/lib/types";
 import { getOperator, setOperator, type Operator } from "@/lib/operator";
 
@@ -33,14 +33,14 @@ function OperatorAvatar({
 
 // 院内システムの左メニュー（親＋子のグループ構造）。
 // 営業時間・予約公開設定は「基本設定」内から開くのでサイドバーには出さない。
-type NavItem = { href?: string; label: string; icon?: string; soon?: boolean; children?: NavItem[] };
+type NavItem = { href?: string; label: string; icon?: string; soon?: boolean; ext?: "form"; children?: NavItem[] };
 const DEFAULT_NAV: NavItem[] = [
   { href: "/admin", label: "予約一覧", icon: "🗓️" },
   { href: "/admin/class", label: "体幹教室", icon: "🤸" },
   {
     href: "/admin/patients", label: "患者管理", icon: "👥", children: [
       { href: "/admin/new-patients", label: "新患名簿" },
-      { label: "問診票", soon: true },
+      { label: "問診票", ext: "form" },
       { label: "回数券", soon: true },
       { label: "体幹評価", soon: true },
       { label: "カルテ（将来）", soon: true },
@@ -73,6 +73,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [order, setOrder] = useState<string[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [formUrl, setFormUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setOp(getOperator());
@@ -80,6 +81,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       const s = localStorage.getItem(NAV_ORDER_KEY);
       if (s) setOrder(JSON.parse(s) as string[]);
     } catch { /* noop */ }
+    loadSettings(supabase).then((st) => setFormUrl(st.questionnaire_url?.trim() || null)).catch(() => {});
     (async () => {
       try {
         const st = await loadStaff(supabase, false);
@@ -129,26 +131,45 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       isActive(href) ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"
     }`;
 
-  const renderChild = (c: NavItem) =>
-    c.soon || !c.href ? (
-      <div key={navId(c)} className="flex items-center gap-2 rounded-lg px-2 py-1.5 pl-8 text-[13px] text-slate-300">
-        <span className="text-slate-300">└</span>
-        {c.label}
-        <span className="ml-auto rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-400">準備中</span>
-      </div>
-    ) : (
+  const childBase = "flex items-center gap-2 rounded-lg px-2 py-1.5 pl-8 text-[13px]";
+  const renderChild = (c: NavItem) => {
+    // 問診票：設定のURLがあれば外部リンク（新しいタブ）、無ければ準備中
+    if (c.ext === "form") {
+      return formUrl ? (
+        <a key={navId(c)} href={formUrl} target="_blank" rel="noreferrer" className={`${childBase} font-medium text-slate-500 hover:bg-slate-100`}>
+          <span className="text-slate-300">└</span>
+          {c.label}
+          <span className="ml-auto text-[10px] text-slate-400">↗</span>
+        </a>
+      ) : (
+        <div key={navId(c)} className={`${childBase} text-slate-300`}>
+          <span className="text-slate-300">└</span>
+          {c.label}
+          <span className="ml-auto rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-400">設定でURL登録</span>
+        </div>
+      );
+    }
+    if (c.soon || !c.href) {
+      return (
+        <div key={navId(c)} className={`${childBase} text-slate-300`}>
+          <span className="text-slate-300">└</span>
+          {c.label}
+          <span className="ml-auto rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-400">準備中</span>
+        </div>
+      );
+    }
+    return (
       <Link
         key={navId(c)}
         href={c.href}
         onClick={() => setOpen(false)}
-        className={`flex items-center gap-2 rounded-lg px-2 py-1.5 pl-8 text-[13px] font-medium ${
-          isActive(c.href) ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-100"
-        }`}
+        className={`${childBase} font-medium ${isActive(c.href) ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-100"}`}
       >
         <span className="text-slate-300">└</span>
         {c.label}
       </Link>
     );
+  };
 
   const navList = (
     <nav className="flex flex-col gap-0.5 p-3">
