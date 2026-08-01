@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { loadAllStaff } from "@/lib/data";
+import { loadAllStaff, loadBusinessHours } from "@/lib/data";
 import { toDateStr } from "@/lib/booking";
+import type { BusinessHours, Closure } from "@/lib/types";
 
 interface Member {
   id: string;
@@ -43,6 +44,8 @@ export default function ShiftBoard() {
   const supabase = useMemo(() => createClient(), []);
   const [members, setMembers] = useState<Member[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [bh, setBh] = useState<BusinessHours[]>([]);
+  const [closures, setClosures] = useState<Closure[]>([]);
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -60,15 +63,41 @@ export default function ShiftBoard() {
     const { data } = await supabase.from("shift_members").select("id, name, role, color, default_start, default_end, sort_order, active").order("sort_order");
     setMembers((data as Member[]) ?? []);
   }, [supabase]);
-  useEffect(() => { loadMembers(); }, [loadMembers]);
+  useEffect(() => { loadMembers(); loadBusinessHours(supabase).then(setBh).catch(() => {}); }, [loadMembers, supabase]);
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from("shifts").select("id, date, member_id, start_min, end_min, clinic, note").gte("date", monthStart).lt("date", monthEnd);
-    setShifts((data as Shift[]) ?? []);
+    const [{ data: sh }, { data: cl }] = await Promise.all([
+      supabase.from("shifts").select("id, date, member_id, start_min, end_min, clinic, note").gte("date", monthStart).lt("date", monthEnd),
+      supabase.from("closures").select("id, date, staff_id, service_id, start_min, end_min, reason").gte("date", monthStart).lt("date", monthEnd),
+    ]);
+    setShifts((sh as Shift[]) ?? []);
+    setClosures((cl as Closure[]) ?? []);
     setLoading(false);
   }, [supabase, monthStart, monthEnd]);
   useEffect(() => { reload(); }, [reload]);
+
+  // 曜日別の営業（休診曜日の判定）と営業時間の基本形
+  const bhByWd = useMemo(() => new Map(bh.map((b) => [b.weekday, b])), [bh]);
+  // 院全体の休診（終日/時間帯）を日付別に
+  const closuresByDate = useMemo(() => {
+    const m = new Map<string, Closure[]>();
+    closures.filter((c) => c.staff_id == null && c.service_id == null).forEach((c) => { const a = m.get(c.date) ?? []; a.push(c); m.set(c.date, a); });
+    return m;
+  }, [closures]);
+  // 営業時間の基本形（その日の出勤時間の既定に使う）
+  const bhSpan = useCallback((ds: string) => {
+    const wd = new Date(ds + "T00:00:00").getDay();
+    const b = bhByWd.get(wd);
+    if (!b || !b.is_open) return { start: null as number | null, end: null as number | null };
+    return { start: b.seg1_start ?? b.seg2_start ?? null, end: b.seg2_end ?? b.seg1_end ?? null };
+  }, [bhByWd]);
+  const closureLabel = (c: Closure) => {
+    if (c.start_min == null) return "休診";
+    if (c.end_min != null && c.end_min <= 810) return "午前休診";
+    if (c.start_min >= 780) return "午後休診";
+    return "休診";
+  };
 
   const activeMembers = useMemo(() => members.filter((m) => m.active).sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.sort_order - b.sort_order), [members]);
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
@@ -105,13 +134,16 @@ export default function ShiftBoard() {
 
   function openDay(ds: string) {
     const day = shiftsByDate.get(ds) ?? [];
+    const span = bhSpan(ds); // 営業時間ベースの既定
     const d: Draft = {};
     activeMembers.forEach((m) => {
       const sh = day.find((x) => x.member_id === m.id);
+      const defStart = m.default_start != null ? m.default_start : span.start;
+      const defEnd = m.default_end != null ? m.default_end : span.end;
       d[m.id] = {
         on: !!sh,
-        start: sh?.start_min != null ? minToTime(sh.start_min) : m.default_start != null ? minToTime(m.default_start) : "",
-        end: sh?.end_min != null ? minToTime(sh.end_min) : m.default_end != null ? minToTime(m.default_end) : "",
+        start: sh?.start_min != null ? minToTime(sh.start_min) : defStart != null ? minToTime(defStart) : "",
+        end: sh?.end_min != null ? minToTime(sh.end_min) : defEnd != null ? minToTime(defEnd) : "",
         clinic: sh?.clinic === "kawanishi",
       };
     });
@@ -209,10 +241,21 @@ export default function ShiftBoard() {
                   const day = (shiftsByDate.get(ds) ?? []).map((s) => ({ s, m: memberById.get(s.member_id) })).filter((x) => x.m) as { s: Shift; m: Member }[];
                   day.sort((a, b) => ROLE_ORDER[a.m.role] - ROLE_ORDER[b.m.role] || a.m.sort_order - b.m.sort_order);
                   const dow = d.getDay();
+                  const wdClosed = bhByWd.get(dow)?.is_open === false;
+                  const dayCl = closuresByDate.get(ds) ?? [];
+                  const fullClosed = dayCl.some((c) => c.start_min == null);
+                  const partials = dayCl.filter((c) => c.start_min != null);
+                  const closed = inMonth && (wdClosed || fullClosed);
                   return (
                     <button key={ds} onClick={() => inMonth && openDay(ds)} disabled={!inMonth}
-                      className={`min-h-[76px] border-b border-r p-1 text-left align-top ${inMonth ? "bg-white active:bg-blue-50" : "bg-slate-50/60"}`}>
-                      <div className={`mb-0.5 text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-500"}`}>{d.getDate()}</div>
+                      className={`min-h-[76px] border-b border-r p-1 text-left align-top ${!inMonth ? "bg-slate-50/60" : closed ? "bg-slate-100 active:bg-blue-50" : "bg-white active:bg-blue-50"}`}>
+                      <div className="mb-0.5 flex items-center justify-between">
+                        <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-500"}`}>{d.getDate()}</span>
+                        {closed && <span className="text-[9px] font-bold text-rose-400">休診</span>}
+                      </div>
+                      {inMonth && !closed && partials.map((c) => (
+                        <span key={c.id} className="mb-0.5 block text-[9px] font-bold text-rose-400">{closureLabel(c)}</span>
+                      ))}
                       {inMonth && (
                         <div className="flex flex-col gap-0.5">
                           {day.map(({ s, m }) => (
