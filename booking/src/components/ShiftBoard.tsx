@@ -46,6 +46,7 @@ export default function ShiftBoard() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [bh, setBh] = useState<BusinessHours[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
+  const [staffNames, setStaffNames] = useState<Map<string, string>>(new Map());
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -63,7 +64,11 @@ export default function ShiftBoard() {
     const { data } = await supabase.from("shift_members").select("id, name, role, color, default_start, default_end, sort_order, active").order("sort_order");
     setMembers((data as Member[]) ?? []);
   }, [supabase]);
-  useEffect(() => { loadMembers(); loadBusinessHours(supabase).then(setBh).catch(() => {}); }, [loadMembers, supabase]);
+  useEffect(() => {
+    loadMembers();
+    loadBusinessHours(supabase).then(setBh).catch(() => {});
+    loadAllStaff(supabase).then((st) => setStaffNames(new Map(st.map((s) => [s.id, s.name])))).catch(() => {});
+  }, [loadMembers, supabase]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -98,6 +103,27 @@ export default function ShiftBoard() {
     if (c.start_min >= 780) return "午後休診";
     return "休診";
   };
+  const indivLabel = (c: Closure) => {
+    if (c.start_min == null) return "休";
+    if (c.end_min != null && c.end_min <= 810) return "午前休";
+    if (c.start_min >= 780) return "午後休";
+    return "休";
+  };
+  const memberByName = useMemo(() => new Map(members.map((m) => [m.name, m])), [members]);
+  // スタッフ個別の休み（担当限定の休診）を日付→メンバー別に
+  const indivByDate = useMemo(() => {
+    const m = new Map<string, { member: Member; label: string }[]>();
+    closures.filter((c) => c.staff_id != null && c.service_id == null).forEach((c) => {
+      const name = staffNames.get(c.staff_id as string);
+      if (!name) return;
+      const mem = memberByName.get(name);
+      if (!mem) return;
+      const a = m.get(c.date) ?? [];
+      a.push({ member: mem, label: indivLabel(c) });
+      m.set(c.date, a);
+    });
+    return m;
+  }, [closures, staffNames, memberByName]);
 
   const activeMembers = useMemo(() => members.filter((m) => m.active).sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.sort_order - b.sort_order), [members]);
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
@@ -269,6 +295,11 @@ export default function ShiftBoard() {
                               </span>
                             )
                           ))}
+                          {(indivByDate.get(ds) ?? []).map((x, i) => (
+                            <span key={"i" + i} className="truncate text-[9px] font-bold text-rose-400 line-through decoration-rose-300">
+                              {x.member.name} {x.label}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </button>
@@ -361,6 +392,9 @@ export default function ShiftBoard() {
                         <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: m.color }} />
                         <span className="text-sm font-bold text-slate-800">{m.name || "（無名）"}</span>
                         <span className="rounded bg-slate-100 px-1 text-[10px] text-slate-400">{ROLE_LABEL[m.role]}</span>
+                        {(indivByDate.get(edit) ?? []).some((x) => x.member.id === m.id) && (
+                          <span className="rounded bg-rose-50 px-1 text-[10px] font-bold text-rose-500">お休み登録あり</span>
+                        )}
                       </label>
                     </div>
                     {dr.on && (
