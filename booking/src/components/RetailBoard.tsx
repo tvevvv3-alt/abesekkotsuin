@@ -116,11 +116,6 @@ export default function RetailBoard() {
 
   // 単価（販売/仕入）は合計/数量から算出。数量・単価・商品変更で合計を再計算。
   const unit = (total: number, qty: number) => (qty > 0 ? Math.round(total / qty) : total);
-  function pickProduct(row: RSale, pid: string) {
-    const p = products.find((x) => x.id === pid);
-    const q = row.qty || 1;
-    setSaleLocal(row.id, { product_id: pid || null, selfpay: (p?.price ?? 0) * q, cost: (p?.cost ?? 0) * q });
-  }
   function setUnitPrice(row: RSale, v: number) {
     setSaleLocal(row.id, { selfpay: v * (row.qty || 1) });
   }
@@ -249,14 +244,16 @@ export default function RetailBoard() {
         <button onClick={() => addRow("sale")} className="ml-auto rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 売上（購入者）</button>
         <button onClick={() => addRow("purchase")} className="rounded-md bg-amber-600 px-2 py-1 text-[11px] font-bold text-white active:bg-amber-700">＋ 仕入（まとめ買い）</button>
       </div>
+      <datalist id="retail-product-names">
+        {products.map((p) => (p.name ? <option key={p.id} value={p.name} /> : null))}
+      </datalist>
       <div className="overflow-x-auto rounded-xl border bg-white">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-slate-50 text-[11px] text-slate-500">
             <tr>
               <th className="px-1 py-2 text-left font-bold">日付</th>
               <th className="px-1 py-2 text-left font-bold">担当</th>
-              <th className="px-2 py-2 text-left font-bold">名前</th>
-              <th className="px-1 py-2 text-left font-bold">商品</th>
+              <th className="px-2 py-2 text-left font-bold">商品名</th>
               <th className="px-1 py-2 text-right font-bold">販売</th>
               <th className="px-1 py-2 text-right font-bold">仕入</th>
               <th className="px-1 py-2 text-center font-bold">数量</th>
@@ -266,9 +263,9 @@ export default function RetailBoard() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={9} className="px-2 py-8 text-center text-sm text-slate-400">読み込み中…</td></tr>
+              <tr><td colSpan={8} className="px-2 py-8 text-center text-sm text-slate-400">読み込み中…</td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={9} className="px-2 py-8 text-center text-sm text-slate-400">この月の物販はありません。「＋物販を追加」から入力してください。</td></tr>
+              <tr><td colSpan={8} className="px-2 py-8 text-center text-sm text-slate-400">この月の物販はありません。「＋売上」「＋仕入」から入力してください。</td></tr>
             ) : (
               sales.map((s) => {
                 const c = colorOf(s.staff_id);
@@ -290,13 +287,7 @@ export default function RetailBoard() {
                       )}
                     </td>
                     <td className="px-2 py-1">
-                      <input value={s.patient_name ?? ""} placeholder={isPurchase ? "メモ" : "名前"} onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => persistSale(s.id)} className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
-                    </td>
-                    <td className="px-1 py-1">
-                      <select value={s.product_id ?? ""} onChange={(e) => { pickProduct(s, e.target.value); }} onBlur={() => persistSale(s.id)} className="max-w-[120px] rounded border border-slate-300 px-1 py-1 text-[12px]">
-                        <option value="">選択</option>
-                        {products.map((p) => <option key={p.id} value={p.id}>{p.name || "（無名）"}</option>)}
-                      </select>
+                      <input value={s.patient_name ?? ""} placeholder="商品名" list="retail-product-names" onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => persistSale(s.id)} className="w-36 rounded border border-slate-300 px-1 py-1 text-sm" />
                     </td>
                     <td className="px-1 py-1 text-right">
                       {isPurchase ? (
