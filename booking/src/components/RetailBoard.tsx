@@ -24,6 +24,7 @@ interface RSale {
   selfpay: number; // 販売合計（単価×数量）
   cost: number; // 仕入合計（単価×数量）
   staff_id: string | null;
+  retail_kind: "sale" | "purchase"; // sale=売上 / purchase=仕入
 }
 
 const yen = (n: number) => "¥" + n.toLocaleString();
@@ -60,7 +61,7 @@ export default function RetailBoard() {
     setLoading(true);
     const { data } = await supabase
       .from("sales")
-      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id")
+      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id, retail_kind")
       .or("product_id.not.is.null,retail.is.true")
       .gte("date", monthStart)
       .lt("date", monthEnd)
@@ -90,14 +91,14 @@ export default function RetailBoard() {
     await supabase.from("products").delete().eq("id", id);
   }
 
-  // ---- 物販売上 ----
-  async function addSale() {
+  // ---- 物販（売上／仕入） ----
+  async function addRow(kind: "sale" | "purchase") {
     const { data, error } = await supabase
       .from("sales")
-      .insert({ date, product_id: null, qty: 1, selfpay: 0, cost: 0, staff_id: null, patient_name: "", insurance: 0, burden: 0, payment: "cash", retail: true })
-      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id")
+      .insert({ date, product_id: null, qty: 1, selfpay: 0, cost: 0, staff_id: null, patient_name: "", insurance: 0, burden: 0, payment: "cash", retail: true, retail_kind: kind })
+      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id, retail_kind")
       .single();
-    if (error) { alert("物販を追加できませんでした：\n" + error.message + "\n（sales に product_id/qty/cost 列があるかご確認ください）"); return; }
+    if (error) { alert("追加できませんでした：\n" + error.message + "\n（migration_sales_retail_kind.sql を実行済みかご確認ください）"); return; }
     if (data) setSales((s) => [...s, data as RSale]);
   }
   function setSaleLocal(id: string, patch: Partial<RSale>) {
@@ -106,7 +107,7 @@ export default function RetailBoard() {
   async function persistSale(id: string) {
     const s = sales.find((x) => x.id === id);
     if (!s) return;
-    await supabase.from("sales").update({ date: s.date, patient_name: s.patient_name, product_id: s.product_id, qty: s.qty, selfpay: s.selfpay, cost: s.cost, staff_id: s.staff_id }).eq("id", id);
+    await supabase.from("sales").update({ date: s.date, patient_name: s.patient_name, product_id: s.product_id, qty: s.qty, selfpay: s.selfpay, cost: s.cost, staff_id: s.staff_id, retail_kind: s.retail_kind }).eq("id", id);
   }
   async function deleteSale(id: string) {
     setSales((s) => s.filter((x) => x.id !== id));
@@ -126,6 +127,10 @@ export default function RetailBoard() {
   function setUnitCost(row: RSale, v: number) {
     setSaleLocal(row.id, { cost: v * (row.qty || 1) });
   }
+  // 売上行の利益(合計)を直接入力 → 原価 = 販売 − 利益
+  function setProfit(row: RSale, v: number) {
+    setSaleLocal(row.id, { cost: Math.max(0, row.selfpay - v) });
+  }
   function setQty(row: RSale, q: number) {
     const up = unit(row.selfpay, row.qty || 1);
     const uc = unit(row.cost, row.qty || 1);
@@ -136,14 +141,17 @@ export default function RetailBoard() {
   const assignees = useMemo(() => staff.map((s) => ({ id: s.id, name: s.name, color: s.color || "#64748b" })), [staff]);
   const colorOf = (id: string | null) => assignees.find((a) => a.id === id)?.color ?? null;
 
-  // 担当別の利益集計（未割当含む）
+  // 担当別の利益集計（売上行のみ・未割当含む）
   const byStaff = useMemo(() => {
     const m = new Map<string, number>();
-    sales.forEach((s) => { const k = s.staff_id ?? "__none"; m.set(k, (m.get(k) ?? 0) + profit(s)); });
+    sales.filter((s) => s.retail_kind !== "purchase").forEach((s) => { const k = s.staff_id ?? "__none"; m.set(k, (m.get(k) ?? 0) + profit(s)); });
     return m;
   }, [sales]);
-  const totalProfit = useMemo(() => sales.reduce((x, s) => x + profit(s), 0), [sales]);
-  const totalSales = useMemo(() => sales.reduce((x, s) => x + s.selfpay, 0), [sales]);
+  const saleRows = useMemo(() => sales.filter((s) => s.retail_kind !== "purchase"), [sales]);
+  const purchaseRows = useMemo(() => sales.filter((s) => s.retail_kind === "purchase"), [sales]);
+  const totalProfit = useMemo(() => saleRows.reduce((x, s) => x + profit(s), 0), [saleRows]);
+  const totalSales = useMemo(() => saleRows.reduce((x, s) => x + s.selfpay, 0), [saleRows]);
+  const totalPurchase = useMemo(() => purchaseRows.reduce((x, s) => x + s.cost, 0), [purchaseRows]);
 
   const gotoMonth = (dir: number) => {
     const [y, m] = date.split("-").map(Number);
@@ -173,6 +181,7 @@ export default function RetailBoard() {
           <span className="font-bold text-slate-700">{monthLabel} 物販</span>
           <span className="text-slate-500">売上 <b className="tabnum text-slate-700">{yen(totalSales)}</b></span>
           <span className="text-slate-500">利益 <b className="tabnum text-emerald-700">{yen(totalProfit)}</b></span>
+          <span className="text-slate-500">仕入 <b className="tabnum text-amber-700">{yen(totalPurchase)}</b></span>
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
           {assignees.map((s) => (
@@ -234,10 +243,11 @@ export default function RetailBoard() {
         )}
       </div>
 
-      {/* 物販売上 */}
+      {/* 物販（売上・仕入） */}
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-sm font-bold text-slate-700">物販売上</span>
-        <button onClick={addSale} className="ml-auto rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販を追加</button>
+        <span className="text-sm font-bold text-slate-700">物販</span>
+        <button onClick={() => addRow("sale")} className="ml-auto rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 売上（購入者）</button>
+        <button onClick={() => addRow("purchase")} className="rounded-md bg-amber-600 px-2 py-1 text-[11px] font-bold text-white active:bg-amber-700">＋ 仕入（まとめ買い）</button>
       </div>
       <div className="overflow-x-auto rounded-xl border bg-white">
         <table className="w-full min-w-[640px] text-sm">
@@ -262,20 +272,25 @@ export default function RetailBoard() {
             ) : (
               sales.map((s) => {
                 const c = colorOf(s.staff_id);
+                const isPurchase = s.retail_kind === "purchase";
                 return (
-                  <tr key={s.id}>
+                  <tr key={s.id} className={isPurchase ? "bg-amber-50/40" : undefined}>
                     <td className="px-1 py-1">
                       <input type="date" value={s.date} onChange={(e) => e.target.value && setSaleLocal(s.id, { date: e.target.value })} onBlur={() => persistSale(s.id)} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
                     </td>
                     <td className="px-1 py-1">
-                      <select value={s.staff_id ?? ""} onChange={(e) => setSaleLocal(s.id, { staff_id: e.target.value || null })} onBlur={() => persistSale(s.id)}
-                        className="rounded border px-1 py-1 text-[11px] font-bold" style={c ? { backgroundColor: c, color: "#fff", borderColor: c } : { backgroundColor: "#f1f5f9", color: "#64748b", borderColor: "#e2e8f0" }}>
-                        <option value="" style={{ color: "#0f172a", background: "#fff" }}>-</option>
-                        {assignees.map((a) => <option key={a.id} value={a.id} style={{ color: "#0f172a", background: "#fff" }}>{a.name}</option>)}
-                      </select>
+                      {isPurchase ? (
+                        <span className="inline-block rounded bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-700">仕入</span>
+                      ) : (
+                        <select value={s.staff_id ?? ""} onChange={(e) => setSaleLocal(s.id, { staff_id: e.target.value || null })} onBlur={() => persistSale(s.id)}
+                          className="rounded border px-1 py-1 text-[11px] font-bold" style={c ? { backgroundColor: c, color: "#fff", borderColor: c } : { backgroundColor: "#f1f5f9", color: "#64748b", borderColor: "#e2e8f0" }}>
+                          <option value="" style={{ color: "#0f172a", background: "#fff" }}>-</option>
+                          {assignees.map((a) => <option key={a.id} value={a.id} style={{ color: "#0f172a", background: "#fff" }}>{a.name}</option>)}
+                        </select>
+                      )}
                     </td>
                     <td className="px-2 py-1">
-                      <input value={s.patient_name ?? ""} placeholder="名前" onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => persistSale(s.id)} className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
+                      <input value={s.patient_name ?? ""} placeholder={isPurchase ? "メモ" : "名前"} onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => persistSale(s.id)} className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
                     </td>
                     <td className="px-1 py-1">
                       <select value={s.product_id ?? ""} onChange={(e) => { pickProduct(s, e.target.value); }} onBlur={() => persistSale(s.id)} className="max-w-[120px] rounded border border-slate-300 px-1 py-1 text-[12px]">
@@ -284,15 +299,29 @@ export default function RetailBoard() {
                       </select>
                     </td>
                     <td className="px-1 py-1 text-right">
-                      <input type="number" min={0} value={unit(s.selfpay, s.qty || 1) || ""} placeholder="0" onChange={(e) => setUnitPrice(s, parseInt(e.target.value || "0", 10))} onBlur={() => persistSale(s.id)} className={amt} />
+                      {isPurchase ? (
+                        <span className="text-slate-300">—</span>
+                      ) : (
+                        <input type="number" min={0} value={unit(s.selfpay, s.qty || 1) || ""} placeholder="0" onChange={(e) => setUnitPrice(s, parseInt(e.target.value || "0", 10))} onBlur={() => persistSale(s.id)} className={amt} />
+                      )}
                     </td>
                     <td className="px-1 py-1 text-right">
-                      <input type="number" min={0} value={unit(s.cost, s.qty || 1) || ""} placeholder="0" onChange={(e) => setUnitCost(s, parseInt(e.target.value || "0", 10))} onBlur={() => persistSale(s.id)} className="w-[68px] rounded border border-amber-300 bg-amber-50 px-1 py-1 text-right text-sm tabnum focus:outline-none" />
+                      {isPurchase ? (
+                        <input type="number" min={0} value={unit(s.cost, s.qty || 1) || ""} placeholder="0" onChange={(e) => setUnitCost(s, parseInt(e.target.value || "0", 10))} onBlur={() => persistSale(s.id)} className="w-[68px] rounded border border-amber-300 bg-amber-50 px-1 py-1 text-right text-sm tabnum focus:outline-none" />
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
                     </td>
                     <td className="px-1 py-1 text-center">
                       <input type="number" min={1} value={s.qty || 1} onChange={(e) => setQty(s, Math.max(1, parseInt(e.target.value || "1", 10)))} onBlur={() => persistSale(s.id)} className="w-[46px] rounded border border-slate-300 px-1 py-1 text-center text-sm tabnum focus:outline-none" />
                     </td>
-                    <td className="px-1 py-1 text-right tabnum font-bold text-emerald-700">{profit(s).toLocaleString()}</td>
+                    <td className="px-1 py-1 text-right">
+                      {isPurchase ? (
+                        <span className="text-slate-300">—</span>
+                      ) : (
+                        <input type="number" value={profit(s) || ""} placeholder="0" onChange={(e) => setProfit(s, parseInt(e.target.value || "0", 10))} onBlur={() => persistSale(s.id)} className="w-[68px] rounded border border-emerald-300 bg-emerald-50 px-1 py-1 text-right text-sm tabnum font-bold text-emerald-700 focus:outline-none" />
+                      )}
+                    </td>
                     <td className="px-1 py-1 text-center">
                       <button onClick={() => deleteSale(s.id)} className="text-[11px] font-bold text-red-400">削除</button>
                     </td>
@@ -304,7 +333,7 @@ export default function RetailBoard() {
         </table>
       </div>
       <p className="mt-3 text-xs text-slate-400">
-        商品を選ぶと販売価格・仕入れが自動で入り、行ごとに編集できます。利益＝（販売−仕入）×数量。物販の売上は個別売上（担当ごとの集計・年間一覧）に、担当の粗利として反映されます。
+        <b>売上（購入者）</b>…販売と利益を入力（担当を選ぶと個別売上に反映）。<b>仕入（まとめ買い）</b>…仕入だけ入力。商品を選ぶと単価が自動で入り、行ごとに編集できます。物販の利益は個別売上（担当ごとの集計・年間一覧）に反映されます。
       </p>
     </div>
   );

@@ -35,6 +35,7 @@ interface Sale {
   sort_order?: number | null; // 手動並び替え用
   payment: "cash" | "cashless"; // 窓口徴収の支払方法
   retail?: boolean; // 物販（物販ページにも表示）
+  retail_kind?: "sale" | "purchase"; // 物販の行種別。purchase(まとめ仕入)は日計表に出さない
 }
 const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
   selfpay: 0,
@@ -160,7 +161,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, anchor_appointment_id, sort_order, payment")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, anchor_appointment_id, sort_order, payment")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -211,7 +212,7 @@ export default function SalesBoard() {
     });
     return m;
   }, [sales]);
-  const manualSales = useMemo(() => sales.filter((s) => !s.appointment_id), [sales]);
+  const manualSales = useMemo(() => sales.filter((s) => !s.appointment_id && s.retail_kind !== "purchase"), [sales]);
 
   // 担当の選択肢（実スタッフ＋川西整体院）。realはスタッフ表に目標を持てる人。
   const assignees = useMemo(() => {
