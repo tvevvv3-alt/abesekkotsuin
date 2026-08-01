@@ -35,7 +35,8 @@ export default function SettingsAdmin() {
     if (!s) return;
     setBusy(true);
     setSaved(false);
-    await supabase.from("settings").upsert({
+    setError(null);
+    const { error: saveErr } = await supabase.from("settings").upsert({
       id: 1,
       slot_unit: s.slot_unit,
       same_day_ok: s.same_day_ok,
@@ -59,6 +60,10 @@ export default function SettingsAdmin() {
       updated_at: new Date().toISOString(),
     });
     setBusy(false);
+    if (saveErr) {
+      setError(`保存できませんでした：${saveErr.message}（該当のSQLマイグレーションが未実行の可能性があります）`);
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
