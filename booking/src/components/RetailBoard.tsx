@@ -244,13 +244,13 @@ export default function RetailBoard() {
           <thead className="bg-slate-50 text-[11px] text-slate-500">
             <tr>
               <th className="px-1 py-2 text-left font-bold">日付</th>
+              <th className="px-1 py-2 text-left font-bold">担当</th>
               <th className="px-2 py-2 text-left font-bold">名前</th>
               <th className="px-1 py-2 text-left font-bold">商品</th>
               <th className="px-1 py-2 text-right font-bold">販売</th>
               <th className="px-1 py-2 text-right font-bold">仕入</th>
               <th className="px-1 py-2 text-center font-bold">数量</th>
               <th className="px-1 py-2 text-right font-bold">利益</th>
-              <th className="px-1 py-2 text-left font-bold">担当</th>
               <th className="px-1 py-2"></th>
             </tr>
           </thead>
@@ -266,6 +266,13 @@ export default function RetailBoard() {
                   <tr key={s.id}>
                     <td className="px-1 py-1">
                       <input type="date" value={s.date} onChange={(e) => e.target.value && setSaleLocal(s.id, { date: e.target.value })} onBlur={() => persistSale(s.id)} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
+                    </td>
+                    <td className="px-1 py-1">
+                      <select value={s.staff_id ?? ""} onChange={(e) => setSaleLocal(s.id, { staff_id: e.target.value || null })} onBlur={() => persistSale(s.id)}
+                        className="rounded border px-1 py-1 text-[11px] font-bold" style={c ? { backgroundColor: c, color: "#fff", borderColor: c } : { backgroundColor: "#f1f5f9", color: "#64748b", borderColor: "#e2e8f0" }}>
+                        <option value="" style={{ color: "#0f172a", background: "#fff" }}>-</option>
+                        {assignees.map((a) => <option key={a.id} value={a.id} style={{ color: "#0f172a", background: "#fff" }}>{a.name}</option>)}
+                      </select>
                     </td>
                     <td className="px-2 py-1">
                       <input value={s.patient_name ?? ""} placeholder="名前" onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => persistSale(s.id)} className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
@@ -286,13 +293,6 @@ export default function RetailBoard() {
                       <input type="number" min={1} value={s.qty || 1} onChange={(e) => setQty(s, Math.max(1, parseInt(e.target.value || "1", 10)))} onBlur={() => persistSale(s.id)} className="w-[46px] rounded border border-slate-300 px-1 py-1 text-center text-sm tabnum focus:outline-none" />
                     </td>
                     <td className="px-1 py-1 text-right tabnum font-bold text-emerald-700">{profit(s).toLocaleString()}</td>
-                    <td className="px-1 py-1">
-                      <select value={s.staff_id ?? ""} onChange={(e) => setSaleLocal(s.id, { staff_id: e.target.value || null })} onBlur={() => persistSale(s.id)}
-                        className="rounded border px-1 py-1 text-[11px] font-bold" style={c ? { backgroundColor: c, color: "#fff", borderColor: c } : { backgroundColor: "#f1f5f9", color: "#64748b", borderColor: "#e2e8f0" }}>
-                        <option value="" style={{ color: "#0f172a", background: "#fff" }}>-</option>
-                        {assignees.map((a) => <option key={a.id} value={a.id} style={{ color: "#0f172a", background: "#fff" }}>{a.name}</option>)}
-                      </select>
-                    </td>
                     <td className="px-1 py-1 text-center">
                       <button onClick={() => deleteSale(s.id)} className="text-[11px] font-bold text-red-400">削除</button>
                     </td>
