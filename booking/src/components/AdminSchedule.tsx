@@ -115,7 +115,7 @@ export default function AdminSchedule() {
       {view === "board" ? (
         <AdminBoard date={curDate} />
       ) : (
-        <CalendarView start={curDate} days={calDays} onStartChange={setCurDate} />
+        <CalendarView start={curDate} days={calDays} onStartChange={setCurDate} onDaysChange={setCalDays} />
       )}
     </div>
   );

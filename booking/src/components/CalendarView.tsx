@@ -34,13 +34,14 @@ type Item =
   | { kind: "appt"; s: number; e: number; rank: number; appt: ApptWithSteps }
   | { kind: "note"; s: number; e: number; rank: number; note: CalendarNote };
 
-function layoutLanes(items: Item[]): (Item & { lane: number; cols: number })[] {
+function layoutLanes(items: Item[]): (Item & { lane: number; cols: number; span: number })[] {
   const sorted = [...items].sort((a, b) => a.s - b.s || a.e - b.e);
-  const out: (Item & { lane: number; cols: number })[] = [];
+  const out: (Item & { lane: number; cols: number; span: number })[] = [];
   let cluster: Item[] = [];
   let clusterEnd = -Infinity;
   const flush = () => {
-    const cl = [...cluster].sort((a, b) => a.rank - b.rank || a.s - b.s);
+    // 開始時刻順（同時刻は担当順）で左詰め＝時間の流れが左→右で読みやすい
+    const cl = [...cluster].sort((a, b) => a.s - b.s || a.rank - b.rank);
     const laneEnd: number[] = [];
     const placed = cl.map((it) => {
       let lane = laneEnd.findIndex((end) => end <= it.s);
@@ -48,9 +49,20 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number })[] {
         lane = laneEnd.length;
         laneEnd.push(it.e);
       } else laneEnd[lane] = it.e;
-      return { ...it, lane, cols: 1 };
+      return { ...it, lane, cols: 1, span: 1 };
     });
-    placed.forEach((p) => (p.cols = laneEnd.length));
+    const laneCount = laneEnd.length;
+    // 右側に空いているレーンがあれば、そのぶん幅を広げて常にスペースをフルに使う
+    for (const p of placed) {
+      let span = 1;
+      for (let L = p.lane + 1; L < laneCount; L++) {
+        const conflict = placed.some((q) => q !== p && q.lane === L && q.s < p.e && p.s < q.e);
+        if (conflict) break;
+        span++;
+      }
+      p.span = span;
+    }
+    placed.forEach((p) => (p.cols = laneCount));
     out.push(...placed);
     cluster = [];
   };
@@ -128,10 +140,12 @@ export default function CalendarView({
   start,
   days,
   onStartChange,
+  onDaysChange,
 }: {
   start: string;
   days: number;
   onStartChange: (d: string) => void;
+  onDaysChange?: (n: number) => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -141,6 +155,25 @@ export default function CalendarView({
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
   const [zoom, setZoom] = useState(1);
+
+  // ---- 予約ブロックのドラッグ移動（長押しで掴む）----
+  type DragKind = "move" | "denden";
+  type DragState = {
+    id: string; kind: DragKind;
+    origStart: number; origEnd: number; origDate: string;
+    targetStart: number; targetDate: string; dyPx: number;
+    onStaff: string | null; // 凡例チップにドロップ中の担当
+  };
+  const [dragging, setDragging] = useState<DragState | null>(null);
+  const latestDragRef = useRef<DragState | null>(null);
+  const pressRef = useRef<null | {
+    id: string; kind: DragKind; startX: number; startY: number;
+    origStart: number; origEnd: number; origDate: string; origStaff: string | null;
+    appt: ApptWithSteps; timer: number | null; source: "touch" | "mouse";
+  }>(null);
+  const dragActiveRef = useRef(false);
+  const draggedRef = useRef(false); // ドラッグ直後のクリック（モーダル）を抑止
+  const latestXYRef = useRef<{ x: number; y: number } | null>(null);
 
   const gridRef = useRef<HTMLDivElement>(null);
   const [boxH, setBoxH] = useState(600);
@@ -344,7 +377,135 @@ export default function CalendarView({
   } | null>(null);
   const swipedRef = useRef(false);
 
+  // ---- 予約ブロックのドラッグ移動（長押し→縦で時刻／横で日付／凡例へドロップで担当変更） ----
+  const apptById = (id: string) => appts.find((a) => a.id === id);
+  const isLightStep = (st: AppointmentStep) => stepTone(st) === "light";
+  function cancelPress() {
+    const p = pressRef.current;
+    if (p?.timer) window.clearTimeout(p.timer);
+    pressRef.current = null;
+  }
+  function activatePress() {
+    const p = pressRef.current;
+    if (!p) return;
+    dragActiveRef.current = true;
+    drag.current = null;
+    pinch.current = null;
+    try { if (navigator.vibrate) navigator.vibrate(8); } catch {}
+    const ds: DragState = {
+      id: p.id, kind: p.kind, origStart: p.origStart, origEnd: p.origEnd, origDate: p.origDate,
+      targetStart: p.origStart, targetDate: p.origDate, dyPx: 0, onStaff: null,
+    };
+    latestDragRef.current = ds;
+    setDragging(ds);
+  }
+  function beginPress(appt: ApptWithSteps, kind: DragKind, x: number, y: number, source: "touch" | "mouse") {
+    cancelPress();
+    draggedRef.current = false;
+    latestXYRef.current = { x, y };
+    pressRef.current = {
+      id: appt.id, kind, startX: x, startY: y,
+      origStart: appt.start_min, origEnd: appt.end_min, origDate: appt.date, origStaff: appt.staff_id,
+      appt, timer: window.setTimeout(activatePress, 240), source,
+    };
+  }
+  function movePress(x: number, y: number) {
+    const p = pressRef.current;
+    if (!p) return;
+    latestXYRef.current = { x, y };
+    if (!dragActiveRef.current) {
+      if (Math.hypot(x - p.startX, y - p.startY) > 10) cancelPress();
+      return;
+    }
+    const dyPx = y - p.startY;
+    if (p.kind === "denden") {
+      const ds: DragState = { ...(latestDragRef.current as DragState), dyPx };
+      latestDragRef.current = ds;
+      setDragging(ds);
+      return;
+    }
+    const px = pxRef.current;
+    const dur = p.origEnd - p.origStart;
+    const targetStart = Math.max(VIEW_START, Math.min(VIEW_END - dur, snap(p.origStart + dyPx / px)));
+    let targetDate = p.origDate;
+    const el = gridRef.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      const colW = (rect.width - GUTTER) / days;
+      const idx = Math.floor((x - rect.left - GUTTER) / colW);
+      const center = lists[1];
+      targetDate = center[Math.max(0, Math.min(days - 1, idx))] ?? p.origDate;
+    }
+    let onStaff: string | null = null;
+    const under = document.elementFromPoint(x, y) as HTMLElement | null;
+    const chip = under?.closest?.("[data-staff-id]") as HTMLElement | null;
+    if (chip) onStaff = chip.getAttribute("data-staff-id");
+    const ds: DragState = { id: p.id, kind: "move", origStart: p.origStart, origEnd: p.origEnd, origDate: p.origDate, targetStart, targetDate, dyPx, onStaff };
+    latestDragRef.current = ds;
+    setDragging(ds);
+  }
+  function endPress() {
+    const p = pressRef.current;
+    const wasActive = dragActiveRef.current;
+    const dd = latestDragRef.current;
+    cancelPress();
+    dragActiveRef.current = false;
+    setDragging(null);
+    latestDragRef.current = null;
+    if (!wasActive || !p) return;
+    let changed = false;
+    if (p.kind === "move" && dd) {
+      if (dd.onStaff && dd.onStaff !== p.origStaff) { commitStaff(p.appt, dd.onStaff); changed = true; }
+      else if (dd.targetStart !== p.origStart || dd.targetDate !== p.origDate) { commitMove(p.appt, dd.targetStart, dd.targetDate); changed = true; }
+    } else if (p.kind === "denden" && dd) {
+      if (Math.abs(dd.dyPx / pxRef.current) >= 20) { commitSwap(p.appt); changed = true; }
+    }
+    draggedRef.current = changed;
+  }
+  async function commitMove(appt: ApptWithSteps, newStart: number, newDate: string) {
+    const delta = newStart - appt.start_min;
+    await supabase.from("appointments").update({ start_min: newStart, end_min: appt.end_min + delta, date: newDate }).eq("id", appt.id);
+    await Promise.all((appt.steps ?? []).map((st) =>
+      supabase.from("appointment_steps").update({ start_min: st.start_min + delta, end_min: st.end_min + delta, date: newDate }).eq("id", st.id)
+    ));
+    reload();
+  }
+  async function commitStaff(appt: ApptWithSteps, staffId: string) {
+    await supabase.from("appointments").update({ staff_id: staffId }).eq("id", appt.id);
+    await Promise.all((appt.steps ?? []).filter((st) => st.uses_staff).map((st) =>
+      supabase.from("appointment_steps").update({ staff_id: staffId }).eq("id", st.id)
+    ));
+    reload();
+  }
+  async function commitSwap(appt: ApptWithSteps) {
+    const steps = [...(appt.steps ?? [])].filter((s) => s.start_min != null && s.end_min != null).sort((a, b) => a.start_min - b.start_min);
+    const light = steps.filter(isLightStep);
+    const dark = steps.filter((s) => !isLightStep(s));
+    if (!light.length || !dark.length) return;
+    const lightFirst = light[0].start_min < dark[0].start_min;
+    const order = lightFirst ? [...dark, ...light] : [...light, ...dark];
+    let cursor = steps[0].start_min;
+    const ups = order.map((st) => { const dur = st.end_min - st.start_min; const s = cursor; cursor += dur; return { id: st.id, start_min: s, end_min: cursor }; });
+    await Promise.all(ups.map((u) => supabase.from("appointment_steps").update({ start_min: u.start_min, end_min: u.end_min }).eq("id", u.id)));
+    if (cursor !== appt.end_min) await supabase.from("appointments").update({ end_min: cursor }).eq("id", appt.id);
+    reload();
+  }
+
   function onTouchStart(e: TouchEvent) {
+    if (dragActiveRef.current) return;
+    if (e.touches.length === 1) {
+      const tEl = e.target as HTMLElement;
+      const blk = tEl.closest?.("[data-appt-id]") as HTMLElement | null;
+      if (blk) {
+        const id = blk.getAttribute("data-appt-id");
+        const appt = id ? apptById(id) : undefined;
+        if (appt) {
+          const kind: DragKind = tEl.closest?.("[data-denden]") ? "denden" : "move";
+          beginPress(appt, kind, e.touches[0].clientX, e.touches[0].clientY, "touch");
+          return;
+        }
+      }
+    }
     if (e.touches.length === 2) {
       drag.current = null;
       const [a, b] = [e.touches[0], e.touches[1]];
@@ -367,6 +528,27 @@ export default function CalendarView({
     }
   }
   function onTouchMove(e: TouchEvent) {
+    if (dragActiveRef.current) {
+      e.preventDefault();
+      const t = e.touches[0];
+      movePress(t.clientX, t.clientY);
+      return;
+    }
+    if (pressRef.current) {
+      const t = e.touches[0];
+      const p = pressRef.current;
+      const dx = t.clientX - p.startX;
+      const dy = t.clientY - p.startY;
+      if (Math.hypot(dx, dy) <= 10) { movePress(t.clientX, t.clientY); return; }
+      // 10px超えたら長押しではない：横=ページ送りへ引き継ぎ、縦=ネイティブスクロール
+      cancelPress();
+      if (Math.abs(dx) > Math.abs(dy) && !animating.current) {
+        drag.current = { x: p.startX, y: p.startY, axis: "h", lastX: t.clientX, lastT: performance.now(), vx: 0 };
+        // ↓の横ドラッグ処理へフォールスルー
+      } else {
+        return;
+      }
+    }
     if (pinch.current && e.touches.length === 2) {
       e.preventDefault();
       const [a, b] = [e.touches[0], e.touches[1]];
@@ -407,6 +589,10 @@ export default function CalendarView({
     }
   }
   function onTouchEnd(e: TouchEvent) {
+    if (dragActiveRef.current || pressRef.current) {
+      endPress();
+      return;
+    }
     if (pinch.current) {
       if (e.touches.length < 2) pinch.current = null;
       return;
@@ -533,12 +719,12 @@ export default function CalendarView({
             top,
             height: yFor(it.e) - top,
             left: `${(it.lane * 100) / it.cols}%`,
-            width: `${100 / it.cols}%`,
+            width: `${(it.span * 100) / it.cols}%`,
           };
           const HAIRLINE = "0.5px solid rgba(255,255,255,.95)"; // 細い白枠
           if (it.kind === "note") {
             const h = yFor(it.e) - top;
-            const ml = it.cols === 1 && h >= 40;
+            const ml = it.span === it.cols && h >= 40;
             return (
               <button
                 key={it.note.id}
@@ -563,15 +749,42 @@ export default function CalendarView({
           const col = colorFor(a);
           const segs = apptSegments(a);
           const done = a.status === "done";
+          const hasBoth = segs.some((sg) => sg.tone === "light") && segs.some((sg) => sg.tone === "dark");
+          const drg = dragging && dragging.id === a.id ? dragging : null;
+          let dragStyle: React.CSSProperties = {};
+          if (drg && drg.kind === "move") {
+            const center = lists[1];
+            const oi = center.indexOf(drg.origDate);
+            const ti = center.indexOf(drg.targetDate);
+            const gEl = gridRef.current;
+            const colW = gEl ? (gEl.getBoundingClientRect().width - GUTTER) / days : 0;
+            const dxPx = oi >= 0 && ti >= 0 ? (ti - oi) * colW : 0;
+            const dyPx = yFor(drg.targetStart) - yFor(drg.origStart);
+            dragStyle = { transform: `translate3d(${dxPx}px, ${dyPx}px, 0)`, zIndex: 60, opacity: 0.92, boxShadow: "0 12px 26px rgba(0,0,0,.3)" };
+          }
           return (
             <button
               key={a.id}
+              data-appt-id={a.id}
               onClick={(ev) => {
                 ev.stopPropagation();
+                if (draggedRef.current) { draggedRef.current = false; return; }
                 setModal({ mode: "edit", appt: a });
               }}
+              onPointerDown={(ev) => {
+                if (ev.pointerType !== "mouse" || ev.button !== 0) return;
+                const kind: DragKind = (ev.target as HTMLElement).closest?.("[data-denden]") ? "denden" : "move";
+                try { (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId); } catch {}
+                beginPress(a, kind, ev.clientX, ev.clientY, "mouse");
+              }}
+              onPointerMove={(ev) => {
+                if (ev.pointerType !== "mouse") return;
+                if (dragActiveRef.current) ev.preventDefault();
+                movePress(ev.clientX, ev.clientY);
+              }}
+              onPointerUp={(ev) => { if (ev.pointerType === "mouse") endPress(); }}
               className="absolute"
-              style={{ ...style, background: "transparent", opacity: done ? 0.5 : undefined }}
+              style={{ ...style, background: "transparent", opacity: done ? 0.5 : undefined, ...dragStyle }}
               title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
             >
               {done && (
@@ -579,20 +792,29 @@ export default function CalendarView({
                   済
                 </span>
               )}
+              {drg && drg.kind === "move" && (
+                <span className="absolute -top-5 left-0 z-20 whitespace-nowrap rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {drg.onStaff ? `${staffName(drg.onStaff)}へ` : `${drg.targetDate.slice(5).replace("-", "/")} ${minToLabel(drg.targetStart)}`}
+                </span>
+              )}
               {segs.map((sg, i) => {
                 const segTop = yFor(sg.s) - top;
                 const segH = yFor(sg.e) - yFor(sg.s);
-                const ml = it.cols === 1 && segH >= 44;
+                const ml = it.span === it.cols && segH >= 44;
+                const isDenden = hasBoth && sg.tone === "light";
+                const dendenTf = drg && drg.kind === "denden" && isDenden ? { transform: `translateY(${drg.dyPx}px)`, zIndex: 30, boxShadow: "0 8px 18px rgba(0,0,0,.28)" } : {};
                 // 各30分枠を白枠で囲い、通電・施術それぞれに名前を入れる
                 return (
                   <div
                     key={i}
+                    data-denden={isDenden ? "1" : undefined}
                     className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                     style={{
                       top: segTop,
                       height: segH,
                       backgroundColor: segColor(col, sg.tone),
                       border: HAIRLINE,
+                      ...dendenTf,
                     }}
                   >
                     <span
@@ -621,14 +843,19 @@ export default function CalendarView({
             const dd = new Date(ds + "T00:00:00");
             const isToday = ds === todayStr;
             return (
-              <div
+              <button
                 key={ds}
-                className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold ${
+                onClick={() => {
+                  onStartChange(ds);
+                  if (days > 1) onDaysChange?.(1);
+                }}
+                title={days > 1 ? "この日だけを表示" : undefined}
+                className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold active:bg-slate-100 ${
                   isToday ? "text-blue-600" : "text-slate-600"
                 }`}
               >
                 {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
-              </div>
+              </button>
             );
           })}
         </div>
@@ -672,15 +899,26 @@ export default function CalendarView({
     <div>
       {/* スタッフ色の凡例（カレンダーは列見出しが日付なので色で担当を判別） */}
       <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-        {staff.map((s) => (
-          <span key={s.id} className="inline-flex items-center gap-1">
+        {staff.map((s) => {
+          const hot = dragging?.kind === "move";
+          const on = dragging?.onStaff === s.id;
+          return (
             <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: s.color || "#64748b" }}
-            />
-            {s.name}
-          </span>
-        ))}
+              key={s.id}
+              data-staff-id={s.id}
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 transition ${
+                on ? "font-bold text-white" : hot ? "ring-1 ring-slate-300" : ""
+              }`}
+              style={on ? { backgroundColor: s.color || "#64748b" } : undefined}
+            >
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: s.color || "#64748b" }}
+              />
+              {s.name}
+            </span>
+          );
+        })}
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: CLASS_COLOR }} />
           体幹教室
@@ -748,7 +986,7 @@ export default function CalendarView({
       </div>
 
       <p className="mt-1.5 text-[11px] text-slate-400">
-        空き時間タップで「予約」か「メモ」。横スワイプで前後、2本指ピンチで拡大縮小。
+        空きタップで「予約」か「メモ」。予約を長押し→ドラッグで時刻・日付を変更（凡例へドロップで担当変更）。通電は長押しで前後入れ替え。日付見出しタップでその日だけ表示。
       </p>
 
       {/* 空きタップ → 予約 or メモ 選択 */}
