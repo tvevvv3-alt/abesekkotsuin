@@ -328,9 +328,10 @@ export default function ShiftBoard() {
                   const fullClosed = dayCl.some((c) => c.start_min == null);
                   const wdClosed = bhByWd.get(dow)?.is_open === false;
                   const closed = inMonth && (wdClosed || fullClosed);
+                  const reason = (dayCl.find((c) => c.start_min == null)?.reason ?? "").trim();
                   const workingIds = new Set(day.map((x) => x.m.id));
                   const offMembers = (indivByDate.get(ds) ?? []).filter((x) => !workingIds.has(x.member.id));
-                  // 各出勤者を「終日／午前のみ／午後のみ」に振り分け
+                  // 各出勤者を「終日／午前のみ→午後休診／午後のみ→午前休診」に振り分け
                   const full: { s: Shift; m: Member }[] = [];
                   const partial: { s: Shift; m: Member; label: string }[] = [];
                   const parttime: { s: Shift; m: Member }[] = [];
@@ -338,44 +339,43 @@ export default function ShiftBoard() {
                     if (it.m.role !== "therapist") { parttime.push(it); return; }
                     const { am, pm } = covFor(ds, dow, it.m.id, it.s);
                     if (am && pm) full.push(it);
-                    else if (am && !pm) partial.push({ ...it, label: "午前のみ" });
-                    else if (!am && pm) partial.push({ ...it, label: "午後のみ" });
+                    else if (am && !pm) partial.push({ ...it, label: "午後休診" });
+                    else if (!am && pm) partial.push({ ...it, label: "午前休診" });
                   });
                   const today = ds === toDateStr(new Date());
                   return (
                     <button key={ds} onClick={() => inMonth && (clip ? pasteTo(ds) : openDay(ds))} disabled={!inMonth}
-                      className={`min-h-[84px] border-b border-r p-1 text-left align-top ${!inMonth ? "bg-slate-50/60" : clip ? "bg-amber-50/50 active:bg-amber-100" : closed ? "bg-slate-100 active:bg-blue-50" : "bg-white active:bg-blue-50"}`}>
-                      <div className="mb-0.5 flex items-center justify-between">
-                        <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-600"}`}>{d.getDate()}{today && inMonth ? "・今日" : ""}</span>
-                        {closed && <span className="text-[10px] font-bold text-rose-500">休診</span>}
+                      className={`flex min-h-[104px] flex-col border-b border-r text-left ${!inMonth ? "bg-slate-50/50" : clip ? "active:bg-amber-100" : "active:bg-blue-50"}`}>
+                      {/* 日付バンド */}
+                      <div className={`flex items-center justify-between border-b px-1.5 py-0.5 ${!inMonth ? "bg-slate-100/60" : "bg-[#fbf5df]"}`}>
+                        <span className={`text-[12px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-700"}`}>{d.getDate()}</span>
+                        {inMonth && reason && <span className="truncate text-[10px] font-bold text-rose-500">{reason}</span>}
+                        {inMonth && today && !reason && <span className="rounded bg-blue-600 px-1 text-[9px] font-bold text-white">今日</span>}
                       </div>
-                      {inMonth && !closed && (
-                        <div className="flex flex-col gap-1">
-                          {/* 午前/午後だけの人（灰背景＋区分バッジ） */}
-                          {partial.map(({ s, m, label }) => (
-                            <span key={"p" + s.id} className="flex items-center gap-1 rounded bg-slate-200/70 px-1 py-0.5">
-                              <span className="rounded px-1 text-[9px] font-bold text-white" style={{ backgroundColor: label === "午前のみ" ? "#0ea5e9" : "#f59e0b" }}>{label}</span>
-                              <span className="truncate text-[11px] font-bold" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
-                            </span>
-                          ))}
-                          {/* 終日の施術スタッフ（色名を横並び） */}
-                          {full.length > 0 && (
-                            <span className="flex flex-wrap gap-x-2 gap-y-0.5">
-                              {full.map(({ s, m }) => (
-                                <span key={s.id} className="truncate text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
-                              ))}
-                            </span>
-                          )}
-                          {/* 受付・学生（時間帯付き） */}
-                          {parttime.map(({ s, m }) => (
-                            <span key={"t" + s.id} className="truncate text-[11px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
-                          ))}
-                          {/* 終日休みの人 */}
-                          {offMembers.map((x, i) => (
-                            <span key={"o" + i} className="truncate text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
-                          ))}
-                        </div>
-                      )}
+                      {/* 内容 */}
+                      <div className={`flex flex-1 flex-wrap content-center items-center justify-center gap-x-2 gap-y-1 px-1.5 py-1.5 ${closed ? "bg-slate-100" : ""}`}>
+                        {!inMonth ? null : closed ? (
+                          <span className="text-base font-bold tracking-[0.3em] text-rose-500">休診</span>
+                        ) : (
+                          <>
+                            {partial.map(({ s, m, label }) => (
+                              <span key={"p" + s.id} className="inline-flex flex-col items-center border-r border-dashed border-slate-400 pr-2">
+                                <span className="text-[13px] font-bold" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
+                                <span className="mt-0.5 bg-slate-300 px-1 text-[9px] font-bold text-rose-600">{label}</span>
+                              </span>
+                            ))}
+                            {full.map(({ s, m }) => (
+                              <span key={s.id} className="text-[13px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
+                            ))}
+                            {parttime.map(({ s, m }) => (
+                              <span key={"t" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+                            ))}
+                            {offMembers.map((x, i) => (
+                              <span key={"o" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                            ))}
+                          </>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -384,7 +384,7 @@ export default function ShiftBoard() {
           )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-slate-400">日をタップして編集。施術スタッフは色名、午前/午後だけの人は灰背景＋「午前休診/午後休診」、受付・学生は時間帯付き。</p>
+      <p className="mt-2 text-xs text-slate-400">日をタップして編集。施術スタッフは色名を中央に、午前/午後だけの人は名前＋灰色の「午前休診/午後休診」、受付・学生は時間帯付き。休診日はグレー。</p>
 
       {/* メンバー設定 */}
       <div className="mt-4 rounded-xl border bg-white">
