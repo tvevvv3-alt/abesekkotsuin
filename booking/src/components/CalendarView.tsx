@@ -68,6 +68,15 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number; span:
 
 const snap = (m: number) => Math.round(m / SNAP) * SNAP;
 
+// 基本の並び順：阿部→澁谷→萩原→林→（体幹教室・その他は最後）
+function staffOrderKey(name: string): number {
+  if (name.includes("阿部")) return 0;
+  if (name.includes("澁谷") || name.includes("渋谷")) return 1;
+  if (name.includes("萩原")) return 2;
+  if (name.includes("林")) return 3;
+  return 90;
+}
+
 const CLASS_COLOR = "#EF6C00"; // 体幹教室＝オレンジ
 const TEXT_SHADOW = "0 1px 1px rgba(0,0,0,.28)"; // 白文字を読みやすくする控えめな影（Google風にシャキッと）
 
@@ -200,7 +209,11 @@ export default function CalendarView({
         loadEquipment(supabase),
         loadSettings(supabase),
       ]);
-      setStaff(st.filter((s) => s.admin_visible && s.status !== "retired"));
+      setStaff(
+        st
+          .filter((s) => s.admin_visible && s.status !== "retired")
+          .sort((a, b) => staffOrderKey(a.name) - staffOrderKey(b.name))
+      );
       setServices(sv);
       setEquipment(eq);
       setSettings(se);
