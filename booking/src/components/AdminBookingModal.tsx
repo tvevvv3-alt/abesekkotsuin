@@ -99,7 +99,13 @@ export default function AdminBookingModal({
       const weekday = new Date(y, m - 1, d).getDay();
       const daySchedules = sc.filter((s) => s.weekday === weekday);
       const dur = totalDuration(service.steps);
-      const cands = candidateStarts(daySchedules, dur);
+      const isAfter = !!(service as unknown as { after_hours?: boolean }).after_hours;
+      let cands = candidateStarts(daySchedules, dur);
+      if (isAfter) {
+        // 時間外予約は勤務時間に縛られない夜枠。20:30/21:00/21:30/22:00 を追加。
+        const late = [1230, 1260, 1290, 1320];
+        cands = [...new Set([...cands, ...late])].sort((a, b) => a - b);
+      }
 
       // 管理画面は休診（枠の確保）を無視して予約可能にする（電話予約の確保枠に入れられるように）
       let ok: number[];
@@ -128,7 +134,7 @@ export default function AdminBookingModal({
           equipmentById: equipmentById as Record<string, Equipment>,
         };
         ok = cands.filter(
-          (t) => checkAvailability(service.steps, staffId, t, ctx, appt?.id).ok
+          (t) => checkAvailability(service.steps, staffId, t, ctx, appt?.id, isAfter).ok
         );
       }
       // 編集時、現在の開始時刻が候補に無ければ足す（同一時刻での再保存を許可）
