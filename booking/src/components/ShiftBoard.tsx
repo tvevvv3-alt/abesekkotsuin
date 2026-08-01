@@ -164,8 +164,10 @@ export default function ShiftBoard() {
     const d: Draft = {};
     activeMembers.forEach((m) => {
       const sh = day.find((x) => x.member_id === m.id);
-      const defStart = m.default_start != null ? m.default_start : span.start;
-      const defEnd = m.default_end != null ? m.default_end : span.end;
+      // 施術は時間不要（終日）。受付・学生は既定 or 営業時間帯。
+      const isT = m.role === "therapist";
+      const defStart = isT ? null : m.default_start != null ? m.default_start : span.start;
+      const defEnd = isT ? null : m.default_end != null ? m.default_end : span.end;
       d[m.id] = {
         on: !!sh,
         start: sh?.start_min != null ? minToTime(sh.start_min) : defStart != null ? minToTime(defStart) : "",
@@ -178,12 +180,15 @@ export default function ShiftBoard() {
   async function saveDay() {
     if (!edit) return;
     await supabase.from("shifts").delete().eq("date", edit);
-    const rows = activeMembers.filter((m) => draft[m.id]?.on).map((m) => ({
-      date: edit, member_id: m.id,
-      start_min: draft[m.id].start ? timeToMin(draft[m.id].start) : null,
-      end_min: draft[m.id].end ? timeToMin(draft[m.id].end) : null,
-      clinic: draft[m.id].clinic ? "kawanishi" : null,
-    }));
+    const rows = activeMembers.filter((m) => draft[m.id]?.on).map((m) => {
+      const isT = m.role === "therapist"; // 施術は終日（時間なし）
+      return {
+        date: edit, member_id: m.id,
+        start_min: !isT && draft[m.id].start ? timeToMin(draft[m.id].start) : null,
+        end_min: !isT && draft[m.id].end ? timeToMin(draft[m.id].end) : null,
+        clinic: draft[m.id].clinic ? "kawanishi" : null,
+      };
+    });
     if (rows.length) await supabase.from("shifts").insert(rows);
     setEdit(null); reload();
   }
@@ -272,6 +277,20 @@ export default function ShiftBoard() {
                   const fullClosed = dayCl.some((c) => c.start_min == null);
                   const partials = dayCl.filter((c) => c.start_min != null);
                   const closed = inMonth && (wdClosed || fullClosed);
+                  const clinicAmOff = partials.some((c) => closureLabel(c) === "午前休診");
+                  const clinicPmOff = partials.some((c) => closureLabel(c) === "午後休診");
+                  const split = bhByWd.get(dow)?.seg1_end ?? 780; // 昼の境目
+                  const workingIds = new Set(day.map((x) => x.m.id));
+                  const offMembers = (indivByDate.get(ds) ?? []).filter((x) => !workingIds.has(x.member.id));
+                  // 午前/午後のどちらに出るか（時間＋院の午前/午後休診＋個人の午前/午後休を加味）
+                  const cov = (memberId: string, s: Shift) => {
+                    let am = s.start_min == null ? true : s.start_min < split;
+                    let pm = s.start_min == null ? true : s.end_min == null || s.end_min > split;
+                    if (clinicAmOff) am = false;
+                    if (clinicPmOff) pm = false;
+                    (indivByDate.get(ds) ?? []).filter((x) => x.member.id === memberId).forEach((x) => { if (x.label === "午前休") am = false; if (x.label === "午後休") pm = false; });
+                    return { am, pm };
+                  };
                   return (
                     <button key={ds} onClick={() => inMonth && openDay(ds)} disabled={!inMonth}
                       className={`min-h-[76px] border-b border-r p-1 text-left align-top ${!inMonth ? "bg-slate-50/60" : closed ? "bg-slate-100 active:bg-blue-50" : "bg-white active:bg-blue-50"}`}>
@@ -279,27 +298,37 @@ export default function ShiftBoard() {
                         <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-500"}`}>{d.getDate()}</span>
                         {closed && <span className="text-[9px] font-bold text-rose-400">休診</span>}
                       </div>
-                      {inMonth && !closed && partials.map((c) => (
-                        <span key={c.id} className="mb-0.5 block text-[9px] font-bold text-rose-400">{closureLabel(c)}</span>
-                      ))}
-                      {inMonth && (
-                        <div className="flex flex-col gap-0.5">
-                          {day.map(({ s, m }) => (
-                            m.role === "therapist" ? (
-                              <span key={s.id} className="inline-block truncate rounded px-1 text-[10px] font-bold leading-tight text-white" style={{ backgroundColor: m.color }}>
-                                {m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}{s.start_min != null ? " " + range(s.start_min, s.end_min) : ""}
+                      {inMonth && !closed && (
+                        <div className="relative min-h-[48px]">
+                          {/* 縦割り（午前｜午後）の中心線 */}
+                          <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-slate-200" />
+                          {clinicAmOff && <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-slate-200/60" />}
+                          {clinicPmOff && <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-slate-200/60" />}
+                          <div className="relative z-10 flex flex-col gap-0.5">
+                            {(clinicAmOff || clinicPmOff) && (
+                              <span className={`text-[9px] font-bold text-rose-400 ${clinicPmOff && !clinicAmOff ? "self-end" : ""}`}>{clinicAmOff ? "午前休診" : "午後休診"}</span>
+                            )}
+                            {day.map(({ s, m }) => {
+                              const { am, pm } = cov(m.id, s);
+                              if (!am && !pm) return null;
+                              const w = am && pm ? "w-full" : "w-[48%]";
+                              const right = !am && pm;
+                              return m.role === "therapist" ? (
+                                <span key={s.id} className={`${w} ${right ? "ml-auto text-right" : ""} block truncate rounded px-1 text-[10px] font-bold leading-tight text-white`} style={{ backgroundColor: m.color }}>
+                                  {m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}
+                                </span>
+                              ) : (
+                                <span key={s.id} className={`${w} ${right ? "ml-auto text-right" : ""} block truncate text-[10px] font-bold leading-tight`} style={{ color: m.color }}>
+                                  {m.name} {range(s.start_min, s.end_min)}
+                                </span>
+                              );
+                            })}
+                            {offMembers.map((x, i) => (
+                              <span key={"i" + i} className="truncate text-[9px] font-bold text-rose-400 line-through decoration-rose-300">
+                                {x.member.name} {x.label}
                               </span>
-                            ) : (
-                              <span key={s.id} className="truncate text-[10px] font-bold leading-tight" style={{ color: m.color }}>
-                                {m.name} {range(s.start_min, s.end_min)}
-                              </span>
-                            )
-                          ))}
-                          {(indivByDate.get(ds) ?? []).map((x, i) => (
-                            <span key={"i" + i} className="truncate text-[9px] font-bold text-rose-400 line-through decoration-rose-300">
-                              {x.member.name} {x.label}
-                            </span>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                     </button>
@@ -349,11 +378,15 @@ export default function ShiftBoard() {
                         </div>
                       </td>
                       <td className="px-1 py-1">
-                        <div className="flex items-center gap-1">
-                          <input type="time" value={m.default_start != null ? minToTime(m.default_start) : ""} onChange={(e) => setMemberLocal(m.id, { default_start: e.target.value ? timeToMin(e.target.value) : null })} onBlur={() => persistMember(m.id)} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
-                          <span className="text-slate-400">-</span>
-                          <input type="time" value={m.default_end != null ? minToTime(m.default_end) : ""} onChange={(e) => setMemberLocal(m.id, { default_end: e.target.value ? timeToMin(e.target.value) : null })} onBlur={() => persistMember(m.id)} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
-                        </div>
+                        {m.role === "therapist" ? (
+                          <span className="text-[11px] text-slate-300">終日（時間不要）</span>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <input type="time" value={m.default_start != null ? minToTime(m.default_start) : ""} onChange={(e) => setMemberLocal(m.id, { default_start: e.target.value ? timeToMin(e.target.value) : null })} onBlur={() => persistMember(m.id)} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
+                            <span className="text-slate-400">-</span>
+                            <input type="time" value={m.default_end != null ? minToTime(m.default_end) : ""} onChange={(e) => setMemberLocal(m.id, { default_end: e.target.value ? timeToMin(e.target.value) : null })} onBlur={() => persistMember(m.id)} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
+                          </div>
+                        )}
                       </td>
                       <td className="px-1 py-1 text-center"><button onClick={() => deleteMember(m.id)} className="text-[11px] font-bold text-red-400">削除</button></td>
                     </tr>
@@ -399,15 +432,21 @@ export default function ShiftBoard() {
                     </div>
                     {dr.on && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-6">
-                        <span className="text-[11px] text-slate-400">時間</span>
-                        <input type="time" value={dr.start} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, start: e.target.value } }))} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
-                        <span className="text-slate-400">-</span>
-                        <input type="time" value={dr.end} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, end: e.target.value } }))} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
-                        {m.role === "therapist" && (
-                          <label className="ml-1 flex items-center gap-1 text-[12px] text-slate-600">
-                            <input type="checkbox" checked={dr.clinic} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, clinic: e.target.checked } }))} className="h-3.5 w-3.5" />
-                            川西院
-                          </label>
+                        {m.role === "therapist" ? (
+                          <>
+                            <span className="text-[11px] text-slate-400">終日（午前・午後の休みは休診登録で反映）</span>
+                            <label className="ml-1 flex items-center gap-1 text-[12px] text-slate-600">
+                              <input type="checkbox" checked={dr.clinic} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, clinic: e.target.checked } }))} className="h-3.5 w-3.5" />
+                              川西院
+                            </label>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[11px] text-slate-400">時間</span>
+                            <input type="time" value={dr.start} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, start: e.target.value } }))} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
+                            <span className="text-slate-400">-</span>
+                            <input type="time" value={dr.end} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, end: e.target.value } }))} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
+                          </>
                         )}
                       </div>
                     )}
