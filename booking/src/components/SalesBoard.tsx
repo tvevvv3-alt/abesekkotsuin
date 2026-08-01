@@ -1210,7 +1210,7 @@ export default function SalesBoard() {
                         <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }}
                           className={rowClass(m.id)} style={rowStyle(m.id)}>
                           <td className="px-1 py-0.5">
-                            <select value={m.staff_id ?? ""} onChange={(e) => { const sid = e.target.value || null; setManualLocal(m.id, sid ? { staff_id: sid, cost: 0 } : { staff_id: sid }); }} onBlur={() => persistManual(m.id)}
+                            <select value={m.staff_id ?? ""} onChange={(e) => setManualLocal(m.id, { staff_id: e.target.value || null })} onBlur={() => persistManual(m.id)}
                               className="rounded border px-1 py-1 text-[11px] font-bold"
                               style={m.staff_id ? assigneeSelectStyle(m.staff_id) : { backgroundColor: "#64748b", color: "#fff", borderColor: "#64748b" }}>
                               <option value="" style={{ color: "#0f172a", background: "#fff" }}>物販</option>
@@ -1221,18 +1221,8 @@ export default function SalesBoard() {
                             <input value={m.patient_name ?? ""} placeholder="品目/名前" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
                               className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
                           </td>
-                          <td className="px-1 py-0.5 text-right">
-                            {m.staff_id == null ? (
-                              // 物販（担当なし）：販売価格＋仕入れ
-                              <div className="flex flex-col items-end gap-0.5">
-                                <input type="number" min={0} placeholder="販売" value={m.selfpay || ""} title="販売価格" onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
-                                <input type="number" min={0} placeholder="仕入" value={m.cost || ""} title="仕入れ(原価)。スタッフ売上は販売−仕入の粗利で計上" onChange={(e) => setManualLocal(m.id, { cost: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)}
-                                  className="w-[68px] rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-right text-[11px] tabnum focus:border-amber-400 focus:outline-none" />
-                              </div>
-                            ) : (
-                              // 担当を割り当てた予約外の入力：保険外1つ
-                              <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
-                            )}
+                          <td className="px-1 py-1 text-right">
+                            <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
                           </td>
                           <td className="px-1 py-1 text-right">
                             <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
