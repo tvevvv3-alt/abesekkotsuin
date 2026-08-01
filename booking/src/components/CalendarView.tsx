@@ -633,8 +633,8 @@ export default function CalendarView({
           })}
         </div>
         <div className="flex bg-slate-50/60">
-          {list.map((ds) => {
-            const allDay = notes.filter((n) => n.date === ds && n.start_min == null);
+          {list.map((ds, di) => {
+            const allDay = notes.filter((n) => n.start_min == null && n.date <= ds && (n.end_date || n.date) >= ds);
             return (
               <div
                 key={ds}
@@ -645,16 +645,21 @@ export default function CalendarView({
                   setNoteModal({ mode: "add", date: ds, allDay: true, startMin: boardStart });
                 }}
               >
-                {allDay.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => setNoteModal({ mode: "edit", note: n })}
-                    className="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-bold text-white"
-                    style={{ backgroundColor: n.color || "#64748b" }}
-                  >
-                    {n.text}
-                  </button>
-                ))}
+                {allDay.map((n) => {
+                  const isStart = n.date === ds;
+                  const isEnd = (n.end_date || n.date) === ds;
+                  const showText = isStart || di === 0; // 開始日、または画面左端で文字表示
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => setNoteModal({ mode: "edit", note: n })}
+                      className={`mb-0.5 block w-full truncate px-1 py-0.5 text-left text-[10px] font-bold text-white ${isStart ? "rounded-l" : ""} ${isEnd ? "rounded-r" : ""}`}
+                      style={{ backgroundColor: n.color || "#64748b" }}
+                    >
+                      {showText ? n.text : " "}
+                    </button>
+                  );
+                })}
               </div>
             );
           })}
@@ -846,12 +851,14 @@ function NoteModal({
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly">("none");
   const [count, setCount] = useState(4);
   const date = editing?.date ?? (data.mode === "add" ? data.date : "");
+  const [endDate, setEndDate] = useState<string>(editing?.end_date ?? date);
 
   async function save() {
     if (!text.trim()) return;
     setBusy(true);
     const row = {
       date,
+      end_date: allDay && endDate && endDate > date ? endDate : null,
       text: text.trim(),
       color,
       start_min: allDay ? null : startMin,
@@ -919,6 +926,15 @@ function NoteModal({
             {timeInput(startMin, setStartMin)}
             <span>〜</span>
             {timeInput(endMin, setEndMin)}
+          </div>
+        )}
+        {allDay && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <span className="text-[13px]">📅 期間</span>
+            <span className="rounded-md border bg-slate-50 px-2 py-1 text-sm text-slate-500">{date.slice(5).replace("-", "/")}</span>
+            <span>〜</span>
+            <input type="date" value={endDate} min={date} onChange={(e) => setEndDate(e.target.value || date)} className="rounded-md border px-2 py-1 text-sm" />
+            <span className="text-[11px] text-slate-400">（複数日は終了日を指定）</span>
           </div>
         )}
         <div className="mb-3 flex flex-wrap gap-2">

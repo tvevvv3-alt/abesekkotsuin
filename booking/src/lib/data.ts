@@ -213,7 +213,14 @@ export async function loadCalendarNotes(
   dates: string[]
 ): Promise<CalendarNote[]> {
   if (dates.length === 0) return [];
-  const { data, error } = await sb.from("calendar_notes").select("*").in("date", dates);
+  // 表示範囲と重なるメモを取得（複数日メモ＝end_date が範囲にかかるものも含む）
+  const min = dates.reduce((a, b) => (a < b ? a : b));
+  const max = dates.reduce((a, b) => (a > b ? a : b));
+  const { data, error } = await sb
+    .from("calendar_notes")
+    .select("*")
+    .lte("date", max)
+    .or(`end_date.gte.${min},date.gte.${min}`);
   if (error || !data) return [];
   return data;
 }

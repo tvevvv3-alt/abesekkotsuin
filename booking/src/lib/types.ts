@@ -118,7 +118,8 @@ export interface Opening {
 // カレンダーの自由メモ（受付シフト・zoom・ゴミ捨て 等）。予約とは別。
 export interface CalendarNote {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD（開始日）
+  end_date?: string | null; // 終日メモの終了日（複数日）。null=単日
   start_min: number | null; // null=終日（上部の帯）
   end_min: number | null;
   text: string;
