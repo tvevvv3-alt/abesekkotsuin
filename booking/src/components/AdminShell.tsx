@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { loadStaff, loadSettings } from "@/lib/data";
 import type { Staff } from "@/lib/types";
 import { getOperator, setOperator, type Operator } from "@/lib/operator";
+import PushToggle from "./PushToggle";
 
 // 操作者アイコン（顔写真 or 頭文字）
 function OperatorAvatar({
@@ -247,14 +248,15 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64 bg-white shadow-xl">
+          <div className="absolute left-0 top-0 flex h-full w-64 flex-col bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <span className="font-bold text-slate-800">メニュー</span>
               <button onClick={() => setOpen(false)} className="text-slate-400">
                 ✕
               </button>
             </div>
-            {navList}
+            <div className="flex-1 overflow-y-auto">{navList}</div>
+            <PushToggle />
           </div>
         </div>
       )}
@@ -285,6 +287,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">{navList}</div>
+          <PushToggle />
           <button
             onClick={logout}
             className="border-t px-4 py-3 text-left text-sm text-slate-500 hover:bg-slate-50"

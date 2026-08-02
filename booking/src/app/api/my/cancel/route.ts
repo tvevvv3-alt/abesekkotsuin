@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyLineUser, lineMessagingConfigured, pushText, buildApptInfo, buildCancelText } from "@/lib/line";
+import { verifyLineUser, lineMessagingConfigured, pushText, buildApptInfo, buildCancelText, fmtDateTime } from "@/lib/line";
 import { verifyState } from "@/lib/line-state";
+import { notifyStaff } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, line_user_id, status, date, start_min, service_name, service_id, staff_id")
+    .select("id, line_user_id, status, date, start_min, service_name, service_id, staff_id, patient_name")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return NextResponse.json({ ok: false, reason: "notfound" }, { status: 404 });
@@ -52,6 +53,16 @@ export async function POST(req: NextRequest) {
   const { error } = await admin.from("appointments").update({ status: "cancelled" }).eq("id", appointmentId);
   if (error) return NextResponse.json({ ok: false, reason: "db", detail: error.message }, { status: 500 });
   await admin.from("appointment_steps").delete().eq("appointment_id", appointmentId);
+
+  // 運営端末へプッシュ通知（リスケの旧予約取消=silent は出さない）
+  if (!silent) {
+    await notifyStaff(admin, {
+      title: "❌ キャンセル（LINE）",
+      body: `${fmtDateTime(appt.date, appt.start_min)}\n${appt.patient_name ?? ""}様\n${appt.service_name ?? ""}`,
+      url: "/admin",
+      tag: "appt-" + appointmentId,
+    });
+  }
 
   // 本人へキャンセル確認をLINE通知（任意・失敗しても成功扱い）。silent時は送らない。
   if (!silent && lineMessagingConfigured()) {

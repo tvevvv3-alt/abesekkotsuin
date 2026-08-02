@@ -624,7 +624,7 @@ export default function BookingWizard() {
           await fetch("/api/my/confirm", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken: liffIdToken || "", appointmentId: res.appointment_id }),
+            body: JSON.stringify({ idToken: liffIdToken || "", appointmentId: res.appointment_id, reschedule: true }),
           });
         } catch {
           /* 確認送信に失敗しても予約自体は成立している */

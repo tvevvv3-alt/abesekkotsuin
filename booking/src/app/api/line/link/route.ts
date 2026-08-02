@@ -3,10 +3,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   buildApptInfo,
   DEFAULT_CONFIRM_TEXT,
+  fmtDateTime,
   lineMessagingConfigured,
   pushText,
   renderMessage,
 } from "@/lib/line";
+import { notifyStaff } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const { data: appt, error: apptErr } = await admin
     .from("appointments")
-    .select("id, service_id, staff_id, date, start_min, service_name, confirm_sent_at")
+    .select("id, service_id, staff_id, date, start_min, service_name, patient_name, confirm_sent_at")
     .eq("id", appointmentId)
     .maybeSingle();
   if (apptErr) return ok({ ok: false, stage: "select", error: apptErr.message });
@@ -57,6 +59,23 @@ export async function POST(req: NextRequest) {
     .eq("id", appointmentId);
   if (upErr) return ok({ ok: false, stage: "update", error: upErr.message });
 
+  const { data: s } = await admin
+    .from("settings")
+    .select("clinics, confirm_text")
+    .eq("id", 1)
+    .maybeSingle();
+  const info = await buildApptInfo(admin, appt, (s?.clinics as never) ?? null);
+
+  // 運営端末へプッシュ（初回連携＝新規予約のときだけ）
+  if (!appt.confirm_sent_at) {
+    await notifyStaff(admin, {
+      title: "🆕 新規予約（LINE）",
+      body: `${fmtDateTime(appt.date, appt.start_min)}\n${appt.patient_name ?? ""}様\n${info.serviceName}${info.staffName ? `／担当 ${info.staffName}` : ""}`,
+      url: "/admin",
+      tag: "appt-" + appointmentId,
+    });
+  }
+
   // 予約確認メッセージ（未送信のときだけ）
   if (!lineMessagingConfigured()) {
     return ok({ ok: true, linked: true, sent: false, stage: "push", error: "アクセストークン未設定" });
@@ -64,12 +83,6 @@ export async function POST(req: NextRequest) {
   if (appt.confirm_sent_at) {
     return ok({ ok: true, linked: true, sent: false, error: "already sent" });
   }
-  const { data: s } = await admin
-    .from("settings")
-    .select("clinics, confirm_text")
-    .eq("id", 1)
-    .maybeSingle();
-  const info = await buildApptInfo(admin, appt, (s?.clinics as never) ?? null);
   const tpl = s?.confirm_text?.trim() || DEFAULT_CONFIRM_TEXT;
   const r = await pushText(userId, renderMessage(tpl, info));
   if (r.ok) {

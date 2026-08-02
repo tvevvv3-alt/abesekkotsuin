@@ -5,9 +5,11 @@ import { getBaseUrl } from "@/lib/url";
 import {
   buildApptInfo,
   buildConfirmText,
+  fmtDateTime,
   lineMessagingConfigured,
   pushText,
 } from "@/lib/line";
+import { notifyStaff } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,7 +73,7 @@ export async function GET(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, service_id, staff_id, date, start_min, service_name, confirm_sent_at")
+    .select("id, service_id, staff_id, date, start_min, service_name, patient_name, confirm_sent_at")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return done("?error=noappt");
@@ -80,6 +82,17 @@ export async function GET(req: NextRequest) {
     .from("appointments")
     .update({ line_user_id: userId })
     .eq("id", appointmentId);
+
+  // 運営端末へプッシュ（初回連携＝新規予約のときだけ）
+  if (!appt.confirm_sent_at) {
+    const info = await buildApptInfo(admin, appt);
+    await notifyStaff(admin, {
+      title: "🆕 新規予約（LINE）",
+      body: `${fmtDateTime(appt.date, appt.start_min)}\n${appt.patient_name ?? ""}様\n${info.serviceName}${info.staffName ? `／担当 ${info.staffName}` : ""}`,
+      url: "/admin",
+      tag: "appt-" + appointmentId,
+    });
+  }
 
   // 確認メッセージ（未送信のときだけ）
   if (lineMessagingConfigured() && !appt.confirm_sent_at) {
