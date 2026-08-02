@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+// 公開鍵（VAPID public key）は秘密ではないので既定値を同梱。
+// 環境変数が正しく設定されていればそちらを優先、無効なら既定値にフォールバック。
+const FALLBACK_VAPID_PUBLIC =
+  "BIgxLWtKe8jmM4ChMdSylMqzdDA0xqjoUbWo24lHi7fq-ggAJY-DtrunjTsIgaW43t3GroBtu5MQWOJiNDuYQzc";
+const ENV_VAPID = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "").replace(/[^A-Za-z0-9\-_]/g, "");
+const VAPID_PUBLIC = ENV_VAPID.length >= 80 ? ENV_VAPID : FALLBACK_VAPID_PUBLIC;
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   // 環境変数に混入しがちな空白・改行や base64url 以外の文字を除去
@@ -135,7 +140,7 @@ export default function PushToggle() {
         </button>
       )}
       {msg && <p className="mt-1.5 text-[11px] text-slate-500">{msg}</p>}
-      <p className="mt-1 text-[9px] text-slate-300">通知v3 / 鍵長 {VAPID_PUBLIC.replace(/[^A-Za-z0-9\-_]/g, "").length}</p>
+      <p className="mt-1 text-[9px] text-slate-300">通知v4 / 鍵長 {VAPID_PUBLIC.length}</p>
     </div>
   );
 }
