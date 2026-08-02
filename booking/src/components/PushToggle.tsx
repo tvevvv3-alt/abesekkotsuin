@@ -135,6 +135,7 @@ export default function PushToggle() {
         </button>
       )}
       {msg && <p className="mt-1.5 text-[11px] text-slate-500">{msg}</p>}
+      <p className="mt-1 text-[9px] text-slate-300">通知v3 / 鍵長 {VAPID_PUBLIC.replace(/[^A-Za-z0-9\-_]/g, "").length}</p>
     </div>
   );
 }
