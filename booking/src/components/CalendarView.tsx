@@ -413,7 +413,7 @@ export default function CalendarView({
   }
   function activatePress() {
     const p = pressRef.current;
-    if (!p) return;
+    if (!p || dragActiveRef.current) return;
     dragActiveRef.current = true;
     drag.current = null;
     pinch.current = null;
@@ -440,8 +440,16 @@ export default function CalendarView({
     if (!p) return;
     latestXYRef.current = { x, y };
     if (!dragActiveRef.current) {
-      if (Math.hypot(x - p.startX, y - p.startY) > 10) cancelPress();
-      return;
+      const moved = Math.hypot(x - p.startX, y - p.startY);
+      if (p.source === "mouse") {
+        // PCは長押し不要：少し動かしたら即ドラッグ開始
+        if (moved <= 4) return;
+        activatePress();
+      } else {
+        // タッチは長押しで開始。動いたらスクロール／スワイプ扱いで中止
+        if (moved > 10) cancelPress();
+        return;
+      }
     }
     const dyPx = y - p.startY;
     if (p.kind === "denden") {
