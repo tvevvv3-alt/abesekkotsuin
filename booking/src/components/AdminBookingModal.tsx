@@ -148,19 +148,27 @@ export default function AdminBookingModal({
 
   async function cancelAppt() {
     if (!appt) return;
-    if (!confirm("この予約をキャンセルしますか？")) return;
+    if (!confirm("この予約をキャンセルしますか？（LINE連携の方にはキャンセル通知が届きます）")) return;
     setBusy(true);
-    const { error } = await supabase
-      .from("appointments")
-      .update({ status: "cancelled" })
-      .eq("id", appt.id);
-    // 占有ステップも削除して枠を解放
-    await supabase.from("appointment_steps").delete().eq("appointment_id", appt.id);
-    setBusy(false);
-    if (error) {
-      setError(error.message);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId: appt.id }),
+      });
+      const j = (await res.json()) as { ok: boolean; reason?: string };
+      if (!j.ok) {
+        setError(j.reason === "auth" ? "ログインが必要です" : "キャンセルに失敗しました");
+        setBusy(false);
+        return;
+      }
+    } catch {
+      setError("通信エラー");
+      setBusy(false);
       return;
     }
+    setBusy(false);
     onDone();
   }
 
@@ -400,7 +408,7 @@ export default function AdminBookingModal({
               disabled={busy}
               className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600"
             >
-              キャンセル予約
+              予約をキャンセル
             </button>
           )}
           {mode === "edit" && (

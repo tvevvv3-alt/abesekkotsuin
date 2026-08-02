@@ -50,6 +50,24 @@ export default function PushToggle() {
     })();
   }, [supported]);
 
+  // アプリを開いている間はアイコンのバッジ（未読数）を消す
+  useEffect(() => {
+    const clear = () => {
+      try {
+        (navigator as Navigator & { clearAppBadge?: () => Promise<void> }).clearAppBadge?.();
+      } catch {}
+      navigator.serviceWorker?.ready
+        .then((r) => r.active?.postMessage("clear-badge"))
+        .catch(() => {});
+    };
+    clear();
+    const onVis = () => {
+      if (document.visibilityState === "visible") clear();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   async function enable() {
     setState("busy");
     setMsg(null);
@@ -140,7 +158,7 @@ export default function PushToggle() {
         </button>
       )}
       {msg && <p className="mt-1.5 text-[11px] text-slate-500">{msg}</p>}
-      <p className="mt-1 text-[9px] text-slate-300">通知v4 / 鍵長 {VAPID_PUBLIC.length}</p>
+      <p className="mt-1 text-[9px] text-slate-300">通知v5 / 鍵長 {VAPID_PUBLIC.length}</p>
     </div>
   );
 }
