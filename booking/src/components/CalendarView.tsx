@@ -51,18 +51,9 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number; span:
       } else laneEnd[lane] = it.e;
       return { ...it, lane, cols: 1, span: 1 };
     });
-    // 人数に応じた幅：右に空いているレーンぶん広げる
-    //  → その時間に1人なら全域、2人なら半分、3人なら1/3…と重なり人数で変わる。
+    // すべて等分：重なりグループ内は全員おなじ幅（またぎ予約も含めて分割）。
+    // どの予約も横幅を独り占めしない＝1人のとこは全域・2人は半分・3人は1/3…に近づく。
     const laneCount = laneEnd.length;
-    for (const p of placed) {
-      let span = 1;
-      for (let L = p.lane + 1; L < laneCount; L++) {
-        const conflict = placed.some((q) => q !== p && q.lane === L && q.s < p.e && p.s < q.e);
-        if (conflict) break;
-        span++;
-      }
-      p.span = span;
-    }
     placed.forEach((p) => (p.cols = laneCount));
     out.push(...placed);
     cluster = [];
