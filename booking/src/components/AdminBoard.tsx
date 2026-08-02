@@ -182,6 +182,14 @@ export default function AdminBoard({ date }: { date: string }) {
   const cardDraggedRef = useRef(false);
   const cardLatestRef = useRef<{ targetStart: number; targetStaffId: string | null } | null>(null);
   const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
+  // カードのドラッグ中はボードのスクロールを止める（タッチでテーブルごと動くのを防ぐ）
+  useEffect(() => {
+    const el = boardScrollRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => { if (cardActiveRef.current) e.preventDefault(); };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
 
   // ボード枠の高さを「自分の上端〜画面下端」ぴったりに合わせ、ページ側のスクロールを無くす
   // （カレンダーと同じ“枠内だけスクロール”に統一。二度スクロール問題の解消）
