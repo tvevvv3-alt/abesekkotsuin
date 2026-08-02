@@ -225,20 +225,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </svg>
         </button>
         <span className="font-bold text-slate-800">阿部接骨院</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="flex items-center gap-1.5"
-            aria-label="操作者を切替"
-          >
-            {operator ? (
-              <OperatorAvatar op={operator} size={30} />
-            ) : (
-              <span className="rounded-full border border-dashed border-slate-300 px-2 py-1 text-[10px] text-slate-400">
-                担当を選択
-              </span>
-            )}
-          </button>
+        <div className="flex items-center gap-3">
+          <Link href="/admin/history" aria-label="予約履歴" className="text-xl leading-none active:opacity-60">
+            📢
+          </Link>
           <button onClick={logout} className="text-xs text-slate-500">
             ログアウト
           </button>
