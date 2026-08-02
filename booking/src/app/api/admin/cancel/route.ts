@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildApptInfo, buildCancelText, lineMessagingConfigured, pushText } from "@/lib/line";
+import { buildApptInfo, buildCancelText, fmtDateTime, lineMessagingConfigured, pushText } from "@/lib/line";
+import { notifyStaff } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, line_user_id, status, date, start_min, service_id, staff_id, service_name")
+    .select("id, line_user_id, status, date, start_min, service_id, staff_id, service_name, patient_name")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return NextResponse.json({ ok: false, reason: "notfound" }, { status: 404 });
@@ -59,6 +60,14 @@ export async function POST(req: NextRequest) {
       /* noop */
     }
   }
+
+  // 管理端末へもプッシュ通知（他のスタッフの端末にも届く）
+  await notifyStaff(admin, {
+    title: "❌ キャンセル",
+    body: `${fmtDateTime(appt.date, appt.start_min)}\n${appt.patient_name ?? ""}様\n${appt.service_name ?? ""}`,
+    url: "/admin",
+    tag: "appt-" + appointmentId,
+  });
 
   return NextResponse.json({ ok: true, sent, hadLine: !!appt.line_user_id });
 }
