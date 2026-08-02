@@ -36,6 +36,7 @@ interface Sale {
   payment: "cash" | "cashless"; // 窓口徴収の支払方法
   retail?: boolean; // 物販（物販ページにも表示）
   retail_kind?: "sale" | "purchase"; // 物販の行種別。purchase(まとめ仕入)は日計表に出さない
+  retail_buyer?: string | null; // 物販の購入者名（商品名は patient_name）
 }
 const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
   selfpay: 0,
@@ -161,7 +162,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, anchor_appointment_id, sort_order, payment")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, retail_buyer, anchor_appointment_id, sort_order, payment")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -285,7 +286,7 @@ export default function SalesBoard() {
     const { data } = await supabase
       .from("sales")
       .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, cost: 0, retail: true, payment: "cash", anchor_appointment_id: anchor ?? null })
-      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, anchor_appointment_id, payment")
+      .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_buyer, anchor_appointment_id, payment")
       .single();
     if (data) setSales((prev) => [...prev, data as Sale]);
   }
@@ -297,7 +298,7 @@ export default function SalesBoard() {
     if (!s) return;
     await supabase
       .from("sales")
-      .update({ staff_id: s.staff_id, patient_name: s.patient_name, selfpay: s.selfpay, insurance: s.insurance, burden: s.burden, cost: s.cost ?? 0, retail: s.retail ?? false })
+      .update({ staff_id: s.staff_id, patient_name: s.patient_name, retail_buyer: s.retail_buyer ?? null, selfpay: s.selfpay, insurance: s.insurance, burden: s.burden, cost: s.cost ?? 0, retail: s.retail ?? false })
       .eq("id", id);
   }
   async function deleteManual(id: string) {
@@ -907,10 +908,15 @@ export default function SalesBoard() {
                     className="w-16 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]" />万
                 </span>
               </div>
-              <div className="mb-2 flex items-baseline gap-2">
+              <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="text-lg font-bold tabnum text-slate-800">総売上 {yen(clinicTotal)}</span>
                 {clinicTarget > 0 && (
                   <span className={`text-sm font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>{pct}%</span>
+                )}
+                {view === "day" && (
+                  <span className="rounded-md bg-blue-50 px-2 py-0.5 text-sm font-bold text-blue-700">
+                    {new Date(date + "T00:00:00").getMonth() + 1}/{new Date(date + "T00:00:00").getDate()} 合計 {yen(daySum.gou)}
+                  </span>
                 )}
               </div>
               {clinicTarget > 0 && (
@@ -1227,8 +1233,12 @@ export default function SalesBoard() {
                             </select>
                           </td>
                           <td className="px-2 py-0.5">
-                            <input value={m.patient_name ?? ""} placeholder="品目/名前" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
-                              className="w-24 rounded border border-slate-300 px-1 py-1 text-sm" />
+                            <div className="flex flex-col gap-0.5">
+                              <input value={m.patient_name ?? ""} placeholder="商品名" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
+                                className="w-28 rounded border border-slate-300 px-1 py-1 text-sm" />
+                              <input value={m.retail_buyer ?? ""} placeholder="購入者" onChange={(e) => setManualLocal(m.id, { retail_buyer: e.target.value })} onBlur={() => persistManual(m.id)}
+                                className="w-28 rounded border border-slate-200 px-1 py-0.5 text-[11px] text-slate-600" />
+                            </div>
                           </td>
                           <td className="px-1 py-1 text-right">
                             <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />

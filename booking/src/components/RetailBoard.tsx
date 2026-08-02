@@ -25,6 +25,7 @@ interface RSale {
   cost: number; // 仕入合計（単価×数量）
   staff_id: string | null;
   retail_kind: "sale" | "purchase"; // sale=売上 / purchase=仕入
+  retail_buyer: string | null; // 購入者名
 }
 
 const yen = (n: number) => "¥" + n.toLocaleString();
@@ -61,7 +62,7 @@ export default function RetailBoard() {
     setLoading(true);
     const { data } = await supabase
       .from("sales")
-      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id, retail_kind")
+      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id, retail_kind, retail_buyer")
       .or("product_id.not.is.null,retail.is.true")
       .gte("date", monthStart)
       .lt("date", monthEnd)
@@ -96,7 +97,7 @@ export default function RetailBoard() {
     const { data, error } = await supabase
       .from("sales")
       .insert({ date, product_id: null, qty: 1, selfpay: 0, cost: 0, staff_id: null, patient_name: "", insurance: 0, burden: 0, payment: "cash", retail: true, retail_kind: kind })
-      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id, retail_kind")
+      .select("id, date, patient_name, product_id, qty, selfpay, cost, staff_id, retail_kind, retail_buyer")
       .single();
     if (error) { alert("追加できませんでした：\n" + error.message + "\n（migration_sales_retail_kind.sql を実行済みかご確認ください）"); return; }
     if (data) setSales((s) => [...s, data as RSale]);
@@ -107,7 +108,7 @@ export default function RetailBoard() {
   async function persistSale(id: string) {
     const s = sales.find((x) => x.id === id);
     if (!s) return;
-    await supabase.from("sales").update({ date: s.date, patient_name: s.patient_name, product_id: s.product_id, qty: s.qty, selfpay: s.selfpay, cost: s.cost, staff_id: s.staff_id, retail_kind: s.retail_kind }).eq("id", id);
+    await supabase.from("sales").update({ date: s.date, patient_name: s.patient_name, retail_buyer: s.retail_buyer, product_id: s.product_id, qty: s.qty, selfpay: s.selfpay, cost: s.cost, staff_id: s.staff_id, retail_kind: s.retail_kind }).eq("id", id);
   }
   async function deleteSale(id: string) {
     setSales((s) => s.filter((x) => x.id !== id));
@@ -254,6 +255,7 @@ export default function RetailBoard() {
               <th className="px-1 py-2 text-left font-bold">日付</th>
               <th className="px-1 py-2 text-left font-bold">担当</th>
               <th className="px-2 py-2 text-left font-bold">商品名</th>
+              <th className="px-2 py-2 text-left font-bold">購入者</th>
               <th className="px-1 py-2 text-right font-bold">販売</th>
               <th className="px-1 py-2 text-right font-bold">仕入</th>
               <th className="px-1 py-2 text-center font-bold">数量</th>
@@ -263,9 +265,9 @@ export default function RetailBoard() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={8} className="px-2 py-8 text-center text-sm text-slate-400">読み込み中…</td></tr>
+              <tr><td colSpan={9} className="px-2 py-8 text-center text-sm text-slate-400">読み込み中…</td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={8} className="px-2 py-8 text-center text-sm text-slate-400">この月の物販はありません。「＋売上」「＋仕入」から入力してください。</td></tr>
+              <tr><td colSpan={9} className="px-2 py-8 text-center text-sm text-slate-400">この月の物販はありません。「＋売上」「＋仕入」から入力してください。</td></tr>
             ) : (
               sales.map((s) => {
                 const c = colorOf(s.staff_id);
@@ -288,6 +290,13 @@ export default function RetailBoard() {
                     </td>
                     <td className="px-2 py-1">
                       <input value={s.patient_name ?? ""} placeholder="商品名" list="retail-product-names" onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => persistSale(s.id)} className="w-36 rounded border border-slate-300 px-1 py-1 text-sm" />
+                    </td>
+                    <td className="px-2 py-1">
+                      {isPurchase ? (
+                        <span className="text-slate-300">—</span>
+                      ) : (
+                        <input value={s.retail_buyer ?? ""} placeholder="購入者" onChange={(e) => setSaleLocal(s.id, { retail_buyer: e.target.value })} onBlur={() => persistSale(s.id)} className="w-28 rounded border border-slate-300 px-1 py-1 text-sm" />
+                      )}
                     </td>
                     <td className="px-1 py-1 text-right">
                       {isPurchase ? (
