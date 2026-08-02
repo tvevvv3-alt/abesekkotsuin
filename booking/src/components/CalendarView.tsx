@@ -34,36 +34,48 @@ type Item =
   | { kind: "appt"; s: number; e: number; rank: number; appt: ApptWithSteps }
   | { kind: "note"; s: number; e: number; rank: number; note: CalendarNote };
 
-function layoutLanes(items: Item[]): (Item & { lane: number; cols: number; span: number })[] {
+type Laid = Item & { lane: number; left: number; width: number; full: boolean };
+function layoutLanes(items: Item[]): Laid[] {
   const sorted = [...items].sort((a, b) => a.s - b.s || a.e - b.e);
-  const out: (Item & { lane: number; cols: number; span: number })[] = [];
+  const out: Laid[] = [];
   let cluster: Item[] = [];
   let clusterEnd = -Infinity;
+  const overlap = (a: { s: number; e: number }, b: { s: number; e: number }) => a.s < b.e && b.s < a.e;
   const flush = () => {
     // 開始時刻順（同時刻は担当順）で左詰め＝時間の流れが左→右で読みやすい
     const cl = [...cluster].sort((a, b) => a.s - b.s || a.rank - b.rank);
     const laneEnd: number[] = [];
-    const placed = cl.map((it) => {
+    const placed: Laid[] = cl.map((it) => {
       let lane = laneEnd.findIndex((end) => end <= it.s);
       if (lane === -1) {
         lane = laneEnd.length;
         laneEnd.push(it.e);
       } else laneEnd[lane] = it.e;
-      return { ...it, lane, cols: 1, span: 1 };
+      return { ...it, lane, left: 0, width: 1, full: true };
     });
-    // Googleカレンダー方式：右に空いているレーンぶん幅を広げてスペースをフルに使う。
-    //  1人→全域／複数→列に分割。またぎ予約は自分の列幅のまま、隣が残りを埋めて細分化される。
-    const laneCount = laneEnd.length;
-    for (const p of placed) {
-      let span = 1;
-      for (let L = p.lane + 1; L < laneCount; L++) {
-        const conflict = placed.some((q) => q !== p && q.lane === L && q.s < p.e && p.s < q.e);
-        if (conflict) break;
-        span++;
+    // 幅＝「その予約に実際に重なっている最大人数」で分割（局所の人数で決める）。
+    //  例：11時が5人でも、12時に2人しか居なければその2件は1/2ずつ（1:1）。
+    //  位置は同時刻の下位レーンを左から詰める＝重なりが無い限り横ズレしない。
+    const byLane = [...placed].sort((a, b) => a.lane - b.lane);
+    for (const p of byLane) {
+      // p の時間帯で同時に重なる最大件数（p を含む）
+      const points = new Set<number>([p.s]);
+      placed.forEach((q) => { if (q.s >= p.s && q.s < p.e) points.add(q.s); });
+      let maxc = 1;
+      points.forEach((t) => {
+        const c = placed.filter((q) => q.s <= t && q.e > t).length;
+        if (c > maxc) maxc = c;
+      });
+      const w = 1 / maxc;
+      // 同時刻で自分より左（低レーン）の予約の右端まで詰める
+      let left = 0;
+      for (const q of byLane) {
+        if (q !== p && q.lane < p.lane && overlap(p, q)) left = Math.max(left, q.left + q.width);
       }
-      p.span = span;
+      p.width = Math.min(w, 1 - left);
+      p.left = left;
+      p.full = p.left <= 0.001 && p.left + p.width >= 0.999;
     }
-    placed.forEach((p) => (p.cols = laneCount));
     out.push(...placed);
     cluster = [];
   };
@@ -732,13 +744,13 @@ export default function CalendarView({
           const style = {
             top,
             height: yFor(it.e) - top,
-            left: `${(it.lane * 100) / it.cols}%`,
-            width: `${(it.span * 100) / it.cols}%`,
+            left: `${it.left * 100}%`,
+            width: `${it.width * 100}%`,
           };
           const HAIRLINE = "0.5px solid rgba(255,255,255,.95)"; // 細い白枠
           if (it.kind === "note") {
             const h = yFor(it.e) - top;
-            const ml = it.span === it.cols && h >= 40;
+            const ml = it.full && h >= 40;
             return (
               <button
                 key={it.note.id}
@@ -814,7 +826,7 @@ export default function CalendarView({
               {segs.map((sg, i) => {
                 const segTop = yFor(sg.s) - top;
                 const segH = yFor(sg.e) - yFor(sg.s);
-                const ml = it.span === it.cols && segH >= 44;
+                const ml = it.full && segH >= 44;
                 const isDenden = hasBoth && sg.tone === "light";
                 const dendenTf = drg && drg.kind === "denden" && isDenden ? { transform: `translateY(${drg.dyPx}px)`, zIndex: 30, boxShadow: "0 8px 18px rgba(0,0,0,.28)" } : {};
                 // 各30分枠を白枠で囲い、通電・施術それぞれに名前を入れる
