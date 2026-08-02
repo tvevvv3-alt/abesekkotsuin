@@ -181,6 +181,7 @@ export default function AdminBoard({ date }: { date: string }) {
   const cardActiveRef = useRef(false);
   const cardDraggedRef = useRef(false);
   const cardLatestRef = useRef<{ targetStart: number; targetStaffId: string | null } | null>(null);
+  const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
 
   // ボード枠の高さを「自分の上端〜画面下端」ぴったりに合わせ、ページ側のスクロールを無くす
   // （カレンダーと同じ“枠内だけスクロール”に統一。二度スクロール問題の解消）
@@ -506,7 +507,15 @@ export default function AdminBoard({ date }: { date: string }) {
     if (!active || !p || !latest) return;
     const changed = latest.targetStart !== p.origStart || (p.allowStaff && latest.targetStaffId !== p.origStaff);
     cardDraggedRef.current = changed;
-    if (changed) void commitCardMove(p.appt, latest.targetStart, latest.targetStaffId);
+    if (!changed) return;
+    const nm = p.appt.patient_name || "（未登録）";
+    const from = staff.find((s) => s.id === p.origStaff)?.name ?? "-";
+    const to = staff.find((s) => s.id === latest.targetStaffId)?.name ?? "-";
+    const parts: string[] = [];
+    if (latest.targetStart !== p.origStart) parts.push(`${minToLabel(p.origStart)} → ${minToLabel(latest.targetStart)}`);
+    if (p.allowStaff && latest.targetStaffId !== p.origStaff) parts.push(`担当：${from} → ${to}`);
+    const ts = latest.targetStart, tstaff = latest.targetStaffId, appt = p.appt;
+    setConfirmMove({ title: "予約を変更", detail: `${nm}\n${parts.join("\n")}`, run: () => void commitCardMove(appt, ts, tstaff) });
   }
   async function commitCardMove(appt: ApptWithSteps, newStart: number, newStaff: string | null) {
     await supabase.rpc("reschedule_appointment", {
@@ -1062,6 +1071,20 @@ export default function AdminBoard({ date }: { date: string }) {
             reload();
           }}
         />
+      )}
+
+      {confirmMove && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmMove(null)} />
+          <div className="relative w-full max-w-xs rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-2 text-sm font-bold text-slate-800">{confirmMove.title}</div>
+            <div className="mb-4 whitespace-pre-line text-sm text-slate-600">{confirmMove.detail}</div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmMove(null)} className="flex-1 rounded-lg border px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">元に戻す</button>
+              <button onClick={() => { confirmMove.run(); setConfirmMove(null); }} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white active:bg-blue-700">変更を確定</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

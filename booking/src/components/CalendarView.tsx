@@ -187,6 +187,7 @@ export default function CalendarView({
     onStaff: string | null; // 凡例チップにドロップ中の担当
   };
   const [dragging, setDragging] = useState<DragState | null>(null);
+  const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
   const latestDragRef = useRef<DragState | null>(null);
   const pressRef = useRef<null | {
     id: string; kind: DragKind; startX: number; startY: number;
@@ -487,12 +488,24 @@ export default function CalendarView({
     setDragging(null);
     latestDragRef.current = null;
     if (!wasActive || !p) return;
+    const nm = p.appt.patient_name || "（未登録）";
+    const fmtDT = (d: string, m: number) => `${d.slice(5).replace("-", "/")} ${minToLabel(m)}`;
     let changed = false;
     if (p.kind === "move" && dd) {
-      if (dd.onStaff && dd.onStaff !== p.origStaff) { commitStaff(p.appt, dd.onStaff); changed = true; }
-      else if (dd.targetStart !== p.origStart || dd.targetDate !== p.origDate) { commitMove(p.appt, dd.targetStart, dd.targetDate); changed = true; }
+      if (dd.onStaff && dd.onStaff !== p.origStaff) {
+        const to = dd.onStaff;
+        setConfirmMove({ title: "担当を変更", detail: `${nm}\n担当：${staffName(p.origStaff) || "-"} → ${staffName(to) || "-"}`, run: () => commitStaff(p.appt, to) });
+        changed = true;
+      } else if (dd.targetStart !== p.origStart || dd.targetDate !== p.origDate) {
+        const ts = dd.targetStart, td = dd.targetDate;
+        setConfirmMove({ title: "予約を移動", detail: `${nm}\n${fmtDT(p.origDate, p.origStart)} → ${fmtDT(td, ts)}`, run: () => commitMove(p.appt, ts, td) });
+        changed = true;
+      }
     } else if (p.kind === "denden" && dd) {
-      if (Math.abs(dd.dyPx / pxRef.current) >= 20) { commitSwap(p.appt); changed = true; }
+      if (Math.abs(dd.dyPx / pxRef.current) >= 20) {
+        setConfirmMove({ title: "通電の順番を入れ替え", detail: nm, run: () => commitSwap(p.appt) });
+        changed = true;
+      }
     }
     draggedRef.current = changed;
   }
@@ -1089,6 +1102,20 @@ export default function CalendarView({
             reload();
           }}
         />
+      )}
+
+      {confirmMove && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmMove(null)} />
+          <div className="relative w-full max-w-xs rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-2 text-sm font-bold text-slate-800">{confirmMove.title}</div>
+            <div className="mb-4 whitespace-pre-line text-sm text-slate-600">{confirmMove.detail}</div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmMove(null)} className="flex-1 rounded-lg border px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">元に戻す</button>
+              <button onClick={() => { confirmMove.run(); setConfirmMove(null); }} className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white active:bg-blue-700">変更を確定</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
