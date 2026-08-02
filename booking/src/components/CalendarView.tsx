@@ -52,7 +52,16 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number; span:
       return { ...it, lane, cols: 1, span: 1 };
     });
     const laneCount = laneEnd.length;
-    // 同時間帯のブロックは均等幅で分割（重なり数ぶんに等分）
+    // 右側に空いているレーンがあれば、そのぶん幅を広げて常にスペースをフルに使う
+    for (const p of placed) {
+      let span = 1;
+      for (let L = p.lane + 1; L < laneCount; L++) {
+        const conflict = placed.some((q) => q !== p && q.lane === L && q.s < p.e && p.s < q.e);
+        if (conflict) break;
+        span++;
+      }
+      p.span = span;
+    }
     placed.forEach((p) => (p.cols = laneCount));
     out.push(...placed);
     cluster = [];
