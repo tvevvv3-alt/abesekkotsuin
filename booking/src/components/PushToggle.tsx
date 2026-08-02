@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  // 環境変数に混入しがちな空白・改行や base64url 以外の文字を除去
+  const clean = base64.trim().replace(/[^A-Za-z0-9\-_]/g, "");
+  const padding = "=".repeat((4 - (clean.length % 4)) % 4);
+  const b64 = (clean + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(b64);
   const arr = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
