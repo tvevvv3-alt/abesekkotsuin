@@ -169,6 +169,19 @@ export default function AdminBoard({ date }: { date: string }) {
     { ctx: ColCtx; x: number; y: number; startMin: number; mouse: boolean } | null
   >(null);
 
+  // 予約カードのドラッグ移動（上下＝時刻／左右＝担当列）
+  const [cardDrag, setCardDrag] = useState<null | {
+    id: string; dx: number; dy: number; targetStart: number; targetStaffId: string | null; staffName: string;
+  }>(null);
+  const cardPressRef = useRef<null | {
+    id: string; appt: ApptWithSteps; startX: number; startY: number;
+    origStart: number; origEnd: number; origStaff: string | null;
+    timer: number | null; source: "mouse" | "touch"; allowStaff: boolean;
+  }>(null);
+  const cardActiveRef = useRef(false);
+  const cardDraggedRef = useRef(false);
+  const cardLatestRef = useRef<{ targetStart: number; targetStaffId: string | null } | null>(null);
+
   // ボード枠の高さを「自分の上端〜画面下端」ぴったりに合わせ、ページ側のスクロールを無くす
   // （カレンダーと同じ“枠内だけスクロール”に統一。二度スクロール問題の解消）
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -435,6 +448,94 @@ export default function AdminBoard({ date }: { date: string }) {
   const snap = (m: number) => Math.round(m / GRID_STEP) * GRID_STEP;
   const yToMin = (clientY: number) => minForY(clientY - trackTopRef.current);
 
+  // ---- 予約カードのドラッグ移動 ----
+  function cardCancel() {
+    const p = cardPressRef.current;
+    if (p?.timer) window.clearTimeout(p.timer);
+    cardPressRef.current = null;
+  }
+  function cardActivate() {
+    const p = cardPressRef.current;
+    if (!p || cardActiveRef.current) return;
+    cardActiveRef.current = true;
+    setDrag(null);
+    try { if (navigator.vibrate) navigator.vibrate(8); } catch {}
+    const name = staff.find((s) => s.id === p.origStaff)?.name ?? "";
+    cardLatestRef.current = { targetStart: p.origStart, targetStaffId: p.origStaff };
+    setCardDrag({ id: p.id, dx: 0, dy: 0, targetStart: p.origStart, targetStaffId: p.origStaff, staffName: name });
+  }
+  function cardBegin(appt: ApptWithSteps, allowStaff: boolean, x: number, y: number, source: "mouse" | "touch") {
+    cardCancel();
+    cardDraggedRef.current = false;
+    cardPressRef.current = {
+      id: appt.id, appt, startX: x, startY: y,
+      origStart: appt.start_min, origEnd: appt.end_min, origStaff: appt.staff_id,
+      timer: window.setTimeout(cardActivate, 240), source, allowStaff,
+    };
+  }
+  function cardMove(x: number, y: number) {
+    const p = cardPressRef.current;
+    if (!p) return;
+    if (!cardActiveRef.current) {
+      const moved = Math.hypot(x - p.startX, y - p.startY);
+      if (p.source === "mouse") { if (moved <= 4) return; cardActivate(); }
+      else { if (moved > 10) cardCancel(); return; }
+    }
+    const dx = x - p.startX;
+    const dy = y - p.startY;
+    const dur = p.origEnd - p.origStart;
+    const targetStart = Math.max(minMin, Math.min(maxMin - dur, snap(minForY(yFor(p.origStart) + dy))));
+    let targetStaffId = p.origStaff;
+    if (p.allowStaff) {
+      const under = document.elementFromPoint(x, y) as HTMLElement | null;
+      const col = under?.closest?.("[data-col-staff]") as HTMLElement | null;
+      if (col) targetStaffId = col.getAttribute("data-col-staff");
+    }
+    const name = staff.find((s) => s.id === targetStaffId)?.name ?? "";
+    cardLatestRef.current = { targetStart, targetStaffId };
+    setCardDrag({ id: p.id, dx, dy, targetStart, targetStaffId, staffName: name });
+  }
+  function cardEnd() {
+    const p = cardPressRef.current;
+    const active = cardActiveRef.current;
+    const latest = cardLatestRef.current;
+    cardCancel();
+    cardActiveRef.current = false;
+    setCardDrag(null);
+    cardLatestRef.current = null;
+    if (!active || !p || !latest) return;
+    const changed = latest.targetStart !== p.origStart || (p.allowStaff && latest.targetStaffId !== p.origStaff);
+    cardDraggedRef.current = changed;
+    if (changed) void commitCardMove(p.appt, latest.targetStart, latest.targetStaffId);
+  }
+  async function commitCardMove(appt: ApptWithSteps, newStart: number, newStaff: string | null) {
+    await supabase.rpc("reschedule_appointment", {
+      p_appointment_id: appt.id,
+      p_service_id: appt.service_id,
+      p_staff_id: newStaff,
+      p_date: date,
+      p_start_min: newStart,
+      p_note: null,
+    });
+    reload();
+  }
+  // カードに付けるドラッグ用ハンドラ（マウス＝即／タッチ＝長押し）
+  const cardHandlers = (appt: ApptWithSteps, allowStaff: boolean) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      e.stopPropagation();
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+      cardBegin(appt, allowStaff, e.clientX, e.clientY, e.pointerType === "mouse" ? "mouse" : "touch");
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (!cardPressRef.current) return;
+      if (cardActiveRef.current) e.preventDefault();
+      cardMove(e.clientX, e.clientY);
+    },
+    onPointerUp: () => cardEnd(),
+    onPointerCancel: () => cardEnd(),
+  });
+
   // タッチ＝スクロール優先／マウス＝ドラッグ選択。タップ(=ほぼ動かない)で30分枠のメニュー表示。
   function beginDrag(ctx: ColCtx, e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -617,6 +718,7 @@ export default function AdminBoard({ date }: { date: string }) {
                   key={st.id}
                   header={st.name}
                   headerColor={st.color || "#334155"}
+                  colStaffId={st.id}
                   height={height}
                   yFor={yFor}
                   ticks={ticks}
@@ -640,10 +742,15 @@ export default function AdminBoard({ date }: { date: string }) {
                     const segs = kawanishi
                       ? [{ s: topSnap, e: botSnap, tone: "dark" as const }]
                       : apptSegments(appt, topSnap, botSnap);
+                    const cd = cardDrag && cardDrag.id === appt.id ? cardDrag : null;
                     return (
                       <button
                         key={`${appt.id}-${lane}`}
-                        onClick={() => setModal({ mode: "edit", appt })}
+                        {...cardHandlers(appt, true)}
+                        onClick={() => {
+                          if (cardDraggedRef.current) { cardDraggedRef.current = false; return; }
+                          setModal({ mode: "edit", appt });
+                        }}
                         className="absolute z-20"
                         style={{
                           top: cardTop,
@@ -652,9 +759,15 @@ export default function AdminBoard({ date }: { date: string }) {
                           width: `calc(${w}% - 4px)`,
                           background: "transparent",
                           opacity: appt.status === "done" ? 0.5 : undefined,
+                          ...(cd ? { transform: `translate(${cd.dx}px, ${cd.dy}px)`, zIndex: 50, opacity: 0.9, filter: "drop-shadow(0 10px 20px rgba(0,0,0,.3))" } : {}),
                         }}
                         title={`${minToLabel(appt.start_min)} ${appt.patient_name ?? ""}`}
                       >
+                        {cd && (
+                          <span className="absolute -top-5 left-0 z-40 whitespace-nowrap rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                            {cd.staffName || "担当なし"} {minToLabel(cd.targetStart)}
+                          </span>
+                        )}
                         {appt.status === "done" && (
                           <span className="absolute right-0.5 top-0.5 z-30 rounded bg-white/90 px-1 text-[9px] font-bold text-slate-600">
                             済
@@ -971,11 +1084,13 @@ function Column({
   onPointerMoveTrack,
   onPointerUpTrack,
   onPointerCancelTrack,
+  colStaffId,
   children,
 }: {
   header: string;
   subHeader?: string;
   headerColor: string;
+  colStaffId?: string;
   height: number;
   yFor: (m: number) => number;
   ticks: number[];
@@ -1001,7 +1116,7 @@ function Column({
         <span>{header}</span>
         {subHeader && <span className="text-[9px] font-normal opacity-80">{subHeader}</span>}
       </div>
-      <div className="relative select-none" style={{ height }}>
+      <div className="relative select-none" style={{ height }} data-col-staff={colStaffId}>
         {/* 目盛り線 */}
         {ticks.map((t) => (
           <div
