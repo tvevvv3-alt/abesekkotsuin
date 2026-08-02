@@ -37,6 +37,7 @@ function OperatorAvatar({
 type NavItem = { href?: string; label: string; icon?: string; soon?: boolean; ext?: "form"; children?: NavItem[] };
 const DEFAULT_NAV: NavItem[] = [
   { href: "/admin", label: "予約一覧", icon: "🗓️" },
+  { href: "/admin/history", label: "予約履歴", icon: "🕘" },
   { href: "/admin/class", label: "体幹教室", icon: "🤸" },
   {
     href: "/admin/patients", label: "患者管理", icon: "👥", children: [
