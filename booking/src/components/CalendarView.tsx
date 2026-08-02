@@ -51,9 +51,18 @@ function layoutLanes(items: Item[]): (Item & { lane: number; cols: number; span:
       } else laneEnd[lane] = it.e;
       return { ...it, lane, cols: 1, span: 1 };
     });
-    // すべて等分：重なりグループ内は全員おなじ幅（またぎ予約も含めて分割）。
-    // どの予約も横幅を独り占めしない＝1人のとこは全域・2人は半分・3人は1/3…に近づく。
+    // Googleカレンダー方式：右に空いているレーンぶん幅を広げてスペースをフルに使う。
+    //  1人→全域／複数→列に分割。またぎ予約は自分の列幅のまま、隣が残りを埋めて細分化される。
     const laneCount = laneEnd.length;
+    for (const p of placed) {
+      let span = 1;
+      for (let L = p.lane + 1; L < laneCount; L++) {
+        const conflict = placed.some((q) => q !== p && q.lane === L && q.s < p.e && p.s < q.e);
+        if (conflict) break;
+        span++;
+      }
+      p.span = span;
+    }
     placed.forEach((p) => (p.cols = laneCount));
     out.push(...placed);
     cluster = [];
