@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   loadAllStaff,
@@ -57,6 +57,19 @@ interface LiffApi {
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
+
+// 冪等キー（UUID）。crypto.randomUUID が無い環境向けにフォールバックも用意。
+function newIdemKey(): string {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {
+    /* noop */
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 
 // 院（拠点）。川西整体院メニューだけ川西、それ以外は茨木本院。
 type ClinicId = "" | "ibaraki" | "kawanishi";
@@ -191,6 +204,12 @@ export default function BookingWizard() {
 
   // 確定
   const [submitting, setSubmitting] = useState(false);
+  // 二重送信のハード防止：state更新は非同期なので、同期的に弾くフラグも持つ
+  const submitLock = useRef(false);
+  // 冪等キー：この予約フォーム1回分につき1つのUUID。連打・戻る→再送信でも
+  // 同じキーで送るのでサーバー側で重複予約が作られない。新しい予約を始める
+  // （最初に戻る）ときだけ振り直す。
+  const [idemKey, setIdemKey] = useState<string>(() => newIdemKey());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastAppointmentId, setLastAppointmentId] = useState<string | null>(null);
   const [lineEnabled, setLineEnabled] = useState(false);
@@ -560,6 +579,9 @@ export default function BookingWizard() {
   async function submit() {
     if (!service || !selected) return;
     if (!isClass && !selectedStaff) return;
+    // 二重送信ガード：連打・Enter連打でも1回しか実行しない（stateより先に同期で弾く）
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -575,12 +597,18 @@ export default function BookingWizard() {
         p_phone: phone.trim() || null,
         p_note: null,
         p_source: "patient",
+        // 冪等キー（同じキーの再送信は既存予約を返す＝重複しない）
+        p_idempotency_key: idemKey,
       });
       if (error) throw new Error(error.message);
-      const res = data as { ok: boolean; reason?: string; appointment_id?: string };
+      const res = data as { ok: boolean; reason?: string; appointment_id?: string; duplicate?: boolean };
       if (!res.ok) {
-        // 直前に他の人が予約したケース等
-        setSubmitError(res.reason || "予約できませんでした。別の時間をお選びください。");
+        // 枠が埋まった（同時に他の人が取った）／その他の予約不可
+        setSubmitError(
+          res.reason === "slot_taken"
+            ? "申し訳ありません、その枠は先ほど埋まりました。別のお時間をお選びください。"
+            : res.reason || "予約できませんでした。別の時間をお選びください。"
+        );
         await reloadWeek();
         setStep(2);
         setSelected(null);
@@ -665,6 +693,9 @@ export default function BookingWizard() {
       setSubmitError(e instanceof Error ? e.message : "エラーが発生しました");
     } finally {
       setSubmitting(false);
+      // 同期ロックは解除。以降の再送信は冪等キーで重複が防がれる
+      // （同じキー＝既存予約を返すだけ。新規は作られない）。
+      submitLock.current = false;
     }
   }
 
@@ -678,6 +709,8 @@ export default function BookingWizard() {
     setLinkedViaLiff(false);
     setLineSent(null);
     setLineErr(null);
+    // 新しい予約を始めるので冪等キーを振り直す（別予約として登録できるように）
+    setIdemKey(newIdemKey());
   }
 
   // 保存済みの家族情報をフォームへ反映
@@ -1319,11 +1352,18 @@ export default function BookingWizard() {
           )}
 
           <button
+            type="button"
             disabled={submitting}
             onClick={submit}
-            className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-400"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-400"
           >
-            {submitting ? "確定処理中…（画面が変わるまでお待ちください）" : "予約を確定する"}
+            {submitting && (
+              <svg className="h-5 w-5 animate-spin text-white" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+            )}
+            {submitting ? "送信中…（画面が変わるまでお待ちください）" : "予約を確定する"}
           </button>
           {submitting ? (
             <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-center text-[12px] font-bold text-amber-700">
@@ -1333,7 +1373,7 @@ export default function BookingWizard() {
             <p className="mt-2 text-center text-[11px] text-slate-500">
               {liffIdToken
                 ? "予約確認・リマインドをLINEにお届けします"
-                : "確定後、数秒でLINEに移動します（予約確認・問診票・リマインドをLINEでお届け）。ボタンは1回だけ押してください。"}
+                : "確定後、数秒でLINEに移動します（予約確認・問診票・リマインドをLINEでお届け）。"}
             </p>
           )}
         </Section>

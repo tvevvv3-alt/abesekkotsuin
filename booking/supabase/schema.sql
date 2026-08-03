@@ -506,19 +506,29 @@ create or replace function public.book_appointment(
   p_birth_date date default null,
   p_phone      text default null,
   p_note       text default null,
-  p_source     text default 'patient'
+  p_source     text default 'patient',
+  p_idempotency_key uuid default null
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   v_check    jsonb;
   v_patient  uuid;
   v_appt     uuid;
+  v_existing uuid;
   v_end      int;
   v_cursor   int;
   v_num      text;
   v_svc_name text;
   step       record;
 begin
+  -- 冪等性①：同じキーの予約が既にあれば、新規作成せず既存を返す（成功扱い）。
+  if p_idempotency_key is not null then
+    select id into v_existing from appointments where idempotency_key = p_idempotency_key limit 1;
+    if v_existing is not null then
+      return jsonb_build_object('ok', true, 'appointment_id', v_existing, 'duplicate', true);
+    end if;
+  end if;
+
   -- 同日での同時確定を直列化（二重予約防止の要）
   perform pg_advisory_xact_lock(hashtextextended(p_date::text, 0));
 
@@ -551,14 +561,26 @@ begin
 
   select name into v_svc_name from services where id = p_service_id;
 
-  -- 予約本体
-  insert into appointments
-    (patient_id, service_id, staff_id, date, start_min, end_min, status, source, note,
-     patient_name, service_name)
-  values
-    (v_patient, p_service_id, p_staff_id, p_date, p_start_min, v_end, 'booked', p_source, p_note,
-     p_name, v_svc_name)
-  returning id into v_appt;
+  -- 予約本体（ユニーク制約に当たった場合はキー競合／枠競合として扱う）
+  begin
+    insert into appointments
+      (patient_id, service_id, staff_id, date, start_min, end_min, status, source, note,
+       patient_name, service_name, idempotency_key)
+    values
+      (v_patient, p_service_id, p_staff_id, p_date, p_start_min, v_end, 'booked', p_source, p_note,
+       p_name, v_svc_name, p_idempotency_key)
+    returning id into v_appt;
+  exception when unique_violation then
+    -- 冪等キーの競合：ほぼ同時の再送信 → 既存予約を成功として返す
+    if p_idempotency_key is not null then
+      select id into v_existing from appointments where idempotency_key = p_idempotency_key limit 1;
+      if v_existing is not null then
+        return jsonb_build_object('ok', true, 'appointment_id', v_existing, 'duplicate', true);
+      end if;
+    end if;
+    -- それ以外＝同じ枠を他の人が先に取った
+    return jsonb_build_object('ok', false, 'reason', 'slot_taken');
+  end;
 
   -- 工程の実体を展開して保存
   v_cursor := p_start_min;
