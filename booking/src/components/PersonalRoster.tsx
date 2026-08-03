@@ -103,7 +103,7 @@ export default function PersonalRoster() {
   );
 
   const maxCols = useMemo(() => {
-    let n = 6;
+    let n = 10; // 10回分の予約枠は常に表示
     rows.forEach((r) => {
       n = Math.max(n, (visitsByName.get(r.name.trim()) ?? []).length);
     });
@@ -177,9 +177,8 @@ export default function PersonalRoster() {
             <thead>
               <tr className="bg-slate-50 text-slate-500">
                 <th className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-b border-r bg-slate-50 px-2 py-1 text-left font-bold">名前</th>
-                <th className="whitespace-nowrap border-b border-l px-2 py-1 text-center font-bold">担当</th>
+                <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">担当</th>
                 <th className="whitespace-nowrap border-b border-l px-2 py-1 text-center font-bold">有効期限</th>
-                <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">回数</th>
                 <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">既使用</th>
                 <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">残</th>
                 {Array.from({ length: maxCols }).map((_, i) => (
@@ -203,7 +202,7 @@ export default function PersonalRoster() {
                       <select
                         value={r.staff_id ?? ""}
                         onChange={(e) => { setLocal(r.id, { staff_id: e.target.value || null }); setTimeout(() => persist(r.id), 0); }}
-                        className="w-[84px] rounded border px-1 py-0.5 text-[11px] font-bold"
+                        className="w-[52px] rounded border px-0.5 py-0.5 text-[11px] font-bold"
                         style={{ backgroundColor: st?.color || "#94a3b8", borderColor: st?.color || "#94a3b8", color: "#fff" }}
                       >
                         <option value="" style={{ color: "#111" }}>—</option>
@@ -214,9 +213,6 @@ export default function PersonalRoster() {
                     </td>
                     <td className="border-l px-1 py-1 align-middle">
                       <input value={r.expiry ?? ""} placeholder="例：8月末" onChange={(e) => setLocal(r.id, { expiry: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} w-[72px] text-center`} />
-                    </td>
-                    <td className="border-l px-1 py-1 text-center align-middle">
-                      <input type="number" min={0} value={r.quota || ""} onChange={(e) => setLocal(r.id, { quota: parseInt(e.target.value || "0", 10) })} onBlur={() => persist(r.id)} className={`${amt} w-[40px] text-center tabnum`} />
                     </td>
                     <td className="border-l px-1 py-1 text-center align-middle">
                       <input type="number" min={0} value={r.used_offset || ""} placeholder="0" onChange={(e) => setLocal(r.id, { used_offset: parseInt(e.target.value || "0", 10) })} onBlur={() => persist(r.id)} className={`${amt} w-[40px] text-center tabnum`} />
@@ -253,8 +249,8 @@ export default function PersonalRoster() {
 
       <p className="mt-3 text-[11px] text-slate-400">
         「パーソナル回数券対象」メニューの予約が、患者名の一致で自動反映されます（<b>30分=1回・60分=2回</b>）。
-        <b>残</b>＝回数 − 既使用 − 予約からの消費。移行前にすでに使った回数は「既使用」に入れてください。
-        担当・有効期限・回数はこの表で、来院日時は予約（カレンダー）で管理します。
+        <b>残</b>＝10回 − 既使用 − 予約からの消費。移行前にすでに使った回数は「既使用」に入れてください。
+        担当・有効期限はこの表で、来院日時は予約（カレンダー）で管理します。
       </p>
     </div>
   );
