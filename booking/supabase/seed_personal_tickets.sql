@@ -1,7 +1,7 @@
 -- パーソナル回数券：会員の初期登録（スプレッドシート「6パーソナル回数券」より）。
--- 1〜15行のうち 4・12・14 を除いた12名。担当は青=阿部を既定で設定。
--- （紫=萩原の方は、あとでアプリの担当プルダウン、または下部のUPDATEで切替）
--- 何度実行しても安全（重複追加なし）。personal_tickets 未作成でも動きます。
+-- 1〜15行のうち 4・12・14 を除いた12名。
+-- 担当：木内智子・上田龍太郎＝阿部（青）、それ以外＝萩原（紫）。
+-- 何度実行しても安全（重複追加なし・担当も毎回正しく設定）。未作成でも動きます。
 
 create table if not exists public.personal_tickets (
   id          uuid primary key default gen_random_uuid(),
@@ -28,11 +28,9 @@ where kind = 'パーソナル'
     or (name = '新名圭汰' and expiry = '4月末')
   );
 
--- 12名を登録（担当＝阿部を既定。同じ氏名×有効期限が無い場合のみ追加）
-insert into public.personal_tickets (name, staff_id, expiry, kind, quota, sort_order)
-select v.name,
-       (select id from public.staff where name like '%阿部%' order by sort_order limit 1),
-       v.expiry, 'パーソナル', 6, v.ord
+-- 12名を登録（同じ氏名×有効期限が無い場合のみ追加）
+insert into public.personal_tickets (name, expiry, kind, quota, sort_order)
+select v.name, v.expiry, 'パーソナル', 6, v.ord
 from (values
   ('木内智子',   '8月末',  1),
   ('井手翔太',   '10月末', 2),
@@ -52,12 +50,14 @@ where not exists (
   where p.name = v.name and coalesce(p.expiry, '') = coalesce(v.expiry, '')
 );
 
--- 既にシード済みで担当が未設定の行にも 阿部 を設定
+-- 担当を設定：阿部（木内智子・上田龍太郎）
 update public.personal_tickets
 set staff_id = (select id from public.staff where name like '%阿部%' order by sort_order limit 1)
-where kind = 'パーソナル' and staff_id is null;
+where kind = 'パーソナル' and name in ('木内智子', '上田龍太郎');
 
--- ▼ 紫＝萩原の方がいれば、氏名を並べて実行（担当を萩原に変更）
--- update public.personal_tickets
--- set staff_id = (select id from public.staff where name like '%萩原%' order by sort_order limit 1)
--- where kind = 'パーソナル' and name in ('○○', '△△');
+-- 担当を設定：萩原（それ以外）
+update public.personal_tickets
+set staff_id = (select id from public.staff where name like '%萩原%' order by sort_order limit 1)
+where kind = 'パーソナル'
+  and name in ('井手翔太', '山本倫平', '新名圭汰', '神田歩斗', '前田透冴',
+               '辻内暁斗', '津田雄大', '池田壮司郎', '須川朔太郎', '大西貴則');
