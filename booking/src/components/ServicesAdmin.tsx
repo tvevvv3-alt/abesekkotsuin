@@ -58,6 +58,7 @@ export default function ServicesAdmin() {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [published, setPublished] = useState(true);
   const [newBooking, setNewBooking] = useState(true);
+  const [personal, setPersonal] = useState(false); // パーソナル回数券の対象
   const [shortDesc, setShortDesc] = useState("");
   const [badge, setBadge] = useState("");
   const [priceNote, setPriceNote] = useState("");
@@ -99,6 +100,7 @@ export default function ServicesAdmin() {
     setCategory(CATEGORIES[0]);
     setPublished(true);
     setNewBooking(true);
+    setPersonal(false);
     setShortDesc("");
     setBadge("");
     setPriceNote("");
@@ -119,6 +121,7 @@ export default function ServicesAdmin() {
     setCategory(s.category || CATEGORIES[0]);
     setPublished(s.published);
     setNewBooking(s.new_booking);
+    setPersonal((s as unknown as { personal?: boolean }).personal ?? false);
     setShortDesc(s.short_desc || "");
     setBadge(s.badge || "");
     setPriceNote(s.price_note || "");
@@ -205,6 +208,7 @@ export default function ServicesAdmin() {
         category,
         published,
         new_booking: newBooking,
+        personal,
         short_desc: shortDesc.trim() || null,
         badge: badge.trim() || null,
         price_note: priceNote.trim() || null,
@@ -449,6 +453,7 @@ export default function ServicesAdmin() {
               <div className="flex items-end gap-3 text-sm">
                 <label className="flex items-center gap-1.5"><input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />公開</label>
                 <label className="flex items-center gap-1.5"><input type="checkbox" checked={newBooking} onChange={(e) => setNewBooking(e.target.checked)} />新規受付</label>
+                <label className="flex items-center gap-1.5" title="このメニューの予約をパーソナル回数券に自動反映（30分=1回・60分=2回）"><input type="checkbox" checked={personal} onChange={(e) => setPersonal(e.target.checked)} />パーソナル回数券</label>
               </div>
             </div>
             <textarea

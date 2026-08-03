@@ -67,6 +67,7 @@ export interface Service {
   note: string | null;
   class_starts: string | null; // 開始時刻を固定する場合（"分"カンマ区切り）
   after_hours: boolean; // 時間外予約（勤務時間に関係なく固定の夜枠のみ受付）
+  personal: boolean; // パーソナル回数券の対象メニュー（予約が回数券に自動反映）
 }
 
 // メニューを構成する工程テンプレート
