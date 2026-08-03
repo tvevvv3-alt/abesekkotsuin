@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { loadServices } from "@/lib/data";
 import { minToLabel, toDateStr } from "@/lib/booking";
 import type { ServiceWithSteps } from "@/lib/types";
+import CoreEvalModal from "@/components/CoreEvalModal";
 
 interface Row {
   id: string;
@@ -39,6 +40,7 @@ export default function ClassRoster() {
   const [msg, setMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "month4" | "free">("all");
   const [sort, setSort] = useState<"name" | "date">("name");
+  const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
 
   const from = useMemo(() => toDateStr(month), [month]);
   const to = useMemo(
@@ -358,6 +360,14 @@ export default function ClassRoster() {
                               />
                             )}
                           </div>
+                          <button
+                            onClick={() =>
+                              setEvalTarget({ name, lineUserId: visits.find((v) => v.line_user_id)?.line_user_id ?? null })
+                            }
+                            className="mt-1 w-full rounded-md border border-indigo-300 bg-indigo-50 px-1 py-0.5 text-[10px] font-bold text-indigo-600 active:bg-indigo-100"
+                          >
+                            📋 体幹テスト
+                          </button>
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
                           const v = visits[i];
@@ -405,7 +415,12 @@ export default function ClassRoster() {
         名前は横スクロールしても固定、パス種別は氏名ごとに保存されます。
         今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
+        「体幹テスト」から評価を入力してLINE送信できます。
       </p>
+
+      {evalTarget && (
+        <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => setEvalTarget(null)} />
+      )}
     </div>
   );
 }

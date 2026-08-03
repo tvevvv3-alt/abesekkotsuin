@@ -12,11 +12,13 @@ export async function POST(req: NextRequest) {
   let evalId = "";
   let name = "";
   let pngBase64 = "";
+  let lineUserId = "";
   try {
-    const b = (await req.json()) as { evalId?: string; name?: string; pngBase64?: string };
+    const b = (await req.json()) as { evalId?: string; name?: string; pngBase64?: string; lineUserId?: string };
     evalId = b.evalId || "";
     name = (b.name || "").trim();
     pngBase64 = b.pngBase64 || "";
+    lineUserId = (b.lineUserId || "").trim();
   } catch {
     /* noop */
   }
@@ -25,15 +27,18 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   if (!admin) return NextResponse.json({ ok: false, reason: "server" }, { status: 500 });
 
-  // 氏名に紐づくLINEユーザーを、直近の予約から取得
-  const { data: appts } = await admin
-    .from("appointments")
-    .select("line_user_id, date")
-    .eq("patient_name", name)
-    .not("line_user_id", "is", null)
-    .order("date", { ascending: false })
-    .limit(1);
-  const userId = (appts as { line_user_id: string | null }[] | null)?.[0]?.line_user_id ?? null;
+  // 送信先LINEユーザー。明示指定（予約から起動）を最優先。無ければ氏名で直近予約から取得。
+  let userId: string | null = lineUserId || null;
+  if (!userId) {
+    const { data: appts } = await admin
+      .from("appointments")
+      .select("line_user_id, date")
+      .eq("patient_name", name)
+      .not("line_user_id", "is", null)
+      .order("date", { ascending: false })
+      .limit(1);
+    userId = (appts as { line_user_id: string | null }[] | null)?.[0]?.line_user_id ?? null;
+  }
   if (!userId) return NextResponse.json({ ok: false, reason: "noline" });
 
   if (!lineMessagingConfigured()) return NextResponse.json({ ok: false, reason: "notconfigured" });

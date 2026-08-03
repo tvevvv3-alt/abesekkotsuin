@@ -20,6 +20,7 @@ import type {
 } from "@/lib/types";
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
+import CoreEvalModal from "./CoreEvalModal";
 
 const GUTTER = 44; // 左の時間軸の幅(px)
 const SNAP = 30;
@@ -188,6 +189,7 @@ export default function CalendarView({
   };
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
+  const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
   const latestDragRef = useRef<DragState | null>(null);
   const pressRef = useRef<null | {
     id: string; kind: DragKind; startX: number; startY: number;
@@ -1088,7 +1090,15 @@ export default function CalendarView({
             setModal(null);
             reload();
           }}
+          onCoreTest={(nm, lu) => {
+            setModal(null);
+            setEvalTarget({ name: nm, lineUserId: lu });
+          }}
         />
+      )}
+
+      {evalTarget && (
+        <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => setEvalTarget(null)} />
       )}
 
       {noteModal && (

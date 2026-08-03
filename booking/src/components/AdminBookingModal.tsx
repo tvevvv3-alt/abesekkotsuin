@@ -25,6 +25,8 @@ interface Props {
   equipment: Equipment[];
   onClose: () => void;
   onDone: () => void;
+  // 体幹教室の予約から「体幹テスト」（評価入力→LINE送信）を開く
+  onCoreTest?: (name: string, lineUserId: string | null) => void;
 }
 
 export default function AdminBookingModal({
@@ -39,6 +41,7 @@ export default function AdminBookingModal({
   equipment,
   onClose,
   onDone,
+  onCoreTest,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -418,6 +421,20 @@ export default function AdminBookingModal({
               className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-600 active:bg-emerald-50 disabled:opacity-50"
             >
               問診票を送る
+            </button>
+          )}
+          {mode === "edit" && isClass && onCoreTest && appt && (
+            <button
+              onClick={() =>
+                onCoreTest(
+                  appt.patient_name || "",
+                  (appt as unknown as { line_user_id?: string | null }).line_user_id ?? null
+                )
+              }
+              disabled={busy}
+              className="rounded-lg border border-indigo-300 px-3 py-2 text-sm font-bold text-indigo-600 active:bg-indigo-50 disabled:opacity-50"
+            >
+              📋 体幹テスト
             </button>
           )}
           {mode === "edit" && isClass && (
