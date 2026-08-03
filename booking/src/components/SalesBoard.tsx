@@ -944,7 +944,7 @@ export default function SalesBoard() {
             </>
           );
         })()}
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2">
           {assignees.map((s) => {
             const tot = staffTotal(s.id);
             const target = targets[s.id] ?? 0;
@@ -955,11 +955,11 @@ export default function SalesBoard() {
                   <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
                   <span className="text-sm font-bold text-slate-800">{s.name}</span>
                   {s.real && (
-                    <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
+                    <span className="ml-auto flex items-center gap-0.5 text-[10px] text-slate-400">
                       目標
                       <input type="number" min={0} value={target ? target / 10000 : ""} placeholder="0"
                         onChange={(e) => saveTarget(s.id, parseFloat(e.target.value || "0"))}
-                        className="w-14 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]" />万
+                        className="w-9 rounded border border-slate-300 px-1 py-0.5 text-right text-[10px]" />万
                     </span>
                   )}
                 </div>
