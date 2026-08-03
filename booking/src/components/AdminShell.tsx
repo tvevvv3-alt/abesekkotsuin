@@ -18,7 +18,7 @@ const DEFAULT_NAV: NavItem[] = [
     href: "/admin/patients", label: "患者管理", icon: "👥", children: [
       { href: "/admin/new-patients", label: "新患名簿" },
       { label: "問診票", ext: "form" },
-      { label: "回数券", soon: true },
+      { href: "/admin/personal", label: "回数券（パーソナル）" },
       { label: "体幹評価", soon: true },
       { label: "カルテ（将来）", soon: true },
     ],
