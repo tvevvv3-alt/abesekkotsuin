@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// ログイン用の固定アカウント（メールは秘密ではないので固定。環境変数で上書き可）。
-// パスワードはコードに持たず、Supabase 認証で照合する。
-const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "abesekkotsuin.ibaraki@gmail.com").trim();
+const DEFAULT_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "abesekkotsuin.ibaraki@gmail.com").trim();
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const [email, setEmail] = useState(DEFAULT_EMAIL);
+  const [showEmail, setShowEmail] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,11 +21,12 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError(null);
     const { error } = await supabase.auth.signInWithPassword({
-      email: ADMIN_EMAIL,
+      email: email.trim(),
       password: password.trim(),
     });
     if (error) {
-      setError("パスワードが正しくありません");
+      setError("メールアドレスかパスワードが正しくありません");
+      setShowEmail(true); // 失敗時はメールを直せるように表示
       setLoading(false);
       return;
     }
@@ -43,6 +44,20 @@ export default function AdminLoginPage() {
           <h1 className="text-xl font-bold text-slate-800">阿部接骨院</h1>
           <p className="mt-1 text-sm text-slate-500">予約管理 ログイン</p>
         </div>
+
+        {showEmail && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">メールアドレス</label>
+            <input
+              type="email"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              required
+            />
+          </div>
+        )}
 
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">パスワード</label>
@@ -65,9 +80,16 @@ export default function AdminLoginPage() {
         >
           {loading ? "ログイン中…" : "ログイン"}
         </button>
-        <p className="text-center text-[11px] text-slate-400">
-          一度ログインすると、この端末では入ったままになります。
-        </p>
+
+        {!showEmail && (
+          <button
+            type="button"
+            onClick={() => setShowEmail(true)}
+            className="w-full text-center text-[11px] text-slate-400"
+          >
+            メールアドレスを変更
+          </button>
+        )}
       </form>
     </main>
   );
