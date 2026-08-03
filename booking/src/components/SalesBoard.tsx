@@ -574,6 +574,12 @@ export default function SalesBoard() {
       sales.reduce((sum, s) => (s.staff_id === staffId ? sum + total(s) : sum), 0),
     [sales]
   );
+  // その日の担当別売上（自費＋保険）
+  const dayStaffTotal = useCallback(
+    (staffId: string | null) =>
+      sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId ? sum + total(s) : sum), 0),
+    [sales, date]
+  );
   // 担当ごとの自費（保険外）月計
   const spByStaff = useCallback(
     (staffId: string | null) =>
@@ -661,9 +667,10 @@ export default function SalesBoard() {
     }
     return false;
   }
-  // 行のどこでもドラッグで並び替え（入力欄以外）
+  // 行のどこでもドラッグで並び替え（入力欄以外）。スマホ(タッチ)では誤操作防止で無効。
   function onRowPointerDown(e: React.PointerEvent, id: string) {
-    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (e.pointerType !== "mouse") return; // タッチは並び替えしない（スクロール・入力優先）
+    if (e.button !== 0) return;
     if (isInteractiveTarget(e.target)) return;
     onDragStart(e, id);
   }
@@ -924,6 +931,29 @@ export default function SalesBoard() {
                   <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, pct)}%` }} />
                 </div>
               )}
+              {view === "day" && (
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-400">本日の担当別</span>
+                  {assignees.map((s) => {
+                    const v = dayStaffTotal(s.id);
+                    return (
+                      <span key={s.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px]"
+                        style={v > 0 ? { borderColor: s.color, backgroundColor: s.color + "14" } : undefined}>
+                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                        <span className="font-bold text-slate-700">{s.name}</span>
+                        <span className="tabnum text-slate-600">{yen(v)}</span>
+                      </span>
+                    );
+                  })}
+                  {dayStaffTotal(null) > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[12px]">
+                      <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+                      <span className="font-bold text-slate-700">物販・その他</span>
+                      <span className="tabnum text-slate-600">{yen(dayStaffTotal(null))}</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </>
           );
         })()}
@@ -1154,9 +1184,9 @@ export default function SalesBoard() {
                   <th className="px-1 py-2 text-left font-bold">担当</th>
                   <th className="px-2 py-2 text-left font-bold">名前</th>
                   <th className="px-1 py-2 text-right font-bold">保険外</th>
-                  <th className="px-1 py-2 text-right font-bold">合計額</th>
-                  <th className="px-1 py-2 text-right font-bold">負担額</th>
-                  <th className="px-1 py-2 text-right font-bold">入金額</th>
+                  <th className="hidden px-1 py-2 text-right font-bold sm:table-cell">合計額</th>
+                  <th className="hidden px-1 py-2 text-right font-bold sm:table-cell">負担額</th>
+                  <th className="hidden px-1 py-2 text-right font-bold sm:table-cell">入金額</th>
                   <th className="px-2 py-2 text-right font-bold">合計</th>
                   <th className="px-1 py-2 text-center font-bold">支払</th>
                   <th className="px-1 py-2"></th>
@@ -1199,17 +1229,18 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-1 text-right">
                             <input type="number" min={0} placeholder={suggestSelf(a) ? String(suggestSelf(a)) : "0"} value={s.selfpay || ""}
+                              onFocus={() => { if (!s.selfpay && suggestSelf(a) > 0) { setApptField(a, "selfpay", suggestSelf(a)); } }}
                               onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="hidden px-1 py-1 text-right sm:table-cell">
                             <input type="number" min={0} placeholder="0" value={s.insurance || ""}
                               onChange={(e) => setApptField(a, "insurance", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="hidden px-1 py-1 text-right sm:table-cell">
                             <input type="number" min={0} placeholder="0" value={s.burden || ""}
                               onChange={(e) => setApptField(a, "burden", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
+                          <td className="hidden px-1 py-1 text-right tabnum text-slate-500 sm:table-cell">{paid(s).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
                           <td className="px-1 py-1 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
                           <td className="whitespace-nowrap px-1 py-1 text-center">
@@ -1243,13 +1274,13 @@ export default function SalesBoard() {
                           <td className="px-1 py-1 text-right">
                             <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="hidden px-1 py-1 text-right sm:table-cell">
                             <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="hidden px-1 py-1 text-right sm:table-cell">
                             <input type="number" min={0} placeholder="0" value={m.burden || ""} onChange={(e) => setManualLocal(m.id, { burden: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
+                          <td className="hidden px-1 py-1 text-right tabnum text-slate-500 sm:table-cell">{paid(m).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
                           <td className="px-1 py-1 text-center">{payBtn(m.payment, () => toggleManualPayment(m))}</td>
                           <td className="whitespace-nowrap px-1 py-1 text-center">
@@ -1268,9 +1299,9 @@ export default function SalesBoard() {
                 <tr className="border-t-2 bg-amber-50 font-bold tabnum">
                   <td className="px-2 py-2 text-left" colSpan={2}>計 {daySum.cnt}件</td>
                   <td className="px-1 py-2 text-right">{daySum.sp.toLocaleString()}</td>
-                  <td className="px-1 py-2 text-right">{daySum.ins.toLocaleString()}</td>
-                  <td className="px-1 py-2 text-right">{daySum.bur.toLocaleString()}</td>
-                  <td className="px-1 py-2 text-right">{daySum.paid.toLocaleString()}</td>
+                  <td className="hidden px-1 py-2 text-right sm:table-cell">{daySum.ins.toLocaleString()}</td>
+                  <td className="hidden px-1 py-2 text-right sm:table-cell">{daySum.bur.toLocaleString()}</td>
+                  <td className="hidden px-1 py-2 text-right sm:table-cell">{daySum.paid.toLocaleString()}</td>
                   <td className="px-2 py-2 text-right">{daySum.gou.toLocaleString()}</td>
                   <td></td>
                   <td></td>
