@@ -775,6 +775,7 @@ export default function AdminBoard({ date }: { date: string }) {
                           left: `calc(${lane * w}% + 2px)`,
                           width: `calc(${w}% - 4px)`,
                           background: "transparent",
+                          touchAction: "none",
                           opacity: appt.status === "done" ? 0.5 : undefined,
                           ...(cd ? { transform: `translate(${cd.dx}px, ${cd.dy}px)`, zIndex: 50, opacity: 0.9, filter: "drop-shadow(0 10px 20px rgba(0,0,0,.3))" } : {}),
                         }}
