@@ -25,7 +25,8 @@ export default function AdminLoginPage() {
       password: password.trim(),
     });
     if (error) {
-      setError("メールアドレスかパスワードが正しくありません");
+      // 原因特定のため、Supabaseからのメッセージをそのまま表示
+      setError(`${error.message}${error.status ? `（${error.status}）` : ""}`);
       setShowEmail(true); // 失敗時はメールを直せるように表示
       setLoading(false);
       return;
