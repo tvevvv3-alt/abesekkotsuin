@@ -65,7 +65,7 @@ export default function PersonalRoster() {
 
   // 表示する「◯回目」列数（各行の quota と入力済み数の最大。最低6）
   const maxCols = useMemo(() => {
-    let n = 6;
+    let n = 10;
     rows.forEach((r) => {
       const filled = r.visits.filter(Boolean).length;
       n = Math.max(n, r.quota, filled);
@@ -106,7 +106,7 @@ export default function PersonalRoster() {
   async function addRow() {
     const { data, error } = await supabase
       .from("personal_tickets")
-      .insert({ name: "", staff_id: null, expiry: null, kind: "パーソナル", quota: 6, visits: [], sort_order: rows.length })
+      .insert({ name: "", staff_id: null, expiry: null, kind: "パーソナル", quota: 10, visits: [], sort_order: rows.length })
       .select("id, name, staff_id, expiry, kind, quota, visits, sort_order")
       .single();
     if (error) {
@@ -168,7 +168,6 @@ export default function PersonalRoster() {
                 </th>
                 <th className="whitespace-nowrap border-b border-l px-2 py-1.5 text-center font-bold">担当</th>
                 <th className="whitespace-nowrap border-b border-l px-2 py-1.5 text-center font-bold">有効期限</th>
-                <th className="whitespace-nowrap border-b border-l px-2 py-1.5 text-center font-bold">種類</th>
                 <th className="whitespace-nowrap border-b border-l px-2 py-1.5 text-center font-bold">回数</th>
                 <th className="whitespace-nowrap border-b border-l px-2 py-1.5 text-center font-bold">残</th>
                 {Array.from({ length: maxCols }).map((_, i) => (
@@ -196,24 +195,23 @@ export default function PersonalRoster() {
                       />
                     </td>
                     <td className="border-l px-1 py-1.5 align-top">
-                      <div className="flex items-center gap-1">
-                        <span
-                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: st?.color || "#cbd5e1" }}
-                        />
-                        <select
-                          value={r.staff_id ?? ""}
-                          onChange={(e) => { setLocal(r.id, { staff_id: e.target.value || null }); setTimeout(() => persist(r.id), 0); }}
-                          className="w-[76px] rounded border border-slate-300 px-0.5 py-0.5 text-[11px]"
-                        >
-                          <option value="">—</option>
-                          {staff.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.display_name || s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <select
+                        value={r.staff_id ?? ""}
+                        onChange={(e) => { setLocal(r.id, { staff_id: e.target.value || null }); setTimeout(() => persist(r.id), 0); }}
+                        className="w-[84px] rounded border px-1 py-0.5 text-[11px] font-bold"
+                        style={{
+                          backgroundColor: st?.color || "#94a3b8",
+                          borderColor: st?.color || "#94a3b8",
+                          color: "#fff",
+                        }}
+                      >
+                        <option value="" style={{ color: "#111" }}>—</option>
+                        {staff.map((s) => (
+                          <option key={s.id} value={s.id} style={{ color: "#111" }}>
+                            {s.display_name || s.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="border-l px-1 py-1.5 align-top">
                       <input
@@ -222,14 +220,6 @@ export default function PersonalRoster() {
                         onChange={(e) => setLocal(r.id, { expiry: e.target.value })}
                         onBlur={() => persist(r.id)}
                         className={`${amt} w-[72px] text-center`}
-                      />
-                    </td>
-                    <td className="border-l px-1 py-1.5 align-top">
-                      <input
-                        value={r.kind}
-                        onChange={(e) => setLocal(r.id, { kind: e.target.value })}
-                        onBlur={() => persist(r.id)}
-                        className={`${amt} w-[80px] text-center`}
                       />
                     </td>
                     <td className="border-l px-1 py-1.5 text-center align-top">

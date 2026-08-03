@@ -30,7 +30,7 @@ where kind = 'パーソナル'
 
 -- 12名を登録（同じ氏名×有効期限が無い場合のみ追加）
 insert into public.personal_tickets (name, expiry, kind, quota, sort_order)
-select v.name, v.expiry, 'パーソナル', 6, v.ord
+select v.name, v.expiry, 'パーソナル', 10, v.ord
 from (values
   ('木内智子',   '8月末',  1),
   ('井手翔太',   '10月末', 2),
@@ -49,6 +49,9 @@ where not exists (
   select 1 from public.personal_tickets p
   where p.name = v.name and coalesce(p.expiry, '') = coalesce(v.expiry, '')
 );
+
+-- 回数を10回に統一（初期の6回のまま残っていれば更新）
+update public.personal_tickets set quota = 10 where kind = 'パーソナル' and quota = 6;
 
 -- 担当を設定：阿部（木内智子・上田龍太郎）
 update public.personal_tickets

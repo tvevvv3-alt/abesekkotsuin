@@ -8,7 +8,7 @@ create table if not exists public.personal_tickets (
   staff_id    uuid references public.staff(id) on delete set null, -- 担当
   expiry      text,                                   -- 有効期限（例：8月末）自由入力
   kind        text not null default 'パーソナル',      -- 種類
-  quota       int  not null default 6,                -- 回数券の回数
+  quota       int  not null default 10,               -- 回数券の回数
   visits      jsonb not null default '[]'::jsonb,     -- 来院日時（datetime-local文字列の配列）
   note        text,
   sort_order  int  not null default 0,
