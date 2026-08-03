@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const DEFAULT_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "abesekkotsuin.ibaraki@gmail.com").trim();
+const DEFAULT_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "t.ve.vvv3@gmail.com").trim();
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -25,9 +25,8 @@ export default function AdminLoginPage() {
       password: password.trim(),
     });
     if (error) {
-      // 原因特定のため、Supabaseからのメッセージをそのまま表示
-      setError(`${error.message}${error.status ? `（${error.status}）` : ""}`);
-      setShowEmail(true); // 失敗時はメールを直せるように表示
+      setError("パスワードが正しくありません");
+      setShowEmail(true); // 念のため：失敗時はメールも直せるように表示
       setLoading(false);
       return;
     }
