@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const DEFAULT_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "t.ve.vvv3@gmail.com").trim();
+const DEFAULT_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "abesekkotsuin.ibaraki@gmail.com").trim();
 
 export default function AdminLoginPage() {
   const router = useRouter();
