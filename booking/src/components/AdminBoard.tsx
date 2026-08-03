@@ -496,9 +496,13 @@ export default function AdminBoard({ date }: { date: string }) {
     const targetStart = Math.max(minMin, Math.min(maxMin - dur, snap(minForY(yFor(p.origStart) + dy))));
     let targetStaffId = p.origStaff;
     if (p.allowStaff) {
-      const under = document.elementFromPoint(x, y) as HTMLElement | null;
-      const col = under?.closest?.("[data-col-staff]") as HTMLElement | null;
-      if (col) targetStaffId = col.getAttribute("data-col-staff");
+      // ドラッグ中のカードは指の下に来るので除外し、その下の担当列を拾う
+      const els = document.elementsFromPoint(x, y) as HTMLElement[];
+      for (const el of els) {
+        if (el.closest?.("[data-appt-card]")) continue;
+        const col = el.closest?.("[data-col-staff]") as HTMLElement | null;
+        if (col) { targetStaffId = col.getAttribute("data-col-staff"); break; }
+      }
     }
     const name = staff.find((s) => s.id === targetStaffId)?.name ?? "";
     cardLatestRef.current = { targetStart, targetStaffId };
@@ -763,6 +767,7 @@ export default function AdminBoard({ date }: { date: string }) {
                     return (
                       <button
                         key={`${appt.id}-${lane}`}
+                        data-appt-card="1"
                         {...cardHandlers(appt, true)}
                         onClick={() => {
                           if (cardDraggedRef.current) { cardDraggedRef.current = false; return; }

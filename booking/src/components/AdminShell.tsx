@@ -4,33 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { loadStaff, loadSettings } from "@/lib/data";
-import type { Staff } from "@/lib/types";
-import { getOperator, setOperator, type Operator } from "@/lib/operator";
+import { loadSettings } from "@/lib/data";
 import PushToggle from "./PushToggle";
-
-// 操作者アイコン（顔写真 or 頭文字）
-function OperatorAvatar({
-  op,
-  size = 32,
-}: {
-  op: { name: string; image_path: string | null; color?: string | null };
-  size?: number;
-}) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full"
-      style={{ width: size, height: size, backgroundColor: op.color || "#64748b" }}
-    >
-      {op.image_path ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={op.image_path} alt={op.name} className="h-full w-full object-cover" />
-      ) : (
-        <span className="text-xs font-bold text-white">{op.name.slice(0, 1)}</span>
-      )}
-    </span>
-  );
-}
 
 // 院内システムの左メニュー（親＋子のグループ構造）。
 // 営業時間・予約公開設定は「基本設定」内から開くのでサイドバーには出さない。
@@ -70,36 +45,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
-  const [operator, setOp] = useState<Operator | null>(null);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [order, setOrder] = useState<string[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [formUrl, setFormUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    setOp(getOperator());
     try {
       const s = localStorage.getItem(NAV_ORDER_KEY);
       if (s) setOrder(JSON.parse(s) as string[]);
     } catch { /* noop */ }
     loadSettings(supabase).then((st) => setFormUrl(st.questionnaire_url?.trim() || null)).catch(() => {});
-    (async () => {
-      try {
-        const st = await loadStaff(supabase, false);
-        setStaffList(st.filter((s) => s.admin_visible !== false));
-      } catch {
-        /* noop */
-      }
-    })();
   }, [supabase]);
-
-  function chooseOperator(s: Staff) {
-    const o = { id: s.id, name: s.name, image_path: s.image_path };
-    setOperator(o);
-    setOp(o);
-    setPickerOpen(false);
-  }
 
   async function logout() {
     const sb = createClient();
@@ -258,24 +214,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <div className="border-b px-4 py-4">
             <div className="font-bold text-slate-800">阿部接骨院</div>
             <div className="text-xs text-slate-400">予約管理</div>
-            <button
-              onClick={() => setPickerOpen(true)}
-              className="mt-3 flex w-full items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-left hover:bg-slate-50"
-            >
-              {operator ? (
-                <>
-                  <OperatorAvatar op={operator} size={30} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-slate-700">
-                      {operator.name}
-                    </span>
-                    <span className="block text-[10px] text-slate-400">切替</span>
-                  </span>
-                </>
-              ) : (
-                <span className="text-xs text-slate-400">担当を選択 ›</span>
-              )}
-            </button>
           </div>
           <div className="flex-1 overflow-y-auto">{navList}</div>
           <PushToggle />
@@ -289,43 +227,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         <main className="min-w-0 flex-1 px-2 py-4 md:px-3">{children}</main>
       </div>
-
-      {/* 操作者の切替（Google風） */}
-      {pickerOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setPickerOpen(false)} />
-          <div className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-3 text-center text-sm font-bold text-slate-700">
-              操作しているスタッフを選択
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              {staffList.map((s) => {
-                const on = operator?.id === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => chooseOperator(s)}
-                    className="flex flex-col items-center gap-1"
-                  >
-                    <span className={`rounded-full ${on ? "ring-2 ring-blue-600 ring-offset-2" : ""}`}>
-                      <OperatorAvatar op={s} size={46} />
-                    </span>
-                    <span className="max-w-[56px] truncate text-[10px] text-slate-600">
-                      {s.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setPickerOpen(false)}
-              className="mt-4 w-full rounded-lg border py-2 text-sm text-slate-500"
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
