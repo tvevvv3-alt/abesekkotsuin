@@ -590,6 +590,15 @@ export default function SalesBoard() {
       sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId ? sum + total(s) : sum), 0),
     [sales, date]
   );
+  // 当月の出勤日数（売上のあった日数）
+  const staffDays = useCallback(
+    (staffId: string | null) => {
+      const set = new Set<string>();
+      sales.forEach((s) => { if (s.staff_id === staffId && total(s) > 0) set.add(s.date); });
+      return set.size;
+    },
+    [sales]
+  );
   // 担当ごとの自費（保険外）月計
   const spByStaff = useCallback(
     (staffId: string | null) =>
@@ -954,6 +963,7 @@ export default function SalesBoard() {
                 <div className="flex items-center gap-1.5">
                   <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
                   <span className="text-sm font-bold text-slate-800">{s.name}</span>
+                  <span className="text-[10px] font-bold text-slate-400">{staffDays(s.id)}日</span>
                   {s.real && (
                     <span className="ml-auto flex items-center gap-0.5 text-[10px] text-slate-400">
                       目標
