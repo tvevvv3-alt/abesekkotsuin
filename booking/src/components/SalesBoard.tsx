@@ -941,29 +941,6 @@ export default function SalesBoard() {
                   <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, pct)}%` }} />
                 </div>
               )}
-              {view === "day" && (
-                <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-400">本日の担当別</span>
-                  {assignees.map((s) => {
-                    const v = dayStaffTotal(s.id);
-                    return (
-                      <span key={s.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px]"
-                        style={v > 0 ? { borderColor: s.color, backgroundColor: s.color + "14" } : undefined}>
-                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                        <span className="font-bold text-slate-700">{s.name}</span>
-                        <span className="tabnum text-slate-600">{yen(v)}</span>
-                      </span>
-                    );
-                  })}
-                  {dayStaffTotal(null) > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[12px]">
-                      <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
-                      <span className="font-bold text-slate-700">物販・その他</span>
-                      <span className="tabnum text-slate-600">{yen(dayStaffTotal(null))}</span>
-                    </span>
-                  )}
-                </div>
-              )}
             </>
           );
         })()}
@@ -988,8 +965,15 @@ export default function SalesBoard() {
                 </div>
                 <div className="mt-1 flex items-baseline gap-2">
                   <span className="text-base font-bold tabnum text-slate-800">{yen(tot)}</span>
+                  <span className="text-[10px] text-slate-400">当月</span>
                   {target > 0 && <span className={`text-xs font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>{pct}%</span>}
                 </div>
+                {view === "day" && (
+                  <div className="mt-0.5 flex items-baseline gap-1 text-sm">
+                    <span className="rounded px-1 text-[10px] font-bold text-white" style={{ backgroundColor: s.color }}>本日</span>
+                    <span className="font-bold tabnum" style={{ color: s.color }}>{yen(dayStaffTotal(s.id))}</span>
+                  </div>
+                )}
                 {target > 0 && (
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: s.color }} />
@@ -1003,7 +987,16 @@ export default function SalesBoard() {
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
               <span className="text-sm font-bold text-slate-800">物販・その他</span>
             </div>
-            <div className="mt-1 text-base font-bold tabnum text-slate-800">{yen(staffTotal(null))}</div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-base font-bold tabnum text-slate-800">{yen(staffTotal(null))}</span>
+              <span className="text-[10px] text-slate-400">当月</span>
+            </div>
+            {view === "day" && (
+              <div className="mt-0.5 flex items-baseline gap-1 text-sm">
+                <span className="rounded bg-amber-500 px-1 text-[10px] font-bold text-white">本日</span>
+                <span className="font-bold tabnum text-amber-600">{yen(dayStaffTotal(null))}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
