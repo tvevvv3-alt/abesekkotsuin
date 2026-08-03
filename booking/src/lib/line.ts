@@ -255,3 +255,35 @@ export async function pushText(
     return { ok: false, error: e instanceof Error ? e.message : "送信失敗" };
   }
 }
+
+// LINEに画像メッセージを送る（originalContentUrl / previewImageUrl は共に公開HTTPS必須）。
+export async function pushImage(
+  userId: string,
+  imageUrl: string,
+  previewUrl?: string
+): Promise<{ ok: boolean; error?: string }> {
+  const token = (process.env.LINE_CHANNEL_ACCESS_TOKEN || "").trim();
+  if (!token) return { ok: false, error: "LINE_CHANNEL_ACCESS_TOKEN 未設定" };
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        to: userId,
+        messages: [
+          { type: "image", originalContentUrl: imageUrl, previewImageUrl: previewUrl || imageUrl },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return { ok: false, error: `LINE ${res.status}: ${body}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "送信失敗" };
+  }
+}

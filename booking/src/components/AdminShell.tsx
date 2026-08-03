@@ -13,13 +13,16 @@ type NavItem = { href?: string; label: string; icon?: string; soon?: boolean; ex
 const DEFAULT_NAV: NavItem[] = [
   { href: "/admin", label: "予約一覧", icon: "🗓️" },
   { href: "/admin/history", label: "予約履歴", icon: "🕘" },
-  { href: "/admin/class", label: "体幹教室", icon: "🤸" },
+  {
+    href: "/admin/class", label: "体幹教室", icon: "🤸", children: [
+      { href: "/admin/core-eval", label: "体幹評価" },
+    ],
+  },
   {
     href: "/admin/patients", label: "患者管理", icon: "👥", children: [
       { href: "/admin/new-patients", label: "新患名簿" },
       { label: "問診票", ext: "form" },
       { href: "/admin/personal", label: "回数券（パーソナル）" },
-      { label: "体幹評価", soon: true },
       { label: "カルテ（将来）", soon: true },
     ],
   },
