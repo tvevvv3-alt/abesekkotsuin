@@ -287,7 +287,8 @@ export default function SalesBoard() {
       },
       { onConflict: "appointment_id" }
     );
-    reload();
+    // reload() はしない：楽観更新済みの状態を保持し、連続入力中に
+    // フォーカス（カーソル）が飛ばないようにする。金額はDBに保存済み。
   }
 
   // --- 手動行（物販・予約外） ---
