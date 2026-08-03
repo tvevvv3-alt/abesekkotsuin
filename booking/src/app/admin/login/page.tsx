@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+
 // ログイン用の固定アカウント（メールは秘密ではないので固定。環境変数で上書き可）。
 // パスワードはコードに持たず、Supabase 認証で照合する。
 const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "abesekkotsuin.ibaraki@gmail.com").trim();
+const PW_KEY = "abe_admin_pw"; // この端末を記憶して次回から省略（共有端末向け）
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -13,6 +15,24 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [autoTrying, setAutoTrying] = useState(true);
+
+  // 端末を記憶していれば自動ログイン（＝2回目以降はパスワード入力をスキップ）
+  useEffect(() => {
+    let done = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) { router.replace("/admin"); return; }
+      let saved = "";
+      try { saved = localStorage.getItem(PW_KEY) || ""; } catch { /* noop */ }
+      if (saved) {
+        const { error } = await supabase.auth.signInWithPassword({ email: ADMIN_EMAIL, password: atob(saved) });
+        if (!error) { done = true; router.replace("/admin"); router.refresh(); return; }
+        try { localStorage.removeItem(PW_KEY); } catch { /* noop */ }
+      }
+      if (!done) setAutoTrying(false);
+    })();
+  }, [router, supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,8 +48,17 @@ export default function AdminLoginPage() {
       setLoading(false);
       return;
     }
+    try { localStorage.setItem(PW_KEY, btoa(password)); } catch { /* noop */ }
     router.replace("/admin");
     router.refresh();
+  }
+
+  if (autoTrying) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100">
+        <p className="text-sm text-slate-400">読み込み中…</p>
+      </main>
+    );
   }
 
   return (
@@ -64,6 +93,9 @@ export default function AdminLoginPage() {
         >
           {loading ? "ログイン中…" : "ログイン"}
         </button>
+        <p className="text-center text-[11px] text-slate-400">
+          この端末を記憶し、次回からは自動でログインします。
+        </p>
       </form>
     </main>
   );
