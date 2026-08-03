@@ -89,7 +89,7 @@ export default function SalesBoard() {
   const salesRef = useRef(sales);
   salesRef.current = sales;
   const [targets, setTargets] = useState<Record<string, number>>({});
-  const [clinicTarget, setClinicTarget] = useState(0);
+  const [clinicTarget, setClinicTarget] = useState(4_000_000); // 総売上目標の既定：400万
   const [loading, setLoading] = useState(true);
   // 自費の自動計算
   const [prices, setPrices] = useState<Record<string, SelfPrices>>({});
@@ -135,7 +135,7 @@ export default function SalesBoard() {
       if (tk) setTaikan({ id: tk.id, name: "体幹教室", color: TAIKAN_COLOR });
       const { data: cfg } = await supabase.from("settings").select("clinic_sales_target, self_options").eq("id", 1).maybeSingle();
       if (cfg) {
-        setClinicTarget((cfg as { clinic_sales_target?: number }).clinic_sales_target ?? 0);
+        setClinicTarget((cfg as { clinic_sales_target?: number }).clinic_sales_target || 4_000_000);
         const so = (cfg as { self_options?: Partial<SelfOptions> }).self_options;
         if (so) setOptions({ ...DEFAULT_OPTIONS, ...so });
       }
