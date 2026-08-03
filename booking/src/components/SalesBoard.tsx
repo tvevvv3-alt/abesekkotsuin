@@ -953,7 +953,7 @@ export default function SalesBoard() {
             </>
           );
         })()}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {assignees.map((s) => {
             const tot = staffTotal(s.id);
             const target = targets[s.id] ?? 0;
