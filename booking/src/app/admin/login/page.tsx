@@ -1,44 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getSavedEmail, setSavedEmail } from "@/lib/operator";
-
-const ENV_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim();
+// ログイン用の固定アカウント（メールは秘密ではないので固定。環境変数で上書き可）。
+// パスワードはコードに持たず、Supabase 認証で照合する。
+const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "abesekkotsuin.ibaraki@gmail.com").trim();
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [savedEmail, setSaved] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setSaved(getSavedEmail() || ENV_EMAIL);
-  }, []);
-
-  // 記憶しているメール（or 環境変数）があればパスワードだけ。無ければ初回のみメール入力。
-  const emailToUse = savedEmail || email;
-  const needEmail = !savedEmail;
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!emailToUse || !password) return;
+    if (!password) return;
     setLoading(true);
     setError(null);
     const { error } = await supabase.auth.signInWithPassword({
-      email: emailToUse,
+      email: ADMIN_EMAIL,
       password,
     });
     if (error) {
-      setError(needEmail ? "メールアドレスまたはパスワードが正しくありません" : "パスワードが正しくありません");
+      setError("パスワードが正しくありません");
       setLoading(false);
       return;
     }
-    setSavedEmail(emailToUse);
     router.replace("/admin");
     router.refresh();
   }
@@ -54,20 +43,6 @@ export default function AdminLoginPage() {
           <p className="mt-1 text-sm text-slate-500">予約管理 ログイン</p>
         </div>
 
-        {needEmail && (
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">メールアドレス</label>
-            <input
-              type="email"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="username"
-              required
-            />
-          </div>
-        )}
-
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">パスワード</label>
           <input
@@ -76,7 +51,7 @@ export default function AdminLoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
-            autoFocus={!needEmail}
+            autoFocus
             required
           />
         </div>
@@ -89,16 +64,6 @@ export default function AdminLoginPage() {
         >
           {loading ? "ログイン中…" : "ログイン"}
         </button>
-
-        {!needEmail && (
-          <button
-            type="button"
-            onClick={() => { setSaved(""); setEmail(""); }}
-            className="w-full text-center text-[11px] text-slate-400"
-          >
-            別のメールでログイン
-          </button>
-        )}
       </form>
     </main>
   );
