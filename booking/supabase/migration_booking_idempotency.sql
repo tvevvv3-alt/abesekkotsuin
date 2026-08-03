@@ -4,24 +4,15 @@
 --  1) appointments に idempotency_key（冪等キー）列を追加＋ユニーク制約
 --     - 予約フォーム1回分につき1つのUUID。ボタン連打／戻る→再送信でも
 --       同じキーで来れば新規作成せず既存予約を返す（= 重複0件）。
---  2) 同じ「担当者 × 日付 × 開始時刻」の重複を弾くユニーク制約（保険）
---     - staff_id が NULL のクラス（体幹教室）は対象外（複数人が同時刻可）。
---     - キャンセル済みは対象外。
---  3) book_appointment を冪等対応に差し替え。
+--  2) book_appointment を冪等対応に差し替え。
 --
---  ★ 実行前の注意（重複データがあるとユニーク制約が貼れません）
---    まず下の「重複チェック」を実行し、0行であることを確認してください。
---    行が返る場合は、その予約を先に整理（キャンセル/削除）してから
---    CREATE UNIQUE INDEX を実行してください。
+--  ★「担当者×日付×開始時刻」のユニーク制約は入れません。
+--    当院では同じ担当者が同時刻に複数人を進行するケース（例：1人を全身通電の
+--    機械にかけている間にもう1人を手技）が正常運用として存在するため、
+--    そこにユニークを貼ると正常な同時予約が弾かれます。実際の空き判定は
+--    check_booking_availability（機械の台数・工程の重なり）＋ advisory lock が
+--    担っており、二重送信は下記の冪等キーで防ぎます。
 -- =====================================================================
-
--- ---- 重複チェック（先に実行。0行ならOK）---------------------------------
--- 同じ 担当者×日付×開始時刻 で、キャンセル以外の予約が2件以上ある場合に一覧表示。
-select staff_id, date, start_min, count(*) as n, array_agg(id) as appointment_ids
-from public.appointments
-where staff_id is not null and status <> 'cancelled'
-group by staff_id, date, start_min
-having count(*) > 1;
 
 -- ---- 1) 冪等キー列＋ユニーク ------------------------------------------
 alter table public.appointments
@@ -31,13 +22,7 @@ create unique index if not exists appointments_idempotency_key_uidx
   on public.appointments (idempotency_key)
   where idempotency_key is not null;
 
--- ---- 2) 担当者×日付×開始時刻 のユニーク（保険）-----------------------
---  上の重複チェックが0行であることを確認してから実行してください。
-create unique index if not exists appointments_staff_slot_uidx
-  on public.appointments (staff_id, date, start_min)
-  where staff_id is not null and status <> 'cancelled';
-
--- ---- 3) book_appointment を冪等対応に差し替え -------------------------
+-- ---- 2) book_appointment を冪等対応に差し替え -------------------------
 --  旧シグネチャを破棄してから作り直す（引数追加のため）。
 drop function if exists public.book_appointment(uuid, uuid, date, int, text, text, date, text, text, text);
 
