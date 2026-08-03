@@ -1,24 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createRaw } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ログイン用アカウント（メール）を作成／パスワード更新する一度きりの設定用。
-// 現在ログイン中の管理者だけが実行できる。パスワードは ?pw= で渡す（コードに残さない）。
-// 例: /api/admin/setup-login?email=abesekkotsuin.ibaraki@gmail.com&pw=xxxxxx
-export async function GET(req: NextRequest) {
-  const sb = createClient();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, reason: "ログインしてから開いてください" }, { status: 401 });
+// 現在のログイン用アカウント（本人確認に使う）
+const OWNER_EMAIL = "t.ve.vvv3@gmail.com";
 
+// ログイン用アカウント（メール）を作成／パスワード更新する一度きりの設定用。
+// 本人確認：現在のパスワードを ?current= で渡す（=今ログインできるパスワード）。
+// 新アカウント：?email=（既定 abesekkotsuin.ibaraki@gmail.com）&pw=（新パスワード）
+// 例: /api/admin/setup-login?current=いまのパス&pw=tra2016
+export async function GET(req: NextRequest) {
   const url = new URL(req.url);
+  const current = url.searchParams.get("current") || "";
   const email = (url.searchParams.get("email") || "abesekkotsuin.ibaraki@gmail.com").trim();
   const pw = url.searchParams.get("pw") || "";
-  if (pw.length < 6) return NextResponse.json({ ok: false, reason: "?pw= に6文字以上のパスワードを指定してください" }, { status: 400 });
+  if (!current) return NextResponse.json({ ok: false, reason: "?current= に今のパスワードを指定してください" }, { status: 400 });
+  if (pw.length < 6) return NextResponse.json({ ok: false, reason: "?pw= に6文字以上の新パスワードを指定してください" }, { status: 400 });
+
+  // 本人確認：今のパスワードでログインできるか確認
+  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  if (!supaUrl || !anon) return NextResponse.json({ ok: false, reason: "server config" }, { status: 500 });
+  const raw = createRaw(supaUrl, anon, { auth: { persistSession: false } });
+  const { error: authErr } = await raw.auth.signInWithPassword({ email: OWNER_EMAIL, password: current });
+  if (authErr) return NextResponse.json({ ok: false, reason: "今のパスワードが違います（本人確認に失敗）" }, { status: 401 });
 
   const admin = createAdminClient();
   if (!admin) return NextResponse.json({ ok: false, reason: "server" }, { status: 500 });
