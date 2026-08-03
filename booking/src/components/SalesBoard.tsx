@@ -590,6 +590,18 @@ export default function SalesBoard() {
       sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId ? sum + total(s) : sum), 0),
     [sales, date]
   );
+  // Enterで次の金額欄へ移動（保険外→合計額→負担額→次の行の保険外…）。表示中の欄だけ辿る。
+  function onAmountKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const inputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>("input[data-amt='1']")
+    ).filter((el) => el.offsetParent !== null);
+    const i = inputs.indexOf(e.currentTarget);
+    const next = inputs[i + 1];
+    if (next) { next.focus(); next.select(); }
+    else e.currentTarget.blur();
+  }
   // 当月の出勤日数（売上のあった日数）
   const staffDays = useCallback(
     (staffId: string | null) => {
@@ -1243,15 +1255,15 @@ export default function SalesBoard() {
                           <td className="px-1 py-1 text-right">
                             <input type="number" min={0} placeholder={suggestSelf(a) ? String(suggestSelf(a)) : "0"} value={s.selfpay || ""}
                               onFocus={() => { if (!s.selfpay && suggestSelf(a) > 0) { setApptField(a, "selfpay", suggestSelf(a)); } }}
-                              onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
+                              onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
                           <td className="hidden px-1 py-1 text-right sm:table-cell">
                             <input type="number" min={0} placeholder="0" value={s.insurance || ""}
-                              onChange={(e) => setApptField(a, "insurance", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
+                              onChange={(e) => setApptField(a, "insurance", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
                           <td className="hidden px-1 py-1 text-right sm:table-cell">
                             <input type="number" min={0} placeholder="0" value={s.burden || ""}
-                              onChange={(e) => setApptField(a, "burden", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} className={amt} />
+                              onChange={(e) => setApptField(a, "burden", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
                           <td className="hidden px-1 py-1 text-right tabnum text-slate-500 sm:table-cell">{paid(s).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
@@ -1285,13 +1297,13 @@ export default function SalesBoard() {
                             </div>
                           </td>
                           <td className="px-1 py-1 text-right">
-                            <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                            <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
                           <td className="hidden px-1 py-1 text-right sm:table-cell">
-                            <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                            <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
                           <td className="hidden px-1 py-1 text-right sm:table-cell">
-                            <input type="number" min={0} placeholder="0" value={m.burden || ""} onChange={(e) => setManualLocal(m.id, { burden: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} className={amt} />
+                            <input type="number" min={0} placeholder="0" value={m.burden || ""} onChange={(e) => setManualLocal(m.id, { burden: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
                           <td className="hidden px-1 py-1 text-right tabnum text-slate-500 sm:table-cell">{paid(m).toLocaleString()}</td>
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
