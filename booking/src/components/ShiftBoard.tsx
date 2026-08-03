@@ -352,6 +352,14 @@ export default function ShiftBoard() {
                     else if (am && !pm) partial.push({ ...it, label: "午後休診" });
                     else if (!am && pm) partial.push({ ...it, label: "午前休診" });
                   });
+                  // 段分け：施術スタッフ／受付／学生（＋その他）を別々の行で表示
+                  const reception = parttime.filter((x) => x.m.role === "reception");
+                  const student = parttime.filter((x) => x.m.role === "student");
+                  const other = parttime.filter((x) => x.m.role === "other");
+                  const offTher = offMembers.filter((x) => x.member.role === "therapist");
+                  const offRec = offMembers.filter((x) => x.member.role === "reception");
+                  const offStu = offMembers.filter((x) => x.member.role === "student");
+                  const hasTher = partial.length > 0 || full.length > 0 || offTher.length > 0;
                   const today = ds === toDateStr(new Date());
                   return (
                     <button key={ds} onClick={() => inMonth && (clip ? pasteTo(ds) : openDay(ds))} disabled={!inMonth}
@@ -362,27 +370,59 @@ export default function ShiftBoard() {
                         {inMonth && reason && <span className="truncate text-[10px] font-bold text-rose-500">{reason}</span>}
                         {inMonth && today && !reason && <span className="rounded bg-blue-600 px-1 text-[9px] font-bold text-white">今日</span>}
                       </div>
-                      {/* 内容 */}
-                      <div className={`flex flex-1 flex-wrap content-center items-center justify-center gap-x-2 gap-y-1 px-1.5 py-1.5 ${closed ? "bg-slate-100" : ""}`}>
+                      {/* 内容：施術スタッフ／受付／学生 の3段 */}
+                      <div className={`flex flex-1 flex-col justify-center gap-0.5 px-1.5 py-1.5 ${closed ? "bg-slate-100" : ""}`}>
                         {!inMonth ? null : closed ? (
-                          <span className="text-base font-bold tracking-[0.3em] text-rose-500">休診</span>
+                          <span className="text-center text-base font-bold tracking-[0.3em] text-rose-500">休診</span>
                         ) : (
                           <>
-                            {partial.map(({ s, m, label }) => (
-                              <span key={"p" + s.id} className="inline-flex flex-col items-center border-r border-dashed border-slate-400 pr-2">
-                                <span className="text-[13px] font-bold" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
-                                <span className="mt-0.5 bg-slate-300 px-1 text-[9px] font-bold text-rose-600">{label}</span>
-                              </span>
-                            ))}
-                            {full.map(({ s, m }) => (
-                              <span key={s.id} className="text-[13px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
-                            ))}
-                            {parttime.map(({ s, m }) => (
-                              <span key={"t" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
-                            ))}
-                            {offMembers.map((x, i) => (
-                              <span key={"o" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
-                            ))}
+                            {/* ① 施術スタッフ */}
+                            {hasTher && (
+                              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
+                                {partial.map(({ s, m, label }) => (
+                                  <span key={"p" + s.id} className="inline-flex flex-col items-center border-r border-dashed border-slate-400 pr-2">
+                                    <span className="text-[13px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
+                                    <span className="mt-0.5 bg-slate-300 px-1 text-[9px] font-bold text-rose-600">{label}</span>
+                                  </span>
+                                ))}
+                                {full.map(({ s, m }) => (
+                                  <span key={s.id} className="text-[13px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
+                                ))}
+                                {offTher.map((x, i) => (
+                                  <span key={"ot" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                                ))}
+                              </div>
+                            )}
+                            {/* ② 受付 */}
+                            {(reception.length > 0 || offRec.length > 0) && (
+                              <div className={`flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 ${hasTher ? "border-t border-slate-100 pt-0.5" : ""}`}>
+                                {reception.map(({ s, m }) => (
+                                  <span key={"r" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+                                ))}
+                                {offRec.map((x, i) => (
+                                  <span key={"or" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                                ))}
+                              </div>
+                            )}
+                            {/* ③ 学生 */}
+                            {(student.length > 0 || offStu.length > 0) && (
+                              <div className={`flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 ${hasTher || reception.length > 0 || offRec.length > 0 ? "border-t border-slate-100 pt-0.5" : ""}`}>
+                                {student.map(({ s, m }) => (
+                                  <span key={"s" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+                                ))}
+                                {offStu.map((x, i) => (
+                                  <span key={"os" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                                ))}
+                              </div>
+                            )}
+                            {/* その他 */}
+                            {other.length > 0 && (
+                              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 border-t border-slate-100 pt-0.5">
+                                {other.map(({ s, m }) => (
+                                  <span key={"x" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+                                ))}
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -394,7 +434,7 @@ export default function ShiftBoard() {
           )}
         </div>
       </div>
-      <p className="mt-2 text-xs text-slate-400">日をタップして編集。施術スタッフは色名を中央に、午前/午後だけの人は名前＋灰色の「午前休診/午後休診」、受付・学生は時間帯付き。休診日はグレー。</p>
+      <p className="mt-2 text-xs text-slate-400">日をタップして編集。上から<b>施術スタッフ</b>／<b>受付</b>／<b>学生</b>の3段で表示（受付・学生は時間帯付き）。午前/午後だけの人は名前＋灰色の「午前休診/午後休診」。休診日はグレー。</p>
 
       {/* メンバー設定 */}
       <div className="mt-4 rounded-xl border bg-white">

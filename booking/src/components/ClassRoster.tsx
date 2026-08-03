@@ -310,9 +310,10 @@ export default function ClassRoster() {
                   {shown.map(([name, visits]) => {
                     const mem = passOf(name);
                     const count = visits.length;
+                    const pu = purchaseOf(name);
                     return (
                       <tr key={name} className="border-t">
-                        <td className="sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-r bg-white px-2 py-1.5 align-top">
+                        <td className={`sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-r px-2 py-1.5 align-top ${pu.purchased ? "bg-white" : "bg-rose-50"}`}>
                           <div className="truncate text-[13px] font-bold text-slate-800">{name}</div>
                           <div className="mt-0.5 flex items-center gap-1">
                             <select
@@ -336,22 +337,26 @@ export default function ClassRoster() {
                               {mem.pass_type === "free" ? "ﾌﾘｰ" : `残${Math.max(0, mem.quota - count)}`}
                             </span>
                           </div>
-                          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                            <label className="flex shrink-0 items-center gap-0.5">
+                          <div className="mt-1 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => togglePurchased(name, !pu.purchased)}
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                pu.purchased
+                                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                                  : "bg-red-500 text-white shadow-sm"
+                              }`}
+                            >
+                              {pu.purchased ? "購入済" : "未購入"}
+                            </button>
+                            {pu.purchased && (
                               <input
-                                type="checkbox"
-                                checked={purchaseOf(name).purchased}
-                                onChange={(e) => togglePurchased(name, e.target.checked)}
-                                className="h-3 w-3 accent-blue-600"
+                                type="date"
+                                value={pu.purchase_date ?? ""}
+                                onChange={(e) => setPurchaseDate(name, e.target.value)}
+                                className="min-w-0 flex-1 rounded border border-slate-300 px-0.5 py-0 text-[9px] text-slate-500"
                               />
-                              購入
-                            </label>
-                            <input
-                              type="date"
-                              value={purchaseOf(name).purchase_date ?? ""}
-                              onChange={(e) => setPurchaseDate(name, e.target.value)}
-                              className="min-w-0 flex-1 rounded border border-slate-300 px-0.5 py-0 text-[9px]"
-                            />
+                            )}
                           </div>
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
@@ -398,6 +403,8 @@ export default function ClassRoster() {
         予約が入ると自動で表に反映されます（行＝人・列＝回数）。各回のマスを
         タップすると「終了＋LINE」（来場日・今月何回目・残り回数を通知／フリーは無制限）。
         名前は横スクロールしても固定、パス種別は氏名ごとに保存されます。
+        今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
+        タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
       </p>
     </div>
   );
