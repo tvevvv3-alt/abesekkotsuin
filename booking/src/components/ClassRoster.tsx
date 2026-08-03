@@ -295,13 +295,14 @@ export default function ClassRoster() {
               <table className="border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500">
-                    <th className="sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-b border-r bg-slate-50 px-2 py-1.5 text-left font-bold">
+                    <th className="sticky left-0 z-10 w-[124px] min-w-[124px] max-w-[124px] border-b border-r bg-slate-50 px-2 py-1 text-left font-bold">
                       会員
                     </th>
+                    <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">テスト</th>
                     {Array.from({ length: maxVisits }).map((_, i) => (
                       <th
                         key={i}
-                        className="whitespace-nowrap border-b border-l px-2 py-1.5 text-center font-bold"
+                        className="whitespace-nowrap border-b border-l px-2 py-1 text-center font-bold"
                       >
                         {i + 1}回目
                       </th>
@@ -315,8 +316,21 @@ export default function ClassRoster() {
                     const pu = purchaseOf(name);
                     return (
                       <tr key={name} className="border-t">
-                        <td className={`sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-r px-2 py-1.5 align-top ${pu.purchased ? "bg-white" : "bg-rose-50"}`}>
-                          <div className="truncate text-[13px] font-bold text-slate-800">{name}</div>
+                        <td className={`sticky left-0 z-10 w-[124px] min-w-[124px] max-w-[124px] border-r px-1.5 py-1 align-middle ${pu.purchased ? "bg-white" : "bg-rose-50"}`}>
+                          <div className="flex items-center gap-1">
+                            <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800">{name}</span>
+                            <button
+                              type="button"
+                              onClick={() => togglePurchased(name, !pu.purchased)}
+                              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                pu.purchased
+                                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                                  : "bg-red-500 text-white shadow-sm"
+                              }`}
+                            >
+                              {pu.purchased ? "購入済" : "未購入"}
+                            </button>
+                          </div>
                           <div className="mt-0.5 flex items-center gap-1">
                             <select
                               value={mem.pass_type}
@@ -338,19 +352,6 @@ export default function ClassRoster() {
                             >
                               {mem.pass_type === "free" ? "ﾌﾘｰ" : `残${Math.max(0, mem.quota - count)}`}
                             </span>
-                          </div>
-                          <div className="mt-1 flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => togglePurchased(name, !pu.purchased)}
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                pu.purchased
-                                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                                  : "bg-red-500 text-white shadow-sm"
-                              }`}
-                            >
-                              {pu.purchased ? "購入済" : "未購入"}
-                            </button>
                             {pu.purchased && (
                               <input
                                 type="date"
@@ -360,18 +361,21 @@ export default function ClassRoster() {
                               />
                             )}
                           </div>
+                        </td>
+                        <td className="border-l px-1 py-1 text-center align-middle">
                           <button
                             onClick={() =>
                               setEvalTarget({ name, lineUserId: visits.find((v) => v.line_user_id)?.line_user_id ?? null })
                             }
-                            className="mt-1 w-full rounded-md border border-indigo-300 bg-indigo-50 px-1 py-0.5 text-[10px] font-bold text-indigo-600 active:bg-indigo-100"
+                            className="rounded-md border border-indigo-300 bg-indigo-50 px-1.5 py-1 text-[10px] font-bold leading-tight text-indigo-600 active:bg-indigo-100"
                           >
-                            📋 体幹テスト
+                            <span className="block">体幹</span>
+                            <span className="block">テスト</span>
                           </button>
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
                           const v = visits[i];
-                          if (!v) return <td key={i} className="border-l px-2 py-2" />;
+                          if (!v) return <td key={i} className="border-l px-1.5 py-1" />;
                           const d = new Date(v.date + "T00:00:00");
                           const done = v.status === "done";
                           return (
@@ -381,18 +385,16 @@ export default function ClassRoster() {
                                 if (!done && busy !== v.id && confirm(`${name} を終了＋LINE送信しますか？`))
                                   finish(v);
                               }}
-                              className={`whitespace-nowrap border-l px-2 py-1.5 text-center ${
+                              className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${
                                 done ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-blue-50"
                               }`}
                             >
-                              <div className="font-medium text-slate-700">
+                              <div className="text-[12px] font-medium text-slate-700">
                                 {d.getMonth() + 1}/{d.getDate()}
+                                <span className="ml-1 text-[10px] text-slate-500">{minToLabel(v.start_min)}</span>
                               </div>
-                              <div className="text-[10px] text-slate-500">{minToLabel(v.start_min)}</div>
                               {done ? (
-                                <div className="text-[10px] font-bold">
-                                  {v.line_user_id ? "✅" : "済"}
-                                </div>
+                                <div className="text-[10px] font-bold">{v.line_user_id ? "✅" : "済"}</div>
                               ) : (
                                 <div className="text-[9px] text-blue-500">タップで終了</div>
                               )}
