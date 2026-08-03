@@ -8,6 +8,7 @@ export type SelfOptions = {
   jikangai_ippan: number;
   jikangai_gakusei: number;
   student_max_age: number;
+  taikan_price: number; // 体幹教室 1回あたりの料金（自動入力用）
 };
 
 export const DEFAULT_OPTIONS: SelfOptions = {
@@ -16,6 +17,7 @@ export const DEFAULT_OPTIONS: SelfOptions = {
   jikangai_ippan: 2750,
   jikangai_gakusei: 550,
   student_max_age: 22,
+  taikan_price: 0,
 };
 
 // HP掲載の既定料金（名前で割り当て。林・その他は萩原と同額）

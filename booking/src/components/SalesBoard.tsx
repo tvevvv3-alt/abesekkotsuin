@@ -223,10 +223,19 @@ export default function SalesBoard() {
     if (taikan) extra.push({ id: taikan.id, name: taikan.name, color: taikan.color, real: false });
     return [...base, ...extra];
   }, [staff, kawa, taikan]);
-  // 川西の予約は担当を「川西整体院」に自動割当
+  // 体幹教室（定員制クラス）の予約か
+  const isClassAppt = useCallback(
+    (a: Appt) => !!taikan && a.service_id === taikan.id,
+    [taikan]
+  );
+  // 川西→川西整体院、体幹教室→体幹教室に担当を自動割当
   const defStaffId = useCallback(
-    (a: Appt) => (kawa && a.service_id === kawa.id ? kawa.id : a.staff_id),
-    [kawa]
+    (a: Appt) => {
+      if (kawa && a.service_id === kawa.id) return kawa.id;
+      if (taikan && a.service_id === taikan.id) return taikan.id;
+      return a.staff_id;
+    },
+    [kawa, taikan]
   );
 
   // --- 予約行の編集（担当・自費・合計額・負担額） ---
@@ -369,6 +378,7 @@ export default function SalesBoard() {
   };
   const suggestSelf = (a: Appt): number => {
     if (kawa && a.service_id === kawa.id) return 0; // 川西は別料金
+    if (isClassAppt(a)) return options.taikan_price; // 体幹教室は1回料金
     const staffId = a.staff_id;
     if (!staffId || !prices[staffId]) return 0;
     const p = prices[staffId];
@@ -1368,7 +1378,7 @@ export default function SalesBoard() {
               <div className="mt-4">
                 <div className="mb-1 text-sm font-bold text-slate-700">オプション加算</div>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-[12px] text-slate-600">
-                  {([["tsuden_ippan", "全身通電 一般"], ["tsuden_gakusei", "全身通電 学生"], ["jikangai_ippan", "時間外 一般"], ["jikangai_gakusei", "時間外 学生"], ["student_max_age", "学生とみなす年齢(以下)"]] as const).map(([key, label]) => (
+                  {([["tsuden_ippan", "全身通電 一般"], ["tsuden_gakusei", "全身通電 学生"], ["jikangai_ippan", "時間外 一般"], ["jikangai_gakusei", "時間外 学生"], ["taikan_price", "体幹教室 1回"], ["student_max_age", "学生とみなす年齢(以下)"]] as const).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-1">
                       {label}
                       <input type="number" min={0} value={options[key] || ""} onChange={(e) => setOpt(key, parseInt(e.target.value || "0", 10))}
@@ -1376,7 +1386,7 @@ export default function SalesBoard() {
                     </label>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">時間外は20:30以降の予約に自動加算。通電は「全身通電」を含むメニューに自動加算。学生/一般は生年月日から自動判定（各行で切替可）。</p>
+                <p className="mt-2 text-[11px] text-slate-400">時間外は20:30以降の予約に自動加算。通電は「全身通電」を含むメニューに自動加算。学生/一般は生年月日から自動判定（各行で切替可）。体幹教室は担当が自動で「体幹教室」になり、上の「体幹教室 1回」を金額に自動入力します（0なら金額なし）。</p>
               </div>
             </div>
             <div className="flex items-center gap-2 border-t px-4 py-3">
