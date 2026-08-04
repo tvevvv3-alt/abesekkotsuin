@@ -6,16 +6,17 @@ import { loadAllStaff } from "@/lib/data";
 import { minToLabel } from "@/lib/booking";
 import type { Staff } from "@/lib/types";
 
-// パーソナルトレーニング 回数券（1行＝1冊）。
-// 「パーソナル回数券対象」メニューの予約を、患者名で一致する会員に自動反映。
-// 消費：所要30分=1回・60分=2回（＝30分単位で切り上げ）。
+// パーソナルトレーニング 回数券。体幹教室と同じ仕組み：
+// 「パーソナル回数券対象」メニューの予約が患者名で自動的にここに並び、
+// 各回を「タップで終了」すると消費（30分=1・60分=2）＋本人へLINE送信。
+// 未登録の人が予約すると自動で行が作られる。
 interface Ticket {
   id: string;
   name: string;
   staff_id: string | null;
   expiry: string | null;
   quota: number;
-  used_offset: number; // 移行前の使用済み（手入力）
+  used_offset: number;
   sort_order: number;
 }
 
@@ -25,15 +26,24 @@ interface Visit {
   date: string;
   start_min: number;
   end_min: number;
+  status: "booked" | "cancelled" | "done";
+  staff_id: string | null;
+  service_id: string | null;
+  line_user_id: string | null;
 }
 
-// 消費回数（30分=1・60分=2・以降30分ごと+1）
 function consumeOf(v: Visit): number {
   return Math.max(1, Math.round((v.end_min - v.start_min) / 30));
 }
 function mdLabel(date: string): string {
   const m = date.match(/^\d{4}-(\d{2})-(\d{2})/);
   return m ? `${Number(m[1])}/${Number(m[2])}` : date;
+}
+// 有効期限ラベル（初回来院＋Nヶ月の「M月末」）
+function expiryLabel(date: string, months: number): string {
+  const d = new Date(date + "T00:00:00");
+  d.setMonth(d.getMonth() + months);
+  return `${d.getMonth() + 1}月末`;
 }
 
 export default function PersonalRoster() {
@@ -43,15 +53,17 @@ export default function PersonalRoster() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [hasPersonalMenu, setHasPersonalMenu] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const [staffFilter, setStaffFilter] = useState<string>("all");
 
   const reload = useCallback(async () => {
     setLoading(true);
-    // 回数券対象メニュー
-    const { data: sv } = await supabase.from("services").select("id, personal");
-    const personalIds = ((sv as { id: string; personal: boolean }[] | null) ?? [])
-      .filter((s) => s.personal)
-      .map((s) => s.id);
+    // 回数券対象メニュー（＋有効期限の月数）
+    const { data: sv } = await supabase.from("services").select("id, personal, personal_valid_months");
+    const personalSvc = ((sv as { id: string; personal: boolean; personal_valid_months: number | null }[] | null) ?? []).filter((s) => s.personal);
+    const personalIds = personalSvc.map((s) => s.id);
+    const vmById = new Map(personalSvc.map((s) => [s.id, s.personal_valid_months ?? 5]));
     setHasPersonalMenu(personalIds.length > 0);
 
     const [{ data: tk }, appts] = await Promise.all([
@@ -63,15 +75,44 @@ export default function PersonalRoster() {
       personalIds.length
         ? supabase
             .from("appointments")
-            .select("id, patient_name, date, start_min, end_min")
+            .select("id, patient_name, date, start_min, end_min, status, staff_id, service_id, line_user_id")
             .in("service_id", personalIds)
             .neq("status", "cancelled")
             .order("date")
             .order("start_min")
         : Promise.resolve({ data: [] as Visit[] }),
     ]);
-    setRows(((tk as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 })));
-    setVisits((appts.data as Visit[]) ?? []);
+    let tickets = ((tk as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 }));
+    const visitData = (appts.data as Visit[]) ?? [];
+
+    // 予約はあるが未登録の人 → 自動で回数券に行を作る
+    const existing = new Set(tickets.map((t) => t.name.trim()));
+    const groups = new Map<string, Visit[]>();
+    visitData.forEach((v) => {
+      const key = (v.patient_name || "").trim();
+      if (!key) return;
+      const a = groups.get(key) ?? [];
+      a.push(v);
+      groups.set(key, a);
+    });
+    const toCreate: Record<string, unknown>[] = [];
+    groups.forEach((list, nm) => {
+      if (existing.has(nm)) return;
+      const first = list[0];
+      const vm = vmById.get(first.service_id ?? "") ?? 5;
+      const staffId = [...list].reverse().find((a) => a.staff_id)?.staff_id ?? null;
+      toCreate.push({ name: nm, staff_id: staffId, expiry: expiryLabel(first.date, vm), kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: 900 });
+    });
+    if (toCreate.length) {
+      const { data: created } = await supabase
+        .from("personal_tickets")
+        .insert(toCreate)
+        .select("id, name, staff_id, expiry, quota, used_offset, sort_order");
+      tickets = [...tickets, ...(((created as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 })))];
+    }
+
+    setRows(tickets);
+    setVisits(visitData);
     setLoading(false);
   }, [supabase]);
 
@@ -84,7 +125,6 @@ export default function PersonalRoster() {
 
   const staffById = useMemo(() => new Map(staff.map((s) => [s.id, s])), [staff]);
 
-  // 患者名 → 来院（自動）
   const visitsByName = useMemo(() => {
     const m = new Map<string, Visit[]>();
     visits.forEach((v) => {
@@ -103,7 +143,7 @@ export default function PersonalRoster() {
   );
 
   const maxCols = useMemo(() => {
-    let n = 10; // 10回分の予約枠は常に表示
+    let n = 10;
     rows.forEach((r) => {
       n = Math.max(n, (visitsByName.get(r.name.trim()) ?? []).length);
     });
@@ -140,6 +180,32 @@ export default function PersonalRoster() {
     await supabase.from("personal_tickets").delete().eq("id", id);
   }
 
+  // 終了：予約を done にし、本人へお礼＋残り回数をLINE送信（体幹教室と同じ）
+  async function finish(v: Visit, name: string) {
+    setBusy(v.id);
+    setMsg(null);
+    await supabase.from("appointments").update({ status: "done" }).eq("id", v.id);
+    let note = "終了にしました";
+    if (v.line_user_id) {
+      try {
+        const res = await fetch("/api/personal/done", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appointmentId: v.id }),
+        });
+        const j = (await res.json()) as { ok: boolean; reason?: string; remaining?: number };
+        note = j.ok ? `${name} を終了＋LINE送信（残り${j.remaining ?? "?"}回）` : `終了（LINE未送信: ${j.reason ?? "?"}）`;
+      } catch {
+        note = "終了（LINE送信エラー）";
+      }
+    } else {
+      note = `${name} を終了（LINE未連携）`;
+    }
+    setBusy(null);
+    setMsg(note);
+    reload();
+  }
+
   const amt = "w-full rounded border border-slate-300 px-1 py-0.5 text-sm focus:border-blue-400 focus:outline-none";
 
   return (
@@ -163,14 +229,16 @@ export default function PersonalRoster() {
       {!hasPersonalMenu && (
         <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           「パーソナル回数券対象」のメニューが未設定です。施術メニュー管理で <b>パーソナル30分／60分</b> を作り、
-          <b>「パーソナル回数券」にチェック</b>を入れてください。以降その予約が自動で下の表に反映されます（30分=1回・60分=2回）。
+          <b>「パーソナル回数券」にチェック</b>を入れてください。以降その予約が自動でここに並びます。
         </div>
       )}
+
+      {msg && <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">{msg}</div>}
 
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
       ) : shown.length === 0 ? (
-        <p className="py-10 text-center text-sm text-slate-500">回数券がありません。「＋ 会員を追加」から登録してください。</p>
+        <p className="py-10 text-center text-sm text-slate-500">回数券がありません。パーソナル予約が入ると自動で並びます。</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-white">
           <table className="border-collapse text-xs">
@@ -190,9 +258,9 @@ export default function PersonalRoster() {
             <tbody>
               {shown.map((r) => {
                 const st = r.staff_id ? staffById.get(r.staff_id) : null;
-                const vs = (visitsByName.get(r.name.trim()) ?? []);
-                const autoConsumed = vs.reduce((n, v) => n + consumeOf(v), 0);
-                const remain = r.quota - (r.used_offset ?? 0) - autoConsumed;
+                const vs = visitsByName.get(r.name.trim()) ?? [];
+                const consumedDone = vs.filter((v) => v.status === "done").reduce((n, v) => n + consumeOf(v), 0);
+                const remain = r.quota - (r.used_offset ?? 0) - consumedDone;
                 return (
                   <tr key={r.id} className="border-t">
                     <td className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-r bg-white px-1.5 py-1 align-middle">
@@ -224,8 +292,13 @@ export default function PersonalRoster() {
                       const v = vs[i];
                       if (!v) return <td key={i} className="border-l px-1.5 py-1" />;
                       const c = consumeOf(v);
+                      const done = v.status === "done";
                       return (
-                        <td key={i} className="whitespace-nowrap border-l px-1.5 py-1 text-center align-middle">
+                        <td
+                          key={i}
+                          onClick={() => { if (!done && busy !== v.id && confirm(`${r.name} を終了＋LINE送信しますか？（${c}回消費）`)) finish(v, r.name); }}
+                          className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${done ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-blue-50"}`}
+                        >
                           <div className="text-[12px] font-medium text-slate-700">
                             {mdLabel(v.date)}
                             <span className="ml-1 text-[10px] text-slate-500">{minToLabel(v.start_min)}</span>
@@ -233,6 +306,11 @@ export default function PersonalRoster() {
                           <div className="text-[9px] font-bold text-slate-400">
                             {v.end_min - v.start_min}分{c >= 2 ? <span className="ml-0.5 rounded bg-orange-100 px-1 text-orange-600">×{c}</span> : null}
                           </div>
+                          {done ? (
+                            <div className="text-[10px] font-bold">{v.line_user_id ? "✅" : "済"}</div>
+                          ) : (
+                            <div className="text-[9px] text-blue-500">タップで終了</div>
+                          )}
                         </td>
                       );
                     })}
@@ -248,9 +326,9 @@ export default function PersonalRoster() {
       )}
 
       <p className="mt-3 text-[11px] text-slate-400">
-        「パーソナル回数券対象」メニューの予約が、患者名の一致で自動反映されます（<b>30分=1回・60分=2回</b>）。
-        <b>残</b>＝10回 − 既使用 − 予約からの消費。移行前にすでに使った回数は「既使用」に入れてください。
-        担当・有効期限はこの表で、来院日時は予約（カレンダー）で管理します。
+        「パーソナル回数券対象」メニューの予約が、患者名で自動的にここに並びます。各回のマスを<b>タップで終了</b>すると
+        <b>消費（30分=1回・60分=2回）＋本人へLINE（残り回数）</b>を送信します。<b>残</b>＝10回 − 既使用 − 終了済みの消費。
+        未登録の方が予約すると自動で行が作られ、担当・有効期限（初回＋5ヶ月）も自動で入ります。
       </p>
     </div>
   );
