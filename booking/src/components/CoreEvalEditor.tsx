@@ -31,6 +31,22 @@ function rowScores(r: EvalRow): EvalScores {
   return { operation: r.operation, balance: r.balance, handstand: r.handstand, ring: r.ring, boxjump: r.boxjump };
 }
 
+// 画像URL → dataURI（SVGをImageで描画する際、外部URLはcanvasを汚染するため）
+async function urlToDataUri(url: string): Promise<string> {
+  try {
+    const r = await fetch(url, { mode: "cors" });
+    const b = await r.blob();
+    return await new Promise<string>((resolve) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result));
+      fr.onerror = () => resolve("");
+      fr.readAsDataURL(b);
+    });
+  } catch {
+    return "";
+  }
+}
+
 // SVG文字列 → PNG DataURL（ブラウザのフォントで描画。日本語もOK）
 function svgToPng(svg: string, scale = 2): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -77,6 +93,15 @@ export default function CoreEvalEditor({ name, editableName, names, onNameChange
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [evalImages, setEvalImages] = useState<Partial<Record<EvalKey, string>>>({});
+
+  // 項目イラスト（設定済みなら）
+  useEffect(() => {
+    supabase.from("settings").select("eval_images").eq("id", 1).maybeSingle().then(({ data }) => {
+      const im = (data as { eval_images?: Partial<Record<EvalKey, string>> } | null)?.eval_images;
+      if (im) setEvalImages(im);
+    });
+  }, [supabase]);
 
   const loadHistory = useCallback(async (nm: string) => {
     if (!nm.trim()) { setHistory([]); return; }
@@ -115,8 +140,8 @@ export default function CoreEvalEditor({ name, editableName, names, onNameChange
   }, [history, editingId, date]);
 
   const svg = useMemo(
-    () => buildEvalSvg({ name, date, curr: scores, prev: prevRow ? rowScores(prevRow) : null, prevDate: prevRow?.eval_date ?? null, comment }),
-    [name, date, scores, prevRow, comment]
+    () => buildEvalSvg({ name, date, curr: scores, prev: prevRow ? rowScores(prevRow) : null, prevDate: prevRow?.eval_date ?? null, comment, images: evalImages }),
+    [name, date, scores, prevRow, comment, evalImages]
   );
 
   async function save(): Promise<string | null> {
@@ -147,7 +172,14 @@ export default function CoreEvalEditor({ name, editableName, names, onNameChange
     setMsg(null);
     const id = await save();
     try {
-      const png = await svgToPng(svg, 2);
+      // 画像化のためイラストURLをdataURIに変換（canvas汚染回避）
+      const entries = await Promise.all(
+        Object.entries(evalImages).map(async ([k, u]) => [k, u ? await urlToDataUri(u) : ""] as const)
+      );
+      const imgData: Partial<Record<EvalKey, string>> = {};
+      entries.forEach(([k, v]) => { if (v) imgData[k as EvalKey] = v; });
+      const svgForSend = buildEvalSvg({ name, date, curr: scores, prev: prevRow ? rowScores(prevRow) : null, prevDate: prevRow?.eval_date ?? null, comment, images: imgData });
+      const png = await svgToPng(svgForSend, 2);
       const res = await fetch("/api/eval/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
