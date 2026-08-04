@@ -25,6 +25,7 @@ export interface EvalRow {
   boxjump: number | null;
   comment: string | null;
   line_sent_at: string | null;
+  created_at?: string | null;
 }
 
 function rowScores(r: EvalRow): EvalScores {
@@ -108,9 +109,10 @@ export default function CoreEvalEditor({ name, editableName, names, onNameChange
     setLoading(true);
     const { data } = await supabase
       .from("core_evaluations")
-      .select("id, name, eval_date, operation, balance, handstand, ring, boxjump, comment, line_sent_at")
+      .select("id, name, eval_date, operation, balance, handstand, ring, boxjump, comment, line_sent_at, created_at")
       .eq("name", nm.trim())
-      .order("eval_date", { ascending: false });
+      .order("eval_date", { ascending: false })
+      .order("created_at", { ascending: false });
     setHistory((data as EvalRow[]) ?? []);
     setLoading(false);
   }, [supabase]);
@@ -133,11 +135,17 @@ export default function CoreEvalEditor({ name, editableName, names, onNameChange
     setMsg(null);
   }
 
+  // 前回＝「今回」の1つ前の記録（同じ日でもOK）。
+  // history は新しい順（eval_date desc, created_at desc）。
   const prevRow = useMemo(() => {
-    return history
-      .filter((r) => r.id !== editingId && r.eval_date < date)
-      .sort((a, b) => b.eval_date.localeCompare(a.eval_date))[0] || null;
-  }, [history, editingId, date]);
+    if (editingId) {
+      // 既存を編集中：その記録の1つ後ろ（=1つ前の測定）
+      const idx = history.findIndex((r) => r.id === editingId);
+      return idx >= 0 ? history[idx + 1] ?? null : null;
+    }
+    // 新規（今日）を入力中：保存済みの最新が前回
+    return history[0] ?? null;
+  }, [history, editingId]);
 
   const svg = useMemo(
     () => buildEvalSvg({ name, date, curr: scores, prev: prevRow ? rowScores(prevRow) : null, prevDate: prevRow?.eval_date ?? null, comment, images: evalImages }),
