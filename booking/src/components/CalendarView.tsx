@@ -295,6 +295,11 @@ export default function CalendarView({
     () => new Set(services.filter((s) => s.capacity > 1).map((s) => s.id)),
     [services]
   );
+  // パーソナル回数券メニュー（名前の前にPマーク）
+  const personalIds = useMemo(
+    () => new Set(services.filter((s) => (s as unknown as { personal?: boolean }).personal).map((s) => s.id)),
+    [services]
+  );
   const colorFor = (a: ApptWithSteps) =>
     a.service_id === kawanishiId
       ? abeColor
@@ -870,6 +875,9 @@ export default function CalendarView({
                       className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-normal text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
+                      {personalIds.has(a.service_id ?? "") && (
+                        <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
+                      )}
                       {a.patient_name || "（未登録）"}
                       <span className="ml-1 font-normal opacity-90">{minToLabel(sg.s)}</span>
                     </span>

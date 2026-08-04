@@ -400,6 +400,11 @@ export default function AdminBoard({ date }: { date: string }) {
     () => services.filter((s) => s.capacity > 1),
     [services]
   );
+  // パーソナル回数券メニュー（名前の前にPマーク）
+  const personalIds = useMemo(
+    () => new Set(services.filter((s) => (s as unknown as { personal?: boolean }).personal).map((s) => s.id)),
+    [services]
+  );
 
   // 担当者列から除外するサービス（体幹教室＝別列 / 川西＝阿部列に別枠で追加）
   const excludeFromStaff = useMemo(() => {
@@ -811,6 +816,9 @@ export default function AdminBoard({ date }: { date: string }) {
                               className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
                               style={{ textShadow: TEXT_SHADOW }}
                             >
+                              {personalIds.has(appt.service_id ?? "") && (
+                                <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
+                              )}
                               {appt.patient_name || "（未登録）"}
                               <span className="ml-1 font-normal opacity-90">{minToLabel(sg.s)}</span>
                             </span>
