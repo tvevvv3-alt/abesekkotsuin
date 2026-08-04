@@ -175,8 +175,10 @@ export function buildEvalSvg(input: EvalReportInput): string {
   ];
   rows.forEach((r, ri) => {
     const y = tblY + rowH * (ri + 1);
-    svg += `<rect x="${tblX}" y="${y}" width="${labelW}" height="${rowH}" fill="#f8fafc" stroke="#e2e8f0"/>`;
-    svg += `<text x="${tblX + labelW / 2}" y="${y + 20}" fill="${r.color}" font-size="13" font-weight="bold" text-anchor="middle">${r.label}</text>`;
+    const isCurr = ri === 0;
+    svg += `<rect x="${tblX}" y="${y}" width="${labelW}" height="${rowH}" fill="${isCurr ? "#eef2ff" : "#fdf3f4"}" stroke="#e2e8f0"/>`;
+    svg += `<circle cx="${tblX + 14}" cy="${y + rowH / 2}" r="4" fill="${isCurr ? r.color : "#ffffff"}" stroke="${r.color}" stroke-width="1.5"/>`;
+    svg += `<text x="${tblX + labelW / 2 + 6}" y="${y + 20}" fill="${r.color}" font-size="13" font-weight="bold" text-anchor="middle">${r.label}</text>`;
     EVAL_CATS.forEach((c, i) => {
       const x = tblX + labelW + i * colW;
       const v = r.s ? r.s[c.key] : null;
@@ -202,15 +204,27 @@ export function buildEvalSvg(input: EvalReportInput): string {
     const [ex, ey] = axisPoint(cx, cy, R, i, EVAL_MAX);
     svg += `<line x1="${cx}" y1="${cy}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="#cbd5e1" stroke-width="1"/>`;
   });
-  // 前回（塗り薄ピンク）→ 今回（黒線）の順で重ねる
+  // 前回（ピンクの点線・塗りなし＝過去）→ 今回（黒の実線＋塗り＝主役）の順で重ねる
   if (prev) {
-    svg += `<polygon points="${radarPoints(cx, cy, R, prev)}" fill="${PREV}" fill-opacity="0.25" stroke="${PREV}" stroke-width="2"/>`;
+    svg += `<polygon points="${radarPoints(cx, cy, R, prev)}" fill="none" stroke="${PREV}" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>`;
+    // 前回の頂点に小さな中空マーカー
+    EVAL_CATS.forEach((c, i) => {
+      const [x, y] = axisPoint(cx, cy, R, i, prev[c.key] ?? 0);
+      svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="#ffffff" stroke="${PREV}" stroke-width="1.5"/>`;
+    });
   }
-  svg += `<polygon points="${radarPoints(cx, cy, R, curr)}" fill="${CURR}" fill-opacity="0.06" stroke="${CURR}" stroke-width="2.5"/>`;
-  // 今回の頂点に丸
+  svg += `<polygon points="${radarPoints(cx, cy, R, curr)}" fill="${CURR}" fill-opacity="0.10" stroke="${CURR}" stroke-width="3" stroke-linejoin="round"/>`;
+  // 今回の頂点に丸＋スコア数字（白フチで見やすく）
   EVAL_CATS.forEach((c, i) => {
-    const [x, y] = axisPoint(cx, cy, R, i, curr[c.key] ?? 0);
-    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${CURR}"/>`;
+    const v = curr[c.key] ?? 0;
+    const [x, y] = axisPoint(cx, cy, R, i, v);
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${CURR}" stroke="#ffffff" stroke-width="1.5"/>`;
+    if (curr[c.key] != null) {
+      const ang = -Math.PI / 2 + (i * 2 * Math.PI) / EVAL_CATS.length;
+      const tx = x + Math.cos(ang) * 15;
+      const ty = y + Math.sin(ang) * 15 + 4;
+      svg += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="${CURR}" font-size="12" font-weight="bold" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke">${v}</text>`;
+    }
   });
   // 項目ラベル
   EVAL_CATS.forEach((c, i) => {
@@ -219,9 +233,12 @@ export function buildEvalSvg(input: EvalReportInput): string {
     svg += `<rect x="${(lx - (anchor === "middle" ? 34 : anchor === "start" ? 0 : 68)).toFixed(1)}" y="${(ly - 15).toFixed(1)}" width="68" height="20" rx="4" fill="${c.color}" opacity="0.12"/>`;
     svg += `<text x="${lx.toFixed(1)}" y="${(ly - 1).toFixed(1)}" fill="${c.color}" font-size="12.5" font-weight="bold" text-anchor="${anchor}">${esc(c.label)}</text>`;
   });
-  // 凡例
-  svg += `<circle cx="${cx - 70}" cy="${cy + R + 60}" r="5" fill="${CURR}"/><text x="${cx - 60}" y="${cy + R + 65}" font-size="13" fill="#334155">今回</text>`;
-  svg += `<circle cx="${cx + 20}" cy="${cy + R + 60}" r="5" fill="${PREV}"/><text x="${cx + 30}" y="${cy + R + 65}" font-size="13" fill="#334155">前回</text>`;
+  // 凡例（線のスタイルで区別：今回＝実線・前回＝点線）
+  const ly0 = cy + R + 60;
+  svg += `<line x1="${cx - 96}" y1="${ly0}" x2="${cx - 72}" y2="${ly0}" stroke="${CURR}" stroke-width="3"/>`;
+  svg += `<text x="${cx - 66}" y="${ly0 + 5}" font-size="13" font-weight="bold" fill="#111827">今回（実線）</text>`;
+  svg += `<line x1="${cx + 24}" y1="${ly0}" x2="${cx + 48}" y2="${ly0}" stroke="${PREV}" stroke-width="3" stroke-dasharray="5 4"/>`;
+  svg += `<text x="${cx + 54}" y="${ly0 + 5}" font-size="13" fill="#9a6b70">前回（点線）</text>`;
 
   // --- 評価内容（ルーブリック：イラスト＋各項目の1〜7と能力の説明）---
   const imgs = input.images || {};
