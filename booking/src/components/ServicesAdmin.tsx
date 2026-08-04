@@ -59,8 +59,6 @@ export default function ServicesAdmin() {
   const [published, setPublished] = useState(true);
   const [newBooking, setNewBooking] = useState(true);
   const [personal, setPersonal] = useState(false); // パーソナル回数券の対象
-  const [personalUnit, setPersonalUnit] = useState(""); // 1回あたり
-  const [personalPack, setPersonalPack] = useState(""); // 10回分
   const [personalMonths, setPersonalMonths] = useState("5"); // 有効期限（月）
   const [shortDesc, setShortDesc] = useState("");
   const [badge, setBadge] = useState("");
@@ -104,8 +102,6 @@ export default function ServicesAdmin() {
     setPublished(true);
     setNewBooking(true);
     setPersonal(false);
-    setPersonalUnit("");
-    setPersonalPack("");
     setPersonalMonths("5");
     setShortDesc("");
     setBadge("");
@@ -129,9 +125,7 @@ export default function ServicesAdmin() {
     setNewBooking(s.new_booking);
     setPersonal((s as unknown as { personal?: boolean }).personal ?? false);
     {
-      const sp = s as unknown as { personal_unit_price?: number | null; personal_pack_price?: number | null; personal_valid_months?: number | null };
-      setPersonalUnit(sp.personal_unit_price != null ? String(sp.personal_unit_price) : "");
-      setPersonalPack(sp.personal_pack_price != null ? String(sp.personal_pack_price) : "");
+      const sp = s as unknown as { personal_valid_months?: number | null };
       setPersonalMonths(sp.personal_valid_months != null ? String(sp.personal_valid_months) : "5");
     }
     setShortDesc(s.short_desc || "");
@@ -221,8 +215,6 @@ export default function ServicesAdmin() {
         published,
         new_booking: newBooking,
         personal,
-        personal_unit_price: personal && personalUnit.trim() ? parseInt(personalUnit, 10) : null,
-        personal_pack_price: personal && personalPack.trim() ? parseInt(personalPack, 10) : null,
         personal_valid_months: personal && personalMonths.trim() ? parseInt(personalMonths, 10) : null,
         short_desc: shortDesc.trim() || null,
         badge: badge.trim() || null,
@@ -566,28 +558,21 @@ export default function ServicesAdmin() {
                 ))}
               </div>
             </div>
-            {/* パーソナル料金（1回あたり／10回分／有効期限）*/}
+            {/* パーソナル：有効期限（月）*/}
             {personal && (
               <div className="mb-2 rounded-lg border border-indigo-200 bg-indigo-50/50 p-2">
-                <span className="mb-1 block text-xs font-bold text-indigo-700">パーソナル料金・有効期限</span>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-                  <label className="flex items-center gap-1">1回あたり ¥
-                    <input type="number" value={personalUnit} onChange={(e) => setPersonalUnit(e.target.value)} className="w-24 rounded border px-1.5 py-1" />
-                  </label>
-                  <label className="flex items-center gap-1">10回分 ¥
-                    <input type="number" value={personalPack} onChange={(e) => setPersonalPack(e.target.value)} className="w-24 rounded border px-1.5 py-1" />
-                  </label>
-                  <label className="flex items-center gap-1">有効期限
-                    <input type="number" value={personalMonths} onChange={(e) => setPersonalMonths(e.target.value)} className="w-14 rounded border px-1.5 py-1" />ヶ月
-                  </label>
-                </div>
-                <p className="mt-1 text-[10px] text-indigo-400">初診/再診ではなく、1回・10回分の料金で管理します。60分メニューは回数券から2回分消費されます。</p>
+                <label className="flex items-center gap-1 text-xs font-bold text-indigo-700">有効期限
+                  <input type="number" value={personalMonths} onChange={(e) => setPersonalMonths(e.target.value)} className="w-14 rounded border px-1.5 py-1" />ヶ月
+                </label>
+                <p className="mt-1 text-[10px] text-indigo-400">料金は下の「1回／10回分」をスタッフごとに入力。60分メニューは回数券から2回分消費されます。</p>
               </div>
             )}
-            {/* 料金（スタッフ別・初診/再診）*/}
-            {!personal && capacity === 1 && staffIds.size > 0 && (
+            {/* 料金（スタッフ別）。パーソナルは「1回／10回分」、通常は「初診／再診」*/}
+            {capacity === 1 && staffIds.size > 0 && (
               <div className="mb-2">
-                <span className="mb-1 block text-xs font-bold text-slate-600">料金（円・スタッフ別）</span>
+                <span className="mb-1 block text-xs font-bold text-slate-600">
+                  {personal ? "料金（1回／10回分・スタッフ別）" : "料金（円・スタッフ別）"}
+                </span>
                 <div className="space-y-1">
                   {staff
                     .filter((s) => staffIds.has(s.id))
@@ -598,13 +583,13 @@ export default function ServicesAdmin() {
                       return (
                         <div key={s.id} className="flex items-center gap-2 text-xs">
                           <span className="w-12 shrink-0">{s.display_name || s.name}</span>
-                          <label className="flex items-center gap-1">初診
+                          <label className="flex items-center gap-1">{personal ? "1回" : "初診"}
                             <input type="number" value={p.ini} onChange={(e) => set({ ini: e.target.value })}
                               className="w-20 rounded border px-1.5 py-1" />
                           </label>
-                          <label className="flex items-center gap-1">再診
+                          <label className="flex items-center gap-1">{personal ? "10回分" : "再診"}
                             <input type="number" value={p.rep} onChange={(e) => set({ rep: e.target.value })}
-                              className="w-20 rounded border px-1.5 py-1" />
+                              className="w-24 rounded border px-1.5 py-1" />
                           </label>
                         </div>
                       );
