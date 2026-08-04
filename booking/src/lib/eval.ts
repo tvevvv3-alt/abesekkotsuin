@@ -137,7 +137,7 @@ export interface EvalReportInput {
 // レポートSVG（幅760）。ブラウザでPNG化してLINE画像送信、管理画面プレビューにも使う。
 export function buildEvalSvg(input: EvalReportInput): string {
   const W = 760;
-  const H = 900;
+  const H = 1080;
   const { name, date, curr, prev, comment } = input;
   const NAVY = "#0f1f40";
   const GOLD = "#c9a24b";
@@ -222,8 +222,26 @@ export function buildEvalSvg(input: EvalReportInput): string {
   svg += `<circle cx="${cx - 70}" cy="${cy + R + 60}" r="5" fill="${CURR}"/><text x="${cx - 60}" y="${cy + R + 65}" font-size="13" fill="#334155">今回</text>`;
   svg += `<circle cx="${cx + 20}" cy="${cy + R + 60}" r="5" fill="${PREV}"/><text x="${cx + 30}" y="${cy + R + 65}" font-size="13" fill="#334155">前回</text>`;
 
+  // --- 評価内容（ルーブリック：各項目の1〜7と能力の説明）---
+  const ry0 = 712;
+  const colW2 = (W - 40) / EVAL_CATS.length;
+  EVAL_CATS.forEach((c, i) => {
+    const rx = 20 + i * colW2;
+    // 見出し（色バー）
+    svg += `<rect x="${rx}" y="${ry0}" width="${colW2 - 8}" height="18" rx="3" fill="${c.color}"/>`;
+    svg += `<text x="${rx + (colW2 - 8) / 2}" y="${ry0 + 13}" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">${esc(c.label)}</text>`;
+    // 1〜7 の基準
+    c.levels.forEach((lv, j) => {
+      svg += `<text x="${rx + 2}" y="${ry0 + 34 + j * 12.5}" fill="#475569" font-size="8">${esc(`${j + 1}. ${lv}`)}</text>`;
+    });
+    // 能力の説明
+    wrapText(c.desc, 15).slice(0, 3).forEach((ln, k) => {
+      svg += `<text x="${rx + 2}" y="${ry0 + 132 + k * 10}" fill="#94a3b8" font-size="7.5">${esc(ln)}</text>`;
+    });
+  });
+
   // --- 先生からの一言 ---
-  const by = 720;
+  const by = 905;
   svg += `<text x="40" y="${by}" fill="${NAVY}" font-size="14" font-weight="bold">先生からの一言</text>`;
   svg += `<rect x="40" y="${by + 10}" width="${W - 80}" height="120" rx="10" fill="#faf7ee" stroke="${GOLD}" stroke-opacity="0.5"/>`;
   const lines = wrapText(comment || "", 34).slice(0, 4);
