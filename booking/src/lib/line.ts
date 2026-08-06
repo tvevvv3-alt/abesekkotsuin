@@ -134,6 +134,30 @@ export function renderClassDone(
     .join("\n");
 }
 
+export const DEFAULT_PERSONAL_DONE_TEXT = [
+  "本日はパーソナルトレーニングお疲れさまでした！",
+  "回数券の残りは {残り} です。",
+  "",
+  "次回のご予約はこちら↓",
+  "{予約URL}",
+].join("\n");
+
+// パーソナルの終了メッセージにタグを差し込む
+// {名前}=患者名 / {予約URL}=予約リンク / {残り}=あとN回
+export function renderPersonalDone(
+  tpl: string,
+  vals: { name?: string | null; url: string; remaining?: string }
+): string {
+  const out = tpl
+    .split("{名前}").join((vals.name ?? "").trim())
+    .split("{予約URL}").join(vals.url)
+    .split("{残り}").join(vals.remaining ?? "");
+  return out
+    .split("\n")
+    .map((line) => line.replace(/[　・･／、][ 　]*$/u, "").replace(/[ 　]+$/u, ""))
+    .join("\n");
+}
+
 // テンプレートに予約情報を差し込む。値が空の「ラベル：」行は自動で消す。
 export function renderMessage(tpl: string, i: ApptInfo): string {
   const out = tpl

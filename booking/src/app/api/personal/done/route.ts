@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { lineMessagingConfigured, pushText } from "@/lib/line";
+import { DEFAULT_PERSONAL_DONE_TEXT, lineMessagingConfigured, pushText, renderPersonalDone } from "@/lib/line";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
   const { data: sv } = await admin.from("services").select("id, personal");
   const pids = ((sv as { id: string; personal: boolean }[] | null) ?? []).filter((s) => s.personal).map((s) => s.id);
 
+  // 終了メッセージのテンプレート
+  const { data: cfg } = await admin.from("settings").select("personal_done_text").eq("id", 1).maybeSingle();
+  const tpl = (cfg?.personal_done_text as string | null)?.trim() || DEFAULT_PERSONAL_DONE_TEXT;
+
   // 会員の回数・既使用
   const { data: tk } = await admin
     .from("personal_tickets")
@@ -62,10 +66,7 @@ export async function POST(req: NextRequest) {
 
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
   const bookUrl = liffId ? `https://liff.line.me/${liffId}` : process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app";
-  const text =
-    `本日はパーソナルトレーニングお疲れさまでした！\n` +
-    `回数券の残りは あと${remaining}回 です。\n` +
-    `次回のご予約はこちら→ ${bookUrl}`;
+  const text = renderPersonalDone(tpl, { name: appt.patient_name, url: bookUrl, remaining: `あと${remaining}回` });
   const r = await pushText(appt.line_user_id, text);
   return NextResponse.json({ ok: r.ok, remaining, error: r.ok ? undefined : r.error });
 }

@@ -128,6 +128,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     remind_morning_hour: 9,
     remind_morning_text: null,
     class_done_text: null,
+    personal_done_text: null,
   };
   if (!data) return defaults;
   // 移行前で列が無い場合も既定で補完

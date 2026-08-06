@@ -24,6 +24,7 @@ import type {
 } from "@/lib/types";
 import { minToLabel, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
+import CoreEvalModal from "./CoreEvalModal";
 
 const PX_PER_MIN = 1.4;
 const GRID_STEP = 30; // 目盛り・スナップ（分）
@@ -157,6 +158,7 @@ export default function AdminBoard({ date }: { date: string }) {
     | { mode: "edit"; appt: ApptWithSteps }
     | null
   >(null);
+  const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
 
   // ドラッグ選択の状態（列コンテキスト付き：担当者列 or メニュー列）
   const [drag, setDrag] = useState<{ ctx: ColCtx; a: number; b: number } | null>(null);
@@ -1092,7 +1094,15 @@ export default function AdminBoard({ date }: { date: string }) {
             setModal(null);
             reload();
           }}
+          onCoreTest={(nm, lu) => {
+            setModal(null);
+            setEvalTarget({ name: nm, lineUserId: lu });
+          }}
         />
+      )}
+
+      {evalTarget && (
+        <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => setEvalTarget(null)} />
       )}
 
       {confirmMove && (
