@@ -370,6 +370,14 @@ export default function ClassRoster() {
                             <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800">{name}</span>
                             <button
                               type="button"
+                              onClick={() => { setAddFor(name); setAddDate(toDateStr(new Date())); setAddTime("17:00"); }}
+                              title="予約を追加"
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[13px] font-bold leading-none text-white active:bg-emerald-600"
+                            >
+                              ＋
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => togglePurchased(name, !pu.purchased)}
                               className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
                                 pu.purchased
@@ -420,12 +428,6 @@ export default function ClassRoster() {
                           >
                             <span className="block">体幹</span>
                             <span className="block">テスト</span>
-                          </button>
-                          <button
-                            onClick={() => { setAddFor(name); setAddDate(toDateStr(new Date())); setAddTime("17:00"); }}
-                            className="mt-1 block w-full rounded-md border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-[10px] font-bold text-emerald-600 active:bg-emerald-100"
-                          >
-                            ＋予約
                           </button>
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {

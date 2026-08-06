@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
-import { minToLabel } from "@/lib/booking";
+import { minToLabel, toDateStr } from "@/lib/booking";
 import type { Staff } from "@/lib/types";
 
 // パーソナルトレーニング 回数券。体幹教室と同じ仕組み：
@@ -61,15 +61,48 @@ export default function PersonalRoster() {
     | { id: string; name: string; date: string; time: string; start_min: number; end_min: number; done: boolean; line_user_id: string | null }
     | null
   >(null);
+  const [personalSvcList, setPersonalSvcList] = useState<{ id: string; name: string }[]>([]);
+  // ＋予約（回数券から予約を追加）
+  const [add, setAdd] = useState<{ name: string } | null>(null);
+  const [addSvc, setAddSvc] = useState("");
+  const [addStaff, setAddStaff] = useState<string | null>(null);
+  const [addDate, setAddDate] = useState(() => toDateStr(new Date()));
+  const [addTime, setAddTime] = useState("10:00");
+  const [adding, setAdding] = useState(false);
+
+  async function bookVisit() {
+    if (!add || !addSvc) return;
+    if (!addStaff) { alert("担当を選んでください"); return; }
+    const [h, m] = addTime.split(":").map((x) => parseInt(x, 10));
+    const start = (h || 0) * 60 + (m || 0);
+    setAdding(true);
+    const { data, error } = await supabase.rpc("book_appointment", {
+      p_service_id: addSvc,
+      p_staff_id: addStaff,
+      p_date: addDate,
+      p_start_min: start,
+      p_name: add.name,
+      p_source: "admin",
+    });
+    setAdding(false);
+    if (error) { alert("予約できませんでした：\n" + error.message); return; }
+    const res = data as { ok: boolean; reason?: string };
+    if (!res.ok) { alert(res.reason || "予約できませんでした（枠が埋まっている可能性）"); return; }
+    setAdd(null);
+    reload();
+  }
 
   const reload = useCallback(async () => {
     setLoading(true);
     // 回数券対象メニュー（＋有効期限の月数）
-    const { data: sv } = await supabase.from("services").select("id, personal, personal_valid_months");
-    const personalSvc = ((sv as { id: string; personal: boolean; personal_valid_months: number | null }[] | null) ?? []).filter((s) => s.personal);
+    const { data: sv } = await supabase.from("services").select("id, name, personal, personal_valid_months, sort_order");
+    const personalSvc = ((sv as { id: string; name: string; personal: boolean; personal_valid_months: number | null; sort_order: number }[] | null) ?? [])
+      .filter((s) => s.personal)
+      .sort((a, b) => a.sort_order - b.sort_order);
     const personalIds = personalSvc.map((s) => s.id);
     const vmById = new Map(personalSvc.map((s) => [s.id, s.personal_valid_months ?? 5]));
     setHasPersonalMenu(personalIds.length > 0);
+    setPersonalSvcList(personalSvc.map((s) => ({ id: s.id, name: s.name })));
 
     const [{ data: tk }, appts] = await Promise.all([
       supabase
@@ -291,7 +324,16 @@ export default function PersonalRoster() {
                 return (
                   <tr key={r.id} className="border-t">
                     <td className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-r bg-white px-1.5 py-1 align-middle">
-                      <input value={r.name} placeholder="お名前" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} font-bold text-slate-800`} />
+                      <div className="flex items-center gap-1">
+                        <input value={r.name} placeholder="お名前" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} font-bold text-slate-800`} />
+                        <button
+                          onClick={() => { setAdd({ name: r.name }); setAddStaff(r.staff_id); setAddSvc(personalSvcList[0]?.id ?? ""); setAddDate(toDateStr(new Date())); setAddTime("10:00"); }}
+                          title="予約を追加"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[13px] font-bold leading-none text-white active:bg-emerald-600"
+                        >
+                          ＋
+                        </button>
+                      </div>
                     </td>
                     <td className="border-l px-1 py-1 align-middle">
                       <select
@@ -358,6 +400,56 @@ export default function PersonalRoster() {
         未登録の方が予約すると自動で行が作られ、担当・有効期限（初回＋5ヶ月）も自動で入ります。
         各回のマスをタップすると<b>氏名・日付・時刻の編集や終了</b>ができます（同姓同名・兄弟の付け替えに）。
       </p>
+
+      {add && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setAdd(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-800">パーソナル予約を追加</h2>
+              <button onClick={() => setAdd(null)} className="text-slate-400">✕</button>
+            </div>
+            <p className="mb-3 text-sm text-slate-600"><b>{add.name}</b> さんの予約を入れます。</p>
+            {personalSvcList.length === 0 ? (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">パーソナルのメニューが未設定です。施術メニュー管理で「パーソナル30分／60分」を作り「パーソナル回数券」にチェックしてください。</p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-600">メニュー（30分=1回・60分=2回消費）</label>
+                  <select value={addSvc} onChange={(e) => setAddSvc(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
+                    {personalSvcList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-600">担当</label>
+                  <select value={addStaff ?? ""} onChange={(e) => setAddStaff(e.target.value || null)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
+                    <option value="">選択…</option>
+                    {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-xs font-bold text-slate-600">日付</label>
+                    <input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+                  </div>
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs font-bold text-slate-600">時刻</label>
+                    <input type="time" step={300} value={addTime} onChange={(e) => setAddTime(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400">カレンダー・ボードにも反映されます。終了時に回数券から消費されます。</p>
+              </div>
+            )}
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={() => setAdd(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
+              {personalSvcList.length > 0 && (
+                <button onClick={bookVisit} disabled={adding} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700 disabled:bg-slate-300">
+                  {adding ? "予約中…" : "予約する"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {ev && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setEv(null)}>
