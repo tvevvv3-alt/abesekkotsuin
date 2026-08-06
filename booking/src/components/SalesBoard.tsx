@@ -844,11 +844,11 @@ export default function SalesBoard() {
       e.bur += s.burden;
       if (s.staff_id && s.staff_id === bucket.abe) e.ho1 += s.selfpay;
       else if (s.staff_id && s.staff_id === bucket.shibu) e.ho2 += s.selfpay;
-      else if (s.staff_id && (s.staff_id === bucket.hagi || s.staff_id === bucket.haya)) e.ho3 += s.selfpay;
-      else e.ho4 += s.selfpay;
+      else if (s.staff_id && (s.staff_id === bucket.hagi || s.staff_id === bucket.haya || s.staff_id === taikan?.id)) e.ho3 += s.selfpay;
+      else e.ho4 += s.selfpay; // 物販・その他のみ
     });
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [appts, sales, bucket, kawa]);
+  }, [appts, sales, bucket, kawa, taikan]);
   const monthSum = useMemo(
     () =>
       monthDaily.reduce(
@@ -1125,7 +1125,7 @@ export default function SalesBoard() {
                 <th className="px-2 py-2 text-right font-bold">入金額</th>
                 <th className="px-2 py-2 text-right font-bold">保険外1<span className="font-normal">(阿部)</span></th>
                 <th className="px-2 py-2 text-right font-bold">保険外2<span className="font-normal">(澁谷)</span></th>
-                <th className="px-2 py-2 text-right font-bold">保険外3<span className="font-normal">(萩原林)</span></th>
+                <th className="px-2 py-2 text-right font-bold">保険外3<span className="font-normal">(萩原林体幹)</span></th>
                 <th className="px-2 py-2 text-right font-bold">保険外4<span className="font-normal">(物販)</span></th>
                 {kawa && <th className="border-l-2 border-indigo-200 px-2 py-2 text-right font-bold text-indigo-700">川西<span className="font-normal">(整体)</span></th>}
                 <th className="border-l-2 border-emerald-200 px-2 py-2 text-right font-bold text-emerald-700">キャッシュレス</th>
@@ -1173,18 +1173,20 @@ export default function SalesBoard() {
             </tfoot>
           </table>
         </div>
-        {/* 保険外3（萩原・林）の内訳（月計） */}
-        {(bucket.hagi || bucket.haya) && (() => {
+        {/* 保険外3（萩原・林・体幹教室）の内訳（月計） */}
+        {(bucket.hagi || bucket.haya || taikan) && (() => {
           const hg = spByStaff(bucket.hagi);
           const hy = spByStaff(bucket.haya);
+          const tk = taikan ? spByStaff(taikan.id) : 0;
           const hgName = staff.find((s) => s.id === bucket.hagi)?.name ?? "萩原";
           const hyName = staff.find((s) => s.id === bucket.haya)?.name ?? "林";
           return (
             <div className="mt-2 inline-flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-white px-4 py-2 text-sm">
-              <span className="font-bold text-slate-700">保険外3（{hgName}・{hyName}）内訳</span>
+              <span className="font-bold text-slate-700">保険外3（{hgName}・{hyName}・体幹教室）内訳</span>
               <span className="text-slate-500">{hgName} <b className="tabnum text-slate-800">{yen(hg)}</b></span>
               <span className="text-slate-500">{hyName} <b className="tabnum text-slate-800">{yen(hy)}</b></span>
-              <span className="font-bold text-blue-700">計 <span className="tabnum">{yen(hg + hy)}</span></span>
+              <span className="text-slate-500">体幹教室 <b className="tabnum text-slate-800">{yen(tk)}</b></span>
+              <span className="font-bold text-blue-700">計 <span className="tabnum">{yen(hg + hy + tk)}</span></span>
             </div>
           );
         })()}
