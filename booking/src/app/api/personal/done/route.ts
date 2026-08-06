@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_PERSONAL_DONE_TEXT, lineMessagingConfigured, pushText, renderPersonalDone } from "@/lib/line";
 
@@ -12,6 +13,10 @@ function consume(a: { start_min: number; end_min: number }): number {
 }
 
 export async function POST(req: NextRequest) {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
+
   let appointmentId = "";
   try {
     const b = (await req.json()) as { appointmentId?: string };

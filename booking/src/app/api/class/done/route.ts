@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   DEFAULT_CLASS_DONE_TEXT,
@@ -12,6 +13,10 @@ export const dynamic = "force-dynamic";
 
 // 体幹教室の「終了」→ 参加者へお礼＋次回予約案内をLINE送信する。
 export async function POST(req: NextRequest) {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
+
   let appointmentId = "";
   try {
     const body = (await req.json()) as { appointmentId?: string };

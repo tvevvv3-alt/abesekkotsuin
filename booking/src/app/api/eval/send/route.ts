@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { lineMessagingConfigured, pushImage } from "@/lib/line";
 
@@ -9,6 +10,10 @@ export const dynamic = "force-dynamic";
 // ブラウザで作ったPNG(base64)を受け取り、Supabase Storage(公開)へ保存し、
 // その氏名に紐づくLINEユーザー（体幹教室の予約から取得）へ画像メッセージを送信する。
 export async function POST(req: NextRequest) {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
+
   let evalId = "";
   let name = "";
   let pngBase64 = "";

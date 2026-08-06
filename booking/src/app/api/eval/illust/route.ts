@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -9,6 +10,10 @@ export const dynamic = "force-dynamic";
 const KEYS = new Set(["operation", "balance", "handstand", "ring", "boxjump"]);
 
 export async function POST(req: NextRequest) {
+  const sb = createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
+
   let key = "";
   let pngBase64 = "";
   try {
