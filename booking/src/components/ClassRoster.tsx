@@ -43,6 +43,32 @@ export default function ClassRoster() {
   const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null); // ドラッグ中の来院ID
   const [overName, setOverName] = useState<string | null>(null); // ドロップ先の会員名
+  // 回数券から予約を追加
+  const [addFor, setAddFor] = useState<string | null>(null);
+  const [addDate, setAddDate] = useState(() => toDateStr(new Date()));
+  const [addTime, setAddTime] = useState("17:00");
+  const [adding, setAdding] = useState(false);
+
+  async function bookVisit() {
+    if (!addFor || !classId) return;
+    const [h, m] = addTime.split(":").map((x) => parseInt(x, 10));
+    const start = (h || 0) * 60 + (m || 0);
+    setAdding(true);
+    const { data, error } = await supabase.rpc("book_appointment", {
+      p_service_id: classId,
+      p_staff_id: null, // 体幹教室は担当なし
+      p_date: addDate,
+      p_start_min: start,
+      p_name: addFor,
+      p_source: "admin",
+    });
+    setAdding(false);
+    if (error) { alert("予約できませんでした：\n" + error.message); return; }
+    const res = data as { ok: boolean; reason?: string };
+    if (!res.ok) { alert(res.reason || "予約できませんでした（満席や休診の可能性）"); return; }
+    setAddFor(null);
+    reload();
+  }
 
   // 来院を別の会員へ付け替え（同姓同名・兄弟の付け替え）
   async function reassign(apptId: string, fromName: string, toName: string) {
@@ -395,6 +421,12 @@ export default function ClassRoster() {
                             <span className="block">体幹</span>
                             <span className="block">テスト</span>
                           </button>
+                          <button
+                            onClick={() => { setAddFor(name); setAddDate(toDateStr(new Date())); setAddTime("17:00"); }}
+                            className="mt-1 block w-full rounded-md border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-[10px] font-bold text-emerald-600 active:bg-emerald-100"
+                          >
+                            ＋予約
+                          </button>
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
                           const v = visits[i];
@@ -454,6 +486,37 @@ export default function ClassRoster() {
 
       {evalTarget && (
         <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => setEvalTarget(null)} />
+      )}
+
+      {addFor && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddFor(null)}>
+          <div className="w-full max-w-xs rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-800">体幹教室の予約を追加</h2>
+              <button onClick={() => setAddFor(null)} className="text-slate-400">✕</button>
+            </div>
+            <p className="mb-3 text-sm text-slate-600"><b>{addFor}</b> さんの予約を入れます。</p>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="mb-1 block text-xs font-bold text-slate-600">日付</label>
+                <input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+              </div>
+              <div className="w-28">
+                <label className="mb-1 block text-xs font-bold text-slate-600">時刻</label>
+                <input type="time" step={300} value={addTime} onChange={(e) => setAddTime(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">カレンダー・ボードにも反映されます（定員4名／満席時は入りません）。</p>
+            <div className="mt-4 flex items-center gap-2">
+              <button onClick={() => setAddFor(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
+              <button onClick={bookVisit} disabled={adding} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700 disabled:bg-slate-300">
+                {adding ? "予約中…" : "予約する"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
