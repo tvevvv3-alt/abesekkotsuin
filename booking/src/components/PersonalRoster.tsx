@@ -56,6 +56,11 @@ export default function PersonalRoster() {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [staffFilter, setStaffFilter] = useState<string>("all");
+  // 来院（予約）の編集ポップアップ：氏名・日付・時刻を直せる（同姓同名/兄弟の付け替え）
+  const [ev, setEv] = useState<
+    | { id: string; name: string; date: string; time: string; start_min: number; end_min: number; done: boolean; line_user_id: string | null }
+    | null
+  >(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -206,6 +211,28 @@ export default function PersonalRoster() {
     reload();
   }
 
+  // ポップアップから：氏名・日付・時刻を保存（所要時間は維持）
+  async function saveVisit() {
+    if (!ev) return;
+    const [h, m] = ev.time.split(":").map((x) => parseInt(x, 10));
+    const start = (h || 0) * 60 + (m || 0);
+    const dur = Math.max(0, ev.end_min - ev.start_min);
+    await supabase
+      .from("appointments")
+      .update({ patient_name: ev.name.trim(), date: ev.date, start_min: start, end_min: start + dur })
+      .eq("id", ev.id);
+    setEv(null);
+    reload();
+  }
+  // ポップアップから：終了＋LINE
+  async function finishFromPopup() {
+    if (!ev) return;
+    if (!confirm(`${ev.name || "この方"} を終了＋LINE送信しますか？`)) return;
+    const v: Visit = { id: ev.id, patient_name: ev.name, date: ev.date, start_min: ev.start_min, end_min: ev.end_min, status: "booked", staff_id: null, service_id: null, line_user_id: ev.line_user_id };
+    setEv(null);
+    await finish(v, ev.name);
+  }
+
   const amt = "w-full rounded border border-slate-300 px-1 py-0.5 text-sm focus:border-blue-400 focus:outline-none";
 
   return (
@@ -296,7 +323,7 @@ export default function PersonalRoster() {
                       return (
                         <td
                           key={i}
-                          onClick={() => { if (!done && busy !== v.id && confirm(`${r.name} を終了＋LINE送信しますか？（${c}回消費）`)) finish(v, r.name); }}
+                          onClick={() => setEv({ id: v.id, name: v.patient_name ?? "", date: v.date, time: minToLabel(v.start_min), start_min: v.start_min, end_min: v.end_min, done, line_user_id: v.line_user_id })}
                           className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${done ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-blue-50"}`}
                         >
                           <div className="text-[12px] font-medium text-slate-700">
@@ -309,7 +336,7 @@ export default function PersonalRoster() {
                           {done ? (
                             <div className="text-[10px] font-bold">{v.line_user_id ? "✅" : "済"}</div>
                           ) : (
-                            <div className="text-[9px] text-blue-500">タップで終了</div>
+                            <div className="text-[9px] text-blue-500">タップで編集/終了</div>
                           )}
                         </td>
                       );
@@ -329,7 +356,50 @@ export default function PersonalRoster() {
         「パーソナル回数券対象」メニューの予約が、患者名で自動的にここに並びます。各回のマスを<b>タップで終了</b>すると
         <b>消費（30分=1回・60分=2回）＋本人へLINE（残り回数）</b>を送信します。<b>残</b>＝10回 − 既使用 − 終了済みの消費。
         未登録の方が予約すると自動で行が作られ、担当・有効期限（初回＋5ヶ月）も自動で入ります。
+        各回のマスをタップすると<b>氏名・日付・時刻の編集や終了</b>ができます（同姓同名・兄弟の付け替えに）。
       </p>
+
+      {ev && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setEv(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-800">来院の編集{ev.done ? "（終了済み）" : ""}</h2>
+              <button onClick={() => setEv(null)} className="text-slate-400">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-600">氏名</label>
+                <input value={ev.name} onChange={(e) => setEv({ ...ev, name: e.target.value })}
+                  placeholder="氏名" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                <p className="mt-1 text-[11px] text-slate-400">氏名を直すと、その来院は正しい人の回数券へ移ります。</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-bold text-slate-600">日付</label>
+                  <input type="date" value={ev.date} onChange={(e) => setEv({ ...ev, date: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+                </div>
+                <div className="w-28">
+                  <label className="mb-1 block text-xs font-bold text-slate-600">時刻</label>
+                  <input type="time" step={300} value={ev.time} onChange={(e) => setEv({ ...ev, time: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              {!ev.done && (
+                <button onClick={finishFromPopup} disabled={busy === ev.id}
+                  className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300">
+                  終了＋LINE
+                </button>
+              )}
+              <button onClick={saveVisit} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700">
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

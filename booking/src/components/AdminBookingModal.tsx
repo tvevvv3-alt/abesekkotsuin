@@ -140,6 +140,10 @@ export default function AdminBookingModal({
           setError(res.reason || "変更不可");
           return;
         }
+        // 氏名の変更を反映（同姓同名/兄弟の付け替え）
+        if (name.trim() && name.trim() !== (appt.patient_name ?? "")) {
+          await supabase.from("appointments").update({ patient_name: name.trim() }).eq("id", appt.id);
+        }
       }
       onDone();
     } catch (e) {
@@ -293,9 +297,14 @@ export default function AdminBookingModal({
             </div>
           </div>
         ) : (
-          <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
-            <span className="font-bold">{appt?.patient_name}</span>
-            <span className="ml-2 text-xs text-slate-500">の予約</span>
+          <div className="mb-3 rounded-lg border p-3">
+            <label className="mb-1 block text-xs font-medium text-slate-600">氏名（編集可・同姓同名/兄弟の付け替え用）</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="氏名"
+              className="w-full rounded-md border px-2 py-1.5 text-sm"
+            />
           </div>
         )}
 

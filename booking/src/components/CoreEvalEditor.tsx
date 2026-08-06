@@ -176,6 +176,16 @@ export default function CoreEvalEditor({ name, editableName, names, onNameChange
   }
 
   async function sendLine() {
+    if (sending) return; // 二重送信ガード
+    if (!name.trim()) { setMsg("お名前を入力してください"); return; }
+    // 送信済み判定（この記録に line_sent_at があるか）
+    const already = editingId ? history.find((r) => r.id === editingId)?.line_sent_at : null;
+    const ok = window.confirm(
+      already
+        ? `${name} さんへは送信済みです。もう一度LINEで送りますか？`
+        : `${name} さんへLINEで体幹評価を送信します。よろしいですか？`
+    );
+    if (!ok) return;
     setSending(true);
     setMsg(null);
     const id = await save();
