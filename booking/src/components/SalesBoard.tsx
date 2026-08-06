@@ -1197,9 +1197,7 @@ export default function SalesBoard() {
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="text-sm font-bold text-slate-700">{d.getMonth() + 1}/{d.getDate()}（{WEEKDAY_LABELS[d.getDay()]}）</span>
             <div className="ml-auto flex flex-wrap items-center gap-2">
-              <button onClick={autofillSelf} className="rounded-md bg-amber-500 px-2 py-1 text-[11px] font-bold text-white active:bg-amber-600" title="担当×メニュー×初診/再診×学生/一般から自費を自動入力（入力済みは上書きしません）">⚡ 自費 自動入力</button>
               <button onClick={() => setPriceOpen(true)} className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100">料金設定</button>
-              <button onClick={() => fileRef.current?.click()} className="rounded-md border border-blue-600 px-2 py-1 text-[11px] font-bold text-blue-600 active:bg-blue-50">📷 レセコン取込</button>
               <button onClick={() => addManual()} className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販/予約外</button>
             </div>
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
@@ -1348,9 +1346,8 @@ export default function SalesBoard() {
 
       <p className="mt-3 text-[11px] text-slate-400">
         名前・担当は予約から自動。各人に 保険外(自費)・合計額(保険総額)・負担額 を入力すると、
-        入金額(=自費+負担額)・合計(=自費+合計額) と日計・月計が自動集計されます。物販や予約外は
-        「＋物販/予約外」から。担当ごとの合計(自費+保険)で当月の達成率が出ます。レセコンの日計表は
-        「📷 レセコン取込」で写真から自動入力できます（担当は予約から自動）。
+        入金額(=自費+負担額)・総合計(=自費+合計額) と日計・月計が自動集計されます。物販や予約外は
+        「＋物販/予約外」から。担当ごとの合計(自費+保険)で当月の達成率が出ます。
       </p>
 
       {/* 料金設定（自費の自動計算） */}
@@ -1408,7 +1405,7 @@ export default function SalesBoard() {
               </div>
             </div>
             <div className="flex items-center gap-2 border-t px-4 py-3">
-              <span className="text-[11px] text-slate-400">名前・担当は予約から自動。金額は「⚡自費 自動入力」で反映。</span>
+              <span className="text-[11px] text-slate-400">名前・担当は予約から自動。ここで設定した料金を参考に金額を入力します。</span>
               <button onClick={() => setPriceOpen(false)} className="ml-auto rounded-lg border px-3 py-1.5 text-sm text-slate-500">閉じる</button>
               <button onClick={persistPrices} className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700">保存</button>
             </div>
