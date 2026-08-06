@@ -41,6 +41,16 @@ export default function ClassRoster() {
   const [filter, setFilter] = useState<"all" | "month4" | "free">("all");
   const [sort, setSort] = useState<"name" | "date">("name");
   const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null); // ドラッグ中の来院ID
+  const [overName, setOverName] = useState<string | null>(null); // ドロップ先の会員名
+
+  // 来院を別の会員へ付け替え（同姓同名・兄弟の付け替え）
+  async function reassign(apptId: string, fromName: string, toName: string) {
+    if (!apptId || fromName.trim() === toName.trim()) return;
+    if (!confirm(`この来院を「${fromName}」→「${toName}」に付け替えますか？`)) return;
+    await supabase.from("appointments").update({ patient_name: toName }).eq("id", apptId);
+    reload();
+  }
 
   const from = useMemo(() => toDateStr(month), [month]);
   const to = useMemo(
@@ -315,8 +325,21 @@ export default function ClassRoster() {
                     const count = visits.length;
                     const pu = purchaseOf(name);
                     return (
-                      <tr key={name} className="border-t">
-                        <td className={`sticky left-0 z-10 w-[124px] min-w-[124px] max-w-[124px] border-r px-1.5 py-1 align-middle ${pu.purchased ? "bg-white" : "bg-rose-50"}`}>
+                      <tr
+                        key={name}
+                        className={`border-t ${overName === name && dragId ? "bg-indigo-50" : ""}`}
+                        onDragOver={(e) => { if (dragId) { e.preventDefault(); if (overName !== name) setOverName(name); } }}
+                        onDragLeave={() => { if (overName === name) setOverName(null); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const id = e.dataTransfer.getData("apptId");
+                          const from = e.dataTransfer.getData("fromName");
+                          setOverName(null);
+                          setDragId(null);
+                          reassign(id, from, name);
+                        }}
+                      >
+                        <td className={`sticky left-0 z-10 w-[124px] min-w-[124px] max-w-[124px] border-r px-1.5 py-1 align-middle ${overName === name && dragId ? "bg-indigo-100" : pu.purchased ? "bg-white" : "bg-rose-50"}`}>
                           <div className="flex items-center gap-1">
                             <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800">{name}</span>
                             <button
@@ -381,12 +404,20 @@ export default function ClassRoster() {
                           return (
                             <td
                               key={i}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("apptId", v.id);
+                                e.dataTransfer.setData("fromName", name);
+                                e.dataTransfer.effectAllowed = "move";
+                                setDragId(v.id);
+                              }}
+                              onDragEnd={() => { setDragId(null); setOverName(null); }}
                               onClick={() => {
                                 if (!done && busy !== v.id && confirm(`${name} を終了＋LINE送信しますか？`))
                                   finish(v);
                               }}
                               className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${
-                                done ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-blue-50"
+                                done ? "bg-slate-50 text-slate-400" : "cursor-grab hover:bg-blue-50"
                               }`}
                             >
                               <div className="text-[12px] font-medium text-slate-700">
@@ -418,6 +449,7 @@ export default function ClassRoster() {
         今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
         「体幹テスト」から評価を入力してLINE送信できます。
+        来院マスを<b>別の会員の行へドラッグ＆ドロップ</b>すると、その来院を付け替えできます（同姓同名・兄弟の付け替えに）。
       </p>
 
       {evalTarget && (
