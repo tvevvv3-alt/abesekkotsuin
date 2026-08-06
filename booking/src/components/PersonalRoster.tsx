@@ -72,6 +72,7 @@ export default function PersonalRoster() {
 
   async function bookVisit() {
     if (!add || !addSvc) return;
+    if (!add.name.trim()) { alert("会員名を入力してください"); return; }
     if (!addStaff) { alert("担当を選んでください"); return; }
     const [h, m] = addTime.split(":").map((x) => parseInt(x, 10));
     const start = (h || 0) * 60 + (m || 0);
@@ -81,7 +82,7 @@ export default function PersonalRoster() {
       p_staff_id: addStaff,
       p_date: addDate,
       p_start_min: start,
-      p_name: add.name,
+      p_name: add.name.trim(),
       p_source: "admin",
     });
     setAdding(false);
@@ -272,6 +273,12 @@ export default function PersonalRoster() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-bold text-slate-800">パーソナル 回数券</h1>
+        <button
+          onClick={() => { setAdd({ name: "" }); setAddStaff(null); setAddSvc(personalSvcList[0]?.id ?? ""); setAddDate(toDateStr(new Date())); setAddTime("10:00"); }}
+          className="rounded-md bg-emerald-600 px-2.5 py-1 text-[12px] font-bold text-white active:bg-emerald-700"
+        >
+          ＋ 予約追加
+        </button>
         <button onClick={addRow} className="rounded-md bg-blue-600 px-2.5 py-1 text-[12px] font-bold text-white active:bg-blue-700">
           ＋ 会員を追加
         </button>
@@ -324,16 +331,7 @@ export default function PersonalRoster() {
                 return (
                   <tr key={r.id} className="border-t">
                     <td className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-r bg-white px-1.5 py-1 align-middle">
-                      <div className="flex items-center gap-1">
-                        <input value={r.name} placeholder="お名前" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} font-bold text-slate-800`} />
-                        <button
-                          onClick={() => { setAdd({ name: r.name }); setAddStaff(r.staff_id); setAddSvc(personalSvcList[0]?.id ?? ""); setAddDate(toDateStr(new Date())); setAddTime("10:00"); }}
-                          title="予約を追加"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[13px] font-bold leading-none text-white active:bg-emerald-600"
-                        >
-                          ＋
-                        </button>
-                      </div>
+                      <input value={r.name} placeholder="お名前" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} font-bold text-slate-800`} />
                     </td>
                     <td className="border-l px-1 py-1 align-middle">
                       <select
@@ -408,7 +406,14 @@ export default function PersonalRoster() {
               <h2 className="text-base font-bold text-slate-800">パーソナル予約を追加</h2>
               <button onClick={() => setAdd(null)} className="text-slate-400">✕</button>
             </div>
-            <p className="mb-3 text-sm text-slate-600"><b>{add.name}</b> さんの予約を入れます。</p>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-bold text-slate-600">会員名</label>
+              <input list="personal-member-names" value={add.name} onChange={(e) => setAdd({ name: e.target.value })}
+                placeholder="会員名を選択／入力" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <datalist id="personal-member-names">
+                {rows.map((r) => <option key={r.id} value={r.name} />)}
+              </datalist>
+            </div>
             {personalSvcList.length === 0 ? (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">パーソナルのメニューが未設定です。施術メニュー管理で「パーソナル30分／60分」を作り「パーソナル回数券」にチェックしてください。</p>
             ) : (

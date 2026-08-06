@@ -43,14 +43,16 @@ export default function ClassRoster() {
   const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null); // ドラッグ中の来院ID
   const [overName, setOverName] = useState<string | null>(null); // ドロップ先の会員名
-  // 回数券から予約を追加
-  const [addFor, setAddFor] = useState<string | null>(null);
+  // 回数券から予約を追加（一番上のボタンから）
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
   const [addDate, setAddDate] = useState(() => toDateStr(new Date()));
   const [addTime, setAddTime] = useState("17:00");
   const [adding, setAdding] = useState(false);
 
   async function bookVisit() {
-    if (!addFor || !classId) return;
+    if (!addName.trim()) { alert("会員名を入力してください"); return; }
+    if (!classId) return;
     const [h, m] = addTime.split(":").map((x) => parseInt(x, 10));
     const start = (h || 0) * 60 + (m || 0);
     setAdding(true);
@@ -59,14 +61,14 @@ export default function ClassRoster() {
       p_staff_id: null, // 体幹教室は担当なし
       p_date: addDate,
       p_start_min: start,
-      p_name: addFor,
+      p_name: addName.trim(),
       p_source: "admin",
     });
     setAdding(false);
     if (error) { alert("予約できませんでした：\n" + error.message); return; }
     const res = data as { ok: boolean; reason?: string };
     if (!res.ok) { alert(res.reason || "予約できませんでした（満席や休診の可能性）"); return; }
-    setAddFor(null);
+    setAddOpen(false);
     reload();
   }
 
@@ -243,6 +245,12 @@ export default function ClassRoster() {
     <div className="mx-auto max-w-4xl">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-bold text-slate-800">体幹教室 回数管理</h1>
+        <button
+          onClick={() => { setAddOpen(true); setAddName(""); setAddDate(toDateStr(new Date())); setAddTime("17:00"); }}
+          className="rounded-md bg-emerald-600 px-2.5 py-1 text-[12px] font-bold text-white active:bg-emerald-700"
+        >
+          ＋ 予約追加
+        </button>
         {classes.length > 1 && (
           <select
             value={classId}
@@ -370,14 +378,6 @@ export default function ClassRoster() {
                             <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800">{name}</span>
                             <button
                               type="button"
-                              onClick={() => { setAddFor(name); setAddDate(toDateStr(new Date())); setAddTime("17:00"); }}
-                              title="予約を追加"
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[13px] font-bold leading-none text-white active:bg-emerald-600"
-                            >
-                              ＋
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => togglePurchased(name, !pu.purchased)}
                               className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
                                 pu.purchased
@@ -490,14 +490,21 @@ export default function ClassRoster() {
         <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => setEvalTarget(null)} />
       )}
 
-      {addFor && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddFor(null)}>
+      {addOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setAddOpen(false)}>
           <div className="w-full max-w-xs rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-bold text-slate-800">体幹教室の予約を追加</h2>
-              <button onClick={() => setAddFor(null)} className="text-slate-400">✕</button>
+              <button onClick={() => setAddOpen(false)} className="text-slate-400">✕</button>
             </div>
-            <p className="mb-3 text-sm text-slate-600"><b>{addFor}</b> さんの予約を入れます。</p>
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-bold text-slate-600">会員名</label>
+              <input list="class-member-names" value={addName} onChange={(e) => setAddName(e.target.value)}
+                placeholder="会員名を選択／入力" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <datalist id="class-member-names">
+                {shown.map(([n]) => <option key={n} value={n} />)}
+              </datalist>
+            </div>
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="mb-1 block text-xs font-bold text-slate-600">日付</label>
@@ -512,7 +519,7 @@ export default function ClassRoster() {
             </div>
             <p className="mt-2 text-[11px] text-slate-400">カレンダー・ボードにも反映されます（定員4名／満席時は入りません）。</p>
             <div className="mt-4 flex items-center gap-2">
-              <button onClick={() => setAddFor(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
+              <button onClick={() => setAddOpen(false)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
               <button onClick={bookVisit} disabled={adding} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700 disabled:bg-slate-300">
                 {adding ? "予約中…" : "予約する"}
               </button>
