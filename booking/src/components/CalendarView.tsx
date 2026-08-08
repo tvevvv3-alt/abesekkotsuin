@@ -36,17 +36,15 @@ type Item =
   | { kind: "class"; s: number; e: number; rank: number; appts: ApptWithSteps[] }
   | { kind: "note"; s: number; e: number; rank: number; note: CalendarNote };
 
-type Laid = Item & { lane: number; left: number; width: number; full: boolean; pieceKey: string; isFirst: boolean; isLast: boolean };
+type Laid = Item & { lane: number; left: number; width: number; full: boolean };
 function layoutLanes(items: Item[]): Laid[] {
+  const overlap = (a: { s: number; e: number }, b: { s: number; e: number }) => a.s < b.e && b.s < a.e;
   const sorted = [...items].sort((a, b) => a.s - b.s || a.rank - b.rank);
   const out: Laid[] = [];
   let cluster: Item[] = [];
   let clusterEnd = -Infinity;
-  // 連結した重なりグループ（クラスター）ごとに列を割り当てたうえで、
-  // 「同時に存在する予約の数が変わる境目」で各予約を縦にスライスし、
-  // 空いた右隣の列があればその区間だけ幅を伸ばして使い切る。
-  // これで右端に余白ができず（例：通電や体幹が少し長くて隣が空くケース）、
-  // かつ左端はぶれずに（共有の列グリッドを使うので）「N人ならN分割・左詰め」を保つ。
+  // 連結した重なりグループ（クラスター）ごとに、左詰め・隙間なしで列に割り当て、
+  // 右に空き列があればそこまで幅を伸ばして使い切る（Googleカレンダー方式）。
   const flush = () => {
     const cl = [...cluster].sort((a, b) => a.s - b.s || a.rank - b.rank);
     const colEnd: number[] = []; // 各列の最終終了時刻
@@ -57,47 +55,18 @@ function layoutLanes(items: Item[]): Laid[] {
       return c;
     });
     const numCols = colEnd.length;
-    // クラスター内の全ての開始・終了時刻を境目にする
-    const bounds = Array.from(new Set(cl.flatMap((it) => [it.s, it.e]))).sort((a, b) => a - b);
     cl.forEach((it, i) => {
-      const myCol = cols[i];
-      type Slice = { s: number; e: number; left: number; width: number };
-      const slices: Slice[] = [];
-      for (let bi = 0; bi < bounds.length - 1; bi++) {
-        const t0 = bounds[bi], t1 = bounds[bi + 1];
-        if (!(it.s <= t0 && it.e >= t1)) continue; // この区間には存在しない
-        // この区間で「実際に存在する」予約の列一覧
-        const activeCols = cl
-          .map((o, j) => (o.s <= t0 && o.e >= t1 ? cols[j] : -1))
-          .filter((c) => c >= 0)
-          .sort((a, b) => a - b);
-        const pos = activeCols.indexOf(myCol);
-        // 左端の予約は左端(0)まで、それ以外は自分の列から。右端は次に存在する列（無ければ全幅）まで。
-        const leftCol = pos === 0 ? 0 : myCol;
-        const rightCol = pos === activeCols.length - 1 ? numCols : activeCols[pos + 1];
-        const left = leftCol / numCols;
-        const width = (rightCol - leftCol) / numCols;
-        const last = slices[slices.length - 1];
-        if (last && last.e === t0 && Math.abs(last.left - left) < 1e-9 && Math.abs(last.width - width) < 1e-9) {
-          last.e = t1; // 同じ幅なら結合
-        } else {
-          slices.push({ s: t0, e: t1, left, width });
-        }
+      const col = cols[i];
+      // 右隣の列が自分の時間帯で空いていれば、その分だけ幅を伸ばす
+      let span = 1;
+      for (let c = col + 1; c < numCols; c++) {
+        const blocked = cl.some((o, j) => cols[j] === c && overlap(o, it));
+        if (blocked) break;
+        span++;
       }
-      slices.forEach((sl, si) => {
-        out.push({
-          ...it,
-          s: sl.s,
-          e: sl.e,
-          lane: myCol,
-          left: sl.left,
-          width: sl.width,
-          full: sl.left <= 0.001 && sl.left + sl.width >= 0.999,
-          pieceKey: `${i}-${si}`,
-          isFirst: si === 0,
-          isLast: si === slices.length - 1,
-        });
-      });
+      const left = col / numCols;
+      const width = span / numCols;
+      out.push({ ...it, lane: col, left, width, full: left <= 0.001 && left + width >= 0.999 });
     });
     cluster = [];
   };
@@ -816,7 +785,7 @@ export default function CalendarView({
             const ml = it.full && h >= 40;
             return (
               <button
-                key={it.pieceKey}
+                key={it.note.id}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   setNoteModal({ mode: "edit", note: it.note });
@@ -824,13 +793,13 @@ export default function CalendarView({
                 className="absolute flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                 style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
-                {it.isFirst && (<span
+                <span
                   className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-normal text-white`}
                   style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                 >
                   {it.note.text}
                   <span className="ml-1 font-normal opacity-90">{minToLabel(it.s)}</span>
-                </span>)}
+                </span>
               </button>
             );
           }
@@ -838,11 +807,11 @@ export default function CalendarView({
             const h = yFor(it.e) - top;
             return (
               <div
-                key={it.pieceKey}
+                key={"class-" + it.s}
                 className="absolute overflow-hidden rounded-[4px] px-1 py-0.5 text-left"
                 style={{ ...style, backgroundColor: CLASS_COLOR, border: HAIRLINE }}
               >
-                {it.isFirst && it.appts.map((ca) => (
+                {it.appts.map((ca) => (
                   <button
                     key={ca.id}
                     onClick={(ev) => { ev.stopPropagation(); setModal({ mode: "edit", appt: ca }); }}
@@ -874,7 +843,7 @@ export default function CalendarView({
           }
           return (
             <button
-              key={it.pieceKey}
+              key={a.id}
               data-appt-id={a.id}
               onClick={(ev) => {
                 ev.stopPropagation();
@@ -897,17 +866,16 @@ export default function CalendarView({
               style={{ ...style, background: "transparent", opacity: done ? 0.5 : undefined, ...dragStyle }}
               title={`${minToLabel(a.start_min)} ${a.patient_name ?? ""}（${staffName(a.staff_id)}）`}
             >
-              {done && it.isLast && (
+              {done && (
                 <span className="absolute right-0.5 top-0.5 z-10 rounded bg-white/90 px-1 text-[9px] font-bold text-slate-600">
                   済
                 </span>
               )}
-              {drg && drg.kind === "move" && it.isFirst && (
+              {drg && drg.kind === "move" && (
                 <span className="absolute -top-5 left-0 z-20 whitespace-nowrap rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
                   {drg.onStaff ? `${staffName(drg.onStaff)}へ` : `${drg.targetDate.slice(5).replace("-", "/")} ${minToLabel(drg.targetStart)}`}
                 </span>
               )}
-              <div className="absolute inset-0 overflow-hidden rounded-[4px]">
               {segs.map((sg, i) => {
                 const segTop = yFor(sg.s) - top;
                 const segH = yFor(sg.e) - yFor(sg.s);
@@ -940,7 +908,6 @@ export default function CalendarView({
                   </div>
                 );
               })}
-              </div>
             </button>
           );
         })}
