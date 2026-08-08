@@ -33,6 +33,7 @@ const NOTE_COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#0e
 type ApptWithSteps = Appointment & { steps: AppointmentStep[] };
 type Item =
   | { kind: "appt"; s: number; e: number; rank: number; appt: ApptWithSteps }
+  | { kind: "class"; s: number; e: number; rank: number; appts: ApptWithSteps[] }
   | { kind: "note"; s: number; e: number; rank: number; note: CalendarNote };
 
 type Laid = Item & { lane: number; left: number; width: number; full: boolean };
@@ -725,14 +726,28 @@ export default function CalendarView({
 
   // 1日カラム
   function renderColumn(ds: string) {
+    const dayAppts = appts.filter((a) => a.date === ds);
+    // 体幹教室（クラス）は同時刻でまとめて1枠に。それ以外は1件ずつ。
+    const classGroups = new Map<number, ApptWithSteps[]>();
+    dayAppts.forEach((a) => {
+      if (!classIds.has(a.service_id ?? "")) return;
+      const s = apptSegments(a)[0].s;
+      const arr = classGroups.get(s) ?? [];
+      arr.push(a);
+      classGroups.set(s, arr);
+    });
     const items: Item[] = [
-      ...appts
-        .filter((a) => a.date === ds)
+      ...dayAppts
+        .filter((a) => !classIds.has(a.service_id ?? ""))
         .map((a): Item => {
           const rk = staff.findIndex((s) => s.id === a.staff_id);
           const segs = apptSegments(a);
           return { kind: "appt", s: segs[0].s, e: segs[segs.length - 1].e, rank: rk === -1 ? 900 : rk, appt: a };
         }),
+      ...Array.from(classGroups.entries()).map(([s, list]): Item => {
+        const segs = apptSegments(list[0]);
+        return { kind: "class", s, e: segs[segs.length - 1].e, rank: 900, appts: list };
+      }),
       ...notes
         .filter((n) => n.date === ds && n.start_min != null)
         .map((n): Item => ({
@@ -797,6 +812,27 @@ export default function CalendarView({
                   <span className="ml-1 font-normal opacity-90">{minToLabel(it.s)}</span>
                 </span>
               </button>
+            );
+          }
+          if (it.kind === "class") {
+            const h = yFor(it.e) - top;
+            return (
+              <div
+                key={"class-" + it.s}
+                className="absolute overflow-hidden rounded-[4px] px-1 py-0.5 text-left"
+                style={{ ...style, backgroundColor: CLASS_COLOR, border: HAIRLINE }}
+              >
+                {it.appts.map((ca) => (
+                  <button
+                    key={ca.id}
+                    onClick={(ev) => { ev.stopPropagation(); setModal({ mode: "edit", appt: ca }); }}
+                    className="block w-full truncate text-left text-[11px] font-medium leading-[1.3] text-white hover:underline"
+                    style={{ textShadow: TEXT_SHADOW }}
+                  >
+                    {ca.patient_name || "（未登録）"}{ca.status === "done" ? "✅" : ""}
+                  </button>
+                ))}
+              </div>
             );
           }
           const a = it.appt;
