@@ -26,7 +26,7 @@ import { minToLabel, WEEKDAY_LABELS } from "@/lib/booking";
 import AdminBookingModal from "./AdminBookingModal";
 import CoreEvalModal from "./CoreEvalModal";
 
-const PX_PER_MIN = 1.4;
+const PX_PER_MIN = 0.9; // カレンダーに合わせて縦を詰める（30分＝27px）
 const GRID_STEP = 30; // 目盛り・スナップ（分）
 
 // 列コンテキスト：担当者列 or メニュー列（体幹/川西/ハイチャージ）
@@ -282,24 +282,9 @@ export default function AdminBoard({ date }: { date: string }) {
     ];
   }, [daySchedules, settings]);
 
-  // 昼休みなど「勤務の内部ギャップ」を圧縮して 10-20時を一目で見やすくする
-  const BREAK_SCALE = 0.32;
-  const breakGap = useMemo<[number, number] | null>(() => {
-    const iv = daySchedules
-      .map((s) => [s.start_min, s.end_min] as [number, number])
-      .sort((a, b) => a[0] - b[0]);
-    if (iv.length < 2) return null;
-    const merged: [number, number][] = [];
-    for (const [a, b] of iv) {
-      const last = merged[merged.length - 1];
-      if (last && a <= last[1]) last[1] = Math.max(last[1], b);
-      else merged.push([a, b]);
-    }
-    if (merged.length < 2) return null;
-    const gs = merged[0][1];
-    const ge = merged[1][0];
-    return ge - gs >= 60 ? [gs, ge] : null; // 1時間以上の内部ギャップ（昼休み）のみ圧縮
-  }, [daySchedules]);
+  // 昼(13-16)などの内部ギャップも圧縮せず、カレンダーと同じ一定スケールで表示する
+  const BREAK_SCALE = 1;
+  const breakGap = useMemo<[number, number] | null>(() => null, []);
 
   const yFor = useCallback(
     (m: number) => {
