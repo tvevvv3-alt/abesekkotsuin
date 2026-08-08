@@ -313,8 +313,7 @@ export default function PersonalRoster() {
               <tr className="bg-slate-50 text-slate-500">
                 <th className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-b border-r bg-slate-50 px-2 py-1 text-left font-bold">名前</th>
                 <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">担当</th>
-                <th className="whitespace-nowrap border-b border-l px-2 py-1 text-center font-bold">有効期限</th>
-                <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">既使用</th>
+                <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">有効期限</th>
                 <th className="whitespace-nowrap border-b border-l px-1 py-1 text-center font-bold">残</th>
                 {Array.from({ length: maxCols }).map((_, i) => (
                   <th key={i} className="whitespace-nowrap border-b border-l px-2 py-1 text-center font-bold">{i + 1}回目</th>
@@ -347,10 +346,7 @@ export default function PersonalRoster() {
                       </select>
                     </td>
                     <td className="border-l px-1 py-1 align-middle">
-                      <input value={r.expiry ?? ""} placeholder="例：8月末" onChange={(e) => setLocal(r.id, { expiry: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} w-[72px] text-center`} />
-                    </td>
-                    <td className="border-l px-1 py-1 text-center align-middle">
-                      <input type="number" min={0} value={r.used_offset || ""} placeholder="0" onChange={(e) => setLocal(r.id, { used_offset: parseInt(e.target.value || "0", 10) })} onBlur={() => persist(r.id)} className={`${amt} w-[40px] text-center tabnum`} />
+                      <input value={r.expiry ?? ""} placeholder="例：8月末" onChange={(e) => setLocal(r.id, { expiry: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} w-[56px] text-center`} />
                     </td>
                     <td className="border-l px-1 py-1 text-center align-middle">
                       <span className={`text-xs font-bold ${remain <= 0 ? "text-red-500" : remain <= 2 ? "text-orange-500" : "text-blue-600"}`}>残{Math.max(0, remain)}</span>
@@ -394,7 +390,7 @@ export default function PersonalRoster() {
 
       <p className="mt-3 text-[11px] text-slate-400">
         「パーソナル回数券対象」メニューの予約が、患者名で自動的にここに並びます。各回のマスを<b>タップで終了</b>すると
-        <b>消費（30分=1回・60分=2回）＋本人へLINE（残り回数）</b>を送信します。<b>残</b>＝10回 − 既使用 − 終了済みの消費。
+        <b>消費（30分=1回・60分=2回）＋本人へLINE（残り回数）</b>を送信します。<b>残</b>＝回数 − 終了済みの消費。
         未登録の方が予約すると自動で行が作られ、担当・有効期限（初回＋5ヶ月）も自動で入ります。
         各回のマスをタップすると<b>氏名・日付・時刻の編集や終了</b>ができます（同姓同名・兄弟の付け替えに）。
       </p>
