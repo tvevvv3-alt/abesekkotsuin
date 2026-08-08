@@ -214,6 +214,17 @@ export default function SalesBoard() {
     return m;
   }, [sales]);
   const manualSales = useMemo(() => sales.filter((s) => !s.appointment_id && s.retail_kind !== "purchase"), [sales]);
+  // 予約（カレンダー）に存在する「日付＋氏名」の集合。予約に紐づかない“はぐれ売上”で
+  // 同名のものは重複表示・二重計上しないための判定に使う。
+  const apptKeys = useMemo(() => {
+    const set = new Set<string>();
+    appts.forEach((a) => { const nn = normName(a.patient_name); if (nn) set.add(a.date + "|" + nn); });
+    return set;
+  }, [appts]);
+  const isOrphanDup = useCallback(
+    (s: Sale) => !s.appointment_id && !!normName(s.patient_name) && apptKeys.has(s.date + "|" + normName(s.patient_name)),
+    [apptKeys]
+  );
 
   // 担当の選択肢（実スタッフ＋川西整体院）。realはスタッフ表に目標を持てる人。
   const assignees = useMemo(() => {
@@ -661,7 +672,8 @@ export default function SalesBoard() {
     })();
     return () => { alive = false; };
   }, [dayRows, date, supabase]);
-  const dayManual = useMemo(() => manualSales.filter((s) => s.date === date), [manualSales, date]);
+  // 予約に同名がいる“はぐれ売上”は日別入力に出さない（予約行に集約）。物販・予約外はそのまま。
+  const dayManual = useMemo(() => manualSales.filter((s) => s.date === date && !isOrphanDup(s)), [manualSales, date, isOrphanDup]);
   // 並び順（sort_orderで手動入れ替え可。既定は予約=時刻順、物販=末尾）
   const dayItems = useMemo(() => {
     const items = [
@@ -835,6 +847,7 @@ export default function SalesBoard() {
       });
     // 金額（salesベース）：川西は独立集計、それ以外は合計額・負担額＋保険外1〜4に振り分け
     sales.forEach((s) => {
+      if (isOrphanDup(s)) return; // 予約に同名がいる“はぐれ売上”は二重計上しない
       const e = get(s.date);
       // 窓口徴収(=保険外+負担額)の現金/キャッシュレス仕訳（全会計対象）
       const pay = s.selfpay + s.burden;
@@ -848,7 +861,7 @@ export default function SalesBoard() {
       else e.ho4 += s.selfpay; // 物販・その他のみ
     });
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [appts, sales, bucket, kawa, taikan]);
+  }, [appts, sales, bucket, kawa, taikan, isOrphanDup]);
   const monthSum = useMemo(
     () =>
       monthDaily.reduce(
