@@ -332,6 +332,14 @@ export default function SalesBoard() {
     setSales((prev) => prev.filter((s) => s.appointment_id !== a.id));
     await supabase.from("sales").delete().eq("appointment_id", a.id);
   }
+  // 売上未入力の予約行から、その予約ごと削除（カレンダー/ボードからも消える）
+  async function removeAppt(a: Appt) {
+    if (!confirm(`${a.patient_name || "この予約"} の予約を削除します。\nカレンダー・ボードからも消えます。よろしいですか？`)) return;
+    setAppts((prev) => prev.filter((x) => x.id !== a.id));
+    await supabase.from("sales").delete().eq("appointment_id", a.id);
+    await supabase.from("appointment_steps").delete().eq("appointment_id", a.id);
+    await supabase.from("appointments").update({ status: "cancelled" }).eq("id", a.id);
+  }
   // 支払方法（現金⇄キャッシュレス）切替。予約行は無ければ会計を作成して保存。
   async function toggleApptPayment(a: Appt) {
     const cur = salesRef.current.find((x) => x.appointment_id === a.id) ?? apptVal(a);
@@ -1283,7 +1291,9 @@ export default function SalesBoard() {
                           <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
                           <td className="px-1 py-1 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
                           <td className="whitespace-nowrap px-1 py-1 text-center">
-                            {saleByAppt[a.id] && <button onClick={() => deleteApptSale(a)} className="text-[11px] font-bold text-red-400">削除</button>}
+                            {saleByAppt[a.id]
+                              ? <button onClick={() => deleteApptSale(a)} className="text-[11px] font-bold text-red-400">売上削除</button>
+                              : <button onClick={() => removeAppt(a)} className="text-[11px] font-bold text-red-400">予約削除</button>}
                           </td>
                         </tr>
                       );
