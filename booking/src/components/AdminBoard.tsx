@@ -769,8 +769,8 @@ export default function AdminBoard({ date }: { date: string }) {
                         style={{
                           top: cardTop,
                           height: yFor(botSnap) - cardTop - 2,
-                          left: `calc(${lane * w}% + 2px)`,
-                          width: `calc(${w}% - 4px)`,
+                          left: `${lane * w}%`,
+                          width: `${w}%`,
                           background: "transparent",
                           touchAction: "none",
                           opacity: appt.status === "done" ? 0.5 : undefined,
@@ -941,8 +941,8 @@ export default function AdminBoard({ date }: { date: string }) {
                         style={{
                           top: cardTop,
                           height: yFor(botSnap) - cardTop - 2,
-                          left: `calc(${lane * w}% + 2px)`,
-                          width: `calc(${w}% - 4px)`,
+                          left: `${lane * w}%`,
+                          width: `${w}%`,
                           background: "transparent",
                           opacity: appt.status === "done" ? 0.5 : undefined,
                         }}
