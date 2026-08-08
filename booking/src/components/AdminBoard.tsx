@@ -807,7 +807,6 @@ export default function AdminBoard({ date }: { date: string }) {
                                 <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
                               )}
                               {appt.patient_name || "（未登録）"}
-                              <span className="ml-1 font-normal opacity-90">{minToLabel(sg.s)}</span>
                             </span>
                           </div>
                         ))}
@@ -864,12 +863,11 @@ export default function AdminBoard({ date }: { date: string }) {
                       border: "0.5px solid rgba(255,255,255,.95)",
                     }}
                   >
-                    <div className="mb-0.5 text-[11px] font-bold text-white" style={{ textShadow: TEXT_SHADOW }}>
-                      {g.list.length}/{cls.capacity}
-                      {g.list.length >= cls.capacity && (
-                        <span className="ml-1 rounded bg-white/25 px-1 text-[9px] text-white">満</span>
-                      )}
-                    </div>
+                    {g.list.length >= cls.capacity && (
+                      <div className="mb-0.5" style={{ textShadow: TEXT_SHADOW }}>
+                        <span className="rounded bg-white/25 px-1 text-[9px] font-bold text-white">満</span>
+                      </div>
+                    )}
                     {g.list.map((a) => (
                       <button
                         key={a.id}
@@ -967,9 +965,6 @@ export default function AdminBoard({ date }: { date: string }) {
                             style={{ textShadow: TEXT_SHADOW }}
                           >
                             {appt.patient_name || "（未登録）"}
-                            <span className="ml-1 font-normal opacity-90">
-                              {minToLabel(appt.start_min)}
-                            </span>
                           </span>
                         </div>
                       </button>

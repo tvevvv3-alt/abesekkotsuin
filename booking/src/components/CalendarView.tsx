@@ -879,7 +879,6 @@ export default function CalendarView({
                         <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
                       )}
                       {a.patient_name || "（未登録）"}
-                      <span className="ml-1 font-normal opacity-90">{minToLabel(sg.s)}</span>
                     </span>
                   </div>
                 );
