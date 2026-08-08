@@ -38,47 +38,36 @@ type Item =
 
 type Laid = Item & { lane: number; left: number; width: number; full: boolean };
 function layoutLanes(items: Item[]): Laid[] {
-  const sorted = [...items].sort((a, b) => a.s - b.s || a.e - b.e);
+  const overlap = (a: { s: number; e: number }, b: { s: number; e: number }) => a.s < b.e && b.s < a.e;
+  const sorted = [...items].sort((a, b) => a.s - b.s || a.rank - b.rank);
   const out: Laid[] = [];
   let cluster: Item[] = [];
   let clusterEnd = -Infinity;
-  const overlap = (a: { s: number; e: number }, b: { s: number; e: number }) => a.s < b.e && b.s < a.e;
+  // 連結した重なりグループ（クラスター）ごとに、左詰め・隙間なしで列に割り当て、
+  // 右に空き列があればそこまで幅を伸ばして使い切る（Googleカレンダー方式）。
   const flush = () => {
-    // 開始時刻順（同時刻は担当順）で左詰め＝時間の流れが左→右で読みやすい
     const cl = [...cluster].sort((a, b) => a.s - b.s || a.rank - b.rank);
-    const laneEnd: number[] = [];
-    const placed: Laid[] = cl.map((it) => {
-      let lane = laneEnd.findIndex((end) => end <= it.s);
-      if (lane === -1) {
-        lane = laneEnd.length;
-        laneEnd.push(it.e);
-      } else laneEnd[lane] = it.e;
-      return { ...it, lane, left: 0, width: 1, full: true };
+    const colEnd: number[] = []; // 各列の最終終了時刻
+    const cols: number[] = cl.map((it) => {
+      let c = colEnd.findIndex((end) => end <= it.s);
+      if (c === -1) { c = colEnd.length; colEnd.push(it.e); }
+      else colEnd[c] = it.e;
+      return c;
     });
-    // 幅＝「その予約に実際に重なっている最大人数」で分割（局所の人数で決める）。
-    //  例：11時が5人でも、12時に2人しか居なければその2件は1/2ずつ（1:1）。
-    //  位置は同時刻の下位レーンを左から詰める＝重なりが無い限り横ズレしない。
-    const byLane = [...placed].sort((a, b) => a.lane - b.lane);
-    for (const p of byLane) {
-      // p の時間帯で同時に重なる最大件数（p を含む）
-      const points = new Set<number>([p.s]);
-      placed.forEach((q) => { if (q.s >= p.s && q.s < p.e) points.add(q.s); });
-      let maxc = 1;
-      points.forEach((t) => {
-        const c = placed.filter((q) => q.s <= t && q.e > t).length;
-        if (c > maxc) maxc = c;
-      });
-      const w = 1 / maxc;
-      // 同時刻で自分より左（低レーン）の予約の右端まで詰める
-      let left = 0;
-      for (const q of byLane) {
-        if (q !== p && q.lane < p.lane && overlap(p, q)) left = Math.max(left, q.left + q.width);
+    const numCols = colEnd.length;
+    cl.forEach((it, i) => {
+      const col = cols[i];
+      // 右隣の列が自分の時間帯で空いていれば、その分だけ幅を伸ばす
+      let span = 1;
+      for (let c = col + 1; c < numCols; c++) {
+        const blocked = cl.some((o, j) => cols[j] === c && overlap(o, it));
+        if (blocked) break;
+        span++;
       }
-      p.width = Math.min(w, 1 - left);
-      p.left = left;
-      p.full = p.left <= 0.001 && p.left + p.width >= 0.999;
-    }
-    out.push(...placed);
+      const left = col / numCols;
+      const width = span / numCols;
+      out.push({ ...it, lane: col, left, width, full: left <= 0.001 && left + width >= 0.999 });
+    });
     cluster = [];
   };
   for (const it of sorted) {
