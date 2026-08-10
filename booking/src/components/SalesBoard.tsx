@@ -916,10 +916,10 @@ export default function SalesBoard() {
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
-  const amt = "w-[68px] rounded border border-slate-300 px-1 py-0.5 text-right text-sm tabnum focus:border-blue-400 focus:outline-none";
+  const amt = "w-[60px] rounded border border-slate-300 px-1 py-0 text-right text-[13px] leading-tight tabnum focus:border-blue-400 focus:outline-none";
   const payBtn = (payment: "cash" | "cashless", onClick: () => void) => (
     <button onClick={onClick}
-      className={`whitespace-nowrap rounded-md border px-1.5 py-1 text-[10px] font-bold ${payment === "cashless" ? "border-indigo-300 bg-indigo-50 text-indigo-600" : "border-slate-300 bg-slate-50 text-slate-500"}`}
+      className={`whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${payment === "cashless" ? "border-indigo-300 bg-indigo-50 text-indigo-600" : "border-slate-300 bg-slate-50 text-slate-500"}`}
       title="現金／キャッシュレス切替">
       {payment === "cashless" ? "💳レス" : "💴現金"}
     </button>
@@ -1225,18 +1225,18 @@ export default function SalesBoard() {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickReseko(f); e.target.value = ""; }} />
           </div>
           <div className="overflow-x-auto rounded-xl border bg-white">
-            <table className="w-full text-sm">
+            <table className="w-full text-[13px]">
               <thead className="bg-slate-50 text-[11px] text-slate-500">
                 <tr>
-                  <th className="px-1 py-2 text-left font-bold">担当</th>
-                  <th className="px-2 py-2 text-left font-bold">名前</th>
-                  <th className="px-1 py-2 text-right font-bold">保険外</th>
-                  <th className="px-1 py-2 text-right font-bold">合計額</th>
-                  <th className="px-1 py-2 text-right font-bold">負担額</th>
-                  <th className="px-1 py-2 text-right font-bold">入金額</th>
-                  <th className="px-2 py-2 text-right font-bold">総合計</th>
-                  <th className="px-1 py-2 text-center font-bold">支払</th>
-                  <th className="px-1 py-2"></th>
+                  <th className="px-1 py-1 text-left font-bold">担当</th>
+                  <th className="px-2 py-1 text-left font-bold">名前</th>
+                  <th className="px-1 py-1 text-right font-bold">保険外</th>
+                  <th className="px-1 py-1 text-right font-bold">合計額</th>
+                  <th className="px-1 py-1 text-right font-bold">負担額</th>
+                  <th className="px-1 py-1 text-right font-bold">入金額</th>
+                  <th className="px-2 py-1 text-right font-bold">総合計</th>
+                  <th className="px-1 py-1 text-center font-bold">支払</th>
+                  <th className="px-1 py-1"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -1250,7 +1250,7 @@ export default function SalesBoard() {
                           className={rowClass(a.id, "cursor-grab select-none active:cursor-grabbing")} style={rowStyle(a.id)}>
                           <td className="px-1 py-0.5">
                             <select value={s.staff_id ?? ""} onChange={(e) => setApptField(a, "staff_id", e.target.value || null)} onBlur={() => persistAppt(a)}
-                              className="rounded border px-1 py-1 text-[11px] font-bold" style={assigneeSelectStyle(s.staff_id)}>
+                              className="rounded border px-1 py-0.5 text-[11px] font-bold" style={assigneeSelectStyle(s.staff_id)}>
                               <option value="" style={{ color: "#0f172a", background: "#fff" }}>-</option>
                               {assignees.map((st) => <option key={st.id} value={st.id} style={{ color: "#0f172a", background: "#fff" }}>{st.name}</option>)}
                             </select>
@@ -1274,23 +1274,23 @@ export default function SalesBoard() {
                               )}
                             </div>
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="px-1 py-0.5 text-right">
                             <input type="number" min={0} placeholder={suggestSelf(a) ? String(suggestSelf(a)) : "0"} value={s.selfpay || ""}
                               onFocus={() => { if (!s.selfpay && suggestSelf(a) > 0) { setApptField(a, "selfpay", suggestSelf(a)); } }}
                               onChange={(e) => setApptField(a, "selfpay", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="px-1 py-0.5 text-right">
                             <input type="number" min={0} placeholder="0" value={s.insurance || ""}
                               onChange={(e) => setApptField(a, "insurance", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="px-1 py-0.5 text-right">
                             <input type="number" min={0} placeholder="0" value={s.burden || ""}
                               onChange={(e) => setApptField(a, "burden", parseInt(e.target.value || "0", 10))} onBlur={() => persistAppt(a)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
-                          <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
-                          <td className="px-1 py-1 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
-                          <td className="whitespace-nowrap px-1 py-1 text-center">
+                          <td className="px-1 py-0.5 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
+                          <td className="px-2 py-0.5 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
+                          <td className="px-1 py-0.5 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
+                          <td className="whitespace-nowrap px-1 py-0.5 text-center">
                             {saleByAppt[a.id]
                               ? <button onClick={() => deleteApptSale(a)} className="text-[11px] font-bold text-red-400">売上削除</button>
                               : <button onClick={() => removeAppt(a)} className="text-[11px] font-bold text-red-400">予約削除</button>}
@@ -1315,24 +1315,24 @@ export default function SalesBoard() {
                           <td className="px-2 py-0.5">
                             <div className="flex flex-col gap-0.5">
                               <input value={m.patient_name ?? ""} placeholder="商品名" onChange={(e) => setManualLocal(m.id, { patient_name: e.target.value })} onBlur={() => persistManual(m.id)}
-                                className="w-28 rounded border border-slate-300 px-1 py-1 text-sm" />
+                                className="w-28 rounded border border-slate-300 px-1 py-0.5 text-[13px]" />
                               <input value={m.retail_buyer ?? ""} placeholder="購入者" onChange={(e) => setManualLocal(m.id, { retail_buyer: e.target.value })} onBlur={() => persistManual(m.id)}
                                 className="w-28 rounded border border-slate-200 px-1 py-0.5 text-[11px] text-slate-600" />
                             </div>
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="px-1 py-0.5 text-right">
                             <input type="number" min={0} placeholder="0" value={m.selfpay || ""} onChange={(e) => setManualLocal(m.id, { selfpay: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="px-1 py-0.5 text-right">
                             <input type="number" min={0} placeholder="0" value={m.insurance || ""} onChange={(e) => setManualLocal(m.id, { insurance: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right">
+                          <td className="px-1 py-0.5 text-right">
                             <input type="number" min={0} placeholder="0" value={m.burden || ""} onChange={(e) => setManualLocal(m.id, { burden: parseInt(e.target.value || "0", 10) })} onBlur={() => persistManual(m.id)} data-amt="1" onKeyDown={onAmountKey} className={amt} />
                           </td>
-                          <td className="px-1 py-1 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
-                          <td className="px-2 py-1 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
-                          <td className="px-1 py-1 text-center">{payBtn(m.payment, () => toggleManualPayment(m))}</td>
-                          <td className="whitespace-nowrap px-1 py-1 text-center">
+                          <td className="px-1 py-0.5 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
+                          <td className="px-2 py-0.5 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
+                          <td className="px-1 py-0.5 text-center">{payBtn(m.payment, () => toggleManualPayment(m))}</td>
+                          <td className="whitespace-nowrap px-1 py-0.5 text-center">
                             <button onClick={() => deleteManual(m.id)} className="text-[11px] font-bold text-red-400">削除</button>
                           </td>
                         </tr>
