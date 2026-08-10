@@ -951,96 +951,96 @@ export default function SalesBoard() {
 
       {/* 当月サマリー（担当ごとの総売上＝自費＋保険 vs 目標）。年間ビューでは非表示。 */}
       {view !== "year" && (
-      <div className="mb-4 rounded-xl border bg-white p-3">
+      <div className="mb-3 rounded-xl border bg-white p-2">
         {(() => {
           const clinicTotal = monthSp + monthSum.kawa + monthSum.ins;
           const pct = clinicTarget > 0 ? Math.round((clinicTotal / clinicTarget) * 1000) / 10 : 0;
           return (
             <>
-              <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[13px]">
                 <span className="font-bold text-slate-700">{monthLabel} 当月</span>
                 <span className="text-slate-500">保険 <b className="tabnum text-slate-700">{yen(monthSum.ins)}</b></span>
                 <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSp + monthSum.kawa)}</b></span>
-                <span className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-400">
+                <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
                   院目標
                   <input type="number" min={0} value={clinicTarget ? clinicTarget / 10000 : ""} placeholder="0"
                     onChange={(e) => saveClinicTarget(parseFloat(e.target.value || "0"))}
-                    className="w-16 rounded border border-slate-300 px-1 py-0.5 text-right text-[11px]" />万
+                    className="w-14 rounded border border-slate-300 px-1 py-0 text-right text-[11px]" />万
                 </span>
               </div>
-              <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-lg font-bold tabnum text-slate-800">総売上 {yen(clinicTotal)}</span>
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="text-base font-bold tabnum text-slate-800">総売上 {yen(clinicTotal)}</span>
                 {clinicTarget > 0 && (
-                  <span className={`text-sm font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>{pct}%</span>
+                  <span className={`text-[13px] font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>{pct}%</span>
                 )}
                 {view === "day" && (
-                  <span className="rounded-md bg-blue-50 px-2 py-0.5 text-sm font-bold text-blue-700">
+                  <span className="rounded-md bg-blue-50 px-1.5 py-0 text-[13px] font-bold text-blue-700">
                     {new Date(date + "T00:00:00").getMonth() + 1}/{new Date(date + "T00:00:00").getDate()} 合計 {yen(daySum.gou)}
                   </span>
                 )}
               </div>
               {clinicTarget > 0 && (
-                <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="mb-2 mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, pct)}%` }} />
                 </div>
               )}
             </>
           );
         })()}
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
           {assignees.map((s) => {
             const tot = staffTotal(s.id);
             const target = targets[s.id] ?? 0;
             const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
             return (
-              <div key={s.id} className="rounded-lg border p-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-                  <span className="text-sm font-bold text-slate-800">{s.name}</span>
+              <div key={s.id} className="rounded-lg border px-2 py-1">
+                <div className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="text-[13px] font-bold text-slate-800">{s.name}</span>
                   <span className="text-[10px] font-bold text-slate-400">{staffDays(s.id)}日</span>
                   {s.real && (
                     <span className="ml-auto flex items-center gap-0.5 text-[10px] text-slate-400">
                       目標
                       <input type="number" min={0} value={target ? target / 10000 : ""} placeholder="0"
                         onChange={(e) => saveTarget(s.id, parseFloat(e.target.value || "0"))}
-                        className="w-9 rounded border border-slate-300 px-1 py-0.5 text-right text-[10px]" />万
+                        className="w-8 rounded border border-slate-300 px-1 py-0 text-right text-[10px]" />万
                     </span>
                   )}
                 </div>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-base font-bold tabnum text-slate-800">{yen(tot)}</span>
-                  <span className="text-[10px] text-slate-400">当月</span>
-                  {target > 0 && <span className={`text-xs font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>{pct}%</span>}
+                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                  <span className="text-[15px] font-bold tabnum text-slate-800">{yen(tot)}</span>
+                  <span className="text-[9px] text-slate-400">当月</span>
+                  {target > 0 && <span className={`text-[11px] font-bold ${pct >= 100 ? "text-emerald-600" : pct >= 70 ? "text-blue-600" : "text-slate-500"}`}>{pct}%</span>}
+                  {view === "day" && (
+                    <span className="ml-auto flex items-baseline gap-0.5">
+                      <span className="rounded px-1 text-[9px] font-bold text-white" style={{ backgroundColor: s.color }}>本日</span>
+                      <span className="text-[13px] font-bold tabnum" style={{ color: s.color }}>{yen(dayStaffTotal(s.id))}</span>
+                    </span>
+                  )}
                 </div>
-                {view === "day" && (
-                  <div className="mt-0.5 flex items-baseline gap-1 text-sm">
-                    <span className="rounded px-1 text-[10px] font-bold text-white" style={{ backgroundColor: s.color }}>本日</span>
-                    <span className="font-bold tabnum" style={{ color: s.color }}>{yen(dayStaffTotal(s.id))}</span>
-                  </div>
-                )}
                 {target > 0 && (
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-slate-100">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: s.color }} />
                   </div>
                 )}
               </div>
             );
           })}
-          <div className="rounded-lg border p-2">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span className="text-sm font-bold text-slate-800">物販・その他</span>
+          <div className="rounded-lg border px-2 py-1">
+            <div className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+              <span className="text-[13px] font-bold text-slate-800">物販・その他</span>
             </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-base font-bold tabnum text-slate-800">{yen(staffTotal(null))}</span>
-              <span className="text-[10px] text-slate-400">当月</span>
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+              <span className="text-[15px] font-bold tabnum text-slate-800">{yen(staffTotal(null))}</span>
+              <span className="text-[9px] text-slate-400">当月</span>
+              {view === "day" && (
+                <span className="ml-auto flex items-baseline gap-0.5">
+                  <span className="rounded bg-amber-500 px-1 text-[9px] font-bold text-white">本日</span>
+                  <span className="text-[13px] font-bold tabnum text-amber-600">{yen(dayStaffTotal(null))}</span>
+                </span>
+              )}
             </div>
-            {view === "day" && (
-              <div className="mt-0.5 flex items-baseline gap-1 text-sm">
-                <span className="rounded bg-amber-500 px-1 text-[10px] font-bold text-white">本日</span>
-                <span className="font-bold tabnum text-amber-600">{yen(dayStaffTotal(null))}</span>
-              </div>
-            )}
           </div>
         </div>
       </div>
