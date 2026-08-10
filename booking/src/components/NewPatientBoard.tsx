@@ -24,6 +24,18 @@ interface NP {
 const COLS = "id, chart_no, date, insurance, name, kana, existing_no, category, referrer, area_code, area, taikan, kawanishi";
 const AREA_CODES = ["", "茨", "高", "摂", "他"];
 
+// カルテ番号の昇順で並べる。番号未入力の行は末尾（追加直後の入力中の行が動かないように）。
+function byChart(a: NP, b: NP): number {
+  const ta = (a.chart_no ?? "").trim();
+  const tb = (b.chart_no ?? "").trim();
+  const na = Number(ta), nb = Number(tb);
+  const va = ta !== "" && !isNaN(na);
+  const vb = tb !== "" && !isNaN(nb);
+  if (va && vb) return na - nb;      // どちらも数値 → 数値順
+  if (va !== vb) return va ? -1 : 1; // 数値ありを前、空/非数値を後ろ
+  return ta.localeCompare(tb);       // どちらも非数値 → 文字列順
+}
+
 export default function NewPatientBoard() {
   const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<NP[]>([]);
@@ -43,7 +55,7 @@ export default function NewPatientBoard() {
   const reload = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from("new_patients").select(COLS).gte("date", monthStart).lt("date", monthEnd).order("date");
-    setRows((data as NP[]) ?? []);
+    setRows([...((data as NP[]) ?? [])].sort(byChart));
     setLoading(false);
   }, [supabase, monthStart, monthEnd]);
   useEffect(() => { reload(); }, [reload]);
@@ -62,6 +74,7 @@ export default function NewPatientBoard() {
     const { id: _id, ...rest } = r;
     void _id;
     await supabase.from("new_patients").update(rest).eq("id", id);
+    setRows((rs) => [...rs].sort(byChart)); // 入力確定（onBlur）後にカルテ番号順へ並べ直す
   }
   async function persistNow(id: string, patch: Partial<NP>) {
     setLocal(id, patch);
