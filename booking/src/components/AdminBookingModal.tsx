@@ -177,6 +177,52 @@ export default function AdminBookingModal({
   }
 
   // 体幹教室の「終了」→ 予約を終了(done)にし、LINE連携済みならお礼＋次回案内を送信
+  // 問診票リンクを患者のLINEへ1タップ送信（治療の予約向け）
+  async function sendQuestionnaire() {
+    if (!appt) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/send-questionnaire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId: appt.id }),
+      });
+      const j = (await res.json()) as { ok: boolean; reason?: string };
+      if (j.ok) alert("問診票リンクをLINEで送信しました。");
+      else if (j.reason === "noline") alert("この患者はLINE未連携のため送信できません。");
+      else if (j.reason === "nourl") alert("基本設定で問診票URLを登録してください。");
+      else if (j.reason === "notconfigured") alert("LINE送信（アクセストークン）が未設定です。");
+      else setError(`問診票を送信できませんでした: ${j.reason ?? "?"}`);
+    } catch {
+      setError("問診票の送信エラー");
+    }
+    setBusy(false);
+  }
+
+  // 体幹教室：終了にして本人へLINE（来場・回数のお知らせ）
+  async function finishClass() {
+    if (!appt) return;
+    setBusy(true);
+    setError(null);
+    await supabase.from("appointments").update({ status: "done" }).eq("id", appt.id);
+    try {
+      const res = await fetch("/api/class/done", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId: appt.id }),
+      });
+      const j = (await res.json()) as { ok: boolean; reason?: string };
+      if (j.ok) alert("終了にして、LINEで通知しました。");
+      else if (j.reason === "noline") alert("終了にしました。\n📵 この方はLINE未連携のため、通知は送られません。");
+      else setError(`LINE未送信: ${j.reason ?? "?"}`);
+    } catch {
+      setError("LINE送信エラー");
+    }
+    setBusy(false);
+    onDone();
+  }
+
   // 体幹教室の申込書リンクを患者のLINEへ1タップ送信
   async function sendApplication() {
     if (!appt) return;
@@ -400,13 +446,33 @@ export default function AdminBookingModal({
               予約をキャンセル
             </button>
           )}
-          {mode === "edit" && (
+          {/* 治療の予約：問診票 */}
+          {mode === "edit" && !isClass && (
+            <button
+              onClick={sendQuestionnaire}
+              disabled={busy}
+              className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-600 active:bg-emerald-50 disabled:opacity-50"
+            >
+              問診票を送る
+            </button>
+          )}
+          {/* 体幹教室の予約：申込書＋終了＋LINE */}
+          {mode === "edit" && isClass && (
             <button
               onClick={sendApplication}
               disabled={busy}
               className="rounded-lg border border-orange-300 px-3 py-2 text-sm font-medium text-orange-600 active:bg-orange-50 disabled:opacity-50"
             >
               体幹教室申込書を送る
+            </button>
+          )}
+          {mode === "edit" && isClass && (
+            <button
+              onClick={finishClass}
+              disabled={busy}
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300"
+            >
+              {busy ? "処理中…" : "終了＋LINE"}
             </button>
           )}
           <button
