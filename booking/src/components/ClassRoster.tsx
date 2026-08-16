@@ -215,6 +215,7 @@ export default function ClassRoster() {
   async function finish(r: Row) {
     setBusy(r.id);
     setMsg(null);
+    const nm = r.patient_name?.trim() || "この方";
     await supabase.from("appointments").update({ status: "done" }).eq("id", r.id);
     let note = "終了にしました";
     if (r.line_user_id) {
@@ -225,12 +226,20 @@ export default function ClassRoster() {
           body: JSON.stringify({ appointmentId: r.id }),
         });
         const j = (await res.json()) as { ok: boolean; reason?: string };
-        note = j.ok ? "終了＋LINE送信しました" : `終了（LINE未送信: ${j.reason ?? "?"}）`;
+        if (j.ok) {
+          note = `${nm}：終了＋LINEを送信しました`;
+        } else {
+          note = `${nm}：終了しました（LINE送信できませんでした：${j.reason ?? "?"}）`;
+          alert(`${nm} を終了しました。\n⚠️ LINE通知は送信できませんでした（${j.reason ?? "エラー"}）。`);
+        }
       } catch {
-        note = "終了（LINE送信エラー）";
+        note = `${nm}：終了しました（LINE送信エラー）`;
+        alert(`${nm} を終了しました。\n⚠️ LINE通知の送信中にエラーが発生しました。`);
       }
     } else {
-      note = "終了にしました（LINE未連携）";
+      // LINE未連携（運営側で取った予約など）＝通知は送られない。安心のため明示。
+      note = `${nm}：終了しました（LINE未連携のため通知なし）`;
+      alert(`${nm} を終了しました。\n📵 この方はLINE未連携のため、通知は送られません。`);
     }
     setBusy(null);
     setMsg(note);
@@ -447,8 +456,11 @@ export default function ClassRoster() {
                               }}
                               onDragEnd={() => { setDragId(null); setOverName(null); }}
                               onClick={() => {
-                                if (!done && busy !== v.id && confirm(`${name} を終了＋LINE送信しますか？`))
-                                  finish(v);
+                                if (done || busy === v.id) return;
+                                const ask = v.line_user_id
+                                  ? `${name} を終了して、LINEで通知しますか？`
+                                  : `${name} を終了しますか？\n（LINE未連携のため通知は送られません）`;
+                                if (confirm(ask)) finish(v);
                               }}
                               className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${
                                 done ? "bg-slate-50 text-slate-400" : "cursor-grab hover:bg-blue-50"
@@ -459,7 +471,11 @@ export default function ClassRoster() {
                                 <span className="ml-1 text-[10px] text-slate-500">{minToLabel(v.start_min)}</span>
                               </div>
                               {done ? (
-                                <div className="text-[10px] font-bold">{v.line_user_id ? "✅" : "済"}</div>
+                                v.line_user_id ? (
+                                  <div className="text-[9px] font-bold text-emerald-600">✅ 通知済</div>
+                                ) : (
+                                  <div className="text-[9px] font-bold text-slate-400">済・通知なし</div>
+                                )
                               ) : (
                                 <div className="text-[9px] text-blue-500">タップで終了</div>
                               )}

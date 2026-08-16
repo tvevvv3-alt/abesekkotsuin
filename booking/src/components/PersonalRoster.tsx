@@ -224,6 +224,7 @@ export default function PersonalRoster() {
     setBusy(v.id);
     setMsg(null);
     await supabase.from("appointments").update({ status: "done" }).eq("id", v.id);
+    const nm = name?.trim() || "この方";
     let note = "終了にしました";
     if (v.line_user_id) {
       try {
@@ -233,12 +234,20 @@ export default function PersonalRoster() {
           body: JSON.stringify({ appointmentId: v.id }),
         });
         const j = (await res.json()) as { ok: boolean; reason?: string; remaining?: number };
-        note = j.ok ? `${name} を終了＋LINE送信（残り${j.remaining ?? "?"}回）` : `終了（LINE未送信: ${j.reason ?? "?"}）`;
+        if (j.ok) {
+          note = `${nm}：終了＋LINEを送信（残り${j.remaining ?? "?"}回）`;
+        } else {
+          note = `${nm}：終了しました（LINE送信できませんでした：${j.reason ?? "?"}）`;
+          alert(`${nm} を終了しました。\n⚠️ LINE通知は送信できませんでした（${j.reason ?? "エラー"}）。`);
+        }
       } catch {
-        note = "終了（LINE送信エラー）";
+        note = `${nm}：終了しました（LINE送信エラー）`;
+        alert(`${nm} を終了しました。\n⚠️ LINE通知の送信中にエラーが発生しました。`);
       }
     } else {
-      note = `${name} を終了（LINE未連携）`;
+      // LINE未連携（運営側で取った予約など）＝通知は送られない。安心のため明示。
+      note = `${nm}：終了しました（LINE未連携のため通知なし）`;
+      alert(`${nm} を終了しました。\n📵 この方はLINE未連携のため、通知は送られません。`);
     }
     setBusy(null);
     setMsg(note);
@@ -261,7 +270,10 @@ export default function PersonalRoster() {
   // ポップアップから：終了＋LINE
   async function finishFromPopup() {
     if (!ev) return;
-    if (!confirm(`${ev.name || "この方"} を終了＋LINE送信しますか？`)) return;
+    const ask = ev.line_user_id
+      ? `${ev.name || "この方"} を終了して、LINEで通知しますか？`
+      : `${ev.name || "この方"} を終了しますか？\n（LINE未連携のため通知は送られません）`;
+    if (!confirm(ask)) return;
     const v: Visit = { id: ev.id, patient_name: ev.name, date: ev.date, start_min: ev.start_min, end_min: ev.end_min, status: "booked", staff_id: null, service_id: null, line_user_id: ev.line_user_id };
     setEv(null);
     await finish(v, ev.name);
@@ -370,7 +382,11 @@ export default function PersonalRoster() {
                             {v.end_min - v.start_min}分{c >= 2 ? <span className="ml-0.5 rounded bg-orange-100 px-1 text-orange-600">×{c}</span> : null}
                           </div>
                           {done ? (
-                            <div className="text-[10px] font-bold">{v.line_user_id ? "✅" : "済"}</div>
+                            v.line_user_id ? (
+                              <div className="text-[9px] font-bold text-emerald-600">✅ 通知済</div>
+                            ) : (
+                              <div className="text-[9px] font-bold text-slate-400">済・通知なし</div>
+                            )
                           ) : (
                             <div className="text-[9px] text-blue-500">タップで編集/終了</div>
                           )}
