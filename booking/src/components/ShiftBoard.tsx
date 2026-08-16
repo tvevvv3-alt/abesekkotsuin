@@ -383,6 +383,35 @@ export default function ShiftBoard() {
     alert(`${monthLabel} を曜日パターンで作成しました。\nイレギュラーな日を個別に直し、最後に「📅 予約枠に反映」を押してください。`);
   }
 
+  // スタッフ管理の勤務時間（staff_schedules）から当月の施術シフトを作成
+  async function createMonthFromStaffHours() {
+    const targets = members.filter((m) => m.active && m.role === "therapist" && nameToStaff.get((m.name || "").trim()));
+    if (targets.length === 0) { alert("施術スタッフが予約スタッフの氏名と紐付いていません。氏名（阿部/澁谷/萩原/林 等）をご確認ください。"); return; }
+    if (staffSchedules.length === 0) { alert("スタッフ管理に勤務時間が入っていません。先にスタッフ管理で各先生の曜日ごとの勤務時間を登録してください。"); return; }
+    if (!confirm(`${monthLabel} の施術シフトを、スタッフ管理の勤務時間から作成します。\n（施術スタッフ ${targets.length}名の当月シフトを作り直します。受付・学生はそのまま）`)) return;
+    const [yy, mm] = date.split("-").map(Number);
+    const lastDay = new Date(yy, mm, 0).getDate();
+    const monthDates: string[] = [];
+    for (let dd = 1; dd <= lastDay; dd++) monthDates.push(`${yy}-${pad(mm)}-${pad(dd)}`);
+    const ids = targets.map((m) => m.id);
+    await supabase.from("shifts").delete().in("member_id", ids).gte("date", monthStart).lt("date", monthEnd);
+    const rows: { date: string; member_id: string; start_min: number | null; end_min: number | null; clinic: string | null }[] = [];
+    for (const m of targets) {
+      const staffId = nameToStaff.get((m.name || "").trim()) as string;
+      for (const ds of monthDates) {
+        const dow = new Date(ds + "T00:00:00").getDay();
+        const sc = staffSchedules.filter((s) => s.staff_id === staffId && s.weekday === dow);
+        if (sc.length === 0) continue; // その曜日は勤務なし＝オフ
+        const start = Math.min(...sc.map((s) => s.start_min));
+        const end = Math.max(...sc.map((s) => s.end_min));
+        rows.push({ date: ds, member_id: m.id, start_min: start, end_min: end, clinic: null });
+      }
+    }
+    if (rows.length) await supabase.from("shifts").insert(rows);
+    reload();
+    alert(`${monthLabel} の施術シフトをスタッフ管理の勤務時間から作成しました。\nイレギュラーな日だけ個別に直し、必要なら「📅 予約枠に反映」を押してください。`);
+  }
+
   async function saveDay() {
     if (!edit) return;
     await supabase.from("shifts").delete().eq("date", edit);
@@ -460,6 +489,11 @@ export default function ShiftBoard() {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Link href="/admin/staff" className="flex shrink-0 items-center gap-1 rounded-md bg-slate-600 px-2 py-1 text-[11px] font-bold text-white active:bg-slate-700">← スタッフ管理</Link>
         <h1 className="text-lg font-bold text-slate-800">シフト</h1>
+        <button onClick={createMonthFromStaffHours}
+          className="rounded-md bg-sky-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-sky-700"
+          title="スタッフ管理の勤務時間から当月の施術シフトを作成">
+          🕐 勤務から作成
+        </button>
         <button onClick={() => openPattern(activeMembers[0]?.id ?? "")}
           className="rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-violet-700"
           title="メンバーごとの週の基本シフト（週休2日など）を保存">
