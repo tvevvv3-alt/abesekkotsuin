@@ -239,16 +239,25 @@ export default function BookingWizard() {
     return prices.find((p) => p.service_id === service.id && p.staff_id === staffId) || null;
   }, [service, isClass, prices, staffId]);
 
-  // 次の週に「公開中の日」が1日でもあるか（無ければ＝未公開の月なので次へ進ませない）
+  // 明示的に解放された（公開中の窓がある）最後の月。これより後の月は患者に見せない。
+  const lastReleasedMonth = useMemo(() => {
+    const now = new Date();
+    const open = windows.filter((w) => isMonthOpen(w, now)).map((w) => w.year_month);
+    return open.length ? open.sort().slice(-1)[0] : null;
+  }, [windows]);
+
+  // 次の週に「表示できる日」が1日でもあるか（無ければ＝未解放の月なので次へ進ませない）
   const canNext = useMemo(() => {
     const now = new Date();
     const byM = Object.fromEntries(windows.map((w) => [w.year_month, w]));
     for (let i = 7; i < 14; i++) {
       const ds = toDateStr(addDays(weekStart, i));
-      if (isMonthOpen(byM[monthKey(ds)], now)) return true;
+      const mk = monthKey(ds);
+      if (lastReleasedMonth && mk > lastReleasedMonth) continue; // 未解放の先の月はスキップ
+      if (isMonthOpen(byM[mk], now)) return true;
     }
     return false;
-  }, [windows, weekStart]);
+  }, [windows, weekStart, lastReleasedMonth]);
 
   // 表示中の週に未公開の月があれば案内を出す
   const publishNotice = useMemo(() => {
@@ -1149,6 +1158,7 @@ export default function BookingWizard() {
               sameDayOk={settings?.same_day_ok ?? true}
               lastAcceptMin={settings?.last_accept_min ?? null}
               windows={windows}
+              maxMonth={lastReleasedMonth}
               selected={selected}
               onSelect={onSelectSlot}
               accentColor={!isClass ? selectedStaff?.color : null}
@@ -1198,6 +1208,7 @@ export default function BookingWizard() {
                     sameDayOk={settings?.same_day_ok ?? true}
                     lastAcceptMin={null}
                     windows={windows}
+                    maxMonth={lastReleasedMonth}
                     selected={selected}
                     onSelect={selectAfterHours}
                     accentColor={selectedStaff?.color}

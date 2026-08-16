@@ -43,6 +43,7 @@ interface Props {
   sameDayOk?: boolean; // 当日予約可否
   lastAcceptMin?: number | null; // 最終受付時刻
   windows?: BookingWindow[]; // 月別公開設定
+  maxMonth?: string | null; // これより後の月(YYYY-MM)は非表示（未解放の月を隠す）
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
   accentColor?: string | null; // 担当カラー（空き○の色分け）
@@ -75,6 +76,7 @@ export default function WeekCalendar({
   sameDayOk = true,
   lastAcceptMin = null,
   windows = [],
+  maxMonth = null,
   selected,
   onSelect,
   accentColor,
@@ -134,6 +136,7 @@ export default function WeekCalendar({
       const win = windowByMonth[monthKey(dateStr)];
       // 月が未公開 or 受付期間外 or 当日不可 → 予約枠を出さない
       const dayBlocked =
+        (maxMonth != null && monthKey(dateStr) > maxMonth) || // 未解放の先の月は隠す
         !isMonthOpen(win, now) ||
         !acceptsDate(win, dateStr) ||
         (isToday && !sameDayOk);
