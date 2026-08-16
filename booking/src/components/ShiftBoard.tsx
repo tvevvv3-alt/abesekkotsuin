@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { loadAllStaff, loadBusinessHours } from "@/lib/data";
+import { loadAllStaff, loadBusinessHours, loadSchedules } from "@/lib/data";
 import { toDateStr } from "@/lib/booking";
-import type { BusinessHours, Closure } from "@/lib/types";
+import type { BusinessHours, Closure, StaffSchedule } from "@/lib/types";
 
 interface Member {
   id: string;
@@ -40,6 +40,9 @@ const range = (s: number | null, e: number | null) => (s == null ? "" : e == nul
 
 type Seg = "all" | "am" | "pm";
 type Draft = Record<string, { on: boolean; seg: Seg; start: string; end: string; clinic: boolean }>;
+type ShiftLite = { member_id: string; start_min: number | null; end_min: number | null };
+type GenCl = { date: string; staff_id: string; service_id: null; start_min: number | null; end_min: number | null; reason: null; source: string };
+type GenOp = { date: string; staff_id: string; start_min: number; end_min: number; source: string };
 type Clip = { member_id: string; role: Member["role"]; seg: Seg; start_min: number | null; end_min: number | null; clinic: string | null };
 
 export default function ShiftBoard() {
@@ -49,6 +52,8 @@ export default function ShiftBoard() {
   const [bh, setBh] = useState<BusinessHours[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
   const [staffNames, setStaffNames] = useState<Map<string, string>>(new Map());
+  const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>([]);
+  const [applying, setApplying] = useState(false);
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -72,13 +77,14 @@ export default function ShiftBoard() {
     loadMembers();
     loadBusinessHours(supabase).then(setBh).catch(() => {});
     loadAllStaff(supabase).then((st) => setStaffNames(new Map(st.map((s) => [s.id, s.name])))).catch(() => {});
+    loadSchedules(supabase).then(setStaffSchedules).catch(() => {});
   }, [loadMembers, supabase]);
 
   const reload = useCallback(async () => {
     setLoading(true);
     const [{ data: sh }, { data: cl }] = await Promise.all([
       supabase.from("shifts").select("id, date, member_id, start_min, end_min, clinic, note").gte("date", monthStart).lt("date", monthEnd),
-      supabase.from("closures").select("id, date, staff_id, service_id, start_min, end_min, reason").gte("date", monthStart).lt("date", monthEnd),
+      supabase.from("closures").select("id, date, staff_id, service_id, start_min, end_min, reason, source").gte("date", monthStart).lt("date", monthEnd),
     ]);
     setShifts((sh as Shift[]) ?? []);
     setClosures((cl as Closure[]) ?? []);
@@ -117,7 +123,8 @@ export default function ShiftBoard() {
   // スタッフ個別の休み（担当限定の休診）を日付→メンバー別に
   const indivByDate = useMemo(() => {
     const m = new Map<string, { member: Member; label: string }[]>();
-    closures.filter((c) => c.staff_id != null && c.service_id == null).forEach((c) => {
+    // source='shift' はシフト時刻から自動生成した休みなので、表示では重複させない（元のシフトが既に出ている）
+    closures.filter((c) => c.staff_id != null && c.service_id == null && c.source !== "shift").forEach((c) => {
       const name = staffNames.get(c.staff_id as string);
       if (!name) return;
       const mem = memberByName.get(name);
@@ -211,6 +218,81 @@ export default function ShiftBoard() {
       return { date: ds, member_id: m.id, start_min: t.start, end_min: t.end, clinic: dr.clinic ? "kawanishi" : null };
     });
   }
+  // シフトメンバー氏名 → 予約スタッフID（同名で紐付け）
+  const nameToStaff = useMemo(() => {
+    const m = new Map<string, string>();
+    staffNames.forEach((name, id) => { const k = (name || "").trim(); if (k) m.set(k, id); });
+    return m;
+  }, [staffNames]);
+
+  // その日のシフトから、予約に効く closures / openings を生成（施術者のみ・source='shift'）
+  const genShiftAvail = useCallback((ds: string, dayShifts: ShiftLite[]): { cl: GenCl[]; op: GenOp[] } => {
+    const cl: GenCl[] = [];
+    const op: GenOp[] = [];
+    if (dayShifts.length === 0) return { cl, op }; // シフト未入力の日は従来通り（曜日パターン）
+    const dow = new Date(ds + "T00:00:00").getDay();
+    const span = bhSpan(ds);
+    members.filter((m) => m.active && m.role === "therapist").forEach((m) => {
+      const staffId = nameToStaff.get((m.name || "").trim());
+      if (!staffId) return; // 予約スタッフに紐付かない人は対象外
+      const base = staffSchedules.filter((s) => s.staff_id === staffId && s.weekday === dow);
+      const ws = base.length ? Math.min(...base.map((b) => b.start_min)) : null; // 通常勤務の開始
+      const we = base.length ? Math.max(...base.map((b) => b.end_min)) : null;   // 通常勤務の終了
+      const sh = dayShifts.find((s) => s.member_id === m.id);
+      if (!sh) {
+        // 出勤なし＝この日オフ。通常勤務がある曜日なら終日休みにする。
+        if (ws != null) cl.push({ date: ds, staff_id: staffId, service_id: null, start_min: null, end_min: null, reason: null, source: "shift" });
+        return;
+      }
+      const dsS = sh.start_min ?? span.start; // 終日(null)は営業時間
+      const dsE = sh.end_min ?? span.end;
+      if (dsS == null || dsE == null) return; // 営業時間不明なら安全側でスキップ
+      if (ws == null || we == null) {
+        // 通常はオフの曜日に出る → その枠を開放
+        op.push({ date: ds, staff_id: staffId, start_min: dsS, end_min: dsE, source: "shift" });
+      } else {
+        if (dsS > ws) cl.push({ date: ds, staff_id: staffId, service_id: null, start_min: ws, end_min: dsS, reason: null, source: "shift" }); // 遅出→前を閉じる
+        if (dsE < we) cl.push({ date: ds, staff_id: staffId, service_id: null, start_min: dsE, end_min: we, reason: null, source: "shift" }); // 早退→後を閉じる
+        if (dsS < ws) op.push({ date: ds, staff_id: staffId, start_min: dsS, end_min: ws, source: "shift" }); // 通常より前に出る→開放
+        if (dsE > we) op.push({ date: ds, staff_id: staffId, start_min: we, end_min: dsE, source: "shift" }); // 通常より後まで→開放
+      }
+    });
+    return { cl, op };
+  }, [members, nameToStaff, staffSchedules, bhSpan]);
+
+  // 指定日群について、シフト由来(source='shift')の予約枠を作り直す（手動分は残す）
+  const applyShiftAvail = useCallback(async (entries: { ds: string; shifts: ShiftLite[] }[]) => {
+    const dates = entries.map((e) => e.ds);
+    if (dates.length === 0) return;
+    await supabase.from("closures").delete().in("date", dates).eq("source", "shift");
+    await supabase.from("openings").delete().in("date", dates).eq("source", "shift");
+    const cls: GenCl[] = []; const ops: GenOp[] = [];
+    entries.forEach((e) => { const r = genShiftAvail(e.ds, e.shifts); cls.push(...r.cl); ops.push(...r.op); });
+    if (cls.length) await supabase.from("closures").insert(cls);
+    if (ops.length) await supabase.from("openings").insert(ops);
+  }, [supabase, genShiftAvail]);
+
+  // 当月のシフトカレンダー通りに予約枠を一括反映（20日頃の翌月解放用）
+  async function applyMonthToAvailability() {
+    if (!confirm(`${monthLabel} のシフトカレンダー通りに予約枠を反映します。\n・施術者の勤務時間に合わせて空きを開閉\n・シフトが無い施術者はその日オフ\n※シフト由来の枠を作り直します（手動の休み・開放は残ります）`)) return;
+    setApplying(true);
+    try {
+      const { data: sh } = await supabase.from("shifts").select("date, member_id, start_min, end_min").gte("date", monthStart).lt("date", monthEnd);
+      const byDate = new Map<string, ShiftLite[]>();
+      ((sh as (ShiftLite & { date: string })[]) ?? []).forEach((s) => { const a = byDate.get(s.date) ?? []; a.push(s); byDate.set(s.date, a); });
+      const [yy, mm] = date.split("-").map(Number);
+      const lastDay = new Date(yy, mm, 0).getDate();
+      const entries: { ds: string; shifts: ShiftLite[] }[] = [];
+      for (let dd = 1; dd <= lastDay; dd++) { const ds = `${yy}-${pad(mm)}-${pad(dd)}`; entries.push({ ds, shifts: byDate.get(ds) ?? [] }); }
+      await applyShiftAvail(entries);
+      alert(`${monthLabel} の予約枠にシフトを反映しました。\nこの後、ボード/カレンダーで臨時の開放・締めを微調整できます。`);
+    } catch (e) {
+      alert("反映に失敗しました：" + (e as Error).message + "\n（migration_shift_availability.sql を実行済みかご確認ください）");
+    }
+    setApplying(false);
+    reload();
+  }
+
   async function saveDay() {
     if (!edit) return;
     await supabase.from("shifts").delete().eq("date", edit);
@@ -222,6 +304,8 @@ export default function ShiftBoard() {
       const t = dayClosure === "full" ? { start: null, end: null } : segTimes(edit, dayClosure);
       await supabase.from("closures").insert({ date: edit, staff_id: null, service_id: null, start_min: t.start, end_min: t.end, reason: null });
     }
+    // この日のシフト由来の予約枠も更新（直前の締め/開けが即反映）
+    await applyShiftAvail([{ ds: edit, shifts: rows }]);
     setEdit(null); reload();
   }
   // この日のシフトをコピー（貼り付けモードへ）
@@ -240,6 +324,7 @@ export default function ShiftBoard() {
     await supabase.from("shifts").delete().eq("date", ds);
     const rows = clip.map((c) => ({ date: ds, member_id: c.member_id, start_min: c.start_min, end_min: c.end_min, clinic: c.clinic }));
     if (rows.length) await supabase.from("shifts").insert(rows);
+    await applyShiftAvail([{ ds, shifts: rows }]);
     reload();
   }
 
@@ -285,6 +370,11 @@ export default function ShiftBoard() {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Link href="/admin/staff" className="flex shrink-0 items-center gap-1 rounded-md bg-slate-600 px-2 py-1 text-[11px] font-bold text-white active:bg-slate-700">← スタッフ管理</Link>
         <h1 className="text-lg font-bold text-slate-800">シフト</h1>
+        <button onClick={applyMonthToAvailability} disabled={applying}
+          className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-emerald-700 disabled:bg-slate-300"
+          title="このカレンダー通りに、当月の予約の空きを開閉します">
+          {applying ? "反映中…" : "📅 予約枠に反映"}
+        </button>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => gotoMonth(-1)} className={btn}>‹</button>
           <button onClick={() => setDate(toDateStr(new Date()))} className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">今月</button>

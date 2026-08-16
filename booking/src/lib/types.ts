@@ -107,6 +107,7 @@ export interface Closure {
   start_min: number | null; // null=終日
   end_min: number | null;
   reason: string | null;
+  source?: string | null; // 'shift'=シフトから自動生成 / null=手動
 }
 
 // 臨時の予約可能枠（昼休みなど通常は閉まっている時間を、その日だけ開放）
@@ -117,6 +118,7 @@ export interface Opening {
   service_id?: string | null; // 定員制クラス（体幹教室）に紐づく開放
   start_min: number;
   end_min: number;
+  source?: string | null; // 'shift'=シフトから自動生成 / null=手動
 }
 
 // カレンダーの自由メモ（受付シフト・zoom・ゴミ捨て 等）。予約とは別。
