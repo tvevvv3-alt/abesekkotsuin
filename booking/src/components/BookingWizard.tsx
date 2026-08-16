@@ -239,6 +239,17 @@ export default function BookingWizard() {
     return prices.find((p) => p.service_id === service.id && p.staff_id === staffId) || null;
   }, [service, isClass, prices, staffId]);
 
+  // 次の週に「公開中の日」が1日でもあるか（無ければ＝未公開の月なので次へ進ませない）
+  const canNext = useMemo(() => {
+    const now = new Date();
+    const byM = Object.fromEntries(windows.map((w) => [w.year_month, w]));
+    for (let i = 7; i < 14; i++) {
+      const ds = toDateStr(addDays(weekStart, i));
+      if (isMonthOpen(byM[monthKey(ds)], now)) return true;
+    }
+    return false;
+  }, [windows, weekStart]);
+
   // 表示中の週に未公開の月があれば案内を出す
   const publishNotice = useMemo(() => {
     const now = new Date();
@@ -1100,7 +1111,9 @@ export default function BookingWizard() {
             </span>
             <button
               onClick={() => setWeekStart(addDays(weekStart, 7))}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm active:bg-slate-100"
+              disabled={!canNext}
+              title={!canNext ? "翌月以降はまだ予約を受け付けていません" : undefined}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm active:bg-slate-100 disabled:opacity-30"
             >
               次の週 ›
             </button>
