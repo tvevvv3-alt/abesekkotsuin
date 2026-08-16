@@ -193,8 +193,8 @@ export default function ShiftBoard() {
       d[m.id] = {
         on: !!sh,
         seg,
-        start: !isT && sh?.start_min != null ? minToTime(sh.start_min) : defStart != null ? minToTime(defStart) : "",
-        end: !isT && sh?.end_min != null ? minToTime(sh.end_min) : defEnd != null ? minToTime(defEnd) : "",
+        start: sh?.start_min != null ? minToTime(sh.start_min) : (!isT && defStart != null ? minToTime(defStart) : ""),
+        end: sh?.end_min != null ? minToTime(sh.end_min) : (!isT && defEnd != null ? minToTime(defEnd) : ""),
         clinic: sh?.clinic === "kawanishi",
       };
     });
@@ -205,9 +205,10 @@ export default function ShiftBoard() {
   }
   function draftRows(ds: string) {
     return activeMembers.filter((m) => draft[m.id]?.on).map((m) => {
-      const isT = m.role === "therapist";
-      const t = isT ? segTimes(ds, draft[m.id].seg) : { start: draft[m.id].start ? timeToMin(draft[m.id].start) : null, end: draft[m.id].end ? timeToMin(draft[m.id].end) : null };
-      return { date: ds, member_id: m.id, start_min: t.start, end_min: t.end, clinic: draft[m.id].clinic ? "kawanishi" : null };
+      const dr = draft[m.id];
+      // 施術・受付・学生とも、入力された時刻をそのまま保存（空欄＝終日/時刻なし）
+      const t = { start: dr.start ? timeToMin(dr.start) : null, end: dr.end ? timeToMin(dr.end) : null };
+      return { date: ds, member_id: m.id, start_min: t.start, end_min: t.end, clinic: dr.clinic ? "kawanishi" : null };
     });
   }
   async function saveDay() {
@@ -226,24 +227,18 @@ export default function ShiftBoard() {
   // この日のシフトをコピー（貼り付けモードへ）
   function copyDay() {
     if (!edit) return;
-    const rows: Clip[] = activeMembers.filter((m) => draft[m.id]?.on).map((m) => {
-      const isT = m.role === "therapist";
-      return {
-        member_id: m.id, role: m.role, seg: isT ? draft[m.id].seg : "all",
-        start_min: isT ? null : draft[m.id].start ? timeToMin(draft[m.id].start) : null,
-        end_min: isT ? null : draft[m.id].end ? timeToMin(draft[m.id].end) : null,
-        clinic: draft[m.id].clinic ? "kawanishi" : null,
-      };
-    });
+    const rows: Clip[] = activeMembers.filter((m) => draft[m.id]?.on).map((m) => ({
+      member_id: m.id, role: m.role, seg: draft[m.id].seg,
+      start_min: draft[m.id].start ? timeToMin(draft[m.id].start) : null,
+      end_min: draft[m.id].end ? timeToMin(draft[m.id].end) : null,
+      clinic: draft[m.id].clinic ? "kawanishi" : null,
+    }));
     setClip(rows); setEdit(null);
   }
   async function pasteTo(ds: string) {
     if (!clip) return;
     await supabase.from("shifts").delete().eq("date", ds);
-    const rows = clip.map((c) => {
-      const t = c.role === "therapist" ? segTimes(ds, c.seg) : { start: c.start_min, end: c.end_min };
-      return { date: ds, member_id: c.member_id, start_min: t.start, end_min: t.end, clinic: c.clinic };
-    });
+    const rows = clip.map((c) => ({ date: ds, member_id: c.member_id, start_min: c.start_min, end_min: c.end_min, clinic: c.clinic }));
     if (rows.length) await supabase.from("shifts").insert(rows);
     reload();
   }
@@ -383,6 +378,7 @@ export default function ShiftBoard() {
                                   <span key={"p" + s.id} className="inline-flex flex-col items-center border-r border-dashed border-slate-400 pr-1">
                                     <span className="text-[10px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
                                     <span className="mt-0.5 bg-slate-300 px-0.5 text-[8px] font-bold text-rose-600">{label}</span>
+                                    {s.start_min != null && <span className="text-[9px] font-bold" style={{ color: m.color }}>{range(s.start_min, s.end_min)}</span>}
                                   </span>
                                 ))}
                                 {full.map(({ s, m }) => (
@@ -540,11 +536,18 @@ export default function ShiftBoard() {
                         {m.role === "therapist" ? (
                           <>
                             {(["all", "am", "pm"] as const).map((sg) => (
-                              <button key={sg} onClick={() => setDraft((p) => ({ ...p, [m.id]: { ...dr, seg: sg } }))}
+                              <button key={sg} onClick={() => setDraft((p) => {
+                                const t = segTimes(edit as string, sg);
+                                return { ...p, [m.id]: { ...dr, seg: sg, start: t.start != null ? minToTime(t.start) : "", end: t.end != null ? minToTime(t.end) : "" } };
+                              })}
                                 className={`rounded border px-2 py-1 text-[11px] font-bold ${dr.seg === sg ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-slate-600"}`}>
                                 {sg === "all" ? "終日" : sg === "am" ? "午前のみ" : "午後のみ"}
                               </button>
                             ))}
+                            <span className="ml-1 text-[11px] text-slate-400">時刻</span>
+                            <input type="time" value={dr.start} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, start: e.target.value } }))} className="w-[92px] rounded border border-slate-300 px-1 py-1 text-[12px]" />
+                            <span className="text-slate-400">-</span>
+                            <input type="time" value={dr.end} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, end: e.target.value } }))} className="w-[92px] rounded border border-slate-300 px-1 py-1 text-[12px]" />
                             <label className="ml-1 flex items-center gap-1 text-[12px] text-slate-600">
                               <input type="checkbox" checked={dr.clinic} onChange={(e) => setDraft((p) => ({ ...p, [m.id]: { ...dr, clinic: e.target.checked } }))} className="h-3.5 w-3.5" />
                               川西院
@@ -569,7 +572,7 @@ export default function ShiftBoard() {
               <button onClick={copyDay} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">📋 この日をコピー</button>
               <button onClick={saveDay} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700">保存</button>
             </div>
-            <p className="mt-1.5 text-[11px] text-slate-400">施術＝終日/午前のみ/午後のみ。受付・学生＝時間帯。「コピー」後に他の日をタップすると同じ内容を貼り付けます。</p>
+            <p className="mt-1.5 text-[11px] text-slate-400">施術＝終日/午前のみ/午後のみのボタンで時刻が入り、そのまま微調整も可（例：午前休診で18:00〜なら「午後のみ」→開始を18:00に）。終日は時刻を空に。受付・学生＝時間帯。「コピー」後に他の日をタップで貼り付け。</p>
           </div>
         </div>
       )}
