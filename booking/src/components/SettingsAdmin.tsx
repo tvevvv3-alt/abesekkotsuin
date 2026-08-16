@@ -268,8 +268,10 @@ export default function SettingsAdmin() {
             <input
               type="number"
               min={0}
-              value={s.cancel_deadline_hours}
-              onChange={(e) => up({ cancel_deadline_hours: parseInt(e.target.value || "0", 10) })}
+              inputMode="numeric"
+              value={s.cancel_deadline_hours || ""}
+              placeholder="0"
+              onChange={(e) => up({ cancel_deadline_hours: Math.max(0, parseInt(e.target.value || "0", 10) || 0) })}
               className="w-20 rounded-md border px-2 py-1.5"
             />
             時間前まで
@@ -281,8 +283,10 @@ export default function SettingsAdmin() {
             <input
               type="number"
               min={0}
-              value={s.change_deadline_hours}
-              onChange={(e) => up({ change_deadline_hours: parseInt(e.target.value || "0", 10) })}
+              inputMode="numeric"
+              value={s.change_deadline_hours || ""}
+              placeholder="0"
+              onChange={(e) => up({ change_deadline_hours: Math.max(0, parseInt(e.target.value || "0", 10) || 0) })}
               className="w-20 rounded-md border px-2 py-1.5"
             />
             時間前まで

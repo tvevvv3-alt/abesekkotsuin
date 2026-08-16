@@ -318,9 +318,9 @@ export default function ShiftBoard() {
       )}
 
       {/* カレンダー（月グリッド） */}
-      <div className="overflow-x-auto rounded-xl border bg-white">
-        <div className="min-w-[720px]">
-          <div className="grid grid-cols-7 border-b bg-slate-50 text-center text-[11px] font-bold">
+      <div className="overflow-hidden rounded-xl border bg-white">
+        <div>
+          <div className="grid grid-cols-7 border-b bg-slate-50 text-center text-[10px] font-bold">
             {WD.map((w, i) => <div key={w} className={`py-1.5 ${i === 0 ? "text-rose-500" : i === 6 ? "text-blue-500" : "text-slate-500"}`}>{w}</div>)}
           </div>
           {loading ? (
@@ -363,63 +363,63 @@ export default function ShiftBoard() {
                   const today = ds === toDateStr(new Date());
                   return (
                     <button key={ds} onClick={() => inMonth && (clip ? pasteTo(ds) : openDay(ds))} disabled={!inMonth}
-                      className={`flex min-h-[104px] flex-col border-b border-r text-left ${!inMonth ? "bg-slate-50/50" : clip ? "active:bg-amber-100" : "active:bg-blue-50"}`}>
+                      className={`flex min-h-[92px] flex-col border-b border-r text-left ${!inMonth ? "bg-slate-50/50" : clip ? "active:bg-amber-100" : "active:bg-blue-50"}`}>
                       {/* 日付バンド */}
-                      <div className={`flex items-center justify-between border-b px-1.5 py-0.5 ${!inMonth ? "bg-slate-100/60" : "bg-[#fbf5df]"}`}>
-                        <span className={`text-[12px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-700"}`}>{d.getDate()}</span>
-                        {inMonth && reason && <span className="truncate text-[10px] font-bold text-rose-500">{reason}</span>}
-                        {inMonth && today && !reason && <span className="rounded bg-blue-600 px-1 text-[9px] font-bold text-white">今日</span>}
+                      <div className={`flex items-center justify-between border-b px-1 py-0.5 ${!inMonth ? "bg-slate-100/60" : "bg-[#fbf5df]"}`}>
+                        <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-700"}`}>{d.getDate()}</span>
+                        {inMonth && reason && <span className="truncate text-[8px] font-bold text-rose-500">{reason}</span>}
+                        {inMonth && today && !reason && <span className="rounded bg-blue-600 px-0.5 text-[8px] font-bold text-white">今日</span>}
                       </div>
                       {/* 内容：施術スタッフ／受付／学生 の3段 */}
-                      <div className={`flex flex-1 flex-col justify-center gap-0.5 px-1.5 py-1.5 ${closed ? "bg-slate-100" : ""}`}>
+                      <div className={`flex flex-1 flex-col justify-center gap-0.5 px-0.5 py-1 ${closed ? "bg-slate-100" : ""}`}>
                         {!inMonth ? null : closed ? (
-                          <span className="text-center text-base font-bold tracking-[0.3em] text-rose-500">休診</span>
+                          <span className="text-center text-xs font-bold tracking-[0.2em] text-rose-500">休診</span>
                         ) : (
                           <>
                             {/* ① 施術スタッフ */}
                             {hasTher && (
-                              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
+                              <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5">
                                 {partial.map(({ s, m, label }) => (
-                                  <span key={"p" + s.id} className="inline-flex flex-col items-center border-r border-dashed border-slate-400 pr-2">
-                                    <span className="text-[13px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
-                                    <span className="mt-0.5 bg-slate-300 px-1 text-[9px] font-bold text-rose-600">{label}</span>
+                                  <span key={"p" + s.id} className="inline-flex flex-col items-center border-r border-dashed border-slate-400 pr-1">
+                                    <span className="text-[10px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
+                                    <span className="mt-0.5 bg-slate-300 px-0.5 text-[8px] font-bold text-rose-600">{label}</span>
                                   </span>
                                 ))}
                                 {full.map(({ s, m }) => (
-                                  <span key={s.id} className="text-[13px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
+                                  <span key={s.id} className="text-[10px] font-bold leading-tight" style={{ color: m.color }}>{m.name}{s.clinic === "kawanishi" ? "(川西)" : ""}</span>
                                 ))}
                                 {offTher.map((x, i) => (
-                                  <span key={"ot" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                                  <span key={"ot" + i} className="text-[9px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
                                 ))}
                               </div>
                             )}
                             {/* ② 受付 */}
                             {(reception.length > 0 || offRec.length > 0) && (
-                              <div className={`flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 ${hasTher ? "border-t border-slate-100 pt-0.5" : ""}`}>
+                              <div className={`flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 ${hasTher ? "border-t border-slate-100 pt-0.5" : ""}`}>
                                 {reception.map(({ s, m }) => (
-                                  <span key={"r" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+                                  <span key={"r" + s.id} className="text-[10px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
                                 ))}
                                 {offRec.map((x, i) => (
-                                  <span key={"or" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                                  <span key={"or" + i} className="text-[9px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
                                 ))}
                               </div>
                             )}
                             {/* ③ 学生 */}
                             {(student.length > 0 || offStu.length > 0) && (
-                              <div className={`flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 ${hasTher || reception.length > 0 || offRec.length > 0 ? "border-t border-slate-100 pt-0.5" : ""}`}>
+                              <div className={`flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 ${hasTher || reception.length > 0 || offRec.length > 0 ? "border-t border-slate-100 pt-0.5" : ""}`}>
                                 {student.map(({ s, m }) => (
-                                  <span key={"s" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+                                  <span key={"s" + s.id} className="text-[10px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
                                 ))}
                                 {offStu.map((x, i) => (
-                                  <span key={"os" + i} className="text-[10px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
+                                  <span key={"os" + i} className="text-[9px] font-bold text-rose-400 line-through decoration-rose-300">{x.member.name} {x.label}</span>
                                 ))}
                               </div>
                             )}
                             {/* その他 */}
                             {other.length > 0 && (
-                              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 border-t border-slate-100 pt-0.5">
+                              <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 border-t border-slate-100 pt-0.5">
                                 {other.map(({ s, m }) => (
-                                  <span key={"x" + s.id} className="text-[12px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
+                                  <span key={"x" + s.id} className="text-[10px] font-bold leading-tight" style={{ color: m.color }}>{m.name} {range(s.start_min, s.end_min)}</span>
                                 ))}
                               </div>
                             )}
