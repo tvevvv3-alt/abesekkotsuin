@@ -200,29 +200,6 @@ export default function AdminBookingModal({
     setBusy(false);
   }
 
-  // 問診票リンクを患者のLINEへ1タップ送信
-  async function sendQuestionnaire() {
-    if (!appt) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/send-questionnaire", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: appt.id }),
-      });
-      const j = (await res.json()) as { ok: boolean; reason?: string };
-      if (j.ok) alert("問診票リンクをLINEで送信しました。");
-      else if (j.reason === "noline") alert("この患者はLINE未連携のため送信できません。");
-      else if (j.reason === "nourl") alert("基本設定で問診票URLを登録してください。");
-      else if (j.reason === "notconfigured") alert("LINE送信（アクセストークン）が未設定です。");
-      else setError(`問診票を送信できませんでした: ${j.reason ?? "?"}`);
-    } catch {
-      setError("問診票の送信エラー");
-    }
-    setBusy(false);
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-4 sm:rounded-2xl">
@@ -421,15 +398,6 @@ export default function AdminBookingModal({
               className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600"
             >
               予約をキャンセル
-            </button>
-          )}
-          {mode === "edit" && (
-            <button
-              onClick={sendQuestionnaire}
-              disabled={busy}
-              className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-600 active:bg-emerald-50 disabled:opacity-50"
-            >
-              問診票を送る
             </button>
           )}
           {mode === "edit" && (

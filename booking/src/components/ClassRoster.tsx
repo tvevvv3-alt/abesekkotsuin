@@ -467,20 +467,17 @@ export default function ClassRoster() {
                           {(() => {
                             const tested = evaled.has(name.trim());
                             return (
-                              <button
-                                onClick={() =>
-                                  setEvalTarget({ name, lineUserId: visits.find((v) => v.line_user_id)?.line_user_id ?? null })
-                                }
-                                className={`rounded-md border px-1.5 py-1 text-[10px] font-bold leading-tight active:brightness-95 ${
+                              <div
+                                className={`rounded-md border px-1.5 py-1 text-[10px] font-bold leading-tight ${
                                   tested
                                     ? "border-emerald-400 bg-emerald-500 text-white"
-                                    : "border-indigo-300 bg-indigo-50 text-indigo-600"
+                                    : "border-slate-200 bg-slate-50 text-slate-400"
                                 }`}
-                                title={tested ? "今月は体幹テスト入力済み" : "今月は体幹テスト未入力"}
+                                title={tested ? "今月は体幹テスト入力済み" : "今月は体幹テスト未入力（日付をタップ→体幹テスト）"}
                               >
                                 <span className="block">体幹テスト</span>
                                 <span className="block">{tested ? "✅ 済" : "未"}</span>
-                              </button>
+                              </div>
                             );
                           })()}
                         </td>
@@ -535,12 +532,12 @@ export default function ClassRoster() {
 
       <p className="mt-3 text-[11px] text-slate-400">
         予約が入ると自動で表に反映されます（行＝人・列＝回数）。各回のマスを
-        タップすると「予約変更」ポップアップが開き、氏名・日付・時刻の修正や
-        「終了＋LINE」（来場日・今月何回目・残り回数を通知／フリーは無制限）ができます。
+        タップすると「予約変更」ポップアップが開き、氏名・日付・時刻の修正・
+        「体幹テスト」・「終了＋LINE」（来場日・今月何回目・残り回数を通知／フリーは無制限）ができます。
+        「テスト」列は当月の未／済の表示だけ（緑＝済）で、入力は日付タップの体幹テストから。
         名前は横スクロールしても固定、パス種別は氏名ごとに保存されます。
         今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
-        「体幹テスト」から評価を入力してLINE送信できます。
         来院マスを<b>別の会員の行へドラッグ＆ドロップ</b>すると、その来院を付け替えできます（同姓同名・兄弟の付け替えに）。
       </p>
 
@@ -575,7 +572,12 @@ export default function ClassRoster() {
                 </div>
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => { setEvalTarget({ name: ev.name, lineUserId: ev.line_user_id }); setEv(null); }}
+                className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 active:bg-indigo-100">
+                📋 体幹テスト
+              </button>
               {!ev.done && (
                 <button onClick={finishFromPopup} disabled={busy === ev.id}
                   className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300">
