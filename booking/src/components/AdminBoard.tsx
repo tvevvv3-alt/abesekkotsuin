@@ -23,6 +23,7 @@ import type {
   StaffSchedule,
 } from "@/lib/types";
 import { minToLabel, WEEKDAY_LABELS } from "@/lib/booking";
+import { holidayName } from "@/lib/holidays";
 import AdminBookingModal from "./AdminBookingModal";
 
 const PX_PER_MIN = 0.9; // カレンダーに合わせて縦を詰める（30分＝27px）
@@ -683,8 +684,9 @@ export default function AdminBoard({ date }: { date: string }) {
         <p className="min-w-0 truncate text-xs text-slate-400">
           空き時間を上下ドラッグ →「予約追加」か「休診」
         </p>
-        <span className="text-center text-sm font-bold text-slate-700">
+        <span className={`text-center text-sm font-bold ${holidayName(date) ? "text-rose-500" : "text-slate-700"}`}>
           {dObj.getMonth() + 1}/{dObj.getDate()}（{WEEKDAY_LABELS[dObj.getDay()]}）
+          {holidayName(date) && <span className="ml-1 text-[11px] font-bold text-rose-500">{holidayName(date)}</span>}
         </span>
         <div className="flex justify-end">
           <button

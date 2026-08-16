@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff, loadBusinessHours, loadSchedules } from "@/lib/data";
 import { toDateStr } from "@/lib/booking";
+import { holidayName } from "@/lib/holidays";
 import type { BusinessHours, Closure, StaffSchedule } from "@/lib/types";
 
 interface Member {
@@ -57,7 +58,6 @@ export default function ShiftBoard() {
   const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>([]);
   const [applying, setApplying] = useState(false);
   // 一括設定（メンバー×曜日をまとめて設定）
-  const [bulk, setBulk] = useState<{ memberId: string; weekday: number; seg: Seg | "off" | "custom"; start: string; end: string; clinic: boolean } | null>(null); // weekday: -1=全曜日
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -301,36 +301,6 @@ export default function ShiftBoard() {
     reload();
   }
 
-  // 一括設定：メンバー1人を当月の対象曜日にまとめて設定（1日ずつの手間を省く）
-  async function applyBulk() {
-    if (!bulk || !bulk.memberId) { setBulk(null); return; }
-    const m = members.find((x) => x.id === bulk.memberId);
-    if (!m) { setBulk(null); return; }
-    const [yy, mm] = date.split("-").map(Number);
-    const lastDay = new Date(yy, mm, 0).getDate();
-    const dates: string[] = [];
-    for (let dd = 1; dd <= lastDay; dd++) {
-      const ds = `${yy}-${pad(mm)}-${pad(dd)}`;
-      const dow = new Date(ds + "T00:00:00").getDay();
-      if (bulk.weekday === -1 || dow === bulk.weekday) dates.push(ds);
-    }
-    // 既存のこのメンバー分を対象日から削除 → 置き換え
-    await supabase.from("shifts").delete().eq("member_id", bulk.memberId).in("date", dates);
-    if (bulk.seg !== "off") {
-      const rows = dates.map((ds) => {
-        let start: number | null = null, end: number | null = null;
-        if (bulk.seg === "custom") { start = bulk.start ? timeToMin(bulk.start) : null; end = bulk.end ? timeToMin(bulk.end) : null; }
-        else if (bulk.seg === "am" || bulk.seg === "pm") { const t = segTimes(ds, bulk.seg); start = t.start; end = t.end; }
-        return { date: ds, member_id: bulk.memberId, start_min: start, end_min: end, clinic: bulk.clinic ? "kawanishi" : null };
-      });
-      if (rows.length) await supabase.from("shifts").insert(rows);
-    }
-    const wlabel = bulk.weekday === -1 ? "全曜日" : `${WD[bulk.weekday]}曜`;
-    const slabel = bulk.seg === "off" ? "休み（削除）" : bulk.seg === "all" ? "終日" : bulk.seg === "am" ? "午前のみ" : bulk.seg === "pm" ? "午後のみ" : `${bulk.start || "?"}〜${bulk.end || ""}`;
-    setBulk(null);
-    reload();
-    alert(`${m.name}：当月の${wlabel}を「${slabel}」に一括設定しました。\n「📅 予約枠に反映」で予約に反映されます。`);
-  }
 
   // スタッフ管理の勤務時間（staff_schedules）から当月の施術シフトを作成
   async function createMonthFromStaffHours() {
@@ -447,11 +417,6 @@ export default function ShiftBoard() {
           title="スタッフ管理の勤務時間から当月の施術シフトを作成">
           🕐 スタッフ勤務を反映
         </button>
-        <button onClick={() => setBulk({ memberId: activeMembers[0]?.id ?? "", weekday: -1, seg: "all", start: "", end: "", clinic: false })}
-          className="rounded-md bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-indigo-700"
-          title="受付・学生など、メンバー×曜日をまとめて設定">
-          🧑‍🔧 一括設定
-        </button>
         <button onClick={applyMonthToAvailability} disabled={applying}
           className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-emerald-700 disabled:bg-slate-300"
           title="このカレンダー通りに、当月の予約の空きを開閉します">
@@ -528,14 +493,16 @@ export default function ShiftBoard() {
                   const offStu = offMembers.filter((x) => x.member.role === "student");
                   const hasTher = partial.length > 0 || full.length > 0 || offTher.length > 0;
                   const today = ds === toDateStr(new Date());
+                  const hol = holidayName(ds);
                   return (
                     <button key={ds} onClick={() => inMonth && (clip ? pasteTo(ds) : openDay(ds))} disabled={!inMonth}
                       className={`flex min-h-[92px] flex-col border-b border-r text-left ${!inMonth ? "bg-slate-50/50" : clip ? "active:bg-amber-100" : "active:bg-blue-50"}`}>
                       {/* 日付バンド */}
-                      <div className={`flex items-center justify-between border-b px-1 py-0.5 ${!inMonth ? "bg-slate-100/60" : "bg-[#fbf5df]"}`}>
-                        <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-700"}`}>{d.getDate()}</span>
-                        {inMonth && reason && <span className="truncate text-[8px] font-bold text-rose-500">{reason}</span>}
-                        {inMonth && today && !reason && <span className="rounded bg-blue-600 px-0.5 text-[8px] font-bold text-white">今日</span>}
+                      <div className={`flex items-center justify-between border-b px-1 py-0.5 ${!inMonth ? "bg-slate-100/60" : hol ? "bg-rose-50" : "bg-[#fbf5df]"}`}>
+                        <span className={`text-[11px] font-bold ${!inMonth ? "text-slate-300" : hol || dow === 0 ? "text-rose-500" : dow === 6 ? "text-blue-500" : "text-slate-700"}`}>{d.getDate()}</span>
+                        {inMonth && hol && <span className="truncate text-[8px] font-bold text-rose-500">{hol}</span>}
+                        {inMonth && !hol && reason && <span className="truncate text-[8px] font-bold text-rose-500">{reason}</span>}
+                        {inMonth && today && !reason && !hol && <span className="rounded bg-blue-600 px-0.5 text-[8px] font-bold text-white">今日</span>}
                       </div>
                       {/* 内容：施術スタッフ／受付／学生 の3段 */}
                       <div className={`flex flex-1 flex-col justify-center gap-0.5 px-0.5 py-1 ${closed ? "bg-slate-100" : ""}`}>
@@ -666,67 +633,6 @@ export default function ShiftBoard() {
           </div>
         )}
       </div>
-
-      {/* 一括設定モーダル */}
-      {bulk && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setBulk(null)}>
-          <div className="w-full max-w-md rounded-t-2xl bg-white p-4 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-800">一括設定（{monthLabel}）</h2>
-              <button onClick={() => setBulk(null)} className="text-slate-400">✕</button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-600">メンバー</label>
-                <select value={bulk.memberId} onChange={(e) => setBulk({ ...bulk, memberId: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
-                  {activeMembers.map((m) => <option key={m.id} value={m.id}>{m.name || "（無名）"}（{ROLE_LABEL[m.role]}）</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-600">対象の曜日</label>
-                <div className="flex flex-wrap gap-1">
-                  <button onClick={() => setBulk({ ...bulk, weekday: -1 })}
-                    className={`rounded border px-2 py-1 text-[12px] font-bold ${bulk.weekday === -1 ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 text-slate-600"}`}>全曜日</button>
-                  {WD.map((w, i) => (
-                    <button key={w} onClick={() => setBulk({ ...bulk, weekday: i })}
-                      className={`rounded border px-2 py-1 text-[12px] font-bold ${bulk.weekday === i ? "border-indigo-600 bg-indigo-600 text-white" : i === 0 ? "border-slate-300 text-rose-500" : i === 6 ? "border-slate-300 text-blue-500" : "border-slate-300 text-slate-600"}`}>{w}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-600">区分</label>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {(["all", "am", "pm", "custom", "off"] as const).map((sg) => (
-                    <button key={sg} onClick={() => setBulk({ ...bulk, seg: sg })}
-                      className={`rounded border px-2 py-1 text-[12px] font-bold ${bulk.seg === sg ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-slate-600"}`}>
-                      {sg === "all" ? "終日" : sg === "am" ? "午前のみ" : sg === "pm" ? "午後のみ" : sg === "custom" ? "時刻指定" : "休み"}
-                    </button>
-                  ))}
-                </div>
-                {bulk.seg === "custom" && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <input type="time" value={bulk.start} onChange={(e) => setBulk({ ...bulk, start: e.target.value })} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
-                    <span className="text-slate-400">-</span>
-                    <input type="time" value={bulk.end} onChange={(e) => setBulk({ ...bulk, end: e.target.value })} className="rounded border border-slate-300 px-1 py-1 text-[12px]" />
-                  </div>
-                )}
-                {bulk.seg !== "off" && (
-                  <label className="mt-2 flex items-center gap-1 text-[12px] text-slate-600">
-                    <input type="checkbox" checked={bulk.clinic} onChange={(e) => setBulk({ ...bulk, clinic: e.target.checked })} className="h-3.5 w-3.5" />
-                    川西院として
-                  </label>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-400">当月の対象曜日の、このメンバーのシフトを置き換えます（既存は上書き）。反映後に「📅 予約枠に反映」で予約に効きます。</p>
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <button onClick={() => setBulk(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
-              <button onClick={applyBulk} className="ml-auto rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white active:bg-indigo-700">当月に適用</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 日の編集モーダル */}
       {edit && (

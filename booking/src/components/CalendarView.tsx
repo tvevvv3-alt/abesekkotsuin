@@ -19,6 +19,7 @@ import type {
   Staff,
 } from "@/lib/types";
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
+import { holidayName } from "@/lib/holidays";
 import AdminBookingModal from "./AdminBookingModal";
 
 const GUTTER = 44; // 左の時間軸の幅(px)
@@ -921,6 +922,7 @@ export default function CalendarView({
           {list.map((ds) => {
             const dd = new Date(ds + "T00:00:00");
             const isToday = ds === todayStr;
+            const hol = holidayName(ds);
             return (
               <button
                 key={ds}
@@ -928,12 +930,13 @@ export default function CalendarView({
                   onStartChange(ds);
                   if (days > 1) onDaysChange?.(1);
                 }}
-                title={days > 1 ? "この日だけを表示" : undefined}
+                title={days > 1 ? (hol ? `${hol}・この日だけを表示` : "この日だけを表示") : hol || undefined}
                 className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold active:bg-slate-100 ${
-                  isToday ? "text-blue-600" : "text-slate-600"
+                  isToday ? "text-blue-600" : hol ? "text-rose-500" : "text-slate-600"
                 }`}
               >
                 {dd.getMonth() + 1}/{dd.getDate()}（{WEEKDAY_LABELS[dd.getDay()]}）
+                {hol && <span className="block truncate text-[9px] font-bold text-rose-500">{hol}</span>}
               </button>
             );
           })}
