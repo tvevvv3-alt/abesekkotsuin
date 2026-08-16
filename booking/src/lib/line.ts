@@ -158,6 +158,26 @@ export function renderPersonalDone(
     .join("\n");
 }
 
+// 問診票・申込書のLINE本文（設定で編集可）。{URL} の位置にリンクが入る。
+export const DEFAULT_QUESTIONNAIRE_TEXT = [
+  "【問診票のお願い】",
+  "ご来院前に、下記より問診票のご記入をお願いいたします。",
+  "{URL}",
+].join("\n");
+
+export const DEFAULT_APPLICATION_TEXT = [
+  "【体幹教室 申込書のお願い】",
+  "下記より体幹教室の申込書のご記入をお願いいたします。",
+  "{URL}",
+].join("\n");
+
+// リンク系メッセージ：本文の {URL} をリンクに置換。{URL} が無ければ末尾に付与。
+export function renderLinkMessage(tpl: string, url: string): string {
+  const t = (tpl || "").trim();
+  if (!t) return url;
+  return t.includes("{URL}") ? t.split("{URL}").join(url) : `${t}\n${url}`;
+}
+
 // テンプレートに予約情報を差し込む。値が空の「ラベル：」行は自動で消す。
 export function renderMessage(tpl: string, i: ApptInfo): string {
   const out = tpl

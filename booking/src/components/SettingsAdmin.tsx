@@ -13,6 +13,8 @@ import {
   DEFAULT_CONFIRM_TEXT,
   DEFAULT_EVE_TEXT,
   DEFAULT_MORNING_TEXT,
+  DEFAULT_QUESTIONNAIRE_TEXT,
+  DEFAULT_APPLICATION_TEXT,
 } from "@/lib/line";
 
 export default function SettingsAdmin() {
@@ -51,7 +53,9 @@ export default function SettingsAdmin() {
       confirm_text: s.confirm_text,
       cancel_text: s.cancel_text,
       questionnaire_url: s.questionnaire_url,
+      questionnaire_text: s.questionnaire_text,
       class_application_url: s.class_application_url,
+      class_application_text: s.class_application_text,
       remind_eve_enabled: s.remind_eve_enabled,
       remind_eve_hour: s.remind_eve_hour,
       remind_eve_text: s.remind_eve_text,
@@ -150,18 +154,6 @@ export default function SettingsAdmin() {
       </div>
 
       <div className="mb-4 rounded-xl border bg-white p-4">
-        <label className="block text-sm font-bold text-slate-700">問診票リンク（Googleフォーム等）</label>
-        <p className="mt-1 text-[11px] text-slate-500">左メニュー「患者管理 → 問診票」から新しいタブで開きます。空欄なら「準備中」表示。</p>
-        <input
-          value={s.questionnaire_url ?? ""}
-          onChange={(e) => up({ questionnaire_url: e.target.value })}
-          placeholder="https://docs.google.com/forms/d/…/viewform"
-          className="mt-2 w-full rounded-md border px-2 py-1.5 text-sm"
-        />
-        <p className="mt-1 text-[11px] text-slate-400">患者に入力してもらう場合は末尾が <code className="rounded bg-slate-100 px-1">/viewform</code> のURL、回答確認・編集用は <code className="rounded bg-slate-100 px-1">/edit</code> のURL。</p>
-      </div>
-
-      <div className="mb-4 rounded-xl border bg-white p-4">
         <label className="block text-sm font-bold text-slate-700">予約トップのお知らせ</label>
         <p className="mt-1 text-[11px] text-slate-500">WEB予約の院選択画面の上部に表示されます。空欄なら非表示。長期不在・体幹教室のテスト週間などを随時更新できます。</p>
         <div className="mt-2">
@@ -187,14 +179,46 @@ export default function SettingsAdmin() {
       </div>
 
       <div className="mb-4 rounded-xl border bg-white p-4">
-        <label className="block text-sm font-bold text-slate-700">体幹教室 申込書リンク（Googleフォーム等）</label>
-        <p className="mt-1 text-[11px] text-slate-500">予約変更画面の「体幹教室申込書を送る」から、LINE連携済みの本人へ送信します。問診票とは別のURLです。</p>
+        <label className="block text-sm font-bold text-slate-700">問診票</label>
+        <p className="mt-1 text-[11px] text-slate-500">左メニュー「患者管理 → 問診票」から開くほか、治療の予約変更画面「問診票を送る」で本人へLINE送信します。</p>
+        <span className="mt-2 block text-xs font-bold text-slate-500">リンク（Googleフォーム等）</span>
+        <input
+          value={s.questionnaire_url ?? ""}
+          onChange={(e) => up({ questionnaire_url: e.target.value })}
+          placeholder="https://docs.google.com/forms/d/…/viewform"
+          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+        />
+        <p className="mt-1 text-[11px] text-slate-400">患者用は末尾 <code className="rounded bg-slate-100 px-1">/viewform</code>、確認・編集用は <code className="rounded bg-slate-100 px-1">/edit</code>。</p>
+        <span className="mt-3 block text-xs font-bold text-slate-500">LINEメッセージ本文</span>
+        <textarea
+          value={s.questionnaire_text ?? ""}
+          onChange={(e) => up({ questionnaire_text: e.target.value })}
+          rows={3}
+          placeholder={DEFAULT_QUESTIONNAIRE_TEXT}
+          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+        />
+        <p className="mt-1 text-[11px] text-slate-400"><code className="rounded bg-slate-100 px-1">{"{URL}"}</code> の位置にリンクが入ります（無ければ末尾に自動追加）。空欄なら既定文で送信。</p>
+      </div>
+
+      <div className="mb-4 rounded-xl border bg-white p-4">
+        <label className="block text-sm font-bold text-slate-700">体幹教室 申込書</label>
+        <p className="mt-1 text-[11px] text-slate-500">体幹教室の予約変更画面「体幹教室申込書を送る」で本人へLINE送信します。問診票とは別です。</p>
+        <span className="mt-2 block text-xs font-bold text-slate-500">リンク（Googleフォーム等）</span>
         <input
           value={s.class_application_url ?? ""}
           onChange={(e) => up({ class_application_url: e.target.value })}
           placeholder="https://docs.google.com/forms/d/…/viewform"
-          className="mt-2 w-full rounded-md border px-2 py-1.5 text-sm"
+          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
         />
+        <span className="mt-3 block text-xs font-bold text-slate-500">LINEメッセージ本文</span>
+        <textarea
+          value={s.class_application_text ?? ""}
+          onChange={(e) => up({ class_application_text: e.target.value })}
+          rows={3}
+          placeholder={DEFAULT_APPLICATION_TEXT}
+          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+        />
+        <p className="mt-1 text-[11px] text-slate-400"><code className="rounded bg-slate-100 px-1">{"{URL}"}</code> の位置にリンクが入ります（無ければ末尾に自動追加）。空欄なら既定文で送信。</p>
       </div>
 
       <div className="space-y-4 rounded-xl border bg-white p-4">
