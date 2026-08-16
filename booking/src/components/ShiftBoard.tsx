@@ -58,8 +58,6 @@ export default function ShiftBoard() {
   const [applying, setApplying] = useState(false);
   // 一括設定（メンバー×曜日をまとめて設定）
   const [bulk, setBulk] = useState<{ memberId: string; weekday: number; seg: Seg | "off" | "custom"; start: string; end: string; clinic: boolean } | null>(null); // weekday: -1=全曜日
-  // 曜日パターン（週の基本・週休2日など）編集
-  const [pat, setPat] = useState<{ memberId: string; days: DayPat[] } | null>(null);
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -170,7 +168,10 @@ export default function ShiftBoard() {
 
   // その日・そのメンバーが午前/午後どちらに出るか
   const covFor = (ds: string, dow: number, memberId: string, s: Shift) => {
-    const split = bhByWd.get(dow)?.seg1_end ?? 780;
+    // 午前/午後の境目は「昼休みの入口」。2部制(seg2あり)かつ妥当な昼休みならseg1_end、
+    // それ以外（1部制・seg1_endが閉院時刻など）は13:00固定。終日勤務を午後休診と誤判定しないため。
+    const b = bhByWd.get(dow);
+    const split = b && b.seg2_start != null && b.seg1_end != null && b.seg1_end < b.seg2_start ? b.seg1_end : 780;
     let am = s.start_min == null ? true : s.start_min < split;
     let pm = s.start_min == null ? true : s.end_min == null || s.end_min > split;
     (closuresByDate.get(ds) ?? []).forEach((c) => { if (c.start_min != null) { const l = closureLabel(c); if (l === "午前休診") am = false; if (l === "午後休診") pm = false; } });
@@ -331,58 +332,6 @@ export default function ShiftBoard() {
     alert(`${m.name}：当月の${wlabel}を「${slabel}」に一括設定しました。\n「📅 予約枠に反映」で予約に反映されます。`);
   }
 
-  const defaultPattern = (): DayPat[] => Array.from({ length: 7 }, () => ({ seg: "all" as const, start: "", end: "", clinic: false }));
-  const openPattern = (memberId: string) => {
-    const m = members.find((x) => x.id === memberId);
-    const wp = m && Array.isArray(m.week_pattern) && m.week_pattern.length === 7 ? m.week_pattern : defaultPattern();
-    setPat({ memberId, days: wp.map((d) => ({ seg: d.seg, start: d.start || "", end: d.end || "", clinic: !!d.clinic })) });
-  };
-
-  // 曜日パターンで当月のシフトを作成（対象メンバーぶんを作り直す）
-  async function applyPatternToMonth(entries: { memberId: string; days: DayPat[] }[]) {
-    if (entries.length === 0) return;
-    const [yy, mm] = date.split("-").map(Number);
-    const lastDay = new Date(yy, mm, 0).getDate();
-    const monthDates: string[] = [];
-    for (let dd = 1; dd <= lastDay; dd++) monthDates.push(`${yy}-${pad(mm)}-${pad(dd)}`);
-    const ids = entries.map((e) => e.memberId);
-    await supabase.from("shifts").delete().in("member_id", ids).gte("date", monthStart).lt("date", monthEnd);
-    const rows: { date: string; member_id: string; start_min: number | null; end_min: number | null; clinic: string | null }[] = [];
-    for (const e of entries) {
-      for (const ds of monthDates) {
-        const dow = new Date(ds + "T00:00:00").getDay();
-        const p = e.days[dow];
-        if (!p || p.seg === "off") continue;
-        let start: number | null = null, end: number | null = null;
-        if (p.seg === "custom") { start = p.start ? timeToMin(p.start) : null; end = p.end ? timeToMin(p.end) : null; }
-        else if (p.seg === "am" || p.seg === "pm") { const t = segTimes(ds, p.seg); start = t.start; end = t.end; }
-        rows.push({ date: ds, member_id: e.memberId, start_min: start, end_min: end, clinic: p.clinic ? "kawanishi" : null });
-      }
-    }
-    if (rows.length) await supabase.from("shifts").insert(rows);
-  }
-
-  async function savePattern(applyNow: boolean) {
-    if (!pat) return;
-    await supabase.from("shift_members").update({ week_pattern: pat.days }).eq("id", pat.memberId);
-    if (applyNow) await applyPatternToMonth([{ memberId: pat.memberId, days: pat.days }]);
-    const nm = members.find((x) => x.id === pat.memberId)?.name || "";
-    setPat(null);
-    loadMembers();
-    reload();
-    alert(applyNow ? `${nm} の曜日パターンを保存し、${monthLabel} に反映しました。\n最後に「📅 予約枠に反映」を押してください。` : `${nm} の曜日パターンを保存しました。`);
-  }
-
-  // 保存済みの全員の曜日パターンで当月を一括作成
-  async function createMonthFromPatterns() {
-    const withPat = members.filter((m) => m.active && Array.isArray(m.week_pattern) && m.week_pattern.length === 7);
-    if (withPat.length === 0) { alert("先に「📆 曜日パターン」で各メンバーの週の基本（週休2日など）を保存してください。"); return; }
-    if (!confirm(`${monthLabel} を、保存済みの曜日パターン（${withPat.length}名）で作成します。\n※対象メンバーの当月シフトを作り直します（その後イレギュラーな日を個別に直せます）`)) return;
-    await applyPatternToMonth(withPat.map((m) => ({ memberId: m.id, days: m.week_pattern as DayPat[] })));
-    reload();
-    alert(`${monthLabel} を曜日パターンで作成しました。\nイレギュラーな日を個別に直し、最後に「📅 予約枠に反映」を押してください。`);
-  }
-
   // スタッフ管理の勤務時間（staff_schedules）から当月の施術シフトを作成
   async function createMonthFromStaffHours() {
     const targets = members.filter((m) => m.active && m.role === "therapist" && nameToStaff.get((m.name || "").trim()));
@@ -492,21 +441,11 @@ export default function ShiftBoard() {
         <button onClick={createMonthFromStaffHours}
           className="rounded-md bg-sky-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-sky-700"
           title="スタッフ管理の勤務時間から当月の施術シフトを作成">
-          🕐 勤務から作成
-        </button>
-        <button onClick={() => openPattern(activeMembers[0]?.id ?? "")}
-          className="rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-violet-700"
-          title="メンバーごとの週の基本シフト（週休2日など）を保存">
-          📆 曜日パターン
-        </button>
-        <button onClick={createMonthFromPatterns}
-          className="rounded-md border border-violet-400 px-2.5 py-1 text-[11px] font-bold text-violet-700 active:bg-violet-50"
-          title="保存済みの曜日パターンで当月のシフトを作成">
-          当月を作成
+          🕐 スタッフ勤務を反映
         </button>
         <button onClick={() => setBulk({ memberId: activeMembers[0]?.id ?? "", weekday: -1, seg: "all", start: "", end: "", clinic: false })}
           className="rounded-md bg-indigo-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-indigo-700"
-          title="メンバー×曜日をまとめて設定（1日ずつの手間を省く）">
+          title="受付・学生など、メンバー×曜日をまとめて設定">
           🧑‍🔧 一括設定
         </button>
         <button onClick={applyMonthToAvailability} disabled={applying}
@@ -723,63 +662,6 @@ export default function ShiftBoard() {
           </div>
         )}
       </div>
-
-      {/* 曜日パターン（週の基本）モーダル */}
-      {pat && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setPat(null)}>
-          <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-800">曜日パターン（週の基本）</h2>
-              <button onClick={() => setPat(null)} className="text-slate-400">✕</button>
-            </div>
-            <div className="mb-3">
-              <label className="mb-1 block text-xs font-bold text-slate-600">メンバー</label>
-              <select value={pat.memberId} onChange={(e) => openPattern(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm">
-                {activeMembers.map((m) => <option key={m.id} value={m.id}>{m.name || "（無名）"}（{ROLE_LABEL[m.role]}）</option>)}
-              </select>
-            </div>
-            <p className="mb-2 text-[11px] text-slate-400">各曜日の基本を設定します。休みの曜日を選べば「週休2日」などのベースになります。</p>
-            <div className="space-y-1.5">
-              {WD.map((w, i) => {
-                const d = pat.days[i];
-                const setDay = (patch: Partial<DayPat>) => setPat({ ...pat, days: pat.days.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-                return (
-                  <div key={w} className={`rounded-lg border p-1.5 ${d.seg === "off" ? "border-slate-100 bg-slate-50" : "border-slate-300"}`}>
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className={`w-5 text-center text-sm font-bold ${i === 0 ? "text-rose-500" : i === 6 ? "text-blue-500" : "text-slate-600"}`}>{w}</span>
-                      {(["all", "am", "pm", "custom", "off"] as const).map((sg) => (
-                        <button key={sg} onClick={() => setDay({ seg: sg })}
-                          className={`rounded border px-1.5 py-0.5 text-[11px] font-bold ${d.seg === sg ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-slate-600"}`}>
-                          {sg === "all" ? "終日" : sg === "am" ? "午前" : sg === "pm" ? "午後" : sg === "custom" ? "時刻" : "休"}
-                        </button>
-                      ))}
-                      {d.seg === "custom" && (
-                        <span className="flex items-center gap-1">
-                          <input type="time" value={d.start} onChange={(e) => setDay({ start: e.target.value })} className="w-[86px] rounded border border-slate-300 px-1 py-0.5 text-[11px]" />
-                          <span className="text-slate-400">-</span>
-                          <input type="time" value={d.end} onChange={(e) => setDay({ end: e.target.value })} className="w-[86px] rounded border border-slate-300 px-1 py-0.5 text-[11px]" />
-                        </span>
-                      )}
-                      {d.seg !== "off" && (
-                        <label className="ml-auto flex items-center gap-1 text-[11px] text-slate-500">
-                          <input type="checkbox" checked={d.clinic} onChange={(e) => setDay({ clinic: e.target.checked })} className="h-3 w-3" />川西
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button onClick={() => setPat(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
-              <button onClick={() => savePattern(false)} className="rounded-lg border border-violet-400 px-3 py-2 text-sm font-bold text-violet-700 active:bg-violet-50">保存だけ</button>
-              <button onClick={() => savePattern(true)} className="ml-auto rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white active:bg-violet-700">保存して当月に反映</button>
-            </div>
-            <p className="mt-2 text-[11px] text-slate-400">全員ぶんをまとめて反映するときは、保存後に上部の「当月を作成」を押してください。</p>
-          </div>
-        </div>
-      )}
 
       {/* 一括設定モーダル */}
       {bulk && (
