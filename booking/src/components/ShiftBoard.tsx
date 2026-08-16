@@ -76,7 +76,8 @@ export default function ShiftBoard() {
   const monthLabel = useMemo(() => { const d = new Date(date + "T00:00:00"); return `${d.getFullYear()}年${d.getMonth() + 1}月`; }, [date]);
 
   const loadMembers = useCallback(async () => {
-    const { data } = await supabase.from("shift_members").select("id, name, role, color, default_start, default_end, sort_order, active, week_pattern").order("sort_order");
+    // ※ week_pattern 列が未マイグレーションでも壊れないよう "*" で取得
+    const { data } = await supabase.from("shift_members").select("*").order("sort_order");
     setMembers((data as Member[]) ?? []);
   }, [supabase]);
   useEffect(() => {
@@ -426,7 +427,7 @@ export default function ShiftBoard() {
 
   // ---- メンバー（ロスター）編集 ----
   async function addMember() {
-    const { data, error } = await supabase.from("shift_members").insert({ name: "", role: "therapist", color: "#64748b", sort_order: members.length }).select("id, name, role, color, default_start, default_end, sort_order, active, week_pattern").single();
+    const { data, error } = await supabase.from("shift_members").insert({ name: "", role: "therapist", color: "#64748b", sort_order: members.length }).select("*").single();
     if (error) { alert("メンバーを追加できませんでした：\n" + error.message + "\n（migration_shifts.sql を実行済みかご確認ください）"); return; }
     if (data) setMembers((p) => [...p, data as Member]);
   }
