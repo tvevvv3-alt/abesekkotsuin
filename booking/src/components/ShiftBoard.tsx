@@ -337,13 +337,17 @@ export default function ShiftBoard() {
     const targets = members.filter((m) => m.active && m.role === "therapist" && nameToStaff.get((m.name || "").trim()));
     if (targets.length === 0) { alert("施術スタッフが予約スタッフの氏名と紐付いていません。氏名（阿部/澁谷/萩原/林 等）をご確認ください。"); return; }
     if (staffSchedules.length === 0) { alert("スタッフ管理に勤務時間が入っていません。先にスタッフ管理で各先生の曜日ごとの勤務時間を登録してください。"); return; }
-    if (!confirm(`${monthLabel} の施術シフトを、スタッフ管理の勤務時間から作成します。\n（施術スタッフ ${targets.length}名の当月シフトを作り直します。受付・学生はそのまま）`)) return;
+    if (!confirm(`${monthLabel} の施術シフトを、スタッフ管理の勤務時間から作成します。\n・施術スタッフ ${targets.length}名の当月シフトを作り直し\n・施術スタッフ個別の古い休み登録（午前休/午後休/臨時開放）も当月ぶんクリア\n※院全体の休診日は残します。受付・学生もそのまま。\n半休はスタッフ管理の勤務時間（例：日曜=16:00-20:30）で表現してください。`)) return;
     const [yy, mm] = date.split("-").map(Number);
     const lastDay = new Date(yy, mm, 0).getDate();
     const monthDates: string[] = [];
     for (let dd = 1; dd <= lastDay; dd++) monthDates.push(`${yy}-${pad(mm)}-${pad(dd)}`);
     const ids = targets.map((m) => m.id);
+    const staffIds = targets.map((m) => nameToStaff.get((m.name || "").trim()) as string);
     await supabase.from("shifts").delete().in("member_id", ids).gte("date", monthStart).lt("date", monthEnd);
+    // 施術スタッフ個別の休み・臨時開放をクリア（スタッフ勤務を正にする。院全体休診=staff_id null は残す）
+    await supabase.from("closures").delete().in("staff_id", staffIds).is("service_id", null).gte("date", monthStart).lt("date", monthEnd);
+    await supabase.from("openings").delete().in("staff_id", staffIds).gte("date", monthStart).lt("date", monthEnd);
     const rows: { date: string; member_id: string; start_min: number | null; end_min: number | null; clinic: string | null }[] = [];
     for (const m of targets) {
       const staffId = nameToStaff.get((m.name || "").trim()) as string;
@@ -358,7 +362,7 @@ export default function ShiftBoard() {
     }
     if (rows.length) await supabase.from("shifts").insert(rows);
     reload();
-    alert(`${monthLabel} の施術シフトをスタッフ管理の勤務時間から作成しました。\nイレギュラーな日だけ個別に直し、必要なら「📅 予約枠に反映」を押してください。`);
+    alert(`${monthLabel} の施術シフトをスタッフ管理の勤務時間から作成し、古い休み登録もクリアしました。\nイレギュラーな日だけ個別に直し、必要なら「📅 予約枠に反映」を押してください。`);
   }
 
   async function saveDay() {
