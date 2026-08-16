@@ -54,6 +54,7 @@ export function KindBadge({ kind }: { kind: Kind }) {
 export default function MyStatusBanner() {
   const [state, setState] = useState<"loading" | "in" | "out">("loading");
   const [items, setItems] = useState<Item[]>([]);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -139,16 +140,16 @@ export default function MyStatusBanner() {
     );
   }
 
-  // ログイン済み・予約あり：件数＋直近を要約
-  const shown = items.slice(0, 3);
-  const rest = items.length - shown.length;
+  // ログイン済み・予約あり：件数＋直近を要約。
+  // 2件までは全部表示。3件以上は最初の2件だけ表示し、「→」で開閉（院選択が途切れないように）。
+  const many = items.length > 2;
+  const visible = many && !expanded ? items.slice(0, 2) : items;
+  const hidden = items.length - 2;
   return (
-    <a
-      href="/my"
-      className="mb-4 block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition active:scale-[.99]"
-    >
-      <div
-        className="flex items-center justify-between px-4 py-2.5 text-white"
+    <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <a
+        href="/my"
+        className="flex items-center justify-between px-4 py-2.5 text-white transition active:opacity-90"
         style={{ background: NAVY }}
       >
         <span className="text-sm font-bold">
@@ -157,10 +158,10 @@ export default function MyStatusBanner() {
         <span className="text-xs font-bold" style={{ color: GOLD }}>
           確認・変更 ›
         </span>
-      </div>
+      </a>
       <div className="divide-y divide-slate-100">
-        {shown.map((it) => (
-          <div key={it.id} className="px-4 py-2.5">
+        {visible.map((it) => (
+          <a key={it.id} href="/my" className="block px-4 py-2.5 transition active:bg-slate-50">
             <div className="flex items-center gap-2">
               <KindBadge kind={it.kind} />
               <span className="text-sm font-bold text-slate-800">
@@ -176,14 +177,22 @@ export default function MyStatusBanner() {
               {it.service_name}
               {it.staff_name && <span className="text-slate-400">／{it.staff_name}</span>}
             </div>
-          </div>
+          </a>
         ))}
       </div>
-      {rest > 0 && (
-        <div className="px-4 pb-2.5 text-center text-[11px] font-medium text-slate-400">
-          ＋ ほか {rest}件のご予約
-        </div>
+      {many && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex w-full items-center justify-center gap-1 border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-[12px] font-bold text-slate-500 active:bg-slate-100"
+        >
+          {expanded ? (
+            <>閉じる <span className="text-slate-400">▲</span></>
+          ) : (
+            <>ほか {hidden}件を表示 <span className="text-slate-400">▶</span></>
+          )}
+        </button>
       )}
-    </a>
+    </div>
   );
 }

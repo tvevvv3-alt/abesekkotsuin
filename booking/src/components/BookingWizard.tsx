@@ -762,7 +762,7 @@ export default function BookingWizard() {
     return (
       <div className="mx-auto min-h-screen max-w-md bg-slate-50 pb-16 shadow-sm">
         <div
-          className="px-6 pb-12 pt-12 text-center"
+          className="px-6 pb-6 pt-7 text-center"
           style={{ background: `linear-gradient(180deg, ${NAVY} 0%, #172c56 100%)` }}
         >
           <div className="flex justify-center">
@@ -770,13 +770,13 @@ export default function BookingWizard() {
               <img
                 src={settings.logo_url}
                 alt="Total Recoverytation Abe"
-                className="h-44 w-44 rounded-full object-cover"
+                className="h-28 w-28 rounded-full object-cover"
               />
             ) : (
-              <TraBadge size={184} />
+              <TraBadge size={112} />
             )}
           </div>
-          <p className="mt-5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
+          <p className="mt-3 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>
         <div className="px-5 py-7">
           {(settings?.notice_ibaraki?.trim() || settings?.notice_kawanishi?.trim()) && (
