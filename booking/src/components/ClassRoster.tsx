@@ -11,6 +11,7 @@ interface Row {
   id: string;
   date: string;
   start_min: number;
+  end_min: number;
   patient_name: string | null;
   status: "booked" | "cancelled" | "done";
   line_user_id: string | null;
@@ -41,8 +42,14 @@ export default function ClassRoster() {
   const [filter, setFilter] = useState<"all" | "month4" | "free">("all");
   const [sort, setSort] = useState<"name" | "date">("name");
   const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
+  const [evaled, setEvaled] = useState<Set<string>>(new Set()); // 当月に体幹テスト入力済みの会員名
   const [dragId, setDragId] = useState<string | null>(null); // ドラッグ中の来院ID
   const [overName, setOverName] = useState<string | null>(null); // ドロップ先の会員名
+  // 来院マスをタップ → 予約変更ポップアップ（カレンダー同様）
+  const [ev, setEv] = useState<
+    | { id: string; name: string; date: string; time: string; start_min: number; end_min: number; done: boolean; line_user_id: string | null }
+    | null
+  >(null);
   // 回数券から予約を追加（一番上のボタンから）
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -110,10 +117,10 @@ export default function ClassRoster() {
   const reload = useCallback(async () => {
     if (!classId) return;
     setLoading(true);
-    const [{ data: ap }, { data: mem }, { data: pur }] = await Promise.all([
+    const [{ data: ap }, { data: mem }, { data: pur }, { data: evs }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, date, start_min, patient_name, status, line_user_id")
+        .select("id, date, start_min, end_min, patient_name, status, line_user_id")
         .eq("service_id", classId)
         .neq("status", "cancelled")
         .gte("date", from)
@@ -122,8 +129,11 @@ export default function ClassRoster() {
         .order("start_min"),
       supabase.from("class_members").select("name, pass_type, quota"),
       supabase.from("class_purchases").select("name, purchased, purchase_date").eq("ym", ym),
+      // 当月に体幹テスト（評価）を入力済みの会員名（未/済の表示に使う）
+      supabase.from("core_evaluations").select("name, eval_date").gte("eval_date", from).lt("eval_date", to),
     ]);
     setRows((ap as Row[]) ?? []);
+    setEvaled(new Set((evs ?? []).map((e: { name: string | null }) => (e.name || "").trim()).filter(Boolean)));
     const map: Record<string, Member> = {};
     (mem ?? []).forEach((m: Member) => (map[m.name] = m));
     setMembers(map);
@@ -244,6 +254,31 @@ export default function ClassRoster() {
     setBusy(null);
     setMsg(note);
     reload();
+  }
+
+  // ポップアップから：氏名・日付・時刻を保存（所要時間は維持）
+  async function saveVisit() {
+    if (!ev) return;
+    const [h, m] = ev.time.split(":").map((x) => parseInt(x, 10));
+    const start = (h || 0) * 60 + (m || 0);
+    const dur = Math.max(0, ev.end_min - ev.start_min);
+    await supabase
+      .from("appointments")
+      .update({ patient_name: ev.name.trim(), date: ev.date, start_min: start, end_min: start + dur })
+      .eq("id", ev.id);
+    setEv(null);
+    reload();
+  }
+  // ポップアップから：終了＋LINE（LINE有無で確認文を出し分け）
+  async function finishFromPopup() {
+    if (!ev) return;
+    const ask = ev.line_user_id
+      ? `${ev.name || "この方"} を終了して、LINEで通知しますか？`
+      : `${ev.name || "この方"} を終了しますか？\n（LINE未連携のため通知は送られません）`;
+    if (!confirm(ask)) return;
+    const v: Row = { id: ev.id, date: ev.date, start_min: ev.start_min, end_min: ev.end_min, patient_name: ev.name, status: "booked", line_user_id: ev.line_user_id };
+    setEv(null);
+    await finish(v);
   }
 
   const monthLabel = `${month.getFullYear()}年${month.getMonth() + 1}月`;
@@ -429,15 +464,25 @@ export default function ClassRoster() {
                           </div>
                         </td>
                         <td className="border-l px-1 py-1 text-center align-middle">
-                          <button
-                            onClick={() =>
-                              setEvalTarget({ name, lineUserId: visits.find((v) => v.line_user_id)?.line_user_id ?? null })
-                            }
-                            className="rounded-md border border-indigo-300 bg-indigo-50 px-1.5 py-1 text-[10px] font-bold leading-tight text-indigo-600 active:bg-indigo-100"
-                          >
-                            <span className="block">体幹</span>
-                            <span className="block">テスト</span>
-                          </button>
+                          {(() => {
+                            const tested = evaled.has(name.trim());
+                            return (
+                              <button
+                                onClick={() =>
+                                  setEvalTarget({ name, lineUserId: visits.find((v) => v.line_user_id)?.line_user_id ?? null })
+                                }
+                                className={`rounded-md border px-1.5 py-1 text-[10px] font-bold leading-tight active:brightness-95 ${
+                                  tested
+                                    ? "border-emerald-400 bg-emerald-500 text-white"
+                                    : "border-indigo-300 bg-indigo-50 text-indigo-600"
+                                }`}
+                                title={tested ? "今月は体幹テスト入力済み" : "今月は体幹テスト未入力"}
+                              >
+                                <span className="block">体幹テスト</span>
+                                <span className="block">{tested ? "✅ 済" : "未"}</span>
+                              </button>
+                            );
+                          })()}
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
                           const v = visits[i];
@@ -455,13 +500,9 @@ export default function ClassRoster() {
                                 setDragId(v.id);
                               }}
                               onDragEnd={() => { setDragId(null); setOverName(null); }}
-                              onClick={() => {
-                                if (done || busy === v.id) return;
-                                const ask = v.line_user_id
-                                  ? `${name} を終了して、LINEで通知しますか？`
-                                  : `${name} を終了しますか？\n（LINE未連携のため通知は送られません）`;
-                                if (confirm(ask)) finish(v);
-                              }}
+                              onClick={() =>
+                                setEv({ id: v.id, name: v.patient_name ?? name, date: v.date, time: minToLabel(v.start_min), start_min: v.start_min, end_min: v.end_min, done, line_user_id: v.line_user_id })
+                              }
                               className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${
                                 done ? "bg-slate-50 text-slate-400" : "cursor-grab hover:bg-blue-50"
                               }`}
@@ -477,7 +518,7 @@ export default function ClassRoster() {
                                   <div className="text-[9px] font-bold text-slate-400">済・通知なし</div>
                                 )
                               ) : (
-                                <div className="text-[9px] text-blue-500">タップで終了</div>
+                                <div className="text-[9px] text-blue-500">タップで編集/終了</div>
                               )}
                             </td>
                           );
@@ -494,7 +535,8 @@ export default function ClassRoster() {
 
       <p className="mt-3 text-[11px] text-slate-400">
         予約が入ると自動で表に反映されます（行＝人・列＝回数）。各回のマスを
-        タップすると「終了＋LINE」（来場日・今月何回目・残り回数を通知／フリーは無制限）。
+        タップすると「予約変更」ポップアップが開き、氏名・日付・時刻の修正や
+        「終了＋LINE」（来場日・今月何回目・残り回数を通知／フリーは無制限）ができます。
         名前は横スクロールしても固定、パス種別は氏名ごとに保存されます。
         今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
@@ -504,6 +546,48 @@ export default function ClassRoster() {
 
       {evalTarget && (
         <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => setEvalTarget(null)} />
+      )}
+
+      {ev && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setEv(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-800">予約を変更{ev.done ? "（終了済み）" : ""}</h2>
+              <button onClick={() => setEv(null)} className="text-slate-400">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-600">氏名</label>
+                <input value={ev.name} onChange={(e) => setEv({ ...ev, name: e.target.value })}
+                  placeholder="氏名" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                <p className="mt-1 text-[11px] text-slate-400">氏名を直すと、その来院は正しい人の行へ移ります。</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-bold text-slate-600">日付</label>
+                  <input type="date" value={ev.date} onChange={(e) => setEv({ ...ev, date: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+                </div>
+                <div className="w-28">
+                  <label className="mb-1 block text-xs font-bold text-slate-600">時刻</label>
+                  <input type="time" step={300} value={ev.time} onChange={(e) => setEv({ ...ev, time: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-2 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              {!ev.done && (
+                <button onClick={finishFromPopup} disabled={busy === ev.id}
+                  className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300">
+                  終了＋LINE
+                </button>
+              )}
+              <button onClick={saveVisit} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700">
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {addOpen && (

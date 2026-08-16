@@ -51,6 +51,7 @@ export default function SettingsAdmin() {
       confirm_text: s.confirm_text,
       cancel_text: s.cancel_text,
       questionnaire_url: s.questionnaire_url,
+      class_application_url: s.class_application_url,
       remind_eve_enabled: s.remind_eve_enabled,
       remind_eve_hour: s.remind_eve_hour,
       remind_eve_text: s.remind_eve_text,
@@ -59,6 +60,8 @@ export default function SettingsAdmin() {
       remind_morning_text: s.remind_morning_text,
       class_done_text: s.class_done_text,
       personal_done_text: s.personal_done_text,
+      notice_ibaraki: s.notice_ibaraki,
+      notice_kawanishi: s.notice_kawanishi,
       updated_at: new Date().toISOString(),
     });
     setBusy(false);
@@ -156,6 +159,42 @@ export default function SettingsAdmin() {
           className="mt-2 w-full rounded-md border px-2 py-1.5 text-sm"
         />
         <p className="mt-1 text-[11px] text-slate-400">患者に入力してもらう場合は末尾が <code className="rounded bg-slate-100 px-1">/viewform</code> のURL、回答確認・編集用は <code className="rounded bg-slate-100 px-1">/edit</code> のURL。</p>
+      </div>
+
+      <div className="mb-4 rounded-xl border bg-white p-4">
+        <label className="block text-sm font-bold text-slate-700">予約トップのお知らせ</label>
+        <p className="mt-1 text-[11px] text-slate-500">WEB予約の院選択画面の上部に表示されます。空欄なら非表示。長期不在・体幹教室のテスト週間などを随時更新できます。</p>
+        <div className="mt-2">
+          <span className="text-xs font-bold text-blue-700">茨木本院</span>
+          <textarea
+            value={s.notice_ibaraki ?? ""}
+            onChange={(e) => up({ notice_ibaraki: e.target.value })}
+            rows={2}
+            placeholder="例：8月1週目は体幹教室のテスト週間です。"
+            className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div className="mt-3">
+          <span className="text-xs font-bold text-emerald-700">川西整体院</span>
+          <textarea
+            value={s.notice_kawanishi ?? ""}
+            onChange={(e) => up({ notice_kawanishi: e.target.value })}
+            rows={2}
+            placeholder="例：8/10〜8/15は院長不在です。"
+            className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-xl border bg-white p-4">
+        <label className="block text-sm font-bold text-slate-700">体幹教室 申込書リンク（Googleフォーム等）</label>
+        <p className="mt-1 text-[11px] text-slate-500">予約変更画面の「体幹教室申込書を送る」から、LINE連携済みの本人へ送信します。問診票とは別のURLです。</p>
+        <input
+          value={s.class_application_url ?? ""}
+          onChange={(e) => up({ class_application_url: e.target.value })}
+          placeholder="https://docs.google.com/forms/d/…/viewform"
+          className="mt-2 w-full rounded-md border px-2 py-1.5 text-sm"
+        />
       </div>
 
       <div className="space-y-4 rounded-xl border bg-white p-4">

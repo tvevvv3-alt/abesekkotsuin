@@ -779,6 +779,27 @@ export default function BookingWizard() {
           <p className="mt-5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>
         <div className="px-5 py-7">
+          {(settings?.notice_ibaraki?.trim() || settings?.notice_kawanishi?.trim()) && (
+            <div className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
+              <div className="flex items-center gap-1.5 border-b border-amber-200 bg-amber-100/70 px-3 py-1.5 text-[12px] font-bold text-amber-800">
+                <span>📢</span>お知らせ
+              </div>
+              <div className="divide-y divide-amber-100">
+                {settings?.notice_ibaraki?.trim() && (
+                  <div className="px-3 py-2">
+                    <span className="mb-0.5 inline-block rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">茨木本院</span>
+                    <p className="whitespace-pre-wrap text-[13px] leading-snug text-slate-700">{settings.notice_ibaraki}</p>
+                  </div>
+                )}
+                {settings?.notice_kawanishi?.trim() && (
+                  <div className="px-3 py-2">
+                    <span className="mb-0.5 inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">川西整体院</span>
+                    <p className="whitespace-pre-wrap text-[13px] leading-snug text-slate-700">{settings.notice_kawanishi}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <MyStatusBanner />
           <h2 className="mb-4 text-center text-sm font-bold text-slate-700">
             ご予約の院をお選びください

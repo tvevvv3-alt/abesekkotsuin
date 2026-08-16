@@ -25,8 +25,6 @@ interface Props {
   equipment: Equipment[];
   onClose: () => void;
   onDone: () => void;
-  // 体幹教室の予約から「体幹テスト」（評価入力→LINE送信）を開く
-  onCoreTest?: (name: string, lineUserId: string | null) => void;
 }
 
 export default function AdminBookingModal({
@@ -41,7 +39,6 @@ export default function AdminBookingModal({
   equipment,
   onClose,
   onDone,
-  onCoreTest,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -180,24 +177,27 @@ export default function AdminBookingModal({
   }
 
   // 体幹教室の「終了」→ 予約を終了(done)にし、LINE連携済みならお礼＋次回案内を送信
-  async function finishClass() {
+  // 体幹教室の申込書リンクを患者のLINEへ1タップ送信
+  async function sendApplication() {
     if (!appt) return;
     setBusy(true);
     setError(null);
-    await supabase.from("appointments").update({ status: "done" }).eq("id", appt.id);
     try {
-      const res = await fetch("/api/class/done", {
+      const res = await fetch("/api/admin/send-application", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId: appt.id }),
       });
       const j = (await res.json()) as { ok: boolean; reason?: string };
-      if (!j.ok && j.reason !== "noline") setError(`LINE未送信: ${j.reason ?? "?"}`);
+      if (j.ok) alert("体幹教室の申込書リンクをLINEで送信しました。");
+      else if (j.reason === "noline") alert("この患者はLINE未連携のため送信できません。");
+      else if (j.reason === "nourl") alert("基本設定で体幹教室 申込書URLを登録してください。");
+      else if (j.reason === "notconfigured") alert("LINE送信（アクセストークン）が未設定です。");
+      else setError(`申込書を送信できませんでした: ${j.reason ?? "?"}`);
     } catch {
-      setError("LINE送信エラー");
+      setError("申込書の送信エラー");
     }
     setBusy(false);
-    onDone();
   }
 
   // 問診票リンクを患者のLINEへ1タップ送信
@@ -432,35 +432,19 @@ export default function AdminBookingModal({
               問診票を送る
             </button>
           )}
-          {mode === "edit" && isClass && onCoreTest && appt && (
+          {mode === "edit" && (
             <button
-              onClick={() =>
-                onCoreTest(
-                  appt.patient_name || "",
-                  (appt as unknown as { line_user_id?: string | null }).line_user_id ?? null
-                )
-              }
+              onClick={sendApplication}
               disabled={busy}
-              className="rounded-lg border border-indigo-300 px-3 py-2 text-sm font-bold text-indigo-600 active:bg-indigo-50 disabled:opacity-50"
+              className="rounded-lg border border-orange-300 px-3 py-2 text-sm font-medium text-orange-600 active:bg-orange-50 disabled:opacity-50"
             >
-              📋 体幹テスト
-            </button>
-          )}
-          {mode === "edit" && isClass && (
-            <button
-              onClick={finishClass}
-              disabled={busy}
-              className="ml-auto rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300"
-            >
-              {busy ? "処理中…" : "終了＋LINE"}
+              体幹教室申込書を送る
             </button>
           )}
           <button
             onClick={save}
             disabled={busy || startMin === null}
-            className={`${
-              mode === "edit" && isClass ? "" : "ml-auto"
-            } rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white disabled:bg-slate-300`}
+            className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white disabled:bg-slate-300"
           >
             {busy ? "保存中…" : mode === "add" ? "予約する" : "変更を保存"}
           </button>

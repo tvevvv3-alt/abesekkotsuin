@@ -198,6 +198,7 @@ export interface Settings {
   confirm_text: string | null; // 予約確認メッセージの本文
   cancel_text: string | null; // キャンセル完了メッセージの本文
   questionnaire_url: string | null; // 問診票（Googleフォーム等）リンク。メニュー「問診票」から開く
+  class_application_url: string | null; // 体幹教室 申込書（Googleフォーム等）リンク。予約変更から本人へLINE送信
   remind_eve_enabled: boolean; // 前日リマインドを送るか
   remind_eve_hour: number; // 前日リマインドの送信時刻（JST 時, 0-23）
   remind_eve_text: string | null; // 前日リマインドの本文
@@ -206,6 +207,8 @@ export interface Settings {
   remind_morning_text: string | null; // 当日リマインドの本文
   class_done_text: string | null; // 体幹教室「終了」時のお礼メッセージ本文
   personal_done_text: string | null; // パーソナル「終了」時のお礼メッセージ本文
+  notice_ibaraki: string | null; // 予約トップのお知らせ（茨木本院）。空欄なら非表示
+  notice_kawanishi: string | null; // 予約トップのお知らせ（川西整体院）。空欄なら非表示
 }
 
 // 月別の予約公開設定
