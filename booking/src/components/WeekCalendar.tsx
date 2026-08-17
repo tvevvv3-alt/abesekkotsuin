@@ -44,6 +44,7 @@ interface Props {
   lastAcceptMin?: number | null; // 最終受付時刻
   windows?: BookingWindow[]; // 月別公開設定
   maxMonth?: string | null; // これより後の月(YYYY-MM)は非表示（未解放の月を隠す）
+  roomBusyByDate?: Record<string, { s: number; e: number }[]>; // 日付→部屋使用中区間（部屋排他）
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
   accentColor?: string | null; // 担当カラー（空き○の色分け）
@@ -77,6 +78,7 @@ export default function WeekCalendar({
   lastAcceptMin = null,
   windows = [],
   maxMonth = null,
+  roomBusyByDate = {},
   selected,
   onSelect,
   accentColor,
@@ -155,6 +157,7 @@ export default function WeekCalendar({
           staffSteps: dayApptSteps.filter((a) => a.uses_staff && a.staff_id === staffId),
           equipmentSteps: dayApptSteps.filter((a) => a.equipment_id !== null),
           equipmentById,
+          roomBusy: roomBusyByDate[dateStr] ?? [],
         };
         for (const t of rows) {
           if (isToday && t <= nowMin) continue;
@@ -205,7 +208,8 @@ export default function WeekCalendar({
             dayClosures,
             dayApptSteps,
             undefined,
-            classOpenings
+            classOpenings,
+            roomBusyByDate[dateStr] ?? []
           );
           if (r.state === "off") return { kind: "off" };
           if (r.state === "closed") return { kind: "class-closed" };
@@ -226,6 +230,7 @@ export default function WeekCalendar({
           ),
           equipmentSteps: dayApptSteps.filter((a) => a.equipment_id !== null),
           equipmentById,
+          roomBusy: roomBusyByDate[dateStr] ?? [],
         };
 
         // 時間外は順次解放：activeAh（最も早い予約可能枠）だけ◯。

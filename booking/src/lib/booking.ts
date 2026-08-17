@@ -138,6 +138,8 @@ export interface DayContext {
   equipmentSteps: AppointmentStep[];
   // 機器定員
   equipmentById: Record<string, Equipment>;
+  // トレーニングルーム（部屋）が使用中の区間。パーソナル予約でここに重なると不可。
+  roomBusy?: { s: number; e: number }[];
 }
 
 export interface AvailabilityResult {
@@ -163,6 +165,11 @@ export function checkAvailability(
 
   const intervals = expandSteps(serviceSteps, startMin);
   const endMin = intervals[intervals.length - 1].end;
+
+  // ★ トレーニングルーム排他：部屋使用中の区間と重なれば不可（呼び出し側がパーソナル時のみ渡す）
+  if (ctx.roomBusy && ctx.roomBusy.some((r) => r.s < endMin && r.e > startMin)) {
+    return { ok: false, reason: "部屋使用中" };
+  }
 
   // ③ 勤務時間内（予約全体が1つの勤務枠に収まること）
   //    時間外予約は勤務時間に縛られない固定の夜枠なので、このチェックはしない。
@@ -249,9 +256,14 @@ export function classSlot(
   closures: Closure[], // その日の休診
   classSteps: AppointmentStep[], // その日の当該クラスの工程
   excludeAppointmentId?: string,
-  classOpenings: Opening[] = [] // その日の当該クラスの臨時開放枠
+  classOpenings: Opening[] = [], // その日の当該クラスの臨時開放枠
+  roomBusyPersonal: { s: number; e: number }[] = [] // 同室のパーソナル予約区間（重なるとクラス不可）
 ): ClassSlotResult {
   const endMin = startMin + totalDuration(serviceSteps);
+  // ★ 部屋排他：体幹の時間にパーソナルが入っていれば不可
+  if (roomBusyPersonal.some((r) => r.s < endMin && r.e > startMin)) {
+    return { state: "closed", remaining: 0, used: 0, capacity };
+  }
   // 臨時開放枠（その日だけ体幹を開ける）があれば営業時間外でも可。開放枠に開始時刻が入っていればOK
   const openByOpening = classOpenings.some(
     (o) => o.service_id === serviceId && o.start_min <= startMin && o.end_min > startMin

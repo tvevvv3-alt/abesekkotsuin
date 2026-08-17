@@ -192,6 +192,7 @@ export default function BookingWizard() {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [openings, setOpenings] = useState<Opening[]>([]);
   const [apptSteps, setApptSteps] = useState<AppointmentStep[]>([]);
+  const [weekAppts, setWeekAppts] = useState<{ id: string; date: string; start_min: number; end_min: number; service_id: string | null }[]>([]);
   const [loadingWeek, setLoadingWeek] = useState(false);
 
   // 患者情報
@@ -517,21 +518,42 @@ export default function BookingWizard() {
   const reloadWeek = useCallback(async () => {
     setLoadingWeek(true);
     try {
-      const [sc, cl, ap, op] = await Promise.all([
+      const [sc, cl, ap, op, ra] = await Promise.all([
         // クラスは担当者に紐づかないため全担当者の勤務時間（＝営業時間）を使う
         loadSchedules(supabase, isClass ? undefined : staffId),
         loadClosures(supabase, weekDates),
         loadAppointmentSteps(supabase, weekDates),
         loadOpenings(supabase, weekDates),
+        // 部屋排他用：その週の予約（メニュー付き）
+        supabase.from("appointments").select("id, date, start_min, end_min, service_id").in("date", weekDates).eq("status", "booked"),
       ]);
       setSchedules(sc);
       setClosures(cl);
       setApptSteps(ap);
       setOpenings(op);
+      setWeekAppts((ra.data as { id: string; date: string; start_min: number; end_min: number; service_id: string | null }[]) ?? []);
     } finally {
       setLoadingWeek(false);
     }
   }, [supabase, staffId, weekDates, isClass]);
+
+  // 部屋（トレーニングルーム）排他：現在のメニューがパーソナル/体幹なら、日付ごとに使用中区間を作る
+  const roomBusyByDate = useMemo(() => {
+    const personalIds = new Set(services.filter((s) => s.personal).map((s) => s.id));
+    const classIds = new Set(services.filter((s) => s.capacity > 1).map((s) => s.id));
+    const curPersonal = personalIds.has(serviceId);
+    const curClass = classIds.has(serviceId);
+    const out: Record<string, { s: number; e: number }[]> = {};
+    if (!curPersonal && !curClass) return out; // 部屋を使わないメニュー
+    for (const a of weekAppts) {
+      if (rescheduleId && a.id === rescheduleId) continue; // 変更中の自分は除外
+      const isP = !!a.service_id && personalIds.has(a.service_id);
+      const isC = !!a.service_id && classIds.has(a.service_id);
+      const block = curPersonal ? (isP || isC) : isP; // パーソナル→両方 / 体幹→パーソナルのみ
+      if (block) (out[a.date] ??= []).push({ s: a.start_min, e: a.end_min });
+    }
+    return out;
+  }, [services, serviceId, weekAppts, rescheduleId]);
 
   useEffect(() => {
     if (step === 2) reloadWeek();
@@ -1159,6 +1181,7 @@ export default function BookingWizard() {
               lastAcceptMin={settings?.last_accept_min ?? null}
               windows={windows}
               maxMonth={lastReleasedMonth}
+              roomBusyByDate={roomBusyByDate}
               selected={selected}
               onSelect={onSelectSlot}
               accentColor={!isClass ? selectedStaff?.color : null}
@@ -1209,6 +1232,7 @@ export default function BookingWizard() {
                     lastAcceptMin={null}
                     windows={windows}
                     maxMonth={lastReleasedMonth}
+                    roomBusyByDate={roomBusyByDate}
                     selected={selected}
                     onSelect={selectAfterHours}
                     accentColor={selectedStaff?.color}
