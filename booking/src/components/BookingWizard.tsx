@@ -161,6 +161,7 @@ export default function BookingWizard() {
   // マスタ
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
+  const [allSchedules, setAllSchedules] = useState<StaffSchedule[]>([]);
   const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
   const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -408,7 +409,7 @@ export default function BookingWizard() {
   useEffect(() => {
     (async () => {
       try {
-        const [sv, st, ls, pr, se, bw, eq] = await Promise.all([
+        const [sv, st, ls, pr, se, bw, eq, allsc] = await Promise.all([
           loadServices(supabase),
           loadAllStaff(supabase),
           loadStaffServices(supabase),
@@ -416,6 +417,7 @@ export default function BookingWizard() {
           loadSettings(supabase),
           loadBookingWindows(supabase),
           loadEquipment(supabase),
+          loadSchedules(supabase), // 全担当者の勤務時間（＝営業時間。体幹教室の開催枠判定に使う）
         ]);
         setServices(sv);
         setAllStaff(st);
@@ -424,6 +426,7 @@ export default function BookingWizard() {
         setSettings(se);
         setWindows(bw);
         setEquipment(eq);
+        setAllSchedules(allsc);
       } catch (e) {
         setMasterError(e instanceof Error ? e.message : "読み込みに失敗しました");
       } finally {
@@ -545,6 +548,7 @@ export default function BookingWizard() {
     const curClass = classIds.has(serviceId);
     const out: Record<string, { s: number; e: number }[]> = {};
     if (!curPersonal && !curClass) return out; // 部屋を使わないメニュー
+    // ① 既存予約（パーソナル／体幹）で部屋がふさがる区間
     for (const a of weekAppts) {
       if (rescheduleId && a.id === rescheduleId) continue; // 変更中の自分は除外
       const isP = !!a.service_id && personalIds.has(a.service_id);
@@ -552,8 +556,30 @@ export default function BookingWizard() {
       const block = curPersonal ? (isP || isC) : isP; // パーソナル→両方 / 体幹→パーソナルのみ
       if (block) (out[a.date] ??= []).push({ s: a.start_min, e: a.end_min });
     }
+    // ② パーソナル予約時は、体幹教室が「開催枠（解放）」の時間も部屋がふさがる＝全て×
+    if (curPersonal) {
+      const classSv = services.find((s) => s.capacity > 1);
+      const starts = (classSv?.class_starts ?? "").split(",").map((x) => parseInt(x.trim(), 10)).filter((n) => !isNaN(n));
+      if (classSv && starts.length) {
+        const dur = totalDuration(classSv.steps);
+        const byM = Object.fromEntries(windows.map((w) => [w.year_month, w]));
+        const now = new Date();
+        for (const ds of weekDates) {
+          if (!isMonthOpen(byM[monthKey(ds)], now)) continue;
+          const dow = new Date(ds + "T00:00:00").getDay();
+          for (const cs of starts) {
+            const ce = cs + dur;
+            const open = allSchedules.some((sc) => sc.weekday === dow && sc.start_min <= cs && sc.end_min >= ce);
+            if (!open) continue;
+            const closed = closures.some((c) => c.date === ds && ((c.staff_id == null && c.service_id == null) || c.service_id === classSv.id) && (c.start_min == null || (c.start_min < ce && (c.end_min ?? 1440) > cs)));
+            if (closed) continue;
+            (out[ds] ??= []).push({ s: cs, e: ce });
+          }
+        }
+      }
+    }
     return out;
-  }, [services, serviceId, weekAppts, rescheduleId]);
+  }, [services, serviceId, weekAppts, rescheduleId, weekDates, windows, closures, allSchedules]);
 
   useEffect(() => {
     if (step === 2) reloadWeek();
