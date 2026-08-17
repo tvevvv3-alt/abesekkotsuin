@@ -599,16 +599,23 @@ export default function SalesBoard() {
   const total = (s: { selfpay: number; insurance: number }) => s.selfpay + s.insurance; // 合計（販売価格ベース）
   const paid = (s: { selfpay: number; burden: number }) => s.selfpay + s.burden; // 入金額
   // 日計表は売上（販売そのまま）。粗利は物販ページで管理するのでここでは原価を引かない。
+  // 担当別売上：物販は含めない（物販は物販として集計。差額＝利益だけ別途「物販利益込み」で足す）
   const staffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId ? sum + total(s) : sum), 0),
+      sales.reduce((sum, s) => (s.staff_id === staffId && !s.retail ? sum + total(s) : sum), 0),
     [sales]
   );
-  // その日の担当別売上（自費＋保険）
+  // その日の担当別売上（自費＋保険。物販除く）
   const dayStaffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId ? sum + total(s) : sum), 0),
+      sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId && !s.retail ? sum + total(s) : sum), 0),
     [sales, date]
+  );
+  // 担当ごとの物販利益（差額＝販売−仕入）。当月分。
+  const retailProfitByStaff = useCallback(
+    (staffId: string | null) =>
+      sales.reduce((sum, s) => (s.staff_id === staffId && s.retail && s.retail_kind !== "purchase" ? sum + (s.selfpay - (s.cost ?? 0)) : sum), 0),
+    [sales]
   );
   // Enterで次の金額欄へ移動（保険外→合計額→負担額→次の行の保険外…）。表示中の欄だけ辿る。
   function onAmountKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -863,7 +870,8 @@ export default function SalesBoard() {
       if (kawa && s.staff_id === kawa.id) { e.kawa += s.selfpay + s.insurance; return; }
       e.ins += s.insurance;
       e.bur += s.burden;
-      if (s.staff_id && s.staff_id === bucket.abe) e.ho1 += s.selfpay;
+      if (s.retail) e.ho4 += s.selfpay; // 物販は担当が付いても保険外4（物販）に集計
+      else if (s.staff_id && s.staff_id === bucket.abe) e.ho1 += s.selfpay;
       else if (s.staff_id && s.staff_id === bucket.shibu) e.ho2 += s.selfpay;
       else if (s.staff_id && (s.staff_id === bucket.hagi || s.staff_id === bucket.haya || s.staff_id === taikan?.id)) e.ho3 += s.selfpay;
       else e.ho4 += s.selfpay; // 物販・その他のみ
@@ -990,6 +998,7 @@ export default function SalesBoard() {
         <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
           {assignees.map((s) => {
             const tot = staffTotal(s.id);
+            const rp = retailProfitByStaff(s.id);
             const target = targets[s.id] ?? 0;
             const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
             return (
@@ -1018,6 +1027,12 @@ export default function SalesBoard() {
                     </span>
                   )}
                 </div>
+                {rp > 0 && (
+                  <div className="mt-0.5 flex items-baseline gap-1 text-[10px] text-amber-600">
+                    <span>物販利益込み</span>
+                    <b className="tabnum">{yen(tot + rp)}</b>
+                  </div>
+                )}
                 {target > 0 && (
                   <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-slate-100">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: s.color }} />
@@ -1032,12 +1047,12 @@ export default function SalesBoard() {
               <span className="text-[13px] font-bold text-slate-800">物販・その他</span>
             </div>
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
-              <span className="text-[15px] font-bold tabnum text-slate-800">{yen(staffTotal(null))}</span>
+              <span className="text-[15px] font-bold tabnum text-slate-800">{yen(monthSum.ho4)}</span>
               <span className="text-[9px] text-slate-400">当月</span>
               {view === "day" && (
                 <span className="ml-auto flex items-baseline gap-0.5">
                   <span className="rounded bg-amber-500 px-1 text-[9px] font-bold text-white">本日</span>
-                  <span className="text-[13px] font-bold tabnum text-amber-600">{yen(dayStaffTotal(null))}</span>
+                  <span className="text-[13px] font-bold tabnum text-amber-600">{yen(monthDaily.find(([d]) => d === date)?.[1].ho4 ?? 0)}</span>
                 </span>
               )}
             </div>
