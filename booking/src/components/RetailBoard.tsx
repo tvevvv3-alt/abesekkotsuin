@@ -133,7 +133,31 @@ export default function RetailBoard() {
     setSaleLocal(row.id, { qty: q, selfpay: up * q, cost: uc * q });
   }
 
-  const profit = (s: RSale) => s.selfpay - s.cost;
+  // 商品名 → 商品マスタ（原価の自動参照に使う）
+  const productByName = useMemo(() => {
+    const m = new Map<string, { cost: number; price: number }>();
+    products.forEach((p) => { const k = (p.name || "").trim(); if (k) m.set(k, { cost: p.cost, price: p.price }); });
+    return m;
+  }, [products]);
+  // 実効原価：手入力(cost>0)があればそれ、無ければ商品名でマスタの仕入単価×数量を使う
+  const costOf = (s: RSale) => {
+    if (s.cost > 0) return s.cost;
+    const p = productByName.get((s.patient_name ?? "").trim());
+    return p && p.cost > 0 ? p.cost * (s.qty || 1) : s.cost;
+  };
+  const profit = (s: RSale) => s.selfpay - costOf(s);
+  // 商品名を入れ直したら、原価未入力ならマスタから自動セットして保存
+  async function onSaleNameBlur(id: string) {
+    const cur = sales.find((x) => x.id === id);
+    if (!cur) return;
+    let cost = cur.cost;
+    if (cur.retail_kind !== "purchase" && !(cost > 0)) {
+      const p = productByName.get((cur.patient_name ?? "").trim());
+      if (p && p.cost > 0) cost = p.cost * (cur.qty || 1);
+    }
+    if (cost !== cur.cost) setSaleLocal(id, { cost });
+    await supabase.from("sales").update({ date: cur.date, patient_name: cur.patient_name, retail_buyer: cur.retail_buyer, product_id: cur.product_id, qty: cur.qty, selfpay: cur.selfpay, cost, staff_id: cur.staff_id, retail_kind: cur.retail_kind }).eq("id", id);
+  }
   const assignees = useMemo(() => staff.map((s) => ({ id: s.id, name: s.name, color: s.color || "#64748b" })), [staff]);
   const colorOf = (id: string | null) => assignees.find((a) => a.id === id)?.color ?? null;
 
@@ -289,7 +313,7 @@ export default function RetailBoard() {
                       )}
                     </td>
                     <td className="px-2 py-1">
-                      <input value={s.patient_name ?? ""} placeholder="商品名" list="retail-product-names" onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => persistSale(s.id)} className="w-36 rounded border border-slate-300 px-1 py-1 text-sm" />
+                      <input value={s.patient_name ?? ""} placeholder="商品名" list="retail-product-names" onChange={(e) => setSaleLocal(s.id, { patient_name: e.target.value })} onBlur={() => onSaleNameBlur(s.id)} className="w-36 rounded border border-slate-300 px-1 py-1 text-sm" />
                     </td>
                     <td className="px-2 py-1">
                       {isPurchase ? (
