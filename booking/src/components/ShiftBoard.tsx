@@ -335,14 +335,6 @@ export default function ShiftBoard() {
     alert(`${monthLabel} の施術シフトをスタッフ管理の勤務時間から作成し、古い休み登録もクリアしました。\nイレギュラーな日だけ個別に直し、必要なら「📅 予約枠に反映」を押してください。`);
   }
 
-  // 当月の「院全体の休診」をまとめて解除（過去の繰り返し登録の波及などを掃除）
-  async function clearMonthClinicClosures() {
-    if (!confirm(`${monthLabel} の「院全体の休診」をまとめて解除します。\n（過去の繰り返し登録などで入った休診を当月ぶん削除。施術者個別の休みや予約は消えません）`)) return;
-    await supabase.from("closures").delete().is("staff_id", null).is("service_id", null).gte("date", monthStart).lt("date", monthEnd);
-    reload();
-    alert(`${monthLabel} の院全体休診をまとめて解除しました。休診はシフトの日別編集で管理してください。`);
-  }
-
   async function saveDay() {
     if (!edit) return;
     await supabase.from("shifts").delete().eq("date", edit);
@@ -429,11 +421,6 @@ export default function ShiftBoard() {
           className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-emerald-700 disabled:bg-slate-300"
           title="このカレンダー通りに、当月の予約の空きを開閉します">
           {applying ? "反映中…" : "📅 予約枠に反映"}
-        </button>
-        <button onClick={clearMonthClinicClosures}
-          className="rounded-md border border-rose-300 px-2 py-1 text-[11px] font-bold text-rose-500 active:bg-rose-50"
-          title="当月の院全体休診をまとめて解除（繰り返し登録の波及を掃除）">
-          休診クリア
         </button>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => gotoMonth(-1)} className={btn}>‹</button>
