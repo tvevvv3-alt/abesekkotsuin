@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type {
   AppointmentStep,
   BookingWindow,
+  BusinessHours,
   Closure,
   Equipment,
   Opening,
@@ -45,6 +46,8 @@ interface Props {
   windows?: BookingWindow[]; // 月別公開設定
   maxMonth?: string | null; // これより後の月(YYYY-MM)は非表示（未解放の月を隠す）
   roomBusyByDate?: Record<string, { s: number; e: number }[]>; // 日付→部屋使用中区間（部屋排他）
+  businessHours?: BusinessHours[]; // 医院の営業時間（曜日ごと）
+  restrictToBusinessHours?: boolean; // true=営業時間内のみ予約可（パーソナル用。時間外は×）
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
   accentColor?: string | null; // 担当カラー（空き○の色分け）
@@ -79,11 +82,27 @@ export default function WeekCalendar({
   windows = [],
   maxMonth = null,
   roomBusyByDate = {},
+  businessHours = [],
+  restrictToBusinessHours = false,
   selected,
   onSelect,
   accentColor,
 }: Props) {
   const isClass = isClassService(capacity);
+  const bhByWeekday = useMemo(
+    () => Object.fromEntries(businessHours.map((b) => [b.weekday, b])) as Record<number, BusinessHours>,
+    [businessHours]
+  );
+  // 予約全体[start,end]が営業時間の枠（午前 or 午後）に収まっているか
+  const withinBusinessHours = (weekday: number, start: number, end: number): boolean => {
+    const b = bhByWeekday[weekday];
+    if (!b || !b.is_open) return false;
+    const inSeg1 =
+      b.seg1_start != null && b.seg1_end != null && b.seg1_start <= start && b.seg1_end >= end;
+    const inSeg2 =
+      b.seg2_start != null && b.seg2_end != null && b.seg2_start <= start && b.seg2_end >= end;
+    return inSeg1 || inSeg2;
+  };
   const accent = accentColor && /^#[0-9a-f]{6}$/i.test(accentColor) ? accentColor : null;
   const windowByMonth = useMemo(
     () => Object.fromEntries(windows.map((w) => [w.year_month, w])) as Record<string, BookingWindow>,
@@ -178,6 +197,11 @@ export default function WeekCalendar({
           if (lastAcceptMin != null && t > lastAcceptMin) return { kind: "off" };
           const inAnyShift = daySchedules.some((s) => s.start_min <= t && s.end_min > t);
           if (!inAnyShift) return { kind: "off" };
+          // パーソナル：営業時間外は予約不可（時間外は×＝出さない）
+          if (restrictToBusinessHours) {
+            const end = t + serviceSteps.reduce((sum, s) => sum + s.duration_min, 0);
+            if (!withinBusinessHours(weekday, t, end)) return { kind: "off" };
+          }
         } else if (daySchedules.length === 0) {
           return { kind: "off" };
         }

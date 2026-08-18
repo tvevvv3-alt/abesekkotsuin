@@ -6,6 +6,7 @@ import {
   loadAllStaff,
   loadAppointmentSteps,
   loadBookingWindows,
+  loadBusinessHours,
   loadClosures,
   loadEquipment,
   loadOpenings,
@@ -21,6 +22,7 @@ import { TraBadge, TraLoading } from "@/components/TraLogo";
 import type {
   AppointmentStep,
   BookingWindow,
+  BusinessHours,
   Closure,
   Equipment,
   Opening,
@@ -162,6 +164,7 @@ export default function BookingWizard() {
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
   const [allSchedules, setAllSchedules] = useState<StaffSchedule[]>([]);
+  const [businessHours, setBusinessHours] = useState<BusinessHours[]>([]);
   const [links, setLinks] = useState<{ staff_id: string; service_id: string }[]>([]);
   const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -409,7 +412,7 @@ export default function BookingWizard() {
   useEffect(() => {
     (async () => {
       try {
-        const [sv, st, ls, pr, se, bw, eq, allsc] = await Promise.all([
+        const [sv, st, ls, pr, se, bw, eq, allsc, bh] = await Promise.all([
           loadServices(supabase),
           loadAllStaff(supabase),
           loadStaffServices(supabase),
@@ -418,6 +421,7 @@ export default function BookingWizard() {
           loadBookingWindows(supabase),
           loadEquipment(supabase),
           loadSchedules(supabase), // 全担当者の勤務時間（＝営業時間。体幹教室の開催枠判定に使う）
+          loadBusinessHours(supabase), // 医院の営業時間（パーソナルの時間外締めに使う）
         ]);
         setServices(sv);
         setAllStaff(st);
@@ -427,6 +431,7 @@ export default function BookingWizard() {
         setWindows(bw);
         setEquipment(eq);
         setAllSchedules(allsc);
+        setBusinessHours(bh);
       } catch (e) {
         setMasterError(e instanceof Error ? e.message : "読み込みに失敗しました");
       } finally {
@@ -1208,6 +1213,8 @@ export default function BookingWizard() {
               windows={windows}
               maxMonth={lastReleasedMonth}
               roomBusyByDate={roomBusyByDate}
+              businessHours={businessHours}
+              restrictToBusinessHours={isPersonal}
               selected={selected}
               onSelect={onSelectSlot}
               accentColor={!isClass ? selectedStaff?.color : null}

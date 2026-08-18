@@ -45,6 +45,7 @@ declare
   v_capacity int;
   v_after_hours boolean;
   v_personal boolean;
+  v_bh     record;
 begin
   if not exists (select 1 from service_steps where service_id = p_service_id) then
     return jsonb_build_object('ok', false, 'reason', 'メニューに工程がありません');
@@ -102,6 +103,19 @@ begin
   end if;
 
   -- ===== 通常メニュー（capacity=1）=====
+  -- ★パーソナルは「医院の営業時間内」のみ（時間外は不可）。管理者(p_ignore_hours)は除外。
+  if v_personal and not p_ignore_hours then
+    select * into v_bh from business_hours where weekday = v_dow;
+    if v_bh is null or not coalesce(v_bh.is_open, false) or not (
+      (v_bh.seg1_start is not null and v_bh.seg1_end is not null
+        and v_bh.seg1_start <= p_start_min and v_bh.seg1_end >= v_end)
+      or (v_bh.seg2_start is not null and v_bh.seg2_end is not null
+        and v_bh.seg2_start <= p_start_min and v_bh.seg2_end >= v_end)
+    ) then
+      return jsonb_build_object('ok', false, 'reason', '営業時間外');
+    end if;
+  end if;
+
   -- ★部屋排他：パーソナル予約は、同時刻に「パーソナル or 体幹教室」があれば不可（部屋1枠）
   if v_personal then
     if exists (
