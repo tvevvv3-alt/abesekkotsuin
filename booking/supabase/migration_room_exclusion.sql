@@ -254,7 +254,18 @@ end; $$;
 
 grant execute on function public.check_booking_availability(uuid, uuid, date, int, uuid, boolean, boolean) to anon, authenticated;
 
--- ★ 予約確定：source='admin' のときは休診＋勤務時間を無視（7引数で呼ぶ）
+-- ★ 予約確定：冪等キー＋同日ロックで「解放時の同時大量予約」に耐える。
+--   ・冪等キー：連打／戻る→再送信でも同じキーなら新規作成せず既存を返す（重複0）
+--   ・pg_advisory_xact_lock：同じ日付の確定を直列化（二重予約を防ぐ要）
+--   ・source='admin' のときは休診＋勤務時間を無視（7引数で呼ぶ）
+-- 冪等キー列＋ユニーク（未適用でも安全に用意）
+alter table public.appointments add column if not exists idempotency_key uuid;
+create unique index if not exists appointments_idempotency_key_uidx
+  on public.appointments (idempotency_key) where idempotency_key is not null;
+
+-- 旧10引数版（冪等キーなし）を破棄して11引数版に一本化
+drop function if exists public.book_appointment(uuid, uuid, date, int, text, text, date, text, text, text);
+
 create or replace function public.book_appointment(
   p_service_id uuid,
   p_staff_id   uuid,
@@ -265,13 +276,15 @@ create or replace function public.book_appointment(
   p_birth_date date default null,
   p_phone      text default null,
   p_note       text default null,
-  p_source     text default 'patient'
+  p_source     text default 'patient',
+  p_idempotency_key uuid default null
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   v_check    jsonb;
   v_patient  uuid;
   v_appt     uuid;
+  v_existing uuid;
   v_end      int;
   v_cursor   int;
   v_num      text;
@@ -279,6 +292,15 @@ declare
   v_admin    boolean := (p_source = 'admin');
   step       record;
 begin
+  -- 冪等性①：同じキーの予約が既にあれば新規作成せず既存を返す
+  if p_idempotency_key is not null then
+    select id into v_existing from appointments where idempotency_key = p_idempotency_key limit 1;
+    if v_existing is not null then
+      return jsonb_build_object('ok', true, 'appointment_id', v_existing, 'duplicate', true);
+    end if;
+  end if;
+
+  -- 同日での同時確定を直列化（二重予約防止の要）
   perform pg_advisory_xact_lock(hashtextextended(p_date::text, 0));
 
   v_check := check_booking_availability(
@@ -308,13 +330,23 @@ begin
 
   select name into v_svc_name from services where id = p_service_id;
 
-  insert into appointments
-    (patient_id, service_id, staff_id, date, start_min, end_min, status, source, note,
-     patient_name, service_name)
-  values
-    (v_patient, p_service_id, p_staff_id, p_date, p_start_min, v_end, 'booked', p_source, p_note,
-     p_name, v_svc_name)
-  returning id into v_appt;
+  begin
+    insert into appointments
+      (patient_id, service_id, staff_id, date, start_min, end_min, status, source, note,
+       patient_name, service_name, idempotency_key)
+    values
+      (v_patient, p_service_id, p_staff_id, p_date, p_start_min, v_end, 'booked', p_source, p_note,
+       p_name, v_svc_name, p_idempotency_key)
+    returning id into v_appt;
+  exception when unique_violation then
+    if p_idempotency_key is not null then
+      select id into v_existing from appointments where idempotency_key = p_idempotency_key limit 1;
+      if v_existing is not null then
+        return jsonb_build_object('ok', true, 'appointment_id', v_existing, 'duplicate', true);
+      end if;
+    end if;
+    return jsonb_build_object('ok', false, 'reason', 'slot_taken');
+  end;
 
   v_cursor := p_start_min;
   for step in select * from service_steps where service_id = p_service_id order by step_order loop
@@ -332,7 +364,7 @@ begin
   return jsonb_build_object('ok', true, 'appointment_id', v_appt, 'patient_id', v_patient);
 end; $$;
 
-grant execute on function public.book_appointment(uuid, uuid, date, int, text, text, date, text, text, text) to anon, authenticated;
+grant execute on function public.book_appointment(uuid, uuid, date, int, text, text, date, text, text, text, uuid) to anon, authenticated;
 
 -- ★ 予約変更：管理からのみ呼ばれるため休診＋勤務時間を常に無視（7引数で呼ぶ）
 create or replace function public.reschedule_appointment(
