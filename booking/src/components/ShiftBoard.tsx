@@ -58,6 +58,8 @@ export default function ShiftBoard() {
   const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>([]);
   const [kawa, setKawa] = useState<{ id: string; start: number; end: number } | null>(null); // 川西院メニューの解放窓
   const [applying, setApplying] = useState(false);
+  const [savingDay, setSavingDay] = useState(false); // 日別シフト保存中（連打ガード）
+  const [toast, setToast] = useState<string | null>(null); // 保存完了などの一時通知
   // 一括設定（メンバー×曜日をまとめて設定）
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
@@ -351,19 +353,31 @@ export default function ShiftBoard() {
   }
 
   async function saveDay() {
-    if (!edit) return;
-    await supabase.from("shifts").delete().eq("date", edit);
-    const rows = draftRows(edit);
-    if (rows.length) await supabase.from("shifts").insert(rows);
-    // 院全体の休診（予約側の closures と共通）
-    await supabase.from("closures").delete().eq("date", edit).is("staff_id", null).is("service_id", null);
-    if (dayClosure !== "none") {
-      const t = dayClosure === "full" ? { start: null, end: null } : segTimes(edit, dayClosure);
-      await supabase.from("closures").insert({ date: edit, staff_id: null, service_id: null, start_min: t.start, end_min: t.end, reason: null });
+    if (!edit || savingDay) return; // 連打で二重登録しないようガード
+    setSavingDay(true);
+    const target = edit;
+    try {
+      await supabase.from("shifts").delete().eq("date", target);
+      const rows = draftRows(target);
+      if (rows.length) await supabase.from("shifts").insert(rows);
+      // 院全体の休診（予約側の closures と共通）
+      await supabase.from("closures").delete().eq("date", target).is("staff_id", null).is("service_id", null);
+      if (dayClosure !== "none") {
+        const t = dayClosure === "full" ? { start: null, end: null } : segTimes(target, dayClosure);
+        await supabase.from("closures").insert({ date: target, staff_id: null, service_id: null, start_min: t.start, end_min: t.end, reason: null });
+      }
+      // この日のシフト由来の予約枠も更新（直前の締め/開けが即反映）
+      await applyShiftAvail([{ ds: target, shifts: rows }]);
+      setEdit(null);
+      await reload();
+      const [, mm, dd] = target.split("-");
+      setToast(`${Number(mm)}/${Number(dd)} のシフトを保存しました ✓`);
+      setTimeout(() => setToast(null), 2200);
+    } catch (e) {
+      alert("保存に失敗しました：" + (e as Error).message);
+    } finally {
+      setSavingDay(false);
     }
-    // この日のシフト由来の予約枠も更新（直前の締め/開けが即反映）
-    await applyShiftAvail([{ ds: edit, shifts: rows }]);
-    setEdit(null); reload();
   }
   // この日のシフトをコピー（貼り付けモードへ）
   function copyDay() {
@@ -424,6 +438,11 @@ export default function ShiftBoard() {
 
   return (
     <div className="mx-auto max-w-5xl">
+      {toast && (
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg">
+          {toast}
+        </div>
+      )}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Link href="/admin/staff" className="flex shrink-0 items-center gap-1 rounded-md bg-slate-600 px-2 py-1 text-[11px] font-bold text-white active:bg-slate-700">← スタッフ管理</Link>
         <h1 className="text-lg font-bold text-slate-800">シフト</h1>
@@ -724,7 +743,7 @@ export default function ShiftBoard() {
             </div>
             <div className="mt-4 flex items-center gap-2">
               <button onClick={copyDay} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">📋 この日をコピー</button>
-              <button onClick={saveDay} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700">保存</button>
+              <button onClick={saveDay} disabled={savingDay} className="ml-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white active:bg-blue-700 disabled:opacity-50">{savingDay ? "保存中…" : "保存"}</button>
             </div>
             <p className="mt-1.5 text-[11px] text-slate-400">施術＝終日/午前のみ/午後のみのボタンで時刻が入り、そのまま微調整も可（例：午前休診で18:00〜なら「午後のみ」→開始を18:00に）。終日は時刻を空に。受付・学生＝時間帯。「コピー」後に他の日をタップで貼り付け。</p>
           </div>
