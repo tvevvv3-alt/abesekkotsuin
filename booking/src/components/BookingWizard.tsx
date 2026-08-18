@@ -1215,6 +1215,7 @@ export default function BookingWizard() {
               roomBusyByDate={roomBusyByDate}
               businessHours={businessHours}
               restrictToBusinessHours={isPersonal}
+              openingOnly={service.category === "川西整体院"}
               selected={selected}
               onSelect={onSelectSlot}
               accentColor={!isClass ? selectedStaff?.color : null}

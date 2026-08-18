@@ -16,6 +16,10 @@
 --  Supabase の SQL Editor で1回実行（再実行しても安全）。
 -- =====================================================================
 
+-- ▼ 川西院など「解放日だけ営業」フラグ（基本休診・シフトの川西チェックで解放）
+alter table public.services add column if not exists opening_only boolean not null default false;
+update public.services set opening_only = true where category = '川西整体院';
+
 -- ▼ 既存オーバーロードを全部破棄（曖昧さの元を断つ）
 drop function if exists public.check_booking_availability(uuid, uuid, date, int, uuid);
 drop function if exists public.check_booking_availability(uuid, uuid, date, int, uuid, boolean);
@@ -45,6 +49,7 @@ declare
   v_capacity int;
   v_after_hours boolean;
   v_personal boolean;
+  v_opening_only boolean;
   v_bh     record;
 begin
   if not exists (select 1 from service_steps where service_id = p_service_id) then
@@ -55,9 +60,38 @@ begin
     into v_end
     from service_steps where service_id = p_service_id;
 
-  select capacity, coalesce(after_hours, false), coalesce(personal, false)
-    into v_capacity, v_after_hours, v_personal
+  select capacity, coalesce(after_hours, false), coalesce(personal, false), coalesce(opening_only, false)
+    into v_capacity, v_after_hours, v_personal, v_opening_only
     from services where id = p_service_id;
+
+  -- ===== 解放日だけ営業（川西院など）=====
+  --   基本は休診。openings（解放枠）がある日・時間だけ予約可。
+  --   拠点が別なので茨木の勤務/休診には縛られない（同担当の同時刻重複だけ見る）。
+  if v_opening_only then
+    if not exists (
+      select 1 from openings o
+       where o.service_id = p_service_id and o.date = p_date
+         and o.start_min <= p_start_min and o.end_min >= v_end
+    ) then
+      return jsonb_build_object('ok', false, 'reason', '休診');
+    end if;
+    if not p_ignore_closures and exists (
+      select 1 from closures c
+       where c.date = p_date and c.service_id = p_service_id
+         and (c.start_min is null or (c.start_min < v_end and c.end_min > p_start_min))
+    ) then
+      return jsonb_build_object('ok', false, 'reason', '休診');
+    end if;
+    if exists (
+      select 1 from appointments ap
+      where ap.service_id = p_service_id and ap.status = 'booked' and ap.date = p_date
+        and ap.start_min < v_end and ap.end_min > p_start_min
+        and (p_exclude_appointment_id is null or ap."id" != p_exclude_appointment_id)
+    ) then
+      return jsonb_build_object('ok', false, 'reason', '満');
+    end if;
+    return jsonb_build_object('ok', true, 'end_min', v_end);
+  end if;
 
   -- ===== 定員制クラス（体幹教室など capacity>1）=====
   if coalesce(v_capacity, 1) > 1 then

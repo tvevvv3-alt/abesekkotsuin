@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { loadAllStaff, loadBusinessHours, loadSchedules } from "@/lib/data";
-import { toDateStr } from "@/lib/booking";
+import { loadAllStaff, loadAllServices, loadBusinessHours, loadSchedules } from "@/lib/data";
+import { toDateStr, totalDuration } from "@/lib/booking";
 import { holidayName } from "@/lib/holidays";
 import type { BusinessHours, Closure, StaffSchedule } from "@/lib/types";
 
@@ -43,9 +43,9 @@ const range = (s: number | null, e: number | null) => (s == null ? "" : e == nul
 
 type Seg = "all" | "am" | "pm";
 type Draft = Record<string, { on: boolean; seg: Seg; start: string; end: string; clinic: boolean }>;
-type ShiftLite = { member_id: string; start_min: number | null; end_min: number | null };
+type ShiftLite = { member_id: string; start_min: number | null; end_min: number | null; clinic?: string | null };
 type GenCl = { date: string; staff_id: string; service_id: null; start_min: number | null; end_min: number | null; reason: null; source: string };
-type GenOp = { date: string; staff_id: string; start_min: number; end_min: number; source: string };
+type GenOp = { date: string; staff_id: string | null; service_id?: string | null; start_min: number; end_min: number; source: string };
 type Clip = { member_id: string; role: Member["role"]; seg: Seg; start_min: number | null; end_min: number | null; clinic: string | null };
 
 export default function ShiftBoard() {
@@ -56,6 +56,7 @@ export default function ShiftBoard() {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [staffNames, setStaffNames] = useState<Map<string, string>>(new Map());
   const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>([]);
+  const [kawa, setKawa] = useState<{ id: string; start: number; end: number } | null>(null); // 川西院メニューの解放窓
   const [applying, setApplying] = useState(false);
   // 一括設定（メンバー×曜日をまとめて設定）
   const [date, setDate] = useState(() => toDateStr(new Date()));
@@ -83,6 +84,16 @@ export default function ShiftBoard() {
     loadBusinessHours(supabase).then(setBh).catch(() => {});
     loadAllStaff(supabase).then((st) => setStaffNames(new Map(st.map((s) => [s.id, s.name])))).catch(() => {});
     loadSchedules(supabase).then(setStaffSchedules).catch(() => {});
+    loadAllServices(supabase)
+      .then((svs) => {
+        const k = svs.find((s) => s.category === "川西整体院");
+        if (!k?.class_starts) return;
+        const arr = k.class_starts.split(",").map((x) => parseInt(x.trim(), 10)).filter((n) => !isNaN(n));
+        if (!arr.length) return;
+        const dur = Math.max(totalDuration(k.steps ?? []), 60);
+        setKawa({ id: k.id, start: Math.min(...arr), end: Math.max(...arr) + dur });
+      })
+      .catch(() => {});
   }, [loadMembers, supabase]);
 
   const reload = useCallback(async () => {
@@ -265,8 +276,12 @@ export default function ShiftBoard() {
         if (dsE > we) op.push({ date: ds, staff_id: staffId, start_min: we, end_min: dsE, source: "shift" }); // 通常より後まで→開放
       }
     });
+    // 川西院：その日に「川西」チェックのシフトが1つでもあれば、川西メニューを解放
+    if (kawa && dayShifts.some((s) => s.clinic === "kawanishi")) {
+      op.push({ date: ds, staff_id: null, service_id: kawa.id, start_min: kawa.start, end_min: kawa.end, source: "shift" });
+    }
     return { cl, op };
-  }, [members, nameToStaff, staffSchedules, bhSpan]);
+  }, [members, nameToStaff, staffSchedules, bhSpan, kawa]);
 
   // 指定日群について、シフト由来(source='shift')の予約枠を作り直す（手動分は残す）
   const applyShiftAvail = useCallback(async (entries: { ds: string; shifts: ShiftLite[] }[]) => {
@@ -285,7 +300,7 @@ export default function ShiftBoard() {
     if (!confirm(`${monthLabel} のシフトカレンダー通りに予約枠を反映します。\n・施術者の勤務時間に合わせて空きを開閉\n・シフトが無い施術者はその日オフ\n※シフト由来の枠を作り直します（手動の休み・開放は残ります）`)) return;
     setApplying(true);
     try {
-      const { data: sh } = await supabase.from("shifts").select("date, member_id, start_min, end_min").gte("date", monthStart).lt("date", monthEnd);
+      const { data: sh } = await supabase.from("shifts").select("date, member_id, start_min, end_min, clinic").gte("date", monthStart).lt("date", monthEnd);
       const byDate = new Map<string, ShiftLite[]>();
       ((sh as (ShiftLite & { date: string })[]) ?? []).forEach((s) => { const a = byDate.get(s.date) ?? []; a.push(s); byDate.set(s.date, a); });
       const [yy, mm] = date.split("-").map(Number);

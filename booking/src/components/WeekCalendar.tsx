@@ -48,6 +48,7 @@ interface Props {
   roomBusyByDate?: Record<string, { s: number; e: number }[]>; // 日付→部屋使用中区間（部屋排他）
   businessHours?: BusinessHours[]; // 医院の営業時間（曜日ごと）
   restrictToBusinessHours?: boolean; // true=営業時間内のみ予約可（パーソナル用。時間外は×）
+  openingOnly?: boolean; // true=解放枠がある日だけ予約可（川西院用。基本休診）
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
   accentColor?: string | null; // 担当カラー（空き○の色分け）
@@ -84,6 +85,7 @@ export default function WeekCalendar({
   roomBusyByDate = {},
   businessHours = [],
   restrictToBusinessHours = false,
+  openingOnly = false,
   selected,
   onSelect,
   accentColor,
@@ -202,7 +204,7 @@ export default function WeekCalendar({
             const end = t + serviceSteps.reduce((sum, s) => sum + s.duration_min, 0);
             if (!withinBusinessHours(weekday, t, end)) return { kind: "off" };
           }
-        } else if (daySchedules.length === 0) {
+        } else if (!openingOnly && daySchedules.length === 0) {
           return { kind: "off" };
         }
 
@@ -260,6 +262,23 @@ export default function WeekCalendar({
         // 時間外は順次解放：activeAh（最も早い予約可能枠）だけ◯。
         // 予約が入っている枠だけ✕、順次解放前・休診などは ・（off）にする。
         if (afterHours) {
+          // 川西院：解放枠(openings)がある日・時間だけ予約可。基本は休診(・)。
+          if (openingOnly) {
+            const dur = serviceSteps.reduce((sum, s) => sum + s.duration_min, 0);
+            const opened = openings.some(
+              (o) =>
+                o.service_id === serviceId &&
+                o.date === dateStr &&
+                o.start_min <= t &&
+                o.end_min >= t + dur
+            );
+            if (!opened) return { kind: "off" };
+            // 担当が同時刻に他予約（茨木含む）を持っていれば不可
+            const busy = dayApptSteps.some(
+              (a) => a.uses_staff && a.staff_id === staffId && a.start_min < t + dur && a.end_min > t
+            );
+            return busy ? { kind: "busy" } : { kind: "ok" };
+          }
           if (t === activeAh) return { kind: "ok" };
           const r = checkAvailability(serviceSteps, staffId, t, ctx, undefined, true);
           const booked =
@@ -287,6 +306,9 @@ export default function WeekCalendar({
     capacity,
     classStarts,
     afterHours,
+    openingOnly,
+    restrictToBusinessHours,
+    bhByWeekday,
     isClass,
     equipmentById,
     windowByMonth,
