@@ -1228,8 +1228,8 @@ export default function BookingWizard() {
               : "○＝予約可 ×＝空きなし ·＝受付時間外"}
           </p>
 
-          {/* 時間外への導線（時間外メニュー・体幹教室では出さない）。その場で下に展開。 */}
-          {!afterHours && !isClass && afterHoursService && (
+          {/* 時間外への導線（時間外メニュー・体幹教室・パーソナルでは出さない）。その場で下に展開。 */}
+          {!afterHours && !isClass && !isPersonal && afterHoursService && (
             <div className="mt-3">
               <button
                 onClick={() => setShowAfterHours((v) => !v)}
