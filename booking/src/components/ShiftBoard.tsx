@@ -294,7 +294,7 @@ export default function ShiftBoard() {
   .badge { margin-top: 1px; font-size: 9px; font-weight: 700; color: #c0392b; background: #d9d9d9; padding: 0 3px; border-radius: 2px; }
   .notes { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 12px; font-weight: 600; }
   .note b { font-weight: 800; }
-  .freenote { margin-top: 8px; font-size: 12px; font-weight: 600; line-height: 1.6; white-space: pre-wrap; }
+  .freenote { margin-top: 12px; font-size: 16px; font-weight: 700; line-height: 1.7; white-space: pre-wrap; }
   @media screen { body { padding: 18px; background: #fff; } .toolbar { margin-bottom: 12px; text-align: center; } .toolbar button { font-size: 15px; font-weight: 700; padding: 8px 20px; margin: 0 6px; cursor: pointer; border: 1px solid #888; border-radius: 6px; background: #fff; } }
   @media print { .toolbar { display: none; } }
 </style></head>
