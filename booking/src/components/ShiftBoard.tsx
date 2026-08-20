@@ -61,6 +61,15 @@ export default function ShiftBoard() {
   const [savingDay, setSavingDay] = useState(false); // 日別シフト保存中（連打ガード）
   const [toast, setToast] = useState<string | null>(null); // 保存完了などの一時通知
   const [printNote, setPrintNote] = useState(""); // 印刷カレンダー下部の自由文（月ごと）
+  // 直前の一括反映を元に戻すためのスナップショット（押し間違い対策）
+  const [lastBulk, setLastBulk] = useState<{
+    kind: "staffHours" | "availability";
+    label: string; ms: string; me: string;
+    memberIds: string[]; staffIds: string[];
+    shifts: Record<string, unknown>[];
+    closures: Record<string, unknown>[];
+    openings: Record<string, unknown>[];
+  } | null>(null);
   // 一括設定（メンバー×曜日をまとめて設定）
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
@@ -416,6 +425,12 @@ export default function ShiftBoard() {
       const lastDay = new Date(yy, mm, 0).getDate();
       const entries: { ds: string; shifts: ShiftLite[] }[] = [];
       for (let dd = 1; dd <= lastDay; dd++) { const ds = `${yy}-${pad(mm)}-${pad(dd)}`; entries.push({ ds, shifts: byDate.get(ds) ?? [] }); }
+      // 元に戻す用：反映で作り直される「シフト由来(source='shift')」の枠を退避
+      const [cSnap, oSnap] = await Promise.all([
+        supabase.from("closures").select("*").eq("source", "shift").gte("date", monthStart).lt("date", monthEnd),
+        supabase.from("openings").select("*").eq("source", "shift").gte("date", monthStart).lt("date", monthEnd),
+      ]);
+      setLastBulk({ kind: "availability", label: `${monthLabel} 予約枠に反映`, ms: monthStart, me: monthEnd, memberIds: [], staffIds: [], shifts: [], closures: cSnap.data ?? [], openings: oSnap.data ?? [] });
       await applyShiftAvail(entries);
       alert(`${monthLabel} の予約枠にシフトを反映しました。\nこの後、ボード/カレンダーで臨時の開放・締めを微調整できます。`);
     } catch (e) {
@@ -438,6 +453,13 @@ export default function ShiftBoard() {
     for (let dd = 1; dd <= lastDay; dd++) monthDates.push(`${yy}-${pad(mm)}-${pad(dd)}`);
     const ids = targets.map((m) => m.id);
     const staffIds = targets.map((m) => nameToStaff.get((m.name || "").trim()) as string);
+    // 元に戻す用：作り直し前のシフト・個別休み・開放を退避
+    const [sSnap, cSnap, oSnap] = await Promise.all([
+      supabase.from("shifts").select("*").in("member_id", ids).gte("date", monthStart).lt("date", monthEnd),
+      supabase.from("closures").select("*").in("staff_id", staffIds).is("service_id", null).gte("date", monthStart).lt("date", monthEnd),
+      supabase.from("openings").select("*").in("staff_id", staffIds).gte("date", monthStart).lt("date", monthEnd),
+    ]);
+    setLastBulk({ kind: "staffHours", label: `${monthLabel} スタッフ勤務を反映`, ms: monthStart, me: monthEnd, memberIds: ids, staffIds, shifts: sSnap.data ?? [], closures: cSnap.data ?? [], openings: oSnap.data ?? [] });
     // ★勤務時間は最新をDBから取り直す（別タブで直した直後の取りこぼし＝午後枠落ち を防ぐ）
     const { data: freshSc } = await supabase.from("staff_schedules").select("*");
     const schedules = ((freshSc as StaffSchedule[]) ?? staffSchedules);
@@ -460,7 +482,34 @@ export default function ShiftBoard() {
     }
     if (rows.length) await supabase.from("shifts").insert(rows);
     reload();
-    alert(`${monthLabel} の施術シフトをスタッフ管理の勤務時間から作成し、古い休み登録もクリアしました。\nイレギュラーな日だけ個別に直し、必要なら「📅 予約枠に反映」を押してください。`);
+    alert(`${monthLabel} の施術シフトをスタッフ管理の勤務時間から作成し、古い休み登録もクリアしました。\nイレギュラーな日だけ個別に直し、必要なら「📅 予約枠に反映」を押してください。\n\n※押し間違えた場合は上の「↩ 元に戻す」で直前の状態に戻せます。`);
+  }
+
+  // 直前の一括反映（スタッフ勤務を反映／予約枠に反映）を元に戻す
+  async function undoBulk() {
+    if (!lastBulk) return;
+    if (!confirm(`「${lastBulk.label}」を実行前の状態に戻します。\nこの操作以降にこの月へ加えた自動反映ぶんは取り消されます。よろしいですか？`)) return;
+    setApplying(true);
+    try {
+      if (lastBulk.kind === "staffHours") {
+        await supabase.from("shifts").delete().in("member_id", lastBulk.memberIds).gte("date", lastBulk.ms).lt("date", lastBulk.me);
+        await supabase.from("closures").delete().in("staff_id", lastBulk.staffIds).is("service_id", null).gte("date", lastBulk.ms).lt("date", lastBulk.me);
+        await supabase.from("openings").delete().in("staff_id", lastBulk.staffIds).gte("date", lastBulk.ms).lt("date", lastBulk.me);
+      } else {
+        await supabase.from("closures").delete().eq("source", "shift").gte("date", lastBulk.ms).lt("date", lastBulk.me);
+        await supabase.from("openings").delete().eq("source", "shift").gte("date", lastBulk.ms).lt("date", lastBulk.me);
+      }
+      if (lastBulk.shifts.length) await supabase.from("shifts").insert(lastBulk.shifts);
+      if (lastBulk.closures.length) await supabase.from("closures").insert(lastBulk.closures);
+      if (lastBulk.openings.length) await supabase.from("openings").insert(lastBulk.openings);
+      setLastBulk(null);
+      await reload();
+      setToast("直前の一括反映を元に戻しました ✓");
+      setTimeout(() => setToast(null), 2200);
+    } catch (e) {
+      alert("元に戻すのに失敗しました：" + (e as Error).message);
+    }
+    setApplying(false);
   }
 
   async function saveDay() {
@@ -574,6 +623,13 @@ export default function ShiftBoard() {
           title="このカレンダー通りに、当月の予約の空きを開閉します">
           {applying ? "反映中…" : "📅 予約枠に反映"}
         </button>
+        {lastBulk && (
+          <button onClick={undoBulk} disabled={applying}
+            className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-600 active:bg-rose-100 disabled:opacity-50"
+            title={`「${lastBulk.label}」を実行前に戻す`}>
+            ↩ 元に戻す
+          </button>
+        )}
         <button onClick={printSchedule}
           className="rounded-md bg-slate-700 px-2.5 py-1 text-[11px] font-bold text-white active:bg-slate-800"
           title="施術スタッフの出勤カレンダーを印刷（受付・学生なし・午前/午後表示）">
