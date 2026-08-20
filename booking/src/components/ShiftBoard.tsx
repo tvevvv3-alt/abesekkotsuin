@@ -60,6 +60,7 @@ export default function ShiftBoard() {
   const [applying, setApplying] = useState(false);
   const [savingDay, setSavingDay] = useState(false); // 日別シフト保存中（連打ガード）
   const [toast, setToast] = useState<string | null>(null); // 保存完了などの一時通知
+  const [printNote, setPrintNote] = useState(""); // 印刷カレンダー下部の自由文（月ごと）
   // 一括設定（メンバー×曜日をまとめて設定）
   const [date, setDate] = useState(() => toDateStr(new Date()));
   const [loading, setLoading] = useState(true);
@@ -107,8 +108,21 @@ export default function ShiftBoard() {
     setShifts((sh as Shift[]) ?? []);
     setClosures((cl as Closure[]) ?? []);
     setLoading(false);
+    // 印刷用の月別メモ（テーブル未作成でも落ちないよう握りつぶす）
+    try {
+      const { data: pn } = await supabase.from("shift_print_notes").select("note").eq("year_month", monthStart.slice(0, 7)).maybeSingle();
+      setPrintNote((pn?.note as string) ?? "");
+    } catch { setPrintNote(""); }
   }, [supabase, monthStart, monthEnd]);
   useEffect(() => { reload(); }, [reload]);
+
+  const savePrintNote = async () => {
+    const ym = monthStart.slice(0, 7);
+    const { error } = await supabase.from("shift_print_notes").upsert({ year_month: ym, note: printNote, updated_at: new Date().toISOString() }, { onConflict: "year_month" });
+    if (error) { alert("メモの保存に失敗しました：" + error.message + "\n（migration_shift_print_notes.sql を実行済みかご確認ください）"); return; }
+    setToast("印刷メモを保存しました ✓");
+    setTimeout(() => setToast(null), 2000);
+  };
 
   // 曜日別の営業（休診曜日の判定）と営業時間の基本形
   const bhByWd = useMemo(() => new Map(bh.map((b) => [b.weekday, b])), [bh]);
@@ -279,6 +293,7 @@ export default function ShiftBoard() {
       notes.push(`<span class="note"><b style="color:#166534">【川西整体院】</b>${uniq.map((x) => x + "日").join("・")}</span>`);
     }
     const notesHtml = notes.length ? `<div class="notes">${notes.join("")}</div>` : "";
+    const freeHtml = printNote.trim() ? `<div class="freenote">${esc(printNote.trim())}</div>` : "";
 
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${yy}年${mm}月の診療日</title>
 <style>
@@ -302,6 +317,7 @@ export default function ShiftBoard() {
   .badge { margin-top: 1px; font-size: 9px; font-weight: 700; color: #c0392b; background: #d9d9d9; padding: 0 3px; border-radius: 2px; }
   .notes { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 12px; font-weight: 600; }
   .note b { font-weight: 800; }
+  .freenote { margin-top: 8px; font-size: 12px; font-weight: 600; line-height: 1.6; white-space: pre-wrap; }
   @media screen { body { padding: 18px; background: #fff; } .toolbar { margin-bottom: 12px; text-align: center; } .toolbar button { font-size: 15px; font-weight: 700; padding: 8px 20px; margin: 0 6px; cursor: pointer; border: 1px solid #888; border-radius: 6px; background: #fff; } }
   @media print { .toolbar { display: none; } }
 </style></head>
@@ -313,6 +329,7 @@ export default function ShiftBoard() {
     <tbody>${rowsHtml}</tbody>
   </table>
   ${notesHtml}
+  ${freeHtml}
 </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { alert("印刷ウィンドウを開けませんでした。ポップアップを許可してください。"); return; }
@@ -445,6 +462,10 @@ export default function ShiftBoard() {
     for (let dd = 1; dd <= lastDay; dd++) monthDates.push(`${yy}-${pad(mm)}-${pad(dd)}`);
     const ids = targets.map((m) => m.id);
     const staffIds = targets.map((m) => nameToStaff.get((m.name || "").trim()) as string);
+    // ★勤務時間は最新をDBから取り直す（別タブで直した直後の取りこぼし＝午後枠落ち を防ぐ）
+    const { data: freshSc } = await supabase.from("staff_schedules").select("*");
+    const schedules = ((freshSc as StaffSchedule[]) ?? staffSchedules);
+    setStaffSchedules(schedules);
     await supabase.from("shifts").delete().in("member_id", ids).gte("date", monthStart).lt("date", monthEnd);
     // 施術スタッフ個別の休み・臨時開放をクリア（スタッフ勤務を正にする。院全体休診=staff_id null は残す）
     await supabase.from("closures").delete().in("staff_id", staffIds).is("service_id", null).gte("date", monthStart).lt("date", monthEnd);
@@ -454,7 +475,7 @@ export default function ShiftBoard() {
       const staffId = nameToStaff.get((m.name || "").trim()) as string;
       for (const ds of monthDates) {
         const dow = new Date(ds + "T00:00:00").getDay();
-        const sc = staffSchedules.filter((s) => s.staff_id === staffId && s.weekday === dow);
+        const sc = schedules.filter((s) => s.staff_id === staffId && s.weekday === dow);
         if (sc.length === 0) continue; // その曜日は勤務なし＝オフ
         const start = Math.min(...sc.map((s) => s.start_min));
         const end = Math.max(...sc.map((s) => s.end_min));
@@ -593,6 +614,17 @@ export default function ShiftBoard() {
           </span>
         ))}
         {activeMembers.length === 0 && <span className="text-slate-400">メンバー未登録。下の「メンバー設定」から追加してください。</span>}
+      </div>
+
+      {/* 印刷カレンダー下部の自由文メモ（月ごと） */}
+      <div className="mb-3 rounded-xl border bg-white p-2.5">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-600">🖨 印刷メモ（{monthLabel}・掲示カレンダーの下に印刷）</span>
+          <button onClick={savePrintNote} className="ml-auto rounded-md bg-slate-700 px-2.5 py-1 text-[11px] font-bold text-white active:bg-slate-800">メモ保存</button>
+        </div>
+        <textarea value={printNote} onChange={(e) => setPrintNote(e.target.value)} rows={2}
+          placeholder="例：5日(水)〜9日(日) 澁谷 全国大会帯同のため不在／年末年始 12/30〜1/3 休診 など。改行OK。"
+          className="w-full resize-y rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-700" />
       </div>
 
       {clip && (
