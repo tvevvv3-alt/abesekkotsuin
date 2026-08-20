@@ -93,7 +93,7 @@ export default function HistoryBoard() {
               const m = META[l.action] ?? { label: l.action, cls: "bg-slate-100 text-slate-600" };
               const ap = l.appointment_id ? appts.get(l.appointment_id) : null;
               const st = ap?.staff_id ? staff.get(ap.staff_id) : null;
-              const menu = ap?.service_name || null;
+              const menu = ap?.service_name ? ap.service_name.replace(/全身通電/g, "全通") : null;
               // 「… / 担当名」で終わる detail は担当名を分離して色付け表示にする
               let detailText = l.detail || "";
               let staffName: string | null = null;
@@ -105,13 +105,13 @@ export default function HistoryBoard() {
                 <li key={l.id} className="flex items-center gap-2 px-3 py-2">
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${m.cls}`}>{m.label}</span>
                   <span className="shrink-0 text-sm font-bold text-slate-800">{l.patient_name || "（未登録）"}</span>
-                  <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[12px] text-slate-500">
-                    <span className="truncate">{detailText}</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] text-slate-500">
+                    <span className="shrink-0 whitespace-nowrap">{detailText}</span>
                     {staffName && (
-                      <span className="shrink-0 font-bold" style={{ color: st?.color || "#334155" }}>/ {staffName}</span>
+                      <span className="shrink-0 whitespace-nowrap font-bold" style={{ color: st?.color || "#334155" }}>/ {staffName}</span>
                     )}
                     {menu && (
-                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{menu}</span>
+                      <span className="min-w-0 truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{menu}</span>
                     )}
                   </span>
                   <span className="shrink-0 text-[11px] tabnum text-slate-400">{fmt(l.created_at)}</span>
