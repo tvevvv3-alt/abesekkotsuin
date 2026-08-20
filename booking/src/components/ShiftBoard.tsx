@@ -205,6 +205,82 @@ export default function ShiftBoard() {
     if (seg === "pm") return { start: b?.seg2_start ?? 960, end: b?.seg2_end ?? 1230 };
     return { start: null, end: null };
   };
+
+  // 施術スタッフの出勤カレンダーを印刷（受付・学生なし／時刻なし／午前・午後のみ）
+  const printSchedule = () => {
+    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
+    const ther = activeMembers.filter((m) => m.role === "therapist");
+    const WD = ["日", "月", "火", "水", "木", "金", "土"];
+    const rowsHtml = weeks
+      .map((wk) => {
+        const cells = wk
+          .map((d) => {
+            const ds = toDateStr(d);
+            const dow = d.getDay();
+            const inMonth = d.getMonth() === Number(date.split("-")[1]) - 1;
+            if (!inMonth) return `<td class="out"></td>`;
+            const hol = holidayName(ds);
+            const dayCl = closuresByDate.get(ds) ?? [];
+            const fullClosed = dayCl.some((c) => c.start_min == null);
+            const dateColor = dow === 0 || hol ? "#dc2626" : dow === 6 ? "#2563eb" : "#334155";
+            let body = "";
+            if (fullClosed) {
+              body = `<div class="closed">休診</div>`;
+            } else {
+              const items = ther
+                .map((m) => {
+                  const sh = (shiftsByDate.get(ds) ?? []).find((s) => s.member_id === m.id);
+                  if (!sh) return null;
+                  const { am, pm } = covFor(ds, dow, m.id, sh);
+                  if (!am && !pm) return null;
+                  const seg = am && pm ? "" : am ? "午前" : "午後";
+                  const kawa = sh.clinic === "kawanishi" ? "(川西)" : "";
+                  return `<div class="mem"><span class="dot" style="background:${m.color}"></span><span class="nm">${esc(m.name)}${kawa}</span>${seg ? `<span class="seg">${seg}</span>` : ""}</div>`;
+                })
+                .filter(Boolean)
+                .join("");
+              body = items || `<div class="none"></div>`;
+            }
+            return `<td><div class="dnum" style="color:${dateColor}">${d.getDate()}${hol ? `<span class="hol">${esc(hol)}</span>` : ""}</div>${body}</td>`;
+          })
+          .join("");
+        return `<tr>${cells}</tr>`;
+      })
+      .join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${monthLabel} 施術シフト</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Hiragino Sans", sans-serif; margin: 0; color: #111; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { border: 1px solid #cbd5e1; background: #f1f5f9; font-size: 12px; padding: 3px 0; }
+  th.sun { color: #dc2626; } th.sat { color: #2563eb; }
+  td { border: 1px solid #cbd5e1; vertical-align: top; height: 92px; padding: 3px 4px; }
+  td.out { background: #f8fafc; }
+  .dnum { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+  .hol { font-size: 9px; font-weight: 700; margin-left: 3px; }
+  .mem { display: flex; align-items: center; gap: 3px; font-size: 12px; line-height: 1.5; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+  .nm { font-weight: 600; }
+  .seg { font-size: 10px; color: #b45309; font-weight: 700; margin-left: 1px; }
+  .closed { font-size: 12px; font-weight: 700; color: #94a3b8; }
+  @media screen { body { padding: 16px; background: #fff; } .toolbar { margin-bottom: 10px; } .toolbar button { font-size: 14px; padding: 6px 14px; margin-right: 8px; cursor: pointer; } }
+  @media print { .toolbar { display: none; } }
+</style></head>
+<body>
+  <div class="toolbar"><button onclick="window.print()">🖨 印刷する</button><button onclick="window.close()">閉じる</button></div>
+  <h1>${monthLabel}　施術シフト</h1>
+  <table>
+    <thead><tr>${WD.map((w, i) => `<th class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</th>`).join("")}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { alert("印刷ウィンドウを開けませんでした。ポップアップを許可してください。"); return; }
+    w.document.write(html);
+    w.document.close();
+  };
   function openDay(ds: string) {
     const day = shiftsByDate.get(ds) ?? [];
     const span = bhSpan(ds); // 営業時間ベースの既定
@@ -455,6 +531,11 @@ export default function ShiftBoard() {
           className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-emerald-700 disabled:bg-slate-300"
           title="このカレンダー通りに、当月の予約の空きを開閉します">
           {applying ? "反映中…" : "📅 予約枠に反映"}
+        </button>
+        <button onClick={printSchedule}
+          className="rounded-md bg-slate-700 px-2.5 py-1 text-[11px] font-bold text-white active:bg-slate-800"
+          title="施術スタッフの出勤カレンダーを印刷（受付・学生なし・午前/午後表示）">
+          🖨 印刷
         </button>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => gotoMonth(-1)} className={btn}>‹</button>
