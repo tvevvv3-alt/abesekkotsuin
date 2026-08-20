@@ -495,6 +495,13 @@ export default function ShiftBoard() {
       await supabase.from("shifts").delete().eq("date", target);
       const rows = draftRows(target);
       if (rows.length) await supabase.from("shifts").insert(rows);
+      // ★出勤にした施術者の「個別お休み登録」を消す（シフトの時間を正にする＝午前/午後休診の食い違いを解消）
+      const workStaffIds = rows
+        .map((r) => nameToStaff.get((memberById.get(r.member_id)?.name || "").trim()))
+        .filter((x): x is string => !!x);
+      if (workStaffIds.length) {
+        await supabase.from("closures").delete().eq("date", target).is("service_id", null).in("staff_id", workStaffIds);
+      }
       // 院全体の休診（予約側の closures と共通）
       await supabase.from("closures").delete().eq("date", target).is("staff_id", null).is("service_id", null);
       if (dayClosure !== "none") {
