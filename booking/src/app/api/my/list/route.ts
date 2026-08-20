@@ -43,7 +43,15 @@ export async function POST(req: NextRequest) {
   const svcMap = new Map((svcRows || []).map((s) => [s.id as string, s]));
   const now = Date.now();
 
-  const items = (appts || []).map((a) => {
+  // 開始時刻を過ぎた予約は「現在のご予約」から自動的に外す
+  const apptMsOf = (a: { date: string; start_min: number }) => {
+    const hh = String(Math.floor(a.start_min / 60)).padStart(2, "0");
+    const mm = String(a.start_min % 60).padStart(2, "0");
+    return Date.parse(`${a.date}T${hh}:${mm}:00+09:00`);
+  };
+  const upcoming = (appts || []).filter((a) => apptMsOf(a) > now);
+
+  const items = upcoming.map((a) => {
     const hh = String(Math.floor(a.start_min / 60)).padStart(2, "0");
     const mm = String(a.start_min % 60).padStart(2, "0");
     const apptMs = Date.parse(`${a.date}T${hh}:${mm}:00+09:00`);
