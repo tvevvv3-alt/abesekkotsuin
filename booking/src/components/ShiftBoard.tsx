@@ -206,75 +206,113 @@ export default function ShiftBoard() {
     return { start: null, end: null };
   };
 
-  // 施術スタッフの出勤カレンダーを印刷（受付・学生なし／時刻なし／午前・午後のみ）
+  // 施術スタッフの診療日カレンダーを印刷（受付・学生なし／時刻なし／掲示用レイアウト）
   const printSchedule = () => {
     const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
     const ther = activeMembers.filter((m) => m.role === "therapist");
+    const [yy, mm] = date.split("-").map(Number);
     const WD = ["日", "月", "火", "水", "木", "金", "土"];
+
+    // 下部まとめ用：個別の午前/午後休診の日付、川西の日付
+    const amBy = new Map<string, number[]>();
+    const pmBy = new Map<string, number[]>();
+    const kawaDates: number[] = [];
+
     const rowsHtml = weeks
       .map((wk) => {
         const cells = wk
           .map((d) => {
             const ds = toDateStr(d);
             const dow = d.getDay();
-            const inMonth = d.getMonth() === Number(date.split("-")[1]) - 1;
+            const inMonth = d.getMonth() === mm - 1;
             if (!inMonth) return `<td class="out"></td>`;
             const hol = holidayName(ds);
             const dayCl = closuresByDate.get(ds) ?? [];
             const fullClosed = dayCl.some((c) => c.start_min == null);
-            const dateColor = dow === 0 || hol ? "#dc2626" : dow === 6 ? "#2563eb" : "#334155";
-            let body = "";
-            if (fullClosed) {
-              body = `<div class="closed">休診</div>`;
-            } else {
-              const items = ther
-                .map((m) => {
-                  const sh = (shiftsByDate.get(ds) ?? []).find((s) => s.member_id === m.id);
-                  if (!sh) return null;
-                  const { am, pm } = covFor(ds, dow, m.id, sh);
-                  if (!am && !pm) return null;
-                  const seg = am && pm ? "" : am ? "午前" : "午後";
-                  const kawa = sh.clinic === "kawanishi" ? "(川西)" : "";
-                  return `<div class="mem"><span class="dot" style="background:${m.color}"></span><span class="nm">${esc(m.name)}${kawa}</span>${seg ? `<span class="seg">${seg}</span>` : ""}</div>`;
-                })
-                .filter(Boolean)
-                .join("");
-              body = items || `<div class="none"></div>`;
+            const wdClosed = bhByWd.get(dow)?.is_open === false;
+            const closed = wdClosed || fullClosed;
+            const dcolor = dow === 0 || hol ? "#c0392b" : dow === 6 ? "#1d4ed8" : "#333";
+            const bandBg = hol ? "#fdecec" : "#f7efd6";
+            const head = `<div class="band" style="background:${bandBg}"><span class="dn" style="color:${dcolor}">${d.getDate()}</span>${hol ? `<span class="hol">${esc(hol)}</span>` : ""}</div>`;
+            if (closed) {
+              return `<td>${head}<div class="cell closedcell"><span class="closed">休 診</span></div></td>`;
             }
-            return `<td><div class="dnum" style="color:${dateColor}">${d.getDate()}${hol ? `<span class="hol">${esc(hol)}</span>` : ""}</div>${body}</td>`;
+            const partial: string[] = [];
+            const full: string[] = [];
+            ther.forEach((m) => {
+              const sh = (shiftsByDate.get(ds) ?? []).find((s) => s.member_id === m.id);
+              if (!sh) return;
+              const { am, pm } = covFor(ds, dow, m.id, sh);
+              if (!am && !pm) return;
+              const kawa = sh.clinic === "kawanishi" ? "(川西)" : "";
+              if (sh.clinic === "kawanishi") kawaDates.push(d.getDate());
+              if (am && pm) {
+                full.push(`<span class="nm" style="color:${m.color}">${esc(m.name)}${kawa}</span>`);
+              } else {
+                const label = am ? "午後休診" : "午前休診";
+                if (am) (pmBy.get(m.name) ?? pmBy.set(m.name, []).get(m.name)!).push(d.getDate());
+                else (amBy.get(m.name) ?? amBy.set(m.name, []).get(m.name)!).push(d.getDate());
+                partial.push(`<span class="pmem"><span class="nm" style="color:${m.color}">${esc(m.name)}${kawa}</span><span class="badge">${label}</span></span>`);
+              }
+            });
+            const body = partial.join("") + full.join("");
+            return `<td>${head}<div class="cell">${body}</div></td>`;
           })
           .join("");
         return `<tr>${cells}</tr>`;
       })
       .join("");
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${monthLabel} 施術シフト</title>
+
+    // 下部まとめ行
+    const notes: string[] = [];
+    ther.forEach((m) => {
+      const am = amBy.get(m.name);
+      const pm = pmBy.get(m.name);
+      if (!am && !pm) return;
+      const segs: string[] = [];
+      if (am && am.length) segs.push(`午前休診：${am.map((x) => x + "日").join("・")}`);
+      if (pm && pm.length) segs.push(`午後休診：${pm.map((x) => x + "日").join("・")}`);
+      notes.push(`<span class="note"><b style="color:${m.color}">【${esc(m.name)}】</b>${segs.join("／")}</span>`);
+    });
+    if (kawaDates.length) {
+      const uniq = Array.from(new Set(kawaDates)).sort((a, b) => a - b);
+      notes.push(`<span class="note"><b style="color:#166534">【川西整体院】</b>${uniq.map((x) => x + "日").join("・")}</span>`);
+    }
+    const notesHtml = notes.length ? `<div class="notes">${notes.join("")}</div>` : "";
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${yy}年${mm}月の診療日</title>
 <style>
-  @page { size: A4 landscape; margin: 8mm; }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Hiragino Sans", sans-serif; margin: 0; color: #111; }
-  h1 { font-size: 18px; margin: 0 0 6px; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  th { border: 1px solid #cbd5e1; background: #f1f5f9; font-size: 12px; padding: 3px 0; }
-  th.sun { color: #dc2626; } th.sat { color: #2563eb; }
-  td { border: 1px solid #cbd5e1; vertical-align: top; height: 92px; padding: 3px 4px; }
-  td.out { background: #f8fafc; }
-  .dnum { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
-  .hol { font-size: 9px; font-weight: 700; margin-left: 3px; }
-  .mem { display: flex; align-items: center; gap: 3px; font-size: 12px; line-height: 1.5; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
-  .nm { font-weight: 600; }
-  .seg { font-size: 10px; color: #b45309; font-weight: 700; margin-left: 1px; }
-  .closed { font-size: 12px; font-weight: 700; color: #94a3b8; }
-  @media screen { body { padding: 16px; background: #fff; } .toolbar { margin-bottom: 10px; } .toolbar button { font-size: 14px; padding: 6px 14px; margin-right: 8px; cursor: pointer; } }
+  @page { size: A4 landscape; margin: 10mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif; margin: 0; color: #222; }
+  h1 { text-align: center; font-size: 24px; letter-spacing: 0.15em; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 2px solid #555; }
+  th { border: 1px solid #999; background: #e7e7f0; font-size: 13px; font-weight: 700; padding: 4px 0; }
+  th.sun { color: #c0392b; } th.sat { color: #1d4ed8; }
+  td { border: 1px solid #999; vertical-align: top; height: 96px; padding: 0; }
+  td.out { background: #f2f2f2; }
+  .band { display: flex; align-items: center; gap: 5px; padding: 2px 5px; border-bottom: 1px solid #ddd; }
+  .dn { font-size: 13px; font-weight: 700; }
+  .hol { font-size: 9px; font-weight: 700; color: #c0392b; }
+  .cell { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 8px; padding: 6px 4px; min-height: 66px; }
+  .closedcell { background: #e6e6e6; }
+  .closed { font-size: 15px; font-weight: 700; letter-spacing: 0.3em; color: #c0392b; }
+  .nm { font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+  .pmem { display: inline-flex; flex-direction: column; align-items: center; border-right: 1px dashed #999; padding-right: 7px; }
+  .badge { margin-top: 1px; font-size: 9px; font-weight: 700; color: #c0392b; background: #d9d9d9; padding: 0 3px; border-radius: 2px; }
+  .notes { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 12px; font-weight: 600; }
+  .note b { font-weight: 800; }
+  @media screen { body { padding: 18px; background: #fff; } .toolbar { margin-bottom: 12px; text-align: center; } .toolbar button { font-size: 15px; font-weight: 700; padding: 8px 20px; margin: 0 6px; cursor: pointer; border: 1px solid #888; border-radius: 6px; background: #fff; } }
   @media print { .toolbar { display: none; } }
 </style></head>
 <body>
   <div class="toolbar"><button onclick="window.print()">🖨 印刷する</button><button onclick="window.close()">閉じる</button></div>
-  <h1>${monthLabel}　施術シフト</h1>
+  <h1>${yy}年${mm}月の診療日</h1>
   <table>
     <thead><tr>${WD.map((w, i) => `<th class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</th>`).join("")}</tr></thead>
     <tbody>${rowsHtml}</tbody>
   </table>
+  ${notesHtml}
 </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { alert("印刷ウィンドウを開けませんでした。ポップアップを許可してください。"); return; }
