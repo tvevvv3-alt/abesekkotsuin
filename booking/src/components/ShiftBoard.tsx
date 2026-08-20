@@ -227,11 +227,6 @@ export default function ShiftBoard() {
     const [yy, mm] = date.split("-").map(Number);
     const WD = ["日", "月", "火", "水", "木", "金", "土"];
 
-    // 下部まとめ用：個別の午前/午後休診の日付、川西の日付
-    const amBy = new Map<string, number[]>();
-    const pmBy = new Map<string, number[]>();
-    const kawaDates: number[] = [];
-
     const rowsHtml = weeks
       .map((wk) => {
         const cells = wk
@@ -259,13 +254,10 @@ export default function ShiftBoard() {
               const { am, pm } = covFor(ds, dow, m.id, sh);
               if (!am && !pm) return;
               const kawa = sh.clinic === "kawanishi" ? "(川西)" : "";
-              if (sh.clinic === "kawanishi") kawaDates.push(d.getDate());
               if (am && pm) {
                 full.push(`<span class="nm" style="color:${m.color}">${esc(m.name)}${kawa}</span>`);
               } else {
                 const label = am ? "午後休診" : "午前休診";
-                if (am) (pmBy.get(m.name) ?? pmBy.set(m.name, []).get(m.name)!).push(d.getDate());
-                else (amBy.get(m.name) ?? amBy.set(m.name, []).get(m.name)!).push(d.getDate());
                 partial.push(`<span class="pmem"><span class="nm" style="color:${m.color}">${esc(m.name)}${kawa}</span><span class="badge">${label}</span></span>`);
               }
             });
@@ -277,22 +269,7 @@ export default function ShiftBoard() {
       })
       .join("");
 
-    // 下部まとめ行
-    const notes: string[] = [];
-    ther.forEach((m) => {
-      const am = amBy.get(m.name);
-      const pm = pmBy.get(m.name);
-      if (!am && !pm) return;
-      const segs: string[] = [];
-      if (am && am.length) segs.push(`午前休診：${am.map((x) => x + "日").join("・")}`);
-      if (pm && pm.length) segs.push(`午後休診：${pm.map((x) => x + "日").join("・")}`);
-      notes.push(`<span class="note"><b style="color:${m.color}">【${esc(m.name)}】</b>${segs.join("／")}</span>`);
-    });
-    if (kawaDates.length) {
-      const uniq = Array.from(new Set(kawaDates)).sort((a, b) => a - b);
-      notes.push(`<span class="note"><b style="color:#166534">【川西整体院】</b>${uniq.map((x) => x + "日").join("・")}</span>`);
-    }
-    const notesHtml = notes.length ? `<div class="notes">${notes.join("")}</div>` : "";
+    // 下部は「印刷メモ」欄の自由文のみ
     const freeHtml = printNote.trim() ? `<div class="freenote">${esc(printNote.trim())}</div>` : "";
 
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${yy}年${mm}月の診療日</title>
@@ -328,7 +305,6 @@ export default function ShiftBoard() {
     <thead><tr>${WD.map((w, i) => `<th class="${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${w}</th>`).join("")}</tr></thead>
     <tbody>${rowsHtml}</tbody>
   </table>
-  ${notesHtml}
   ${freeHtml}
 </body></html>`;
     const w = window.open("", "_blank");
