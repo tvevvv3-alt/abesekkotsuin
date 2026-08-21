@@ -167,6 +167,8 @@ export default function CalendarView({
   const [settings, setSettings] = useState<Settings | null>(null);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
+  // シフトの受付・学生を日付別に（終日帯へ自動表示）
+  const [roster, setRoster] = useState<Record<string, { name: string; color: string; role: string; s: number | null; e: number | null }[]>>({});
   const [zoom, setZoom] = useState(1);
 
   // ---- 予約ブロックのドラッグ移動（長押しで掴む）----
@@ -251,10 +253,12 @@ export default function CalendarView({
 
   const reload = useCallback(async () => {
     if (allDates.length === 0) return;
-    const [{ data: aData }, { data: sData }, nt] = await Promise.all([
+    const [{ data: aData }, { data: sData }, nt, { data: shRows }, { data: memRows }] = await Promise.all([
       supabase.from("appointments").select("*").in("date", allDates).neq("status", "cancelled"),
       supabase.from("appointment_steps").select("*").in("date", allDates),
       loadCalendarNotes(supabase, allDates),
+      supabase.from("shifts").select("date, member_id, start_min, end_min").in("date", allDates),
+      supabase.from("shift_members").select("id, name, role, color"),
     ]);
     const stepsByAppt: Record<string, AppointmentStep[]> = {};
     (sData ?? []).forEach((s: AppointmentStep) => {
@@ -262,6 +266,15 @@ export default function CalendarView({
     });
     setAppts((aData ?? []).map((a: Appointment) => ({ ...a, steps: stepsByAppt[a.id] || [] })));
     setNotes(nt);
+    // 受付・学生のシフトを日付別にまとめる
+    const memById = new Map((memRows ?? []).map((m) => [m.id as string, m]));
+    const rmap: Record<string, { name: string; color: string; role: string; s: number | null; e: number | null }[]> = {};
+    (shRows ?? []).forEach((sh) => {
+      const m = memById.get(sh.member_id as string);
+      if (!m || (m.role !== "reception" && m.role !== "student")) return;
+      (rmap[sh.date as string] ||= []).push({ name: (m.name as string) || "", color: (m.color as string) || "#64748b", role: m.role as string, s: sh.start_min as number | null, e: sh.end_min as number | null });
+    });
+    setRoster(rmap);
   }, [supabase, allDates]);
 
   useEffect(() => {
@@ -916,6 +929,8 @@ export default function CalendarView({
 
   // ヘッダー（日付＋終日メモ帯）1ページ分
   function renderHeaderPanel(list: string[]) {
+    const hm = (m: number) => (m % 60 === 0 ? String(m / 60) : `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`);
+    const rosterRange = (s: number | null, e: number | null) => (s == null ? "" : `${hm(s)}${e != null ? "-" + hm(e) : ""}`);
     return (
       <div style={{ flex: "0 0 100%" }}>
         <div className="flex">
@@ -954,6 +969,14 @@ export default function CalendarView({
                   setNoteModal({ mode: "add", date: ds, allDay: true, startMin: boardStart });
                 }}
               >
+                {/* シフトの受付・学生（自動表示・タップ不要） */}
+                {(roster[ds] ?? []).map((r, i) => (
+                  <div key={`r${i}`} className="pointer-events-none mb-0.5 flex items-center gap-1 truncate text-[9px] font-bold leading-tight">
+                    <span className="shrink-0 rounded bg-slate-200 px-0.5 text-slate-500">{r.role === "reception" ? "受付" : "学生"}</span>
+                    <span className="truncate" style={{ color: r.color }}>{r.name}</span>
+                    {r.s != null && <span className="shrink-0 text-slate-400">{rosterRange(r.s, r.e)}</span>}
+                  </div>
+                ))}
                 {allDay.map((n) => {
                   const isStart = n.date === ds;
                   const isEnd = (n.end_date || n.date) === ds;
