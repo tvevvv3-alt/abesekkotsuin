@@ -969,14 +969,6 @@ export default function CalendarView({
                   setNoteModal({ mode: "add", date: ds, allDay: true, startMin: boardStart });
                 }}
               >
-                {/* シフトの受付・学生（自動表示・タップ不要） */}
-                {(roster[ds] ?? []).map((r, i) => (
-                  <div key={`r${i}`} className="pointer-events-none mb-0.5 flex items-center gap-1 truncate text-[9px] font-bold leading-tight">
-                    <span className="shrink-0 rounded bg-slate-200 px-0.5 text-slate-500">{r.role === "reception" ? "受付" : "学生"}</span>
-                    <span className="truncate" style={{ color: r.color }}>{r.name}</span>
-                    {r.s != null && <span className="shrink-0 text-slate-400">{rosterRange(r.s, r.e)}</span>}
-                  </div>
-                ))}
                 {allDay.map((n) => {
                   const isStart = n.date === ds;
                   const isEnd = (n.end_date || n.date) === ds;
@@ -992,6 +984,18 @@ export default function CalendarView({
                     </button>
                   );
                 })}
+                {/* シフトの受付・学生（自動表示・横並びで詰める） */}
+                {(roster[ds] ?? []).length > 0 && (
+                  <div className="pointer-events-none flex flex-wrap gap-x-1.5 gap-y-0 text-[9px] font-bold leading-tight">
+                    {(roster[ds] ?? []).map((r, i) => (
+                      <span key={`r${i}`} className="inline-flex items-center gap-0.5 whitespace-nowrap">
+                        <span className="rounded bg-slate-200 px-0.5 text-slate-500">{r.role === "reception" ? "受付" : "学生"}</span>
+                        <span style={{ color: r.color }}>{r.name}</span>
+                        {r.s != null && <span className="text-slate-400">{rosterRange(r.s, r.e)}</span>}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
