@@ -91,7 +91,7 @@ function staffOrderKey(name: string): number {
 }
 
 const CLASS_COLOR = "#EF6C00"; // 体幹教室＝オレンジ
-const TEXT_SHADOW = "0 1px 1px rgba(0,0,0,.28)"; // 白文字を読みやすくする控えめな影（Google風にシャキッと）
+const TEXT_SHADOW = "0 1px 0 rgba(0,0,0,.35)"; // 白文字用の影（ぼかし0＝Windowsでもにじまずシャキッと）
 
 // 表示用の背景色。白文字が読めるよう明るすぎる色は暗くし、通電(light)は少し薄くする。
 function segColor(hex: string, tone: "light" | "dark"): string {
@@ -784,10 +784,11 @@ export default function CalendarView({
           />
         ))}
         {laid.map((it) => {
-          const top = yFor(it.s);
+          // Windowsのにじみ対策：小数ピクセルだと文字がぼやけるので整数に丸める
+          const top = Math.round(yFor(it.s));
           const style = {
             top,
-            height: yFor(it.e) - top,
+            height: Math.round(yFor(it.e)) - top,
             left: `${it.left * 100}%`,
             width: `${it.width * 100}%`,
           };
@@ -806,7 +807,7 @@ export default function CalendarView({
                 style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
               >
                 <span
-                  className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-normal text-white`}
+                  className={`${ml ? "overflow-hidden text-[13px] leading-[1.25]" : "w-full overflow-hidden whitespace-nowrap text-[12.5px] leading-[1.2]"} font-semibold text-white`}
                   style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                 >
                   {it.note.text}
@@ -827,7 +828,7 @@ export default function CalendarView({
                   <button
                     key={ca.id}
                     onClick={(ev) => { ev.stopPropagation(); setModal({ mode: "edit", appt: ca }); }}
-                    className="block w-full truncate text-left text-[11px] font-medium leading-[1.3] text-white hover:underline"
+                    className="block w-full truncate text-left text-[12.5px] font-semibold leading-[1.3] text-white hover:underline"
                     style={{ textShadow: TEXT_SHADOW }}
                   >
                     {ca.patient_name || "（未登録）"}{ca.status === "done" ? "✅" : ""}
@@ -909,7 +910,7 @@ export default function CalendarView({
                     }}
                   >
                     <span
-                      className={`${ml ? "overflow-hidden text-[12px] leading-[1.2]" : "w-full overflow-hidden whitespace-nowrap text-[11.5px] leading-[1.15]"} font-normal text-white`}
+                      className={`${ml ? "overflow-hidden text-[13px] leading-[1.25]" : "w-full overflow-hidden whitespace-nowrap text-[12.5px] leading-[1.2]"} font-semibold text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
                       {personalIds.has(a.service_id ?? "") && (
