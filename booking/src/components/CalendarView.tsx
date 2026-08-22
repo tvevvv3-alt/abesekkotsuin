@@ -1059,7 +1059,7 @@ export default function CalendarView({
         {/* 時間グリッド（縦スクロール＋ピンチ／横スライド） */}
         <div
           ref={gridRef}
-          className="relative overflow-y-auto overflow-x-hidden overscroll-x-none"
+          className="thin-scroll relative overflow-y-auto overflow-x-hidden overscroll-x-none"
           style={{ height: "calc(100dvh - 190px)", touchAction: "pan-y" }}
         >
           <div className="flex" style={{ height: gridH }}>

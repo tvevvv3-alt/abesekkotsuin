@@ -28,6 +28,26 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Windows等の太いスクロールバーで列が窮屈になるのを防ぐ（Macのオーバーレイに寄せる） */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 4px;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* ローディング中のロゴ回転（コインのように裏表＝Y軸で回す。表＝ロゴ / 裏＝白） */
 @keyframes tra-spin {
   from {
