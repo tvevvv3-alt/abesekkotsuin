@@ -189,6 +189,14 @@ export default function ClassRoster() {
     return arr;
   }, [groups, members, filter, sort]);
 
+  // 今月通っている人数（会員数）と延べ来院回数
+  const counts = useMemo(() => {
+    const month = groups.filter(([name]) => (members[name]?.pass_type ?? "month4") === "month4").length;
+    const free = groups.filter(([name]) => (members[name]?.pass_type ?? "month4") === "free").length;
+    const visits = groups.reduce((sum, [, v]) => sum + v.length, 0);
+    return { people: groups.length, month, free, visits };
+  }, [groups, members]);
+
   async function setPass(name: string, pass_type: PassType) {
     await supabase
       .from("class_members")
@@ -289,6 +297,12 @@ export default function ClassRoster() {
     <div className="mx-auto max-w-4xl">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-bold text-slate-800">体幹教室 回数管理</h1>
+        <span className="inline-flex items-baseline gap-1 rounded-full bg-blue-600 px-3 py-1 text-white">
+          <span className="text-[11px] font-bold">今月</span>
+          <b className="text-lg font-black leading-none tabnum">{counts.people}</b>
+          <span className="text-[11px] font-bold">名</span>
+          <span className="ml-1 text-[10px] font-bold text-blue-100">月間{counts.month}・フリー{counts.free}／延べ{counts.visits}回</span>
+        </span>
         <button
           onClick={() => { setAddOpen(true); setAddName(""); setAddDate(toDateStr(new Date())); setAddTime("17:00"); }}
           className="rounded-md bg-emerald-600 px-2.5 py-1 text-[12px] font-bold text-white active:bg-emerald-700"
