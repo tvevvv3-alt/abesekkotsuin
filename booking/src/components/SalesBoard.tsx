@@ -214,6 +214,13 @@ export default function SalesBoard() {
     return m;
   }, [sales]);
   const manualSales = useMemo(() => sales.filter((s) => !s.appointment_id && s.retail_kind !== "purchase"), [sales]);
+  // 有効な予約ID（キャンセル済みは appts に無い）。キャンセル予約に紐づく売上を集計から外すのに使う。
+  const apptIdSet = useMemo(() => new Set(appts.map((a) => a.id)), [appts]);
+  // キャンセル等で予約が消えたのに残った売上行（表には出ないのに集計に入るのを防ぐ）
+  const isCancelledSale = useCallback(
+    (s: Sale) => !!s.appointment_id && !apptIdSet.has(s.appointment_id),
+    [apptIdSet]
+  );
   // 予約（カレンダー）に存在する「日付＋氏名」の集合。予約に紐づかない“はぐれ売上”で
   // 同名のものは重複表示・二重計上しないための判定に使う。
   const apptKeys = useMemo(() => {
@@ -602,20 +609,20 @@ export default function SalesBoard() {
   // 担当別売上：物販は含めない（物販は物販として集計。差額＝利益だけ別途「物販利益込み」で足す）
   const staffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId && !s.retail && !isOrphanDup(s) ? sum + total(s) : sum), 0),
-    [sales, isOrphanDup]
+      sales.reduce((sum, s) => (s.staff_id === staffId && !s.retail && !isOrphanDup(s) && !isCancelledSale(s) ? sum + total(s) : sum), 0),
+    [sales, isOrphanDup, isCancelledSale]
   );
   // その日の担当別売上（自費＋保険。物販除く）
   const dayStaffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId && !s.retail && !isOrphanDup(s) ? sum + total(s) : sum), 0),
-    [sales, date, isOrphanDup]
+      sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId && !s.retail && !isOrphanDup(s) && !isCancelledSale(s) ? sum + total(s) : sum), 0),
+    [sales, date, isOrphanDup, isCancelledSale]
   );
   // 担当ごとの物販利益（差額＝販売−仕入）。当月分。
   const retailProfitByStaff = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId && s.retail && s.retail_kind !== "purchase" && !isOrphanDup(s) ? sum + (s.selfpay - (s.cost ?? 0)) : sum), 0),
-    [sales, isOrphanDup]
+      sales.reduce((sum, s) => (s.staff_id === staffId && s.retail && s.retail_kind !== "purchase" && !isOrphanDup(s) && !isCancelledSale(s) ? sum + (s.selfpay - (s.cost ?? 0)) : sum), 0),
+    [sales, isOrphanDup, isCancelledSale]
   );
   // Enterで次の金額欄へ移動（保険外→合計額→負担額→次の行の保険外…）。表示中の欄だけ辿る。
   function onAmountKey(e: React.KeyboardEvent<HTMLInputElement>) {
