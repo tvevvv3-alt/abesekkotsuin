@@ -602,20 +602,20 @@ export default function SalesBoard() {
   // 担当別売上：物販は含めない（物販は物販として集計。差額＝利益だけ別途「物販利益込み」で足す）
   const staffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId && !s.retail ? sum + total(s) : sum), 0),
-    [sales]
+      sales.reduce((sum, s) => (s.staff_id === staffId && !s.retail && !isOrphanDup(s) ? sum + total(s) : sum), 0),
+    [sales, isOrphanDup]
   );
   // その日の担当別売上（自費＋保険。物販除く）
   const dayStaffTotal = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId && !s.retail ? sum + total(s) : sum), 0),
-    [sales, date]
+      sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId && !s.retail && !isOrphanDup(s) ? sum + total(s) : sum), 0),
+    [sales, date, isOrphanDup]
   );
   // 担当ごとの物販利益（差額＝販売−仕入）。当月分。
   const retailProfitByStaff = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId && s.retail && s.retail_kind !== "purchase" ? sum + (s.selfpay - (s.cost ?? 0)) : sum), 0),
-    [sales]
+      sales.reduce((sum, s) => (s.staff_id === staffId && s.retail && s.retail_kind !== "purchase" && !isOrphanDup(s) ? sum + (s.selfpay - (s.cost ?? 0)) : sum), 0),
+    [sales, isOrphanDup]
   );
   // Enterで次の金額欄へ移動（保険外→合計額→負担額→次の行の保険外…）。表示中の欄だけ辿る。
   function onAmountKey(e: React.KeyboardEvent<HTMLInputElement>) {
