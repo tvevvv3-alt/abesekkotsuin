@@ -9,15 +9,37 @@ function siteUrl(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
 }
 
-// RERE風のカード（テキスト＋ボタン）
+// バナー画像入りのリッチなカード（Flex）。画像タップ・ボタンどちらでも開く。
 function bookingCard(text: string, label: string, uri: string) {
+  const img = siteUrl() + "/line-yoyaku.png";
   return {
-    type: "template",
+    type: "flex",
     altText: text,
-    template: {
-      type: "buttons",
-      text,
-      actions: [{ type: "uri", label, uri }],
+    contents: {
+      type: "bubble",
+      hero: {
+        type: "image",
+        url: img,
+        size: "full",
+        aspectRatio: "1200:795",
+        aspectMode: "cover",
+        action: { type: "uri", uri },
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        contents: [
+          { type: "text", text, wrap: true, size: "md", weight: "bold", color: "#16243F" },
+          {
+            type: "button",
+            style: "primary",
+            color: "#C9A24A",
+            height: "sm",
+            action: { type: "uri", label, uri },
+          },
+        ],
+      },
     },
   };
 }
