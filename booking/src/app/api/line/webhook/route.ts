@@ -4,12 +4,15 @@ import { replyMessages, pushMessages } from "@/lib/line";
 
 export const runtime = "nodejs";
 
-// 予約サイトのURL（末尾スラッシュなし・必ず https:// スキーム付き）
+// 予約サイトのURL。環境変数がどんな形（スキーム無し / http:// など）でも
+// 必ず https:// に正規化する。LINEは https 以外のURIを拒否するため。
 function siteUrl(): string {
-  let u = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").trim().replace(/\/+$/, "");
-  // 環境変数がスキーム無し（例: abesekkotsuin.vercel.app）でも必ず https:// を補う
-  if (!/^https?:\/\//i.test(u)) u = "https://" + u.replace(/^\/+/, "");
-  return u;
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "abesekkotsuin.vercel.app").trim();
+  const rest = raw
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "") // 先頭のスキーム(http:// 等)を除去
+    .replace(/^\/+/, "") // 先頭スラッシュ除去
+    .replace(/\/+$/, ""); // 末尾スラッシュ除去
+  return "https://" + rest;
 }
 
 // バナー画像入りのリッチなカード（Flex）。画像タップ・ボタンどちらでも開く。
