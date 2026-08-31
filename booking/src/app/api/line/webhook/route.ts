@@ -14,12 +14,14 @@ function siteUrl(): string {
 
 // バナー画像入りのリッチなカード（Flex）。画像タップ・ボタンどちらでも開く。
 function bookingCard(text: string, label: string, uri: string) {
-  const img = siteUrl() + "/line-yoyaku.png";
+  // ?v= はLINE側の画像キャッシュを更新するため（バナー差し替え時に上げる）
+  const img = siteUrl() + "/line-yoyaku.png?v=3";
   return {
     type: "flex",
     altText: text,
     contents: {
       type: "bubble",
+      size: "kilo", // 標準(mega)より一回り小さくコンパクトに
       hero: {
         type: "image",
         url: img,
