@@ -56,10 +56,10 @@ function bookingCard(text: string, label: string, uri: string) {
 function replyForText(raw: string): unknown[] | null {
   const t = (raw || "").trim();
   if (/確認|変更|キャンセル/.test(t)) {
-    return [bookingCard("こちらから予約・キャンセル・変更ができます。", "予約を確認する", siteUrl() + "/my")];
+    return [bookingCard("予約　キャンセル　変更ができます", "予約を確認する", siteUrl() + "/my")];
   }
   if (/予約/.test(t)) {
-    return [bookingCard("こちらから予約・キャンセル・変更ができます。", "予約する", siteUrl())];
+    return [bookingCard("予約　キャンセル　変更ができます", "予約する", siteUrl())];
   }
   return null;
 }
@@ -109,31 +109,21 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: true });
   }
-  console.log(`[line-webhook] received ${events.length} event(s): ${events.map((e) => e.type).join(",")} siteUrl=${siteUrl()}`);
-
   await Promise.all(
     events.map(async (ev) => {
       try {
-        console.log(`[line-webhook] event type=${ev.type} mode=${ev.mode} hasReplyToken=${!!ev.replyToken} userId=${ev.source?.userId ? "yes" : "no"}`);
         if (ev.type === "message" && ev.message?.type === "text") {
           const msgs = replyForText(ev.message.text || "");
-          console.log(`[line-webhook] text="${ev.message.text}" matched=${msgs ? "yes" : "no"}`);
           if (msgs) {
             const r = await deliver(ev, msgs);
-            console.log(`[line-webhook] deliver result: ${JSON.stringify(r)}`);
-            // 失敗時：原因の全文をLINEに直接出す（Vercelログは途中で切れて読めないため）。
-            if (!r.ok && ev.source?.userId) {
-              await pushMessages(ev.source.userId, [
-                { type: "text", text: `⚠️カード送信に失敗しました。原因:\n${r.error || "不明"}` },
-              ]);
-            }
+            if (!r.ok) console.error(`[line-webhook] deliver failed: ${r.error}`);
           }
         } else if (ev.type === "follow") {
           // 友だち追加時：予約カードを返す
           const r = await deliver(ev, [
-            bookingCard("友だち追加ありがとうございます。こちらから予約・キャンセル・変更ができます。", "予約する", siteUrl()),
+            bookingCard("友だち追加ありがとうございます🌿\n予約　キャンセル　変更ができます", "予約する", siteUrl()),
           ]);
-          console.log(`[line-webhook] follow deliver result: ${JSON.stringify(r)}`);
+          if (!r.ok) console.error(`[line-webhook] follow deliver failed: ${r.error}`);
         }
       } catch (e) {
         console.error(`[line-webhook] handler error: ${e instanceof Error ? e.message : String(e)}`);
