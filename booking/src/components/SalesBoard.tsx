@@ -870,6 +870,7 @@ export default function SalesBoard() {
     // 金額（salesベース）：川西は独立集計、それ以外は合計額・負担額＋保険外1〜4に振り分け
     sales.forEach((s) => {
       if (isOrphanDup(s)) return; // 予約に同名がいる“はぐれ売上”は二重計上しない
+      if (isCancelledSale(s)) return; // キャンセル済み予約に残った売上は集計に入れない
       const e = get(s.date);
       // 窓口徴収(=保険外+負担額)の現金/キャッシュレス仕訳（全会計対象）
       const pay = s.selfpay + s.burden;
@@ -884,7 +885,7 @@ export default function SalesBoard() {
       else e.ho4 += s.selfpay; // 物販・その他のみ
     });
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [appts, sales, bucket, kawa, taikan, isOrphanDup]);
+  }, [appts, sales, bucket, kawa, taikan, isOrphanDup, isCancelledSale]);
   const monthSum = useMemo(
     () =>
       monthDaily.reduce(
