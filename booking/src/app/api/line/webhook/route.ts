@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { replyMessages } from "@/lib/line";
+import { replyMessages, pushMessages } from "@/lib/line";
 
 export const runtime = "nodejs";
 
@@ -58,9 +58,24 @@ function replyForText(raw: string): unknown[] | null {
 
 type LineEvent = {
   type: string;
+  mode?: string; // "active" | "standby"
   replyToken?: string;
   message?: { type?: string; text?: string };
+  source?: { userId?: string };
 };
+
+// チャットモード（standby）では reply が使えないため push で送る。それ以外は reply。
+async function deliver(ev: LineEvent, messages: unknown[]): Promise<{ ok: boolean; error?: string }> {
+  const userId = ev.source?.userId;
+  if (ev.mode === "standby" || !ev.replyToken) {
+    if (!userId) return { ok: false, error: "no userId for push" };
+    return pushMessages(userId, messages);
+  }
+  const r = await replyMessages(ev.replyToken, messages);
+  // まれに reply が失敗（token期限切れ等）した場合は push でフォロー。
+  if (!r.ok && userId) return pushMessages(userId, messages);
+  return r;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -91,20 +106,20 @@ export async function POST(req: NextRequest) {
   await Promise.all(
     events.map(async (ev) => {
       try {
-        console.log(`[line-webhook] event=${JSON.stringify(ev)}`);
-        if (ev.type === "message" && ev.message?.type === "text" && ev.replyToken) {
+        console.log(`[line-webhook] event type=${ev.type} mode=${ev.mode} hasReplyToken=${!!ev.replyToken} userId=${ev.source?.userId ? "yes" : "no"}`);
+        if (ev.type === "message" && ev.message?.type === "text") {
           const msgs = replyForText(ev.message.text || "");
           console.log(`[line-webhook] text="${ev.message.text}" matched=${msgs ? "yes" : "no"}`);
           if (msgs) {
-            const r = await replyMessages(ev.replyToken, msgs);
-            console.log(`[line-webhook] reply result: ${JSON.stringify(r)}`);
+            const r = await deliver(ev, msgs);
+            console.log(`[line-webhook] deliver result: ${JSON.stringify(r)}`);
           }
-        } else if (ev.type === "follow" && ev.replyToken) {
+        } else if (ev.type === "follow") {
           // 友だち追加時：予約カードを返す
-          const r = await replyMessages(ev.replyToken, [
+          const r = await deliver(ev, [
             bookingCard("友だち追加ありがとうございます。ご予約はこちらからどうぞ。", "予約メニューを開く", siteUrl()),
           ]);
-          console.log(`[line-webhook] follow reply result: ${JSON.stringify(r)}`);
+          console.log(`[line-webhook] follow deliver result: ${JSON.stringify(r)}`);
         }
       } catch (e) {
         console.error(`[line-webhook] handler error: ${e instanceof Error ? e.message : String(e)}`);
