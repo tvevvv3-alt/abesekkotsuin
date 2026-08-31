@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
   await Promise.all(
     events.map(async (ev) => {
       try {
+        console.log(`[line-webhook] event=${JSON.stringify(ev)}`);
         if (ev.type === "message" && ev.message?.type === "text" && ev.replyToken) {
           const msgs = replyForText(ev.message.text || "");
           console.log(`[line-webhook] text="${ev.message.text}" matched=${msgs ? "yes" : "no"}`);
