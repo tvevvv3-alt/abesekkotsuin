@@ -21,7 +21,7 @@ function bookingCard(text: string, label: string, uri: string) {
         type: "image",
         url: img,
         size: "full",
-        aspectRatio: "1200:795",
+        aspectRatio: "80:53", // 2400x1590 を約分（LINEは大きすぎる比を弾くことがある）
         aspectMode: "cover",
         action: { type: "uri", uri },
       },
@@ -113,6 +113,12 @@ export async function POST(req: NextRequest) {
           if (msgs) {
             const r = await deliver(ev, msgs);
             console.log(`[line-webhook] deliver result: ${JSON.stringify(r)}`);
+            // 失敗時：原因の全文をLINEに直接出す（Vercelログは途中で切れて読めないため）。
+            if (!r.ok && ev.source?.userId) {
+              await pushMessages(ev.source.userId, [
+                { type: "text", text: `⚠️カード送信に失敗しました。原因:\n${r.error || "不明"}` },
+              ]);
+            }
           }
         } else if (ev.type === "follow") {
           // 友だち追加時：予約カードを返す
