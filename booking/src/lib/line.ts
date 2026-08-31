@@ -300,6 +300,32 @@ export async function pushText(
   }
 }
 
+// Webhookの返信（replyToken を使う。任意のメッセージオブジェクト配列を送れる）。
+export async function replyMessages(
+  replyToken: string,
+  messages: unknown[]
+): Promise<{ ok: boolean; error?: string }> {
+  const token = (process.env.LINE_CHANNEL_ACCESS_TOKEN || "").trim();
+  if (!token) return { ok: false, error: "LINE_CHANNEL_ACCESS_TOKEN 未設定" };
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ replyToken, messages }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return { ok: false, error: `LINE ${res.status}: ${body}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "返信失敗" };
+  }
+}
+
 // LINEに画像メッセージを送る（originalContentUrl / previewImageUrl は共に公開HTTPS必須）。
 export async function pushImage(
   userId: string,
