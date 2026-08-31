@@ -48,10 +48,10 @@ function bookingCard(text: string, label: string, uri: string) {
 function replyForText(raw: string): unknown[] | null {
   const t = (raw || "").trim();
   if (/確認|変更|キャンセル/.test(t)) {
-    return [bookingCard("ご予約の確認・変更・キャンセルはこちらから。", "予約を確認する", siteUrl() + "/my")];
+    return [bookingCard("こちらから予約・キャンセル・変更ができます。", "予約を確認する", siteUrl() + "/my")];
   }
   if (/予約/.test(t)) {
-    return [bookingCard("LINE上で予約を進めていきます。", "予約メニューを開く", siteUrl())];
+    return [bookingCard("こちらから予約・キャンセル・変更ができます。", "予約する", siteUrl())];
   }
   return null;
 }
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
         } else if (ev.type === "follow") {
           // 友だち追加時：予約カードを返す
           const r = await deliver(ev, [
-            bookingCard("友だち追加ありがとうございます。ご予約はこちらからどうぞ。", "予約メニューを開く", siteUrl()),
+            bookingCard("友だち追加ありがとうございます。こちらから予約・キャンセル・変更ができます。", "予約する", siteUrl()),
           ]);
           console.log(`[line-webhook] follow deliver result: ${JSON.stringify(r)}`);
         }
