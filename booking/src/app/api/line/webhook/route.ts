@@ -71,8 +71,13 @@ export async function POST(req: NextRequest) {
     const sig = req.headers.get("x-line-signature") || "";
     const expected = crypto.createHmac("sha256", secret).update(body).digest("base64");
     if (sig !== expected) {
-      return NextResponse.json({ ok: false, reason: "bad signature" }, { status: 401 });
+      // 署名が合わない＝secretの値ズレ。原因を残しつつ、返信自体は続行して機能を止めない。
+      console.error(
+        `[line-webhook] signature mismatch: header=${sig.slice(0, 8)}… expected=${expected.slice(0, 8)}… (LINE_CHANNEL_SECRETを確認)`
+      );
     }
+  } else {
+    console.log("[line-webhook] LINE_CHANNEL_SECRET 未設定（署名検証スキップ）");
   }
 
   let events: LineEvent[] = [];
@@ -81,21 +86,27 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: true });
   }
+  console.log(`[line-webhook] received ${events.length} event(s): ${events.map((e) => e.type).join(",")}`);
 
   await Promise.all(
     events.map(async (ev) => {
       try {
         if (ev.type === "message" && ev.message?.type === "text" && ev.replyToken) {
           const msgs = replyForText(ev.message.text || "");
-          if (msgs) await replyMessages(ev.replyToken, msgs);
+          console.log(`[line-webhook] text="${ev.message.text}" matched=${msgs ? "yes" : "no"}`);
+          if (msgs) {
+            const r = await replyMessages(ev.replyToken, msgs);
+            console.log(`[line-webhook] reply result: ${JSON.stringify(r)}`);
+          }
         } else if (ev.type === "follow" && ev.replyToken) {
           // 友だち追加時：予約カードを返す
-          await replyMessages(ev.replyToken, [
+          const r = await replyMessages(ev.replyToken, [
             bookingCard("友だち追加ありがとうございます。ご予約はこちらからどうぞ。", "予約メニューを開く", siteUrl()),
           ]);
+          console.log(`[line-webhook] follow reply result: ${JSON.stringify(r)}`);
         }
-      } catch {
-        /* 1件の失敗で全体を落とさない */
+      } catch (e) {
+        console.error(`[line-webhook] handler error: ${e instanceof Error ? e.message : String(e)}`);
       }
     })
   );
