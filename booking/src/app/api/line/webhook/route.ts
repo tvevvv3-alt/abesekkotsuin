@@ -15,24 +15,14 @@ function siteUrl(): string {
   return "https://" + rest;
 }
 
-// バナー画像入りのリッチなカード（Flex）。画像タップ・ボタンどちらでも開く。
+// シンプルなカード（Flex）。バナー画像なし・テキスト＋金ボタンのみでコンパクト。
 function bookingCard(text: string, label: string, uri: string) {
-  // ?v= はLINE側の画像キャッシュを更新するため（バナー差し替え時に上げる）
-  const img = siteUrl() + "/line-yoyaku.png?v=3";
   return {
     type: "flex",
     altText: text,
     contents: {
       type: "bubble",
-      size: "kilo", // 標準(mega)より一回り小さくコンパクトに
-      hero: {
-        type: "image",
-        url: img,
-        size: "full",
-        aspectRatio: "80:53", // 2400x1590 を約分（LINEは大きすぎる比を弾くことがある）
-        aspectMode: "cover",
-        action: { type: "uri", uri },
-      },
+      size: "kilo", // 一回り小さめ
       body: {
         type: "box",
         layout: "vertical",
@@ -56,10 +46,10 @@ function bookingCard(text: string, label: string, uri: string) {
 function replyForText(raw: string): unknown[] | null {
   const t = (raw || "").trim();
   if (/確認|変更|キャンセル/.test(t)) {
-    return [bookingCard("予約　キャンセル　変更ができます", "予約を確認する", siteUrl() + "/my")];
+    return [bookingCard("予約・キャンセル・変更はこちら", "予約を確認する", siteUrl() + "/my")];
   }
   if (/予約/.test(t)) {
-    return [bookingCard("予約　キャンセル　変更ができます", "予約する", siteUrl())];
+    return [bookingCard("予約・キャンセル・変更はこちら", "予約する", siteUrl())];
   }
   return null;
 }
@@ -121,7 +111,7 @@ export async function POST(req: NextRequest) {
         } else if (ev.type === "follow") {
           // 友だち追加時：予約カードを返す
           const r = await deliver(ev, [
-            bookingCard("友だち追加ありがとうございます🌿\n予約　キャンセル　変更ができます", "予約する", siteUrl()),
+            bookingCard("友だち追加ありがとうございます🌿\n予約・キャンセル・変更はこちら", "予約する", siteUrl()),
           ]);
           if (!r.ok) console.error(`[line-webhook] follow deliver failed: ${r.error}`);
         }
