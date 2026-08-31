@@ -4,9 +4,12 @@ import { replyMessages, pushMessages } from "@/lib/line";
 
 export const runtime = "nodejs";
 
-// 予約サイトのURL（末尾スラッシュなし）
+// 予約サイトのURL（末尾スラッシュなし・必ず https:// スキーム付き）
 function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
+  let u = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").trim().replace(/\/+$/, "");
+  // 環境変数がスキーム無し（例: abesekkotsuin.vercel.app）でも必ず https:// を補う
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u.replace(/^\/+/, "");
+  return u;
 }
 
 // バナー画像入りのリッチなカード（Flex）。画像タップ・ボタンどちらでも開く。
@@ -101,7 +104,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: true });
   }
-  console.log(`[line-webhook] received ${events.length} event(s): ${events.map((e) => e.type).join(",")}`);
+  console.log(`[line-webhook] received ${events.length} event(s): ${events.map((e) => e.type).join(",")} siteUrl=${siteUrl()}`);
 
   await Promise.all(
     events.map(async (ev) => {
