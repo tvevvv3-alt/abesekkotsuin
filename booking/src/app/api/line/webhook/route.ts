@@ -4,15 +4,12 @@ import { replyMessages, pushMessages } from "@/lib/line";
 
 export const runtime = "nodejs";
 
-// 予約サイトのURL。環境変数がどんな形（スキーム無し / http:// など）でも
-// 必ず https:// に正規化する。LINEは https 以外のURIを拒否するため。
+// 予約サイトのURL。LINEは https 以外のURIを拒否するので、環境変数は
+// 「ちゃんとした https:// URL のときだけ」採用し、それ以外は本番URLを直接使う。
+const PROD_URL = "https://abesekkotsuin.vercel.app";
 function siteUrl(): string {
-  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "abesekkotsuin.vercel.app").trim();
-  const rest = raw
-    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "") // 先頭のスキーム(http:// 等)を除去
-    .replace(/^\/+/, "") // 先頭スラッシュ除去
-    .replace(/\/+$/, ""); // 末尾スラッシュ除去
-  return "https://" + rest;
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
+  return /^https:\/\/[^/\s]+/i.test(raw) ? raw : PROD_URL;
 }
 
 // シンプルなカード（Flex）。バナー画像なし・テキスト＋金ボタンのみでコンパクト。
@@ -106,7 +103,15 @@ export async function POST(req: NextRequest) {
           const msgs = replyForText(ev.message.text || "");
           if (msgs) {
             const r = await deliver(ev, msgs);
-            if (!r.ok) console.error(`[line-webhook] deliver failed: ${r.error}`);
+            if (!r.ok) {
+              console.error(`[line-webhook] deliver failed: ${r.error}`);
+              // カード送信が失敗しても、患者には必ずリンクを返す（無反応を防ぐ）
+              if (ev.source?.userId) {
+                await pushMessages(ev.source.userId, [
+                  { type: "text", text: `予約・キャンセル・変更はこちら\n${siteUrl()}/my` },
+                ]);
+              }
+            }
           }
         } else if (ev.type === "follow") {
           // 友だち追加時：予約カードを返す
