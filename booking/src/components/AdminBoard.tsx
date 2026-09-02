@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { toDateStr } from "@/lib/booking";
 import {
   loadAllStaff,
   loadClosures,
@@ -285,6 +286,14 @@ export default function AdminBoard({ date }: { date: string }) {
   const BREAK_SCALE = 1;
   const breakGap = useMemo<[number, number] | null>(() => null, []);
 
+  // 現在時刻バー（今日の表示のときだけ・Googleカレンダー風）。1分ごとに更新。
+  const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  useEffect(() => {
+    const id = setInterval(() => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()); }, 30000);
+    return () => clearInterval(id);
+  }, []);
+  const isToday = date === toDateStr(new Date());
+
   const yFor = useCallback(
     (m: number) => {
       const x = Math.max(minMin, Math.min(maxMin, m));
@@ -310,6 +319,7 @@ export default function AdminBoard({ date }: { date: string }) {
   );
 
   const height = yFor(maxMin);
+  const nowYVal = isToday && nowMin >= minMin && nowMin <= maxMin ? yFor(nowMin) : null;
   const ticks: number[] = [];
   for (let t = Math.ceil(minMin / GRID_STEP) * GRID_STEP; t <= maxMin; t += GRID_STEP) {
     // 圧縮した昼休み内は毎時のみ表示（ラベル重なり防止）
@@ -732,6 +742,7 @@ export default function AdminBoard({ date }: { date: string }) {
                   header={st.name}
                   headerColor={st.color || "#334155"}
                   colStaffId={st.id}
+                  nowY={nowYVal}
                   height={height}
                   yFor={yFor}
                   ticks={ticks}
@@ -827,6 +838,7 @@ export default function AdminBoard({ date }: { date: string }) {
                 header={cls.name}
                 subHeader={`定員${cls.capacity}名`}
                 headerColor={CLASS_COLOR}
+                nowY={nowYVal}
                 height={height}
                 yFor={yFor}
                 ticks={ticks}
@@ -901,6 +913,7 @@ export default function AdminBoard({ date }: { date: string }) {
                   key="kawanishi"
                   header={kawanishiService.name}
                   headerColor={KAWANISHI_COLOR}
+                  nowY={nowYVal}
                   height={height}
                   yFor={yFor}
                   ticks={ticks}
@@ -1112,12 +1125,14 @@ function Column({
   onPointerUpTrack,
   onPointerCancelTrack,
   colStaffId,
+  nowY = null,
   children,
 }: {
   header: string;
   subHeader?: string;
   headerColor: string;
   colStaffId?: string;
+  nowY?: number | null;
   height: number;
   yFor: (m: number) => number;
   ticks: number[];
@@ -1152,6 +1167,13 @@ function Column({
             style={{ top: yFor(t) }}
           />
         ))}
+        {/* 現在時刻バー（今日のみ・親が算出したY） */}
+        {nowY != null && (
+          <div className="pointer-events-none absolute left-0 z-20 w-full" style={{ top: nowY }}>
+            <div className="absolute -left-[3px] -top-[4px] h-[8px] w-[8px] rounded-full bg-rose-500" />
+            <div className="h-[2px] w-full bg-rose-500" />
+          </div>
+        )}
         {/* 勤務外グレー */}
         {offRanges.map(([s, e], i) => (
           <div

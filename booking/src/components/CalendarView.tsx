@@ -193,6 +193,13 @@ export default function CalendarView({
 
   const gridRef = useRef<HTMLDivElement>(null);
   const [boxH, setBoxH] = useState(600);
+  // 現在時刻バー（Googleカレンダー風）。1分ごとに更新。
+  const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  useEffect(() => {
+    const tick = () => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()); };
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, []);
   const pxRef = useRef(1);
   const pendScrollRef = useRef<number | null>(null);
   const didInit = useRef(false);
@@ -783,6 +790,13 @@ export default function CalendarView({
             style={{ top: yFor(t) }}
           />
         ))}
+        {/* 現在時刻バー（今日の列だけ・Googleカレンダー風） */}
+        {ds === todayStr && nowMin >= VIEW_START && nowMin <= VIEW_END && (
+          <div className="pointer-events-none absolute left-0 z-20 w-full" style={{ top: Math.round(yFor(nowMin)) }}>
+            <div className="absolute -left-[3px] -top-[4px] h-[8px] w-[8px] rounded-full bg-rose-500" />
+            <div className="h-[2px] w-full bg-rose-500" />
+          </div>
+        )}
         {laid.map((it) => {
           // Windowsのにじみ対策：小数ピクセルだと文字がぼやけるので整数に丸める
           const top = Math.round(yFor(it.s));
