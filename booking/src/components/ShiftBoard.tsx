@@ -63,7 +63,7 @@ export default function ShiftBoard() {
   const [printNote, setPrintNote] = useState(""); // 印刷カレンダー下部の自由文（月ごと）
   // 直前の一括反映を元に戻すためのスナップショット（押し間違い対策）
   const [lastBulk, setLastBulk] = useState<{
-    kind: "staffHours" | "availability";
+    kind: "staffHours" | "availability" | "clearIndiv";
     label: string; ms: string; me: string;
     memberIds: string[]; staffIds: string[];
     shifts: Record<string, unknown>[];
@@ -331,7 +331,12 @@ export default function ShiftBoard() {
       const isT = m.role === "therapist";
       // 施術は終日/午前/午後の区分。受付・学生は時間帯。
       let seg: Seg = "all";
-      if (isT && sh && sh.start_min != null) seg = sh.end_min != null && sh.end_min <= split ? "am" : "pm";
+      if (isT && sh && sh.start_min != null) {
+        // 終日(午前も午後もまたぐ)＝all。午前だけ＝am、午後だけ＝pm。
+        const coversAm = sh.start_min < split;
+        const coversPm = sh.end_min == null || sh.end_min > split;
+        seg = coversAm && coversPm ? "all" : coversAm ? "am" : "pm";
+      }
       const defStart = isT ? null : m.default_start != null ? m.default_start : span.start;
       const defEnd = isT ? null : m.default_end != null ? m.default_end : span.end;
       d[m.id] = {
@@ -485,7 +490,31 @@ export default function ShiftBoard() {
     alert(`${monthLabel} の施術シフトをスタッフ管理の勤務時間から作成し、古い休み登録もクリアしました。\nイレギュラーな日だけ個別に直し、必要なら「📅 予約枠に反映」を押してください。\n\n※押し間違えた場合は上の「↩ 元に戻す」で直前の状態に戻せます。`);
   }
 
-  // 直前の一括反映（スタッフ勤務を反映／予約枠に反映）を元に戻す
+  // 個別の「お休み登録」（施術者ごとの午前休/午後休など・シフト由来でない休診）を当月ぶんクリア。
+  // シフト（勤務）は触らない。半休はシフトの勤務時間で表現する方針のため、これらは古いデータ。
+  async function clearIndivClosuresMonth() {
+    if (!confirm(`${monthLabel} の「個別お休み登録」（施術者ごとの午前休/午後休など）を全部消します。\n・シフト（勤務時間）は変更しません\n・院全体の休診日は残します\n※半休はシフトの勤務時間で表現してください。\n\n押し間違えても上の「↩ 元に戻す」で戻せます。`)) return;
+    setApplying(true);
+    try {
+      const { data: snap } = await supabase
+        .from("closures").select("*")
+        .not("staff_id", "is", null).is("service_id", null)
+        .or("source.is.null,source.neq.shift")
+        .gte("date", monthStart).lt("date", monthEnd);
+      const rows = (snap as Record<string, unknown>[]) ?? [];
+      if (rows.length === 0) { setToast("個別お休み登録はありませんでした"); setTimeout(() => setToast(null), 2200); setApplying(false); return; }
+      setLastBulk({ kind: "clearIndiv", label: `${monthLabel} 個別休みクリア`, ms: monthStart, me: monthEnd, memberIds: [], staffIds: [], shifts: [], closures: rows, openings: [] });
+      await supabase.from("closures").delete().in("id", rows.map((r) => r.id as string));
+      await reload();
+      setToast(`個別お休み登録を ${rows.length}件 消しました ✓`);
+      setTimeout(() => setToast(null), 2600);
+    } catch (e) {
+      alert("クリアに失敗しました：" + (e as Error).message);
+    }
+    setApplying(false);
+  }
+
+  // 直前の一括反映（スタッフ勤務を反映／予約枠に反映／個別休みクリア）を元に戻す
   async function undoBulk() {
     if (!lastBulk) return;
     if (!confirm(`「${lastBulk.label}」を実行前の状態に戻します。\nこの操作以降にこの月へ加えた自動反映ぶんは取り消されます。よろしいですか？`)) return;
@@ -495,10 +524,11 @@ export default function ShiftBoard() {
         await supabase.from("shifts").delete().in("member_id", lastBulk.memberIds).gte("date", lastBulk.ms).lt("date", lastBulk.me);
         await supabase.from("closures").delete().in("staff_id", lastBulk.staffIds).is("service_id", null).gte("date", lastBulk.ms).lt("date", lastBulk.me);
         await supabase.from("openings").delete().in("staff_id", lastBulk.staffIds).gte("date", lastBulk.ms).lt("date", lastBulk.me);
-      } else {
+      } else if (lastBulk.kind === "availability") {
         await supabase.from("closures").delete().eq("source", "shift").gte("date", lastBulk.ms).lt("date", lastBulk.me);
         await supabase.from("openings").delete().eq("source", "shift").gte("date", lastBulk.ms).lt("date", lastBulk.me);
       }
+      // clearIndiv は削除のみなので、下のスナップショット挿入で元に戻る
       if (lastBulk.shifts.length) await supabase.from("shifts").insert(lastBulk.shifts);
       if (lastBulk.closures.length) await supabase.from("closures").insert(lastBulk.closures);
       if (lastBulk.openings.length) await supabase.from("openings").insert(lastBulk.openings);
@@ -622,6 +652,11 @@ export default function ShiftBoard() {
           className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-emerald-700 disabled:bg-slate-300"
           title="このカレンダー通りに、当月の予約の空きを開閉します">
           {applying ? "反映中…" : "📅 予約枠に反映"}
+        </button>
+        <button onClick={clearIndivClosuresMonth} disabled={applying}
+          className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white active:bg-amber-700 disabled:bg-slate-300"
+          title="施術者ごとの古い「お休み登録」（午前休/午後休）を当月ぶん消します。シフトは変えません">
+          🧹 個別休みをクリア
         </button>
         {lastBulk && (
           <button onClick={undoBulk} disabled={applying}
