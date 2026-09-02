@@ -115,15 +115,19 @@ function StaffAvatar({ staff, size = 60 }: { staff: Staff; size?: number }) {
   );
 }
 
-// メニューカードのサムネイル（画像 or 仮アイコン）
-function MenuThumb({ service }: { service: ServiceWithSteps }) {
+// メニューカードのサムネイル（画像 or 仮アイコン）。big=主役カード用に一回り大きく。
+function MenuThumb({ service, big }: { service: ServiceWithSteps; big?: boolean }) {
   return (
-    <div className="aspect-square w-[30%] max-w-[130px] shrink-0 self-start overflow-hidden rounded-xl bg-slate-100">
+    <div
+      className={`aspect-square shrink-0 self-start overflow-hidden rounded-xl bg-slate-100 ${
+        big ? "w-[34%] max-w-[150px]" : "w-[30%] max-w-[130px]"
+      }`}
+    >
       {service.image_path ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={service.image_path} alt="" className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-3xl">
+        <div className={`flex h-full w-full items-center justify-center ${big ? "text-4xl" : "text-3xl"}`}>
           {menuIcon(service)}
         </div>
       )}
@@ -317,13 +321,17 @@ export default function BookingWizard() {
     });
     return set;
   }, [clinicServices]);
-  const shownServices = useMemo(
-    () =>
+  const shownServices = useMemo(() => {
+    const base =
       category === "all"
         ? clinicServices
-        : clinicServices.filter((s) => s.category === category),
-    [clinicServices, category]
-  );
+        : clinicServices.filter((s) => s.category === category);
+    // 主役（イチオシ・受付中）を先頭へ。それ以外は元の並び（sort_order）を維持。
+    return [...base].sort(
+      (a, b) =>
+        (a.recommended && a.new_booking ? 0 : 1) - (b.recommended && b.new_booking ? 0 : 1)
+    );
+  }, [clinicServices, category]);
   // 時間外予約メニュー（この院で受付中の after_hours サービス。複数可＝患者が選ぶ）
   const afterHoursServices = useMemo(
     () =>
@@ -983,40 +991,48 @@ export default function BookingWizard() {
               const stopped = !s.new_booking;
               const label = s.patient_name || s.name;
               const desc = s.short_desc || s.description;
+              const hero = s.recommended && !stopped; // 主役カード（迷ったらコレ）
+              const priceLabel = s.price_note?.trim() || menuPriceLabel(s.id);
               return (
                 <button
                   key={s.id}
                   onClick={() => pickService(s.id)}
-                  className={`flex w-full items-stretch gap-3 rounded-2xl border p-3 text-left transition ${
-                    s.recommended
-                      ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200 active:bg-blue-50"
-                      : "border-slate-200 bg-white active:bg-slate-50"
+                  className={`relative flex w-full items-stretch text-left transition ${
+                    hero
+                      ? "mt-1.5 gap-3.5 rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-amber-50 to-white p-4 pt-6 shadow-md active:bg-amber-100/60"
+                      : "gap-3 rounded-2xl border border-slate-200 bg-white p-3 active:bg-slate-50"
                   }`}
                 >
-                  <MenuThumb service={s} />
+                  {hero && (
+                    <span className="absolute -top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-1 text-[12.5px] font-black text-white shadow-md ring-2 ring-white">
+                      ★ 迷ったらコレ！
+                    </span>
+                  )}
+                  <MenuThumb service={s} big={hero} />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-bold text-slate-800">{label}</span>
-                      <MenuBadge service={s} stopped={stopped} />
+                      <span className={`font-bold text-slate-900 ${hero ? "text-[17px] leading-snug" : ""}`}>{label}</span>
+                      {!hero && <MenuBadge service={s} stopped={stopped} />}
+                      {hero && stopped && <MenuBadge service={s} stopped={stopped} />}
                     </div>
                     {desc && (
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">
+                      <p className={`mt-1 leading-relaxed ${hero ? "text-[13px] text-slate-600" : "line-clamp-2 text-xs text-slate-500"}`}>
                         {desc}
                       </p>
                     )}
                     <div className="mt-auto pt-1.5">
-                      {(s.price_note?.trim() || menuPriceLabel(s.id)) && (
-                        <div className="text-[11px] font-bold" style={{ color: GOLD }}>
-                          {s.price_note?.trim() || menuPriceLabel(s.id)}
+                      {priceLabel && (
+                        <div className={`font-bold ${hero ? "text-[12.5px]" : "text-[11px]"}`} style={{ color: GOLD }}>
+                          {priceLabel}
                         </div>
                       )}
-                      <div className="text-[11px] text-slate-400">
+                      <div className={`text-slate-400 ${hero ? "text-[11.5px]" : "text-[11px]"}`}>
                         所要 約{totalDuration(s.steps)}分
                         {s.capacity > 1 && `・定員${s.capacity}名`}
                       </div>
                     </div>
                   </div>
-                  <span className="flex shrink-0 items-center text-lg text-slate-300">›</span>
+                  <span className={`flex shrink-0 items-center ${hero ? "text-xl text-amber-500" : "text-lg text-slate-300"}`}>›</span>
                 </button>
               );
             })}
