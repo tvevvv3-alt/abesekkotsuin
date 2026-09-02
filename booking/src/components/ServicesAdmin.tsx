@@ -14,6 +14,21 @@ import { totalDuration } from "@/lib/booking";
 
 const CATEGORIES = ["施術メニュー", "体幹教室", "川西整体院", "その他"];
 
+// 分 → "H:MM"（時間外の開始時刻表示用）
+const minToHM = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+// "20:30, 21:00" → [1230, 1260]（分の配列）
+function parseStartsText(txt: string): number[] {
+  return txt
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => {
+      const [h, mm] = x.split(":").map((n) => parseInt(n, 10));
+      return h * 60 + (mm || 0);
+    })
+    .filter((n) => !isNaN(n));
+}
+
 interface StepDraft {
   name: string;
   duration_min: number;
@@ -60,6 +75,8 @@ export default function ServicesAdmin() {
   const [newBooking, setNewBooking] = useState(true);
   const [personal, setPersonal] = useState(false); // パーソナル回数券の対象
   const [personalMonths, setPersonalMonths] = useState("5"); // 有効期限（月）
+  const [afterHours, setAfterHours] = useState(false); // 時間外予約メニュー（夜の固定枠）
+  const [ahStartsText, setAhStartsText] = useState(""); // 時間外の開始時刻（"20:30, 21:00" 形式）
   const [shortDesc, setShortDesc] = useState("");
   const [badge, setBadge] = useState("");
   const [priceNote, setPriceNote] = useState("");
@@ -103,6 +120,8 @@ export default function ServicesAdmin() {
     setNewBooking(true);
     setPersonal(false);
     setPersonalMonths("5");
+    setAfterHours(false);
+    setAhStartsText("");
     setShortDesc("");
     setBadge("");
     setPriceNote("");
@@ -127,6 +146,12 @@ export default function ServicesAdmin() {
     {
       const sp = s as unknown as { personal_valid_months?: number | null };
       setPersonalMonths(sp.personal_valid_months != null ? String(sp.personal_valid_months) : "5");
+    }
+    {
+      const sa = s as unknown as { after_hours?: boolean; class_starts?: string | null };
+      setAfterHours(sa.after_hours ?? false);
+      const mins = (sa.class_starts || "").split(",").map((x) => parseInt(x.trim(), 10)).filter((n) => !isNaN(n));
+      setAhStartsText(mins.map(minToHM).join(", "));
     }
     setShortDesc(s.short_desc || "");
     setBadge(s.badge || "");
@@ -220,6 +245,9 @@ export default function ServicesAdmin() {
         badge: badge.trim() || null,
         price_note: priceNote.trim() || null,
         image_path: imagePath.trim() || null,
+        after_hours: afterHours,
+        // class_starts は体幹教室のクラス開始時刻と共用のため、時間外のときだけ書き換える
+        ...(afterHours ? { class_starts: parseStartsText(ahStartsText).join(",") || null } : {}),
       };
       let serviceId: string;
       if (editing === "new") {
@@ -457,11 +485,21 @@ export default function ServicesAdmin() {
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </label>
-              <div className="flex items-end gap-3 text-sm">
+              <div className="flex flex-wrap items-end gap-3 text-sm">
                 <label className="flex items-center gap-1.5"><input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} />公開</label>
                 <label className="flex items-center gap-1.5"><input type="checkbox" checked={newBooking} onChange={(e) => setNewBooking(e.target.checked)} />新規受付</label>
                 <label className="flex items-center gap-1.5" title="このメニューの予約をパーソナル回数券に自動反映（30分=1回・60分=2回）"><input type="checkbox" checked={personal} onChange={(e) => setPersonal(e.target.checked)} />パーソナル回数券</label>
+                {capacity === 1 && (
+                  <label className="flex items-center gap-1.5" title="20:30以降など夜の固定枠だけ予約できる時間外メニューにする。複数作ると患者が選べます"><input type="checkbox" checked={afterHours} onChange={(e) => setAfterHours(e.target.checked)} />時間外予約</label>
+                )}
               </div>
+              {afterHours && (
+                <label className="block">
+                  <span className="mb-1 block text-xs text-slate-500">時間外の開始時刻（カンマ区切り・例: 20:30, 21:00）</span>
+                  <input value={ahStartsText} onChange={(e) => setAhStartsText(e.target.value)}
+                    placeholder="20:30, 21:00" className="w-full rounded-md border px-2 py-1.5 text-sm" />
+                </label>
+              )}
             </div>
             <textarea
               value={desc}

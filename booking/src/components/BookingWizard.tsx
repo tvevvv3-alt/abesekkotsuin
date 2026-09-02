@@ -324,10 +324,19 @@ export default function BookingWizard() {
         : clinicServices.filter((s) => s.category === category),
     [clinicServices, category]
   );
-  // 時間外予約メニュー（この院に受付中のものがあれば）
-  const afterHoursService = useMemo(
-    () => clinicServices.find((s) => s.after_hours && s.new_booking) || null,
+  // 時間外予約メニュー（この院で受付中の after_hours サービス。複数可＝患者が選ぶ）
+  const afterHoursServices = useMemo(
+    () =>
+      clinicServices
+        .filter((s) => s.after_hours && s.new_booking)
+        .sort((a, b) => a.sort_order - b.sort_order),
     [clinicServices]
+  );
+  const [ahServiceId, setAhServiceId] = useState<string>("");
+  // 実際に表示・予約に使う時間外サービス（選択中／未選択なら先頭）
+  const afterHoursService = useMemo(
+    () => afterHoursServices.find((s) => s.id === ahServiceId) || afterHoursServices[0] || null,
+    [afterHoursServices, ahServiceId]
   );
   // メニューカードの料金表示（スタッフ差があれば最小額＋「〜」）
   function menuPriceLabel(serviceId: string): string | null {
@@ -1240,6 +1249,27 @@ export default function BookingWizard() {
                   <div className="mb-1 px-1 text-xs font-bold text-slate-600">
                     時間外予約（20:30以降）
                   </div>
+                  {/* 時間外メニューが複数あれば患者が選ぶ（例：施術30分／施術30分＋全身通電20分） */}
+                  {afterHoursServices.length > 1 && (
+                    <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+                      {afterHoursServices.map((s) => {
+                        const on = s.id === afterHoursService.id;
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => setAhServiceId(s.id)}
+                            className={`rounded-full border px-3 py-1 text-xs font-bold ${
+                              on
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-300 bg-white text-slate-600 active:bg-slate-50"
+                            }`}
+                          >
+                            {s.patient_name || s.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   {afterHoursService.price_note && (
                     <div className="mb-2 px-1 text-[11px] font-bold" style={{ color: GOLD }}>
                       {afterHoursService.price_note}
