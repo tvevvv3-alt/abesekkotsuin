@@ -33,5 +33,8 @@ export async function POST(req: NextRequest) {
   const text = renderLinkMessage(tpl, url);
   const r = await pushText(appt.line_user_id, text);
   if (!r.ok) return NextResponse.json({ ok: false, reason: "send", error: r.error });
-  return NextResponse.json({ ok: true });
+  // 送信日時を記録（モーダルの「送信済」表示・二重送信防止用）
+  const sentAt = new Date().toISOString();
+  await admin.from("appointments").update({ questionnaire_sent_at: sentAt }).eq("id", appointmentId);
+  return NextResponse.json({ ok: true, sentAt });
 }

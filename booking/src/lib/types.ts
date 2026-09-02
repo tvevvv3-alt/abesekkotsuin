@@ -154,6 +154,7 @@ export interface Appointment {
   note: string | null;
   patient_name: string | null;
   service_name: string | null;
+  questionnaire_sent_at?: string | null; // 問診票をLINEで送った日時（未送信ならnull）
 }
 
 // 予約可否判定に使う「工程の占有」レコード（匿名でも取得可）

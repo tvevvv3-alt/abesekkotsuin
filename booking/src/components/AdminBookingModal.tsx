@@ -54,6 +54,7 @@ export default function AdminBookingModal({
   );
 
   const [name, setName] = useState(appt?.patient_name || "");
+  const [qSentAt, setQSentAt] = useState<string | null>(appt?.questionnaire_sent_at ?? null);
   const [kana, setKana] = useState("");
   const [birth, setBirth] = useState("");
   const [phone, setPhone] = useState("");
@@ -188,8 +189,8 @@ export default function AdminBookingModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId: appt.id }),
       });
-      const j = (await res.json()) as { ok: boolean; reason?: string };
-      if (j.ok) alert("問診票リンクをLINEで送信しました。");
+      const j = (await res.json()) as { ok: boolean; reason?: string; sentAt?: string };
+      if (j.ok) { setQSentAt(j.sentAt ?? new Date().toISOString()); alert("問診票リンクをLINEで送信しました。"); }
       else if (j.reason === "noline") alert("この患者はLINE未連携のため送信できません。");
       else if (j.reason === "nourl") alert("基本設定で問診票URLを登録してください。");
       else if (j.reason === "notconfigured") alert("LINE送信（アクセストークン）が未設定です。");
@@ -448,13 +449,20 @@ export default function AdminBookingModal({
           )}
           {/* 治療の予約：問診票 */}
           {mode === "edit" && !isClass && (
-            <button
-              onClick={sendQuestionnaire}
-              disabled={busy}
-              className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-600 active:bg-emerald-50 disabled:opacity-50"
-            >
-              問診票を送る
-            </button>
+            <div className="inline-flex flex-col items-center gap-0.5">
+              <button
+                onClick={sendQuestionnaire}
+                disabled={busy}
+                className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-600 active:bg-emerald-50 disabled:opacity-50"
+              >
+                問診票を送る
+              </button>
+              {qSentAt && (
+                <span className="text-[10px] font-bold text-emerald-600">
+                  {new Date(qSentAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}送信済
+                </span>
+              )}
+            </div>
           )}
           {/* 体幹教室の予約：申込書＋終了＋LINE */}
           {mode === "edit" && isClass && (
