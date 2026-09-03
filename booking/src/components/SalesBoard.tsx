@@ -942,7 +942,13 @@ export default function SalesBoard() {
       if (!s.appointment_id && !!normName(s.patient_name) && yearApptKeys.has(s.date + "|" + normName(s.patient_name))) return;
       // 物販は担当が付いていても「物販」行へ（担当の自費には入れない）
       if (s.retail) { busM[m] += s.selfpay + s.insurance; return; }
-      if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
+      if (kawa && s.staff_id === kawa.id) {
+        kawaM[m] += s.selfpay + s.insurance; // 川西院（内訳表示用）
+        // 川西は全て阿部が担当 → 阿部の保険/自費にも合算（スプレッドシートと一致させる）
+        const abe = bucket.abe ? byId.get(bucket.abe) : undefined;
+        if (abe) { abe.hoken[m] += s.insurance; abe.jihi[m] += s.selfpay; }
+        return;
+      }
       if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
       const r = s.staff_id ? byId.get(s.staff_id) : undefined;
       if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay; }
@@ -951,10 +957,11 @@ export default function SalesBoard() {
     const perMonth = (fn: (m: number) => number) => new Array(12).fill(0).map((_, m) => fn(m));
     const hokenTotal = perMonth((m) => rows.reduce((x, r) => x + r.hoken[m], 0));
     const jihiTotal = perMonth((m) => rows.reduce((x, r) => x + r.jihi[m], 0));
-    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + kawaM[m] + taikanM[m]);
+    // 川西は阿部に合算済みなので、総合計では kawaM を二重に足さない
+    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + taikanM[m]);
     const busKomi = perMonth((m) => sougou[m] + busM[m]);
     return { rows, kawaM, taikanM, busM, hokenTotal, jihiTotal, sougou, busKomi };
-  }, [yearSales, staff, kawa, taikan, yearApptIdSet, yearApptKeys]);
+  }, [yearSales, staff, kawa, taikan, yearApptIdSet, yearApptKeys, bucket]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
