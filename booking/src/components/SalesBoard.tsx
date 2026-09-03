@@ -199,7 +199,7 @@ export default function SalesBoard() {
       const [salesRes, apptRes] = await Promise.all([
         supabase
           .from("sales")
-          .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, sort_order, payment")
+          .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, anchor_appointment_id, sort_order, payment")
           .gte("date", `${year}-01-01`)
           .lte("date", `${year}-12-31`),
         supabase
@@ -934,10 +934,14 @@ export default function SalesBoard() {
     yearSales.forEach((s) => {
       const m = Number(s.date.slice(5, 7)) - 1;
       if (m < 0 || m > 11) return;
+      // まとめ仕入は売上ではないので集計に入れない
+      if (s.retail_kind === "purchase") return;
       // キャンセル済み予約に残った売上は除外
       if (s.appointment_id && !yearApptIdSet.has(s.appointment_id)) return;
       // 予約に同名がいる“はぐれ売上”は二重計上しない
       if (!s.appointment_id && !!normName(s.patient_name) && yearApptKeys.has(s.date + "|" + normName(s.patient_name))) return;
+      // 物販は担当が付いていても「物販」行へ（担当の自費には入れない）
+      if (s.retail) { busM[m] += s.selfpay + s.insurance; return; }
       if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
       if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
       const r = s.staff_id ? byId.get(s.staff_id) : undefined;
