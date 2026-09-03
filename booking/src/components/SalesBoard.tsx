@@ -187,6 +187,8 @@ export default function SalesBoard() {
 
   // 年間ビュー用：その年の売上を丸ごと取得（月別集計に使う）
   const [yearSales, setYearSales] = useState<Sale[]>([]);
+  // 年間ビュー用：その年の有効な予約（キャンセル除く）。キャンセル/はぐれ売上を年間でも除外するため。
+  const [yearAppts, setYearAppts] = useState<{ id: string; date: string; patient_name: string | null }[]>([]);
   const [yearLoading, setYearLoading] = useState(false);
   const year = useMemo(() => date.slice(0, 4), [date]);
   useEffect(() => {
@@ -194,17 +196,33 @@ export default function SalesBoard() {
     let alive = true;
     (async () => {
       setYearLoading(true);
-      const { data } = await supabase
-        .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, sort_order, payment")
-        .gte("date", `${year}-01-01`)
-        .lte("date", `${year}-12-31`);
+      const [salesRes, apptRes] = await Promise.all([
+        supabase
+          .from("sales")
+          .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, anchor_appointment_id, sort_order, payment")
+          .gte("date", `${year}-01-01`)
+          .lte("date", `${year}-12-31`),
+        supabase
+          .from("appointments")
+          .select("id, date, patient_name")
+          .neq("status", "cancelled")
+          .gte("date", `${year}-01-01`)
+          .lte("date", `${year}-12-31`),
+      ]);
       if (!alive) return;
-      setYearSales((data as Sale[]) ?? []);
+      setYearSales((salesRes.data as Sale[]) ?? []);
+      setYearAppts((apptRes.data as { id: string; date: string; patient_name: string | null }[]) ?? []);
       setYearLoading(false);
     })();
     return () => { alive = false; };
   }, [view, year, supabase]);
+  // 年間用：有効予約IDと「日付|氏名」キー
+  const yearApptIdSet = useMemo(() => new Set(yearAppts.map((a) => a.id)), [yearAppts]);
+  const yearApptKeys = useMemo(() => {
+    const set = new Set<string>();
+    yearAppts.forEach((a) => { const nn = normName(a.patient_name); if (nn) set.add(a.date + "|" + nn); });
+    return set;
+  }, [yearAppts]);
 
   const saleByAppt = useMemo(() => {
     const m: Record<string, Sale> = {};
@@ -916,6 +934,10 @@ export default function SalesBoard() {
     yearSales.forEach((s) => {
       const m = Number(s.date.slice(5, 7)) - 1;
       if (m < 0 || m > 11) return;
+      // キャンセル済み予約に残った売上は除外
+      if (s.appointment_id && !yearApptIdSet.has(s.appointment_id)) return;
+      // 予約に同名がいる“はぐれ売上”は二重計上しない
+      if (!s.appointment_id && !!normName(s.patient_name) && yearApptKeys.has(s.date + "|" + normName(s.patient_name))) return;
       if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
       if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
       const r = s.staff_id ? byId.get(s.staff_id) : undefined;
@@ -928,7 +950,7 @@ export default function SalesBoard() {
     const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + kawaM[m] + taikanM[m]);
     const busKomi = perMonth((m) => sougou[m] + busM[m]);
     return { rows, kawaM, taikanM, busM, hokenTotal, jihiTotal, sougou, busKomi };
-  }, [yearSales, staff, kawa, taikan]);
+  }, [yearSales, staff, kawa, taikan, yearApptIdSet, yearApptKeys]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
