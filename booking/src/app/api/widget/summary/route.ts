@@ -12,6 +12,11 @@ const WD = ["日", "月", "火", "水", "木", "金", "土"];
 function jstToday(): string {
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 }
+// 日本時間（JST）の現在の「0時からの分」
+function jstNowMin(): number {
+  const j = new Date(Date.now() + 9 * 3600 * 1000);
+  return j.getUTCHours() * 60 + j.getUTCMinutes();
+}
 function fmt(dateStr: string, startMin: number) {
   const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));
   const wd = WD[new Date(y, m - 1, d).getDay()];
@@ -53,8 +58,13 @@ export async function GET(req: NextRequest) {
     )
   );
 
+  const nowMin = jstNowMin();
+  const GRACE = 20; // 直前に始まった予約（施術中）も少し残す
+  // 本日ぶんは「これから（現在時刻以降）」だけ。翌日以降は全部。
+  const future = appts.filter((a) => a.date !== today || a.start_min >= nowMin - GRACE);
   const todayCount = appts.filter((a) => a.date === today).length;
-  const upcoming = appts.slice(0, 10).map((a) => {
+  const remainingToday = future.filter((a) => a.date === today).length;
+  const upcoming = future.slice(0, 10).map((a) => {
     const f = fmt(a.date, a.start_min);
     return {
       md: f.md,
@@ -70,6 +80,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     today,
     todayCount,
+    remainingToday,
     upcoming,
     generatedAt: new Date().toISOString(),
   });
