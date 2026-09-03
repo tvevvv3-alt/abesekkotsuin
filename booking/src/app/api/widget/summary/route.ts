@@ -74,3 +74,5 @@ export async function GET(req: NextRequest) {
     generatedAt: new Date().toISOString(),
   });
 }
+
+// widget summary API (env WIDGET_TOKEN required)
