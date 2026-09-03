@@ -187,8 +187,8 @@ export default function SalesBoard() {
 
   // 年間ビュー用：その年の売上を丸ごと取得（月別集計に使う）
   const [yearSales, setYearSales] = useState<Sale[]>([]);
-  // 年間ビュー用：その年の有効な予約（キャンセル除く）。キャンセル/はぐれ売上を年間でも除外するため。
-  const [yearAppts, setYearAppts] = useState<{ id: string; date: string; patient_name: string | null }[]>([]);
+  // 年間ビュー用：その年のキャンセル済み予約ID（紐づく売上を年間集計から外す）。
+  const [yearAppts, setYearAppts] = useState<{ id: string }[]>([]);
   const [yearLoading, setYearLoading] = useState(false);
   const year = useMemo(() => date.slice(0, 4), [date]);
   useEffect(() => {
@@ -201,28 +201,27 @@ export default function SalesBoard() {
           .from("sales")
           .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, anchor_appointment_id, sort_order, payment")
           .gte("date", `${year}-01-01`)
-          .lte("date", `${year}-12-31`),
+          .lte("date", `${year}-12-31`)
+          .limit(50000),
+        // ★キャンセル済みの予約だけ取得（＝これに紐づく売上だけ除外する）。
+        //   「予約が新システムに存在しない（8月=RERE移行分など）」ものは除外しない。
         supabase
           .from("appointments")
-          .select("id, date, patient_name")
-          .neq("status", "cancelled")
+          .select("id")
+          .eq("status", "cancelled")
           .gte("date", `${year}-01-01`)
-          .lte("date", `${year}-12-31`),
+          .lte("date", `${year}-12-31`)
+          .limit(5000),
       ]);
       if (!alive) return;
       setYearSales((salesRes.data as Sale[]) ?? []);
-      setYearAppts((apptRes.data as { id: string; date: string; patient_name: string | null }[]) ?? []);
+      setYearAppts((apptRes.data as { id: string }[]) ?? []);
       setYearLoading(false);
     })();
     return () => { alive = false; };
   }, [view, year, supabase]);
-  // 年間用：有効予約IDと「日付|氏名」キー
-  const yearApptIdSet = useMemo(() => new Set(yearAppts.map((a) => a.id)), [yearAppts]);
-  const yearApptKeys = useMemo(() => {
-    const set = new Set<string>();
-    yearAppts.forEach((a) => { const nn = normName(a.patient_name); if (nn) set.add(a.date + "|" + nn); });
-    return set;
-  }, [yearAppts]);
+  // 年間用：キャンセル済み予約ID（これに紐づく売上だけ集計から外す）
+  const yearCancelledIds = useMemo(() => new Set(yearAppts.map((a) => a.id)), [yearAppts]);
 
   const saleByAppt = useMemo(() => {
     const m: Record<string, Sale> = {};
@@ -936,10 +935,8 @@ export default function SalesBoard() {
       if (m < 0 || m > 11) return;
       // まとめ仕入は売上ではないので集計に入れない
       if (s.retail_kind === "purchase") return;
-      // キャンセル済み予約に残った売上は除外
-      if (s.appointment_id && !yearApptIdSet.has(s.appointment_id)) return;
-      // 予約に同名がいる“はぐれ売上”は二重計上しない
-      if (!s.appointment_id && !!normName(s.patient_name) && yearApptKeys.has(s.date + "|" + normName(s.patient_name))) return;
+      // 明確にキャンセル済みの予約に紐づく売上だけ除外（予約が存在しないものは除外しない）
+      if (s.appointment_id && yearCancelledIds.has(s.appointment_id)) return;
       // 物販は担当が付いていても「物販」行へ（担当の自費には入れない）
       if (s.retail) { busM[m] += s.selfpay + s.insurance; return; }
       if (kawa && s.staff_id === kawa.id) {
@@ -961,7 +958,7 @@ export default function SalesBoard() {
     const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + taikanM[m]);
     const busKomi = perMonth((m) => sougou[m] + busM[m]);
     return { rows, kawaM, taikanM, busM, hokenTotal, jihiTotal, sougou, busKomi };
-  }, [yearSales, staff, kawa, taikan, yearApptIdSet, yearApptKeys, bucket]);
+  }, [yearSales, staff, kawa, taikan, yearCancelledIds, bucket]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
