@@ -1358,12 +1358,21 @@ export default function SalesBoard() {
                         <tr key={m.id} ref={(el) => { rowRefs.current[m.id] = el; }} {...dragHandlers(m.id)}
                           className={rowClass(m.id, "cursor-grab select-none active:cursor-grabbing")} style={rowStyle(m.id)}>
                           <td className="px-1 py-0.5">
-                            <select value={m.staff_id ?? ""} onChange={(e) => { const sid = e.target.value || null; setManualLocal(m.id, { staff_id: sid, retail: !sid }); }} onBlur={() => persistManual(m.id)}
-                              className="rounded border px-1 py-1 text-[11px] font-bold"
-                              style={m.staff_id ? assigneeSelectStyle(m.staff_id) : { backgroundColor: "#64748b", color: "#fff", borderColor: "#64748b" }}>
-                              <option value="" style={{ color: "#0f172a", background: "#fff" }}>物販</option>
-                              {assignees.map((st) => <option key={st.id} value={st.id} style={{ color: "#0f172a", background: "#fff" }}>{st.name}</option>)}
-                            </select>
+                            <div className="flex flex-col items-start gap-0.5">
+                              {/* 担当＝売った人（物販の利益はこの担当に振り分く） */}
+                              <select value={m.staff_id ?? ""} onChange={(e) => { setManualLocal(m.id, { staff_id: e.target.value || null }); }} onBlur={() => persistManual(m.id)}
+                                className="rounded border px-1 py-1 text-[11px] font-bold"
+                                style={m.staff_id ? assigneeSelectStyle(m.staff_id) : { backgroundColor: "#64748b", color: "#fff", borderColor: "#64748b" }}>
+                                <option value="" style={{ color: "#0f172a", background: "#fff" }}>担当なし</option>
+                                {assignees.map((st) => <option key={st.id} value={st.id} style={{ color: "#0f172a", background: "#fff" }}>{st.name}</option>)}
+                              </select>
+                              {/* 物販／施術 の種別トグル。物販=利益だけ担当に、施術=売上まるごと担当に */}
+                              <button onClick={async () => { const next = !m.retail; setManualLocal(m.id, { retail: next }); await supabase.from("sales").update({ retail: next }).eq("id", m.id); }}
+                                className={`w-full rounded border px-1 py-0.5 text-[10px] font-bold ${m.retail ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-300 bg-slate-50 text-slate-600"}`}
+                                title="物販＝利益だけ担当に計上／施術＝売上まるごと担当に計上">
+                                {m.retail ? "物販" : "施術"}
+                              </button>
+                            </div>
                           </td>
                           <td className="px-2 py-0.5">
                             <div className="flex flex-col gap-0.5">
