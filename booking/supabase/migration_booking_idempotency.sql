@@ -49,6 +49,7 @@ declare
   v_cursor   int;
   v_num      text;
   v_svc_name text;
+  v_admin    boolean := (p_source = 'admin'); -- 管理者は休診＋勤務時間を無視
   step       record;
 begin
   -- 冪等性①：同じキーの予約が既にあれば、新規作成せず既存を返す（成功扱い）。
@@ -62,8 +63,8 @@ begin
   -- 同日での同時確定を直列化（二重予約防止の要）
   perform pg_advisory_xact_lock(hashtextextended(p_date::text, 0));
 
-  -- 確定直前の再判定
-  v_check := check_booking_availability(p_service_id, p_staff_id, p_date, p_start_min, null);
+  -- 確定直前の再判定（管理者は休診＋勤務時間外を無視して確定できる）
+  v_check := check_booking_availability(p_service_id, p_staff_id, p_date, p_start_min, null, v_admin, v_admin);
   if not (v_check->>'ok')::boolean then
     return jsonb_build_object('ok', false, 'reason', coalesce(v_check->>'reason', '予約不可'));
   end if;
