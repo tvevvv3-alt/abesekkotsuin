@@ -164,7 +164,7 @@ export default function AdminBoard({ date }: { date: string }) {
   const [drag, setDrag] = useState<{ ctx: ColCtx; a: number; b: number } | null>(null);
   // ドラッグ確定後に出す2択メニュー
   const [pop, setPop] = useState<
-    { ctx: ColCtx; start: number; end: number; x: number; y: number } | null
+    { ctx: ColCtx; start: number; end: number; x: number; y: number; closureId?: string } | null
   >(null);
   const trackTopRef = useRef(0);
   const downRef = useRef<
@@ -748,7 +748,7 @@ export default function AdminBoard({ date }: { date: string }) {
                   ticks={ticks}
                   offRanges={staffOffRanges(st.id)}
                   closureBands={closureBands(st.id)}
-                  onClosureClick={removeClosure}
+                  onClosureClick={(id, start, end, x, y) => setPop({ ctx, start, end, x, y, closureId: id })}
                   openingBands={openingBands(st.id)}
                   onOpeningClick={removeOpening}
                   band={bandFor(ctx)}
@@ -1022,6 +1022,17 @@ export default function AdminBoard({ date }: { date: string }) {
             >
               予約を追加
             </button>
+            {pop.closureId && (
+              <button
+                onClick={() => {
+                  removeClosure(pop.closureId as string);
+                  setPop(null);
+                }}
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-slate-50 py-2.5 text-sm font-bold text-slate-600 active:bg-slate-100"
+              >
+                休診を解除
+              </button>
+            )}
             {(pop.ctx.staffId || pop.ctx.serviceId) &&
               (() => {
                 const sid = pop.ctx.staffId;
@@ -1138,7 +1149,7 @@ function Column({
   ticks: number[];
   offRanges: Array<[number, number]>;
   closureBands: ClosureBand[];
-  onClosureClick?: (id: string) => void;
+  onClosureClick?: (id: string, start: number, end: number, x: number, y: number) => void;
   openingBands?: Opening[];
   onOpeningClick?: (id: string) => void;
   band?: [number, number] | null;
@@ -1193,12 +1204,12 @@ function Column({
             onPointerCancel={onPointerCancelTrack}
           />
         )}
-        {/* 休診バンド（クリックで解除）*/}
+        {/* 休診バンド（タップで「予約追加／休診解除」メニュー）*/}
         {closureBands.map((c) => (
           <button
             key={c.id}
-            onClick={() => onClosureClick?.(c.id)}
-            title="クリックで休診を解除"
+            onClick={(e) => { e.stopPropagation(); onClosureClick?.(c.id, c.start, c.end, e.clientX, e.clientY); }}
+            title="タップで予約追加／休診解除"
             className="absolute left-0 z-10 w-full overflow-hidden border-y border-slate-400/40 bg-slate-400/45 text-[10px] font-bold text-slate-600"
             style={{
               top: yFor(c.start),
