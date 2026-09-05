@@ -403,7 +403,10 @@ export default function ClassRoster() {
         <p className="py-10 text-center text-sm text-slate-500">該当する予約はありません。</p>
       ) : (
         (() => {
-          const maxVisits = Math.max(1, ...shown.map(([, v]) => v.length));
+          const maxVisits = Math.max(
+            1,
+            ...shown.map(([name, v]) => (purchaseOf(name).prior_count ?? 0) + v.length)
+          );
           return (
             <div className="overflow-x-auto rounded-xl border bg-white">
               <table className="border-collapse text-xs">
@@ -518,10 +521,19 @@ export default function ClassRoster() {
                           })()}
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
-                          const v = visits[i];
+                          // 繰越（前月・前システムで既に消費した回）は「✕」で潰す。
+                          // 実際の来院は繰越の次の列（例：繰4なら5回目）から並ぶ。
+                          if (i < prior) {
+                            return (
+                              <td key={i} className="border-l bg-slate-50 px-1.5 py-1 text-center align-middle">
+                                <span className="text-[13px] font-bold text-slate-300" title="繰越（消費済み）">✕</span>
+                              </td>
+                            );
+                          }
+                          const v = visits[i - prior];
                           if (!v) {
                             // 最初の空マスだけ「＋」で、この会員の来院を直接追加できる
-                            const firstEmpty = i === visits.length;
+                            const firstEmpty = i === prior + visits.length;
                             return (
                               <td key={i} className="border-l px-1.5 py-1 text-center align-middle">
                                 {firstEmpty && (
@@ -556,9 +568,6 @@ export default function ClassRoster() {
                                 done ? "bg-slate-50 text-slate-400" : "cursor-grab hover:bg-blue-50"
                               }`}
                             >
-                              {prior > 0 && (
-                                <div className="text-[9px] font-bold text-amber-600">{prior + i + 1}回目</div>
-                              )}
                               <div className="text-[12px] font-medium text-slate-700">
                                 {d.getMonth() + 1}/{d.getDate()}
                                 <span className="ml-1 text-[10px] text-slate-500">{minToLabel(v.start_min)}</span>
@@ -595,8 +604,8 @@ export default function ClassRoster() {
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
         来院マスを<b>別の会員の行へドラッグ＆ドロップ</b>すると、その来院を付け替えできます（同姓同名・兄弟の付け替えに）。
         名前の下の<span className="font-bold text-amber-600">「繰」</span>欄に前月・前システムからの<b>既に消費した回数</b>を入れると、
-        表の「何回目」と終了通知の回数がその分ずれて正しくなります（例：繰5 → 最初の来院が6回目）。
-        空マスの<b>「＋」</b>を押すと、その会員の来院をすぐ追加できます。
+        その回数分だけ左のマスが<b>「✕」</b>で潰れ、実際の来院は次の回から並びます（例：繰4 → 1〜4回目は✕、来院は5回目から）。
+        残回数と終了通知の回数も合います。空マスの<b>「＋」</b>で、その会員の来院をすぐ追加できます。
       </p>
 
       {evalTarget && (

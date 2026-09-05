@@ -184,7 +184,7 @@ export default function PersonalRoster() {
   const maxCols = useMemo(() => {
     let n = 10;
     rows.forEach((r) => {
-      n = Math.max(n, (visitsByName.get(r.name.trim()) ?? []).length);
+      n = Math.max(n, (r.used_offset ?? 0) + (visitsByName.get(r.name.trim()) ?? []).length);
     });
     return n;
   }, [rows, visitsByName]);
@@ -337,6 +337,7 @@ export default function PersonalRoster() {
               {shown.map((r) => {
                 const st = r.staff_id ? staffById.get(r.staff_id) : null;
                 const vs = visitsByName.get(r.name.trim()) ?? [];
+                const off = r.used_offset ?? 0; // 繰越（既消費）→ 先頭を✕で潰す
                 const consumedDone = vs.filter((v) => v.status === "done").reduce((n, v) => n + consumeOf(v), 0);
                 const remain = r.quota - (r.used_offset ?? 0) - consumedDone;
                 return (
@@ -374,10 +375,18 @@ export default function PersonalRoster() {
                       />
                     </td>
                     {Array.from({ length: maxCols }).map((_, i) => {
-                      const v = vs[i];
+                      // 繰越（既に消費した回）は「✕」で潰し、実際の来院は次の回から並べる
+                      if (i < off) {
+                        return (
+                          <td key={i} className="border-l bg-slate-50 px-1.5 py-1 text-center align-middle">
+                            <span className="text-[13px] font-bold text-slate-300" title="繰越（消費済み）">✕</span>
+                          </td>
+                        );
+                      }
+                      const v = vs[i - off];
                       if (!v) {
                         // 最初の空マスだけ「＋」で、この会員の予約を直接追加できる
-                        const firstEmpty = i === vs.length;
+                        const firstEmpty = i === off + vs.length;
                         return (
                           <td key={i} className="border-l px-1.5 py-1 text-center align-middle">
                             {firstEmpty && r.name.trim() && (
@@ -436,7 +445,8 @@ export default function PersonalRoster() {
         未登録の方が予約すると自動で行が作られ、担当・有効期限（初回＋5ヶ月）も自動で入ります。
         各回のマスをタップすると<b>氏名・日付・時刻の編集や終了</b>ができます（同姓同名・兄弟の付け替えに）。
         残の下の<span className="font-bold text-amber-600">「繰」</span>欄に前システム・前月からの<b>既に消費した回数</b>を入れると、
-        残回数と終了通知がその分ずれて正しくなります。空マスの<b>「＋」</b>で、その会員の予約をすぐ追加できます。
+        その分だけ左のマスが<b>「✕」</b>で潰れ、来院は次の回から並びます（残回数と終了通知も合います）。
+        空マスの<b>「＋」</b>で、その会員の予約をすぐ追加できます。
       </p>
 
       {add && (
