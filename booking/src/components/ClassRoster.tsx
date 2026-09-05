@@ -117,7 +117,7 @@ export default function ClassRoster() {
   const reload = useCallback(async () => {
     if (!classId) return;
     setLoading(true);
-    const [{ data: ap }, { data: mem }, { data: pur }, { data: evs }] = await Promise.all([
+    const [{ data: ap }, { data: mem }, purRes, { data: evs }] = await Promise.all([
       supabase
         .from("appointments")
         .select("id, date, start_min, end_min, patient_name, status, line_user_id")
@@ -132,6 +132,16 @@ export default function ClassRoster() {
       // 当月に体幹テスト（評価）を入力済みの会員名（未/済の表示に使う）
       supabase.from("core_evaluations").select("name, eval_date").gte("eval_date", from).lt("eval_date", to),
     ]);
+    // prior_count 列が未マイグレーションでも購入管理は動かす（列を外して再取得）
+    let pur = purRes.data as
+      | { name: string; purchased: boolean; purchase_date: string | null; prior_count: number | null }[]
+      | null;
+    if (purRes.error) {
+      const alt = await supabase.from("class_purchases").select("name, purchased, purchase_date").eq("ym", ym);
+      pur = ((alt.data as { name: string; purchased: boolean; purchase_date: string | null }[] | null) ?? []).map(
+        (p) => ({ ...p, prior_count: 0 })
+      );
+    }
     setRows((ap as Row[]) ?? []);
     setEvaled(new Set((evs ?? []).map((e: { name: string | null }) => (e.name || "").trim()).filter(Boolean)));
     const map: Record<string, Member> = {};
@@ -207,6 +217,21 @@ export default function ClassRoster() {
   function purchaseOf(name: string) {
     return purchases[name] ?? { purchased: false, purchase_date: null, prior_count: 0 };
   }
+  // class_purchases への保存。prior_count 未マイグレーション時は列を外して再試行（購入は必ず保存）。
+  async function upsertPurchase(row: {
+    name: string;
+    ym: string;
+    purchased: boolean;
+    purchase_date: string | null;
+    prior_count: number;
+  }) {
+    const { error } = await supabase.from("class_purchases").upsert(row, { onConflict: "name,ym" });
+    if (error) {
+      const { prior_count: _omit, ...rest } = row;
+      void _omit;
+      await supabase.from("class_purchases").upsert(rest, { onConflict: "name,ym" });
+    }
+  }
   async function savePurchase(
     name: string,
     next: { purchased: boolean; purchase_date: string | null; prior_count?: number }
@@ -218,18 +243,14 @@ export default function ClassRoster() {
       prior_count: next.prior_count ?? cur.prior_count ?? 0,
     };
     setPurchases((p) => ({ ...p, [name]: merged }));
-    await supabase
-      .from("class_purchases")
-      .upsert({ name, ym, ...merged }, { onConflict: "name,ym" });
+    await upsertPurchase({ name, ym, ...merged });
   }
   // 繰越（前月・前システムからの既消費回数）を保存
   async function setPrior(name: string, n: number) {
     const cur = purchaseOf(name);
     const merged = { purchased: cur.purchased, purchase_date: cur.purchase_date, prior_count: Math.max(0, n || 0) };
     setPurchases((p) => ({ ...p, [name]: merged }));
-    await supabase
-      .from("class_purchases")
-      .upsert({ name, ym, ...merged }, { onConflict: "name,ym" });
+    await upsertPurchase({ name, ym, ...merged });
   }
   function togglePurchased(name: string, checked: boolean) {
     const cur = purchaseOf(name);
