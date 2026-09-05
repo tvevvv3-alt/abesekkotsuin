@@ -363,16 +363,28 @@ export default function PersonalRoster() {
                     </td>
                     <td className="border-l px-1 py-1 text-center align-middle">
                       <span className={`block text-xs font-bold ${remain <= 0 ? "text-red-500" : remain <= 2 ? "text-orange-500" : "text-blue-600"}`}>残{Math.max(0, remain)}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={r.used_offset || ""}
-                        placeholder="繰"
-                        onChange={(e) => setLocal(r.id, { used_offset: Math.max(0, parseInt(e.target.value || "0", 10)) })}
-                        onBlur={() => persist(r.id)}
-                        title="前システム・前月からの繰越（既に消費した回数）。残＝回数 − 繰越 − 終了済み消費。"
-                        className="mx-auto mt-0.5 block w-9 rounded border border-amber-300 bg-amber-50 px-0.5 py-0 text-center text-[10px] font-bold text-amber-700"
-                      />
+                      {/* ◀▶で予約を右／左にスライド（繰越＝1〜N回目を✕＝消費済みに） */}
+                      <div
+                        className="mx-auto mt-0.5 flex w-fit items-center overflow-hidden rounded border border-amber-300 bg-amber-50"
+                        title="▶で予約を右へずらす（1〜N回目を✕＝消費済みに）。◀で戻す。前システム・前月からの繰越に。"
+                      >
+                        <button
+                          onClick={() => { setLocal(r.id, { used_offset: Math.max(0, off - 1) }); setTimeout(() => persist(r.id), 0); }}
+                          disabled={off <= 0}
+                          className="px-1 text-[10px] font-bold text-amber-700 active:bg-amber-100 disabled:opacity-30"
+                          aria-label="左へ戻す"
+                        >
+                          ◀
+                        </button>
+                        <span className="min-w-[13px] border-x border-amber-200 text-center text-[10px] font-bold text-amber-700">{off}</span>
+                        <button
+                          onClick={() => { setLocal(r.id, { used_offset: off + 1 }); setTimeout(() => persist(r.id), 0); }}
+                          className="px-1 text-[10px] font-bold text-amber-700 active:bg-amber-100"
+                          aria-label="右へずらす"
+                        >
+                          ▶
+                        </button>
+                      </div>
                     </td>
                     {Array.from({ length: maxCols }).map((_, i) => {
                       // 繰越（既に消費した回）は「✕」で潰し、実際の来院は次の回から並べる
@@ -444,8 +456,8 @@ export default function PersonalRoster() {
         <b>消費（30分=1回・60分=2回）＋本人へLINE（残り回数）</b>を送信します。<b>残</b>＝回数 − 終了済みの消費。
         未登録の方が予約すると自動で行が作られ、担当・有効期限（初回＋5ヶ月）も自動で入ります。
         各回のマスをタップすると<b>氏名・日付・時刻の編集や終了</b>ができます（同姓同名・兄弟の付け替えに）。
-        残の下の<span className="font-bold text-amber-600">「繰」</span>欄に前システム・前月からの<b>既に消費した回数</b>を入れると、
-        その分だけ左のマスが<b>「✕」</b>で潰れ、来院は次の回から並びます（残回数と終了通知も合います）。
+        残の下の<span className="font-bold text-amber-600">◀ N ▶</span>で、前システム・前月からの繰越ぶん予約を右へスライドできます。
+        <b>▶を押すごとに左のマスが「✕」（消費済み）</b>になり、来院は次の回から並びます（残回数と終了通知も合います）。◀で戻せます。
         空マスの<b>「＋」</b>で、その会員の予約をすぐ追加できます。
       </p>
 

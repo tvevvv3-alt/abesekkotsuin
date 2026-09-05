@@ -462,7 +462,7 @@ export default function ClassRoster() {
                               {pu.purchased ? "購入済" : "未購入"}
                             </button>
                           </div>
-                          <div className="mt-0.5 flex items-center gap-1">
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
                             <select
                               value={mem.pass_type}
                               onChange={(e) => setPass(name, e.target.value as PassType)}
@@ -483,15 +483,28 @@ export default function ClassRoster() {
                             >
                               {mem.pass_type === "free" ? "ﾌﾘｰ" : `残${Math.max(0, mem.quota - count)}`}
                             </span>
-                            <input
-                              type="number"
-                              min={0}
-                              value={prior || ""}
-                              placeholder="繰"
-                              onChange={(e) => setPrior(name, parseInt(e.target.value || "0", 10))}
-                              title="前システム・前月からの繰越（既に消費した回数）。ここに入れると『何回目』と終了通知がその分ずれます。"
-                              className="w-7 rounded border border-amber-300 bg-amber-50 px-0.5 py-0 text-center text-[10px] font-bold text-amber-700"
-                            />
+                            {/* ◀▶で予約を右／左にスライド（繰越＝1〜N回目を✕で消費済みにする） */}
+                            <div
+                              className="flex items-center overflow-hidden rounded border border-amber-300 bg-amber-50"
+                              title="▶で予約を右へずらす（1〜N回目を✕＝消費済みに）。◀で戻す。前システム・前月からの繰越に。"
+                            >
+                              <button
+                                onClick={() => setPrior(name, prior - 1)}
+                                disabled={prior <= 0}
+                                className="px-1 text-[10px] font-bold text-amber-700 active:bg-amber-100 disabled:opacity-30"
+                                aria-label="左へ戻す"
+                              >
+                                ◀
+                              </button>
+                              <span className="min-w-[13px] border-x border-amber-200 text-center text-[10px] font-bold text-amber-700">{prior}</span>
+                              <button
+                                onClick={() => setPrior(name, prior + 1)}
+                                className="px-1 text-[10px] font-bold text-amber-700 active:bg-amber-100"
+                                aria-label="右へずらす"
+                              >
+                                ▶
+                              </button>
+                            </div>
                             {pu.purchased && (
                               <input
                                 type="date"
@@ -603,9 +616,10 @@ export default function ClassRoster() {
         今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
         来院マスを<b>別の会員の行へドラッグ＆ドロップ</b>すると、その来院を付け替えできます（同姓同名・兄弟の付け替えに）。
-        名前の下の<span className="font-bold text-amber-600">「繰」</span>欄に前月・前システムからの<b>既に消費した回数</b>を入れると、
-        その回数分だけ左のマスが<b>「✕」</b>で潰れ、実際の来院は次の回から並びます（例：繰4 → 1〜4回目は✕、来院は5回目から）。
-        残回数と終了通知の回数も合います。空マスの<b>「＋」</b>で、その会員の来院をすぐ追加できます。
+        名前の下の<span className="font-bold text-amber-600">◀ N ▶</span>で、前月・前システムからの繰越ぶん予約を右へスライドできます。
+        <b>▶を押すごとに左のマスが「✕」（消費済み）</b>になり、既に1・2回目に入っている予約が右へずれます
+        （例：▶を4回 → 1〜4回目は✕、来院は5回目から）。◀で戻せます。残回数と終了通知の回数も合います。
+        空マスの<b>「＋」</b>で、その会員の来院をすぐ追加できます。
       </p>
 
       {evalTarget && (
