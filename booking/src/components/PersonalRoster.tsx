@@ -129,8 +129,7 @@ export default function PersonalRoster() {
     let tickets = ((tk as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 }));
     const visitData = (appts.data as Visit[]) ?? [];
 
-    // 予約はあるが未登録の人 → 自動で回数券に行を作る
-    const existing = new Set(tickets.map((t) => t.name.trim()));
+    // 予約を患者名でまとめる（既にorder byで日付順）
     const groups = new Map<string, Visit[]>();
     visitData.forEach((v) => {
       const key = (v.patient_name || "").trim();
@@ -139,13 +138,36 @@ export default function PersonalRoster() {
       a.push(v);
       groups.set(key, a);
     });
+    // 既存の回数券を名前ごとにまとめ、容量（スタンプ）を集計
+    const tksByName = new Map<string, Ticket[]>();
+    tickets.forEach((t) => {
+      const k = t.name.trim();
+      if (!k) return;
+      const a = tksByName.get(k) ?? [];
+      a.push(t);
+      tksByName.set(k, a);
+    });
+    // 回数券は10スタンプ。60分=2スタンプ。スタンプが券の容量を超えたら
+    // 新しい回数券（2枚目…）を自動追加する（＝11回目は新しい段へ）。
     const toCreate: Record<string, unknown>[] = [];
+    let sortSeq = 900;
     groups.forEach((list, nm) => {
-      if (existing.has(nm)) return;
+      const totalStamps = list.reduce((n, v) => n + consumeOf(v), 0);
+      const tks = tksByName.get(nm) ?? [];
+      let cap = tks.reduce((n, t) => n + Math.max(0, (t.quota ?? 10) - (t.used_offset ?? 0)), 0);
       const first = list[0];
       const vm = vmById.get(first.service_id ?? "") ?? 5;
       const staffId = [...list].reverse().find((a) => a.staff_id)?.staff_id ?? null;
-      toCreate.push({ name: nm, staff_id: staffId, expiry: expiryLabel(first.date, vm), kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: 900 });
+      // 券が1枚も無ければ1枚目を作る（担当・有効期限つき）
+      if (tks.length === 0) {
+        toCreate.push({ name: nm, staff_id: staffId, expiry: expiryLabel(first.date, vm), kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: sortSeq++ });
+        cap += 10;
+      }
+      // スタンプが容量を超えるぶん、10スタンプ券を追加
+      while (cap < totalStamps) {
+        toCreate.push({ name: nm, staff_id: staffId, expiry: null, kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: sortSeq++ });
+        cap += 10;
+      }
     });
     if (toCreate.length) {
       const { data: created } = await supabase
@@ -181,18 +203,45 @@ export default function PersonalRoster() {
     return m;
   }, [visits]);
 
-  const shown = useMemo(
-    () => (staffFilter === "all" ? rows : rows.filter((r) => r.staff_id === staffFilter)),
-    [rows, staffFilter]
-  );
-
-  const maxCols = useMemo(() => {
-    let n = 10;
-    rows.forEach((r) => {
-      n = Math.max(n, (r.used_offset ?? 0) + (visitsByName.get(r.name.trim()) ?? []).length);
+  // 会員の来院を「回数券（10スタンプ）」ごとに割り当てて“段”を作る。
+  // 60分=2スタンプ。1枚が10スタンプ埋まったら次の券（2枚目…）へ。
+  const couponRows = useMemo(() => {
+    const ticketsByName = new Map<string, Ticket[]>();
+    const nameOrder: string[] = [];
+    const emptyTickets: Ticket[] = [];
+    rows.forEach((t) => {
+      const k = t.name.trim();
+      if (!k) { emptyTickets.push(t); return; }
+      if (!ticketsByName.has(k)) { ticketsByName.set(k, []); nameOrder.push(k); }
+      ticketsByName.get(k)!.push(t);
     });
-    return n;
-  }, [rows, visitsByName]);
+    const out: { ticket: Ticket; visits: Visit[]; idx: number; total: number }[] = [];
+    nameOrder.forEach((k) => {
+      const tks = [...ticketsByName.get(k)!].sort((a, b) => a.sort_order - b.sort_order);
+      const visits = [...(visitsByName.get(k) ?? [])].sort((a, b) => a.date.localeCompare(b.date) || a.start_min - b.start_min);
+      let vi = 0;
+      tks.forEach((tk, i) => {
+        const capacity = Math.max(0, (tk.quota ?? 10) - (tk.used_offset ?? 0)); // 使えるスタンプ数
+        const assigned: Visit[] = [];
+        let used = 0;
+        while (vi < visits.length) {
+          const c = consumeOf(visits[vi]);
+          if (used + c > capacity) break; // この券は満杯 → 次の券へ
+          assigned.push(visits[vi]);
+          used += c;
+          vi++;
+        }
+        out.push({ ticket: tk, visits: assigned, idx: i, total: tks.length });
+      });
+      // 端数（券が足りない保険。通常はreloadで新券が作られる）→ 最後の券に載せる
+      if (vi < visits.length && out.length) out[out.length - 1].visits.push(...visits.slice(vi));
+    });
+    emptyTickets.forEach((t) => out.push({ ticket: t, visits: [], idx: 0, total: 1 }));
+    return staffFilter === "all" ? out : out.filter((r) => r.ticket.staff_id === staffFilter);
+  }, [rows, visitsByName, staffFilter]);
+
+  // 列は回数券の枠数（既定10）まで。11列目は作らない。
+  const maxCols = useMemo(() => Math.max(10, ...rows.map((r) => r.quota ?? 10)), [rows]);
 
   function setLocal(id: string, patch: Partial<Ticket>) {
     setRows((p) => p.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -303,7 +352,7 @@ export default function PersonalRoster() {
 
       {loading ? (
         <p className="py-10 text-center text-sm text-slate-500">読み込み中…</p>
-      ) : shown.length === 0 ? (
+      ) : couponRows.length === 0 ? (
         <p className="py-10 text-center text-sm text-slate-500">回数券がありません。パーソナル予約が入ると自動で並びます。</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-white">
@@ -321,16 +370,28 @@ export default function PersonalRoster() {
               </tr>
             </thead>
             <tbody>
-              {shown.map((r) => {
+              {couponRows.map((cr) => {
+                const r = cr.ticket;
                 const st = r.staff_id ? staffById.get(r.staff_id) : null;
-                const vs = visitsByName.get(r.name.trim()) ?? [];
+                const vs = cr.visits; // この回数券に割り当てられた来院だけ
                 const off = r.used_offset ?? 0; // 繰越（既消費）→ 先頭を✕で潰す
+                const quota = r.quota ?? 10;
                 const consumedDone = vs.filter((v) => v.status === "done").reduce((n, v) => n + consumeOf(v), 0);
-                const remain = r.quota - (r.used_offset ?? 0) - consumedDone;
+                const remain = quota - off - consumedDone;
                 return (
                   <tr key={r.id} className="border-t">
                     <td className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-r bg-white px-1.5 py-1 align-middle">
-                      <input value={r.name} placeholder="お名前" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} font-bold text-slate-800`} />
+                      {cr.idx === 0 ? (
+                        <input value={r.name} placeholder="お名前" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} font-bold text-slate-800`} />
+                      ) : (
+                        <div className="truncate text-[13px] font-bold text-slate-800">
+                          {r.name}
+                          <span className="ml-1 rounded bg-indigo-100 px-1 text-[10px] font-bold text-indigo-600">{cr.idx + 1}枚目</span>
+                        </div>
+                      )}
+                      {cr.idx === 0 && cr.total > 1 && (
+                        <span className="mt-0.5 inline-block rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-500">1枚目 / 全{cr.total}枚</span>
+                      )}
                     </td>
                     <td className="border-l px-1 py-1 align-middle">
                       <select
@@ -373,22 +434,53 @@ export default function PersonalRoster() {
                         </button>
                       </div>
                     </td>
-                    {Array.from({ length: maxCols }).map((_, i) => {
-                      // 繰越（既に消費した回）は「✕」で潰し、実際の来院は次の回から並べる
-                      if (i < off) {
-                        return (
-                          <td key={i} className="border-l bg-slate-50 px-1.5 py-1 text-center align-middle">
+                    {(() => {
+                      // スタンプ単位でセルを組む。繰越✕(各1)→来院(60分=2はcolSpan2)→残り空き。
+                      const cells = [];
+                      let stamp = 0;
+                      for (let k = 0; k < off && stamp < maxCols; k++, stamp++) {
+                        cells.push(
+                          <td key={`x${k}`} className="border-l bg-slate-50 px-1.5 py-1 text-center align-middle">
                             <span className="text-[13px] font-bold text-slate-300" title="繰越（消費済み）">✕</span>
                           </td>
                         );
                       }
-                      const v = vs[i - off];
-                      if (!v) {
-                        // 最初の空マスだけ「＋」で、この会員の予約を直接追加できる
-                        const firstEmpty = i === off + vs.length;
-                        return (
-                          <td key={i} className="border-l px-1.5 py-1 text-center align-middle">
-                            {firstEmpty && r.name.trim() && (
+                      vs.forEach((v) => {
+                        const c = consumeOf(v);
+                        const done = v.status === "done";
+                        cells.push(
+                          <td
+                            key={v.id}
+                            colSpan={c}
+                            onClick={() => setEv({ id: v.id, name: v.patient_name ?? "", date: v.date, time: minToLabel(v.start_min), start_min: v.start_min, end_min: v.end_min, done, line_user_id: v.line_user_id })}
+                            className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${done ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-blue-50"}`}
+                          >
+                            <div className="text-[12px] font-medium text-slate-700">
+                              {mdLabel(v.date)}
+                              <span className="ml-1 text-[10px] text-slate-500">{minToLabel(v.start_min)}</span>
+                            </div>
+                            <div className="text-[9px] font-bold text-slate-400">
+                              {v.end_min - v.start_min}分{c >= 2 ? <span className="ml-0.5 rounded bg-orange-100 px-1 text-orange-600">×{c}</span> : null}
+                            </div>
+                            {done ? (
+                              v.line_user_id ? (
+                                <div className="text-[9px] font-bold text-emerald-600">✅ 通知済</div>
+                              ) : (
+                                <div className="text-[9px] font-bold text-slate-400">済・通知なし</div>
+                              )
+                            ) : (
+                              <div className="text-[9px] text-blue-500">タップで編集/終了</div>
+                            )}
+                          </td>
+                        );
+                        stamp += c;
+                      });
+                      let firstEmpty = true;
+                      while (stamp < maxCols) {
+                        const showPlus = firstEmpty && !!r.name.trim();
+                        cells.push(
+                          <td key={`e${stamp}`} className="border-l px-1.5 py-1 text-center align-middle">
+                            {showPlus && (
                               <button
                                 onClick={() => { setAdd({ name: r.name }); setAddStaff(r.staff_id); setAddSvc(personalSvcList[0]?.id ?? ""); setAddDate(toDateStr(new Date())); setAddTime("10:00"); }}
                                 title="この会員の予約を追加"
@@ -399,34 +491,11 @@ export default function PersonalRoster() {
                             )}
                           </td>
                         );
+                        firstEmpty = false;
+                        stamp++;
                       }
-                      const c = consumeOf(v);
-                      const done = v.status === "done";
-                      return (
-                        <td
-                          key={i}
-                          onClick={() => setEv({ id: v.id, name: v.patient_name ?? "", date: v.date, time: minToLabel(v.start_min), start_min: v.start_min, end_min: v.end_min, done, line_user_id: v.line_user_id })}
-                          className={`whitespace-nowrap border-l px-1.5 py-1 text-center align-middle ${done ? "bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-blue-50"}`}
-                        >
-                          <div className="text-[12px] font-medium text-slate-700">
-                            {mdLabel(v.date)}
-                            <span className="ml-1 text-[10px] text-slate-500">{minToLabel(v.start_min)}</span>
-                          </div>
-                          <div className="text-[9px] font-bold text-slate-400">
-                            {v.end_min - v.start_min}分{c >= 2 ? <span className="ml-0.5 rounded bg-orange-100 px-1 text-orange-600">×{c}</span> : null}
-                          </div>
-                          {done ? (
-                            v.line_user_id ? (
-                              <div className="text-[9px] font-bold text-emerald-600">✅ 通知済</div>
-                            ) : (
-                              <div className="text-[9px] font-bold text-slate-400">済・通知なし</div>
-                            )
-                          ) : (
-                            <div className="text-[9px] text-blue-500">タップで編集/終了</div>
-                          )}
-                        </td>
-                      );
-                    })}
+                      return cells;
+                    })()}
                     <td className="border-l px-1 py-1 text-center align-middle">
                       <button onClick={() => deleteRow(r.id)} className="text-[11px] font-bold text-red-400">削除</button>
                     </td>
@@ -446,6 +515,8 @@ export default function PersonalRoster() {
         残の下の<span className="font-bold text-amber-600">◀ N ▶</span>で、前システム・前月からの繰越ぶん予約を右へスライドできます。
         <b>▶を押すごとに左のマスが「✕」（消費済み）</b>になり、来院は次の回から並びます（残回数と終了通知も合います）。◀で戻せます。
         空マスの<b>「＋」</b>で、その会員の予約をすぐ追加できます。
+        回数券は<b>10スタンプ</b>（60分=2スタンプ）。使い切って<b>11回目</b>になると、
+        その会員の<b>2枚目の回数券が自動で下の段に追加</b>されます（11列目は作りません）。
       </p>
 
       {add && (
