@@ -34,7 +34,7 @@ export default function ClassRoster() {
   const [rows, setRows] = useState<Row[]>([]);
   const [members, setMembers] = useState<Record<string, Member>>({});
   const [purchases, setPurchases] = useState<
-    Record<string, { purchased: boolean; purchase_date: string | null }>
+    Record<string, { purchased: boolean; purchase_date: string | null; prior_count: number }>
   >({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -128,7 +128,7 @@ export default function ClassRoster() {
         .order("date")
         .order("start_min"),
       supabase.from("class_members").select("name, pass_type, quota"),
-      supabase.from("class_purchases").select("name, purchased, purchase_date").eq("ym", ym),
+      supabase.from("class_purchases").select("name, purchased, purchase_date, prior_count").eq("ym", ym),
       // 当月に体幹テスト（評価）を入力済みの会員名（未/済の表示に使う）
       supabase.from("core_evaluations").select("name, eval_date").gte("eval_date", from).lt("eval_date", to),
     ]);
@@ -137,10 +137,10 @@ export default function ClassRoster() {
     const map: Record<string, Member> = {};
     (mem ?? []).forEach((m: Member) => (map[m.name] = m));
     setMembers(map);
-    const pmap: Record<string, { purchased: boolean; purchase_date: string | null }> = {};
+    const pmap: Record<string, { purchased: boolean; purchase_date: string | null; prior_count: number }> = {};
     (pur ?? []).forEach(
-      (p: { name: string; purchased: boolean; purchase_date: string | null }) =>
-        (pmap[p.name] = { purchased: p.purchased, purchase_date: p.purchase_date })
+      (p: { name: string; purchased: boolean; purchase_date: string | null; prior_count: number | null }) =>
+        (pmap[p.name] = { purchased: p.purchased, purchase_date: p.purchase_date, prior_count: p.prior_count ?? 0 })
     );
     setPurchases(pmap);
     setLoading(false);
@@ -205,19 +205,31 @@ export default function ClassRoster() {
   }
 
   function purchaseOf(name: string) {
-    return purchases[name] ?? { purchased: false, purchase_date: null };
+    return purchases[name] ?? { purchased: false, purchase_date: null, prior_count: 0 };
   }
   async function savePurchase(
     name: string,
-    next: { purchased: boolean; purchase_date: string | null }
+    next: { purchased: boolean; purchase_date: string | null; prior_count?: number }
   ) {
-    setPurchases((p) => ({ ...p, [name]: next }));
+    const cur = purchaseOf(name);
+    const merged = {
+      purchased: next.purchased,
+      purchase_date: next.purchase_date,
+      prior_count: next.prior_count ?? cur.prior_count ?? 0,
+    };
+    setPurchases((p) => ({ ...p, [name]: merged }));
     await supabase
       .from("class_purchases")
-      .upsert(
-        { name, ym, purchased: next.purchased, purchase_date: next.purchase_date },
-        { onConflict: "name,ym" }
-      );
+      .upsert({ name, ym, ...merged }, { onConflict: "name,ym" });
+  }
+  // 繰越（前月・前システムからの既消費回数）を保存
+  async function setPrior(name: string, n: number) {
+    const cur = purchaseOf(name);
+    const merged = { purchased: cur.purchased, purchase_date: cur.purchase_date, prior_count: Math.max(0, n || 0) };
+    setPurchases((p) => ({ ...p, [name]: merged }));
+    await supabase
+      .from("class_purchases")
+      .upsert({ name, ym, ...merged }, { onConflict: "name,ym" });
   }
   function togglePurchased(name: string, checked: boolean) {
     const cur = purchaseOf(name);
@@ -414,8 +426,9 @@ export default function ClassRoster() {
                 <tbody>
                   {shown.map(([name, visits]) => {
                     const mem = passOf(name);
-                    const count = visits.length;
                     const pu = purchaseOf(name);
+                    const prior = pu.prior_count ?? 0; // 繰越（既消費）
+                    const count = prior + visits.length;
                     return (
                       <tr
                         key={name}
@@ -455,7 +468,7 @@ export default function ClassRoster() {
                               <option value="month4">月4</option>
                               <option value="free">ﾌﾘｰ</option>
                             </select>
-                            <span className="text-[11px] font-bold text-slate-700">{count}</span>
+                            <span className="text-[11px] font-bold text-slate-700" title="今月の来院回数（繰越を含む）">{count}</span>
                             <span
                               className={`text-[10px] font-bold ${
                                 mem.pass_type === "free"
@@ -467,6 +480,15 @@ export default function ClassRoster() {
                             >
                               {mem.pass_type === "free" ? "ﾌﾘｰ" : `残${Math.max(0, mem.quota - count)}`}
                             </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={prior || ""}
+                              placeholder="繰"
+                              onChange={(e) => setPrior(name, parseInt(e.target.value || "0", 10))}
+                              title="前システム・前月からの繰越（既に消費した回数）。ここに入れると『何回目』と終了通知がその分ずれます。"
+                              className="w-7 rounded border border-amber-300 bg-amber-50 px-0.5 py-0 text-center text-[10px] font-bold text-amber-700"
+                            />
                             {pu.purchased && (
                               <input
                                 type="date"
@@ -497,7 +519,23 @@ export default function ClassRoster() {
                         </td>
                         {Array.from({ length: maxVisits }).map((_, i) => {
                           const v = visits[i];
-                          if (!v) return <td key={i} className="border-l px-1.5 py-1" />;
+                          if (!v) {
+                            // 最初の空マスだけ「＋」で、この会員の来院を直接追加できる
+                            const firstEmpty = i === visits.length;
+                            return (
+                              <td key={i} className="border-l px-1.5 py-1 text-center align-middle">
+                                {firstEmpty && (
+                                  <button
+                                    onClick={() => { setAddName(name); setAddDate(toDateStr(new Date())); setAddTime("17:00"); setAddOpen(true); }}
+                                    title="この会員の来院を追加"
+                                    className="mx-auto block rounded border border-dashed border-slate-200 px-2 py-1 text-[13px] leading-none text-slate-300 hover:border-emerald-400 hover:text-emerald-600 active:bg-emerald-50"
+                                  >
+                                    ＋
+                                  </button>
+                                )}
+                              </td>
+                            );
+                          }
                           const d = new Date(v.date + "T00:00:00");
                           const done = v.status === "done";
                           return (
@@ -518,6 +556,9 @@ export default function ClassRoster() {
                                 done ? "bg-slate-50 text-slate-400" : "cursor-grab hover:bg-blue-50"
                               }`}
                             >
+                              {prior > 0 && (
+                                <div className="text-[9px] font-bold text-amber-600">{prior + i + 1}回目</div>
+                              )}
                               <div className="text-[12px] font-medium text-slate-700">
                                 {d.getMonth() + 1}/{d.getDate()}
                                 <span className="ml-1 text-[10px] text-slate-500">{minToLabel(v.start_min)}</span>
@@ -553,6 +594,9 @@ export default function ClassRoster() {
         今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
         来院マスを<b>別の会員の行へドラッグ＆ドロップ</b>すると、その来院を付け替えできます（同姓同名・兄弟の付け替えに）。
+        名前の下の<span className="font-bold text-amber-600">「繰」</span>欄に前月・前システムからの<b>既に消費した回数</b>を入れると、
+        表の「何回目」と終了通知の回数がその分ずれて正しくなります（例：繰5 → 最初の来院が6回目）。
+        空マスの<b>「＋」</b>を押すと、その会員の来院をすぐ追加できます。
       </p>
 
       {evalTarget && (

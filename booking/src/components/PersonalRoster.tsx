@@ -361,11 +361,37 @@ export default function PersonalRoster() {
                       <input value={r.expiry ?? ""} placeholder="例：8月末" onChange={(e) => setLocal(r.id, { expiry: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} w-[56px] text-center`} />
                     </td>
                     <td className="border-l px-1 py-1 text-center align-middle">
-                      <span className={`text-xs font-bold ${remain <= 0 ? "text-red-500" : remain <= 2 ? "text-orange-500" : "text-blue-600"}`}>残{Math.max(0, remain)}</span>
+                      <span className={`block text-xs font-bold ${remain <= 0 ? "text-red-500" : remain <= 2 ? "text-orange-500" : "text-blue-600"}`}>残{Math.max(0, remain)}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={r.used_offset || ""}
+                        placeholder="繰"
+                        onChange={(e) => setLocal(r.id, { used_offset: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                        onBlur={() => persist(r.id)}
+                        title="前システム・前月からの繰越（既に消費した回数）。残＝回数 − 繰越 − 終了済み消費。"
+                        className="mx-auto mt-0.5 block w-9 rounded border border-amber-300 bg-amber-50 px-0.5 py-0 text-center text-[10px] font-bold text-amber-700"
+                      />
                     </td>
                     {Array.from({ length: maxCols }).map((_, i) => {
                       const v = vs[i];
-                      if (!v) return <td key={i} className="border-l px-1.5 py-1" />;
+                      if (!v) {
+                        // 最初の空マスだけ「＋」で、この会員の予約を直接追加できる
+                        const firstEmpty = i === vs.length;
+                        return (
+                          <td key={i} className="border-l px-1.5 py-1 text-center align-middle">
+                            {firstEmpty && r.name.trim() && (
+                              <button
+                                onClick={() => { setAdd({ name: r.name }); setAddStaff(r.staff_id); setAddSvc(personalSvcList[0]?.id ?? ""); setAddDate(toDateStr(new Date())); setAddTime("10:00"); }}
+                                title="この会員の予約を追加"
+                                className="mx-auto block rounded border border-dashed border-slate-200 px-2 py-1 text-[13px] leading-none text-slate-300 hover:border-emerald-400 hover:text-emerald-600 active:bg-emerald-50"
+                              >
+                                ＋
+                              </button>
+                            )}
+                          </td>
+                        );
+                      }
                       const c = consumeOf(v);
                       const done = v.status === "done";
                       return (
@@ -409,6 +435,8 @@ export default function PersonalRoster() {
         <b>消費（30分=1回・60分=2回）＋本人へLINE（残り回数）</b>を送信します。<b>残</b>＝回数 − 終了済みの消費。
         未登録の方が予約すると自動で行が作られ、担当・有効期限（初回＋5ヶ月）も自動で入ります。
         各回のマスをタップすると<b>氏名・日付・時刻の編集や終了</b>ができます（同姓同名・兄弟の付け替えに）。
+        残の下の<span className="font-bold text-amber-600">「繰」</span>欄に前システム・前月からの<b>既に消費した回数</b>を入れると、
+        残回数と終了通知がその分ずれて正しくなります。空マスの<b>「＋」</b>で、その会員の予約をすぐ追加できます。
       </p>
 
       {add && (

@@ -69,6 +69,17 @@ export async function POST(req: NextRequest) {
     nth = idx >= 0 ? idx + 1 : (month?.length ?? 0) || 1;
   }
 
+  // 繰越（前月・前システムからの既消費回数）を加味して「何回目」をずらす
+  if (appt.patient_name) {
+    const { data: pc } = await admin
+      .from("class_purchases")
+      .select("prior_count")
+      .eq("name", appt.patient_name)
+      .eq("ym", appt.date.slice(0, 7))
+      .maybeSingle();
+    nth += (pc?.prior_count as number | null) ?? 0;
+  }
+
   // パス種別（会員テーブル。未登録は月4回）
   let remaining = "";
   if (appt.patient_name) {
