@@ -14,7 +14,14 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
 
   let appointmentId = "";
-  try { appointmentId = ((await req.json()) as { appointmentId?: string }).appointmentId || ""; } catch { /* noop */ }
+  let preview = false;
+  let overrideText = "";
+  try {
+    const b = (await req.json()) as { appointmentId?: string; preview?: boolean; text?: string };
+    appointmentId = b.appointmentId || "";
+    preview = !!b.preview;
+    overrideText = (b.text || "").toString();
+  } catch { /* noop */ }
   if (!appointmentId) return NextResponse.json({ ok: false, reason: "bad" }, { status: 400 });
 
   const admin = createAdminClient();
@@ -30,7 +37,9 @@ export async function POST(req: NextRequest) {
   if (!lineMessagingConfigured()) return NextResponse.json({ ok: false, reason: "notconfigured" });
 
   const tpl = (s?.questionnaire_text as string | null)?.trim() || DEFAULT_QUESTIONNAIRE_TEXT;
-  const text = renderLinkMessage(tpl, url);
+  const text = overrideText.trim() ? overrideText : renderLinkMessage(tpl, url);
+  // プレビュー：送信せず本文だけ返す
+  if (preview) return NextResponse.json({ ok: true, preview: text });
   const r = await pushText(appt.line_user_id, text);
   if (!r.ok) return NextResponse.json({ ok: false, reason: "send", error: r.error });
   // 送信日時を記録（モーダルの「送信済」表示・二重送信防止用）

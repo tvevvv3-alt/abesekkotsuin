@@ -11,6 +11,7 @@ import type {
   Staff,
 } from "@/lib/types";
 import { minToLabel } from "@/lib/booking";
+import SendMessageModal from "@/components/SendMessageModal";
 
 interface Props {
   mode: "add" | "edit";
@@ -55,6 +56,17 @@ export default function AdminBookingModal({
 
   const [name, setName] = useState(appt?.patient_name || "");
   const [qSentAt, setQSentAt] = useState<string | null>(appt?.questionnaire_sent_at ?? null);
+  // 送信前プレビュー＆編集モーダル
+  const [sendMsg, setSendMsg] = useState<
+    | {
+        title: string;
+        endpoint: string;
+        payload: Record<string, unknown>;
+        note?: string;
+        afterSend?: (result: { ok: boolean } & Record<string, unknown>) => void | Promise<void>;
+      }
+    | null
+  >(null);
   const [kana, setKana] = useState("");
   const [birth, setBirth] = useState("");
   const [phone, setPhone] = useState("");
@@ -178,73 +190,43 @@ export default function AdminBookingModal({
   }
 
   // 体幹教室の「終了」→ 予約を終了(done)にし、LINE連携済みならお礼＋次回案内を送信
-  // 問診票リンクを患者のLINEへ1タップ送信（治療の予約向け）
-  async function sendQuestionnaire() {
+  // 問診票リンク：送信前にプレビュー＆編集
+  function sendQuestionnaire() {
     if (!appt) return;
-    setBusy(true);
     setError(null);
-    try {
-      const res = await fetch("/api/admin/send-questionnaire", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: appt.id }),
-      });
-      const j = (await res.json()) as { ok: boolean; reason?: string; sentAt?: string };
-      if (j.ok) { setQSentAt(j.sentAt ?? new Date().toISOString()); alert("問診票リンクをLINEで送信しました。"); }
-      else if (j.reason === "noline") alert("この患者はLINE未連携のため送信できません。");
-      else if (j.reason === "nourl") alert("基本設定で問診票URLを登録してください。");
-      else if (j.reason === "notconfigured") alert("LINE送信（アクセストークン）が未設定です。");
-      else setError(`問診票を送信できませんでした: ${j.reason ?? "?"}`);
-    } catch {
-      setError("問診票の送信エラー");
-    }
-    setBusy(false);
+    setSendMsg({
+      title: "問診票をLINEで送る",
+      endpoint: "/api/admin/send-questionnaire",
+      payload: { appointmentId: appt.id },
+      afterSend: (j) => setQSentAt((j.sentAt as string) ?? new Date().toISOString()),
+    });
   }
 
-  // 体幹教室：終了にして本人へLINE（来場・回数のお知らせ）
-  async function finishClass() {
+  // 体幹教室：終了＋LINE。送信前にプレビュー＆編集し、送信成功で「終了」にする。
+  function finishClass() {
     if (!appt) return;
-    setBusy(true);
     setError(null);
-    await supabase.from("appointments").update({ status: "done" }).eq("id", appt.id);
-    try {
-      const res = await fetch("/api/class/done", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: appt.id }),
-      });
-      const j = (await res.json()) as { ok: boolean; reason?: string };
-      if (j.ok) alert("終了にして、LINEで通知しました。");
-      else if (j.reason === "noline") alert("終了にしました。\n📵 この方はLINE未連携のため、通知は送られません。");
-      else setError(`LINE未送信: ${j.reason ?? "?"}`);
-    } catch {
-      setError("LINE送信エラー");
-    }
-    setBusy(false);
-    onDone();
+    setSendMsg({
+      title: "体幹教室 終了＋LINE",
+      endpoint: "/api/class/done",
+      payload: { appointmentId: appt.id },
+      note: "送信すると、この予約は「終了」になります。",
+      afterSend: async () => {
+        await supabase.from("appointments").update({ status: "done" }).eq("id", appt.id);
+        onDone();
+      },
+    });
   }
 
-  // 体幹教室の申込書リンクを患者のLINEへ1タップ送信
-  async function sendApplication() {
+  // 体幹教室の申込書リンク：送信前にプレビュー＆編集
+  function sendApplication() {
     if (!appt) return;
-    setBusy(true);
     setError(null);
-    try {
-      const res = await fetch("/api/admin/send-application", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: appt.id }),
-      });
-      const j = (await res.json()) as { ok: boolean; reason?: string };
-      if (j.ok) alert("体幹教室の申込書リンクをLINEで送信しました。");
-      else if (j.reason === "noline") alert("この患者はLINE未連携のため送信できません。");
-      else if (j.reason === "nourl") alert("基本設定で体幹教室 申込書URLを登録してください。");
-      else if (j.reason === "notconfigured") alert("LINE送信（アクセストークン）が未設定です。");
-      else setError(`申込書を送信できませんでした: ${j.reason ?? "?"}`);
-    } catch {
-      setError("申込書の送信エラー");
-    }
-    setBusy(false);
+    setSendMsg({
+      title: "体幹教室 申込書をLINEで送る",
+      endpoint: "/api/admin/send-application",
+      payload: { appointmentId: appt.id },
+    });
   }
 
   return (
@@ -492,6 +474,17 @@ export default function AdminBookingModal({
           </button>
         </div>
       </div>
+
+      {sendMsg && (
+        <SendMessageModal
+          title={sendMsg.title}
+          endpoint={sendMsg.endpoint}
+          payload={sendMsg.payload}
+          note={sendMsg.note}
+          onClose={() => setSendMsg(null)}
+          onSent={async (j) => { await sendMsg.afterSend?.(j); }}
+        />
+      )}
     </div>
   );
 }

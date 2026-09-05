@@ -18,9 +18,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
 
   let appointmentId = "";
+  let preview = false;
+  let overrideText = "";
   try {
-    const body = (await req.json()) as { appointmentId?: string };
+    const body = (await req.json()) as { appointmentId?: string; preview?: boolean; text?: string };
     appointmentId = body.appointmentId || "";
+    preview = !!body.preview;
+    overrideText = (body.text || "").toString();
   } catch {
     /* noop */
   }
@@ -104,13 +108,17 @@ export async function POST(req: NextRequest) {
     .eq("id", 1)
     .maybeSingle();
   const tpl = (st?.class_done_text as string | null)?.trim() || DEFAULT_CLASS_DONE_TEXT;
-  const text = renderClassDone(tpl, {
-    name: appt.patient_name,
-    url: bookUrl,
-    visitDate,
-    nth,
-    remaining,
-  });
+  const text = overrideText.trim()
+    ? overrideText
+    : renderClassDone(tpl, {
+        name: appt.patient_name,
+        url: bookUrl,
+        visitDate,
+        nth,
+        remaining,
+      });
+  // プレビュー：送信せず本文だけ返す
+  if (preview) return NextResponse.json({ ok: true, preview: text });
 
   const r = await pushText(appt.line_user_id, text);
   if (!r.ok) return NextResponse.json({ ok: false, reason: "send", error: r.error });

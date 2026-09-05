@@ -6,6 +6,7 @@ import { loadServices } from "@/lib/data";
 import { minToLabel, toDateStr } from "@/lib/booking";
 import type { ServiceWithSteps } from "@/lib/types";
 import CoreEvalModal from "@/components/CoreEvalModal";
+import SendMessageModal from "@/components/SendMessageModal";
 
 interface Row {
   id: string;
@@ -37,7 +38,6 @@ export default function ClassRoster() {
     Record<string, { purchased: boolean; purchase_date: string | null; prior_count: number }>
   >({});
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "month4" | "free">("all");
   const [sort, setSort] = useState<"name" | "date">("name");
@@ -56,6 +56,11 @@ export default function ClassRoster() {
   const [addDate, setAddDate] = useState(() => toDateStr(new Date()));
   const [addTime, setAddTime] = useState("17:00");
   const [adding, setAdding] = useState(false);
+  // 終了通知の送信前プレビュー＆編集
+  const [sendMsg, setSendMsg] = useState<
+    | { title: string; endpoint: string; payload: Record<string, unknown>; note?: string; afterSend?: () => void | Promise<void> }
+    | null
+  >(null);
 
   async function bookVisit() {
     if (!addName.trim()) { alert("会員名を入力してください"); return; }
@@ -263,40 +268,6 @@ export default function ClassRoster() {
     savePurchase(name, { purchased: !!date, purchase_date: date || null });
   }
 
-  async function finish(r: Row) {
-    setBusy(r.id);
-    setMsg(null);
-    const nm = r.patient_name?.trim() || "この方";
-    await supabase.from("appointments").update({ status: "done" }).eq("id", r.id);
-    let note = "終了にしました";
-    if (r.line_user_id) {
-      try {
-        const res = await fetch("/api/class/done", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ appointmentId: r.id }),
-        });
-        const j = (await res.json()) as { ok: boolean; reason?: string };
-        if (j.ok) {
-          note = `${nm}：終了＋LINEを送信しました`;
-        } else {
-          note = `${nm}：終了しました（LINE送信できませんでした：${j.reason ?? "?"}）`;
-          alert(`${nm} を終了しました。\n⚠️ LINE通知は送信できませんでした（${j.reason ?? "エラー"}）。`);
-        }
-      } catch {
-        note = `${nm}：終了しました（LINE送信エラー）`;
-        alert(`${nm} を終了しました。\n⚠️ LINE通知の送信中にエラーが発生しました。`);
-      }
-    } else {
-      // LINE未連携（運営側で取った予約など）＝通知は送られない。安心のため明示。
-      note = `${nm}：終了しました（LINE未連携のため通知なし）`;
-      alert(`${nm} を終了しました。\n📵 この方はLINE未連携のため、通知は送られません。`);
-    }
-    setBusy(null);
-    setMsg(note);
-    reload();
-  }
-
   // ポップアップから：氏名・日付・時刻を保存（所要時間は維持）
   async function saveVisit() {
     if (!ev) return;
@@ -310,16 +281,33 @@ export default function ClassRoster() {
     setEv(null);
     reload();
   }
-  // ポップアップから：終了＋LINE（LINE有無で確認文を出し分け）
+  // ポップアップから：終了＋LINE
   async function finishFromPopup() {
     if (!ev) return;
-    const ask = ev.line_user_id
-      ? `${ev.name || "この方"} を終了して、LINEで通知しますか？`
-      : `${ev.name || "この方"} を終了しますか？\n（LINE未連携のため通知は送られません）`;
-    if (!confirm(ask)) return;
-    const v: Row = { id: ev.id, date: ev.date, start_min: ev.start_min, end_min: ev.end_min, patient_name: ev.name, status: "booked", line_user_id: ev.line_user_id };
+    const id = ev.id;
+    const nm = ev.name?.trim() || "この方";
+    if (ev.line_user_id) {
+      // LINE連携あり → 送信本文をプレビュー＆編集してから送信。送信成功で「終了」に。
+      setEv(null);
+      setSendMsg({
+        title: "体幹教室 終了＋LINE",
+        endpoint: "/api/class/done",
+        payload: { appointmentId: id },
+        note: "送信すると、この予約は「終了」になります。",
+        afterSend: async () => {
+          await supabase.from("appointments").update({ status: "done" }).eq("id", id);
+          setMsg(`${nm}：終了＋LINEを送信しました`);
+          reload();
+        },
+      });
+      return;
+    }
+    // LINE未連携 → 確認して終了のみ（通知なし）
+    if (!confirm(`${nm} を終了しますか？\n（LINE未連携のため通知は送られません）`)) return;
     setEv(null);
-    await finish(v);
+    await supabase.from("appointments").update({ status: "done" }).eq("id", id);
+    setMsg(`${nm}：終了しました（LINE未連携のため通知なし）`);
+    reload();
   }
 
   const monthLabel = `${month.getFullYear()}年${month.getMonth() + 1}月`;
@@ -681,7 +669,7 @@ export default function ClassRoster() {
                 📋 体幹テスト
               </button>
               {!ev.done && (
-                <button onClick={finishFromPopup} disabled={busy === ev.id}
+                <button onClick={finishFromPopup}
                   className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300">
                   終了＋LINE
                 </button>
@@ -730,6 +718,18 @@ export default function ClassRoster() {
             </div>
           </div>
         </div>
+      )}
+
+      {sendMsg && (
+        <SendMessageModal
+          title={sendMsg.title}
+          endpoint={sendMsg.endpoint}
+          payload={sendMsg.payload}
+          note={sendMsg.note}
+          sendLabel="終了＋送信"
+          onClose={() => setSendMsg(null)}
+          onSent={async () => { await sendMsg.afterSend?.(); }}
+        />
       )}
     </div>
   );

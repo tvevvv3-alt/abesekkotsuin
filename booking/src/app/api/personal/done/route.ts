@@ -18,9 +18,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, reason: "auth" }, { status: 401 });
 
   let appointmentId = "";
+  let preview = false;
+  let overrideText = "";
   try {
-    const b = (await req.json()) as { appointmentId?: string };
+    const b = (await req.json()) as { appointmentId?: string; preview?: boolean; text?: string };
     appointmentId = b.appointmentId || "";
+    preview = !!b.preview;
+    overrideText = (b.text || "").toString();
   } catch {
     /* noop */
   }
@@ -53,16 +57,19 @@ export async function POST(req: NextRequest) {
   const quota = (tk as { quota: number }[] | null)?.[0]?.quota ?? 10;
   const used = (tk as { used_offset: number }[] | null)?.[0]?.used_offset ?? 0;
 
-  // 終了済み（done）の消費合計（このコマ含む）
-  let consumedDone = 0;
+  // 終了済み（done）の消費合計。このコマは done 前でも常に1回分として数える
+  // （プレビューでも実送信でも残り回数が一致するように、当該コマは除外して手動で加算）。
+  let consumedDone = consume(appt);
   if (pids.length && appt.patient_name) {
     const { data: dones } = await admin
       .from("appointments")
-      .select("start_min, end_min")
+      .select("id, start_min, end_min")
       .eq("patient_name", appt.patient_name)
       .eq("status", "done")
       .in("service_id", pids);
-    consumedDone = ((dones as { start_min: number; end_min: number }[] | null) ?? []).reduce((n, a) => n + consume(a), 0);
+    consumedDone += ((dones as { id: string; start_min: number; end_min: number }[] | null) ?? [])
+      .filter((a) => a.id !== appt.id)
+      .reduce((n, a) => n + consume(a), 0);
   }
   const remaining = Math.max(0, quota - used - consumedDone);
 
@@ -71,7 +78,11 @@ export async function POST(req: NextRequest) {
 
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
   const bookUrl = liffId ? `https://liff.line.me/${liffId}` : process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app";
-  const text = renderPersonalDone(tpl, { name: appt.patient_name, url: bookUrl, remaining: `あと${remaining}回` });
+  const text = overrideText.trim()
+    ? overrideText
+    : renderPersonalDone(tpl, { name: appt.patient_name, url: bookUrl, remaining: `あと${remaining}回` });
+  // プレビュー：送信せず本文だけ返す
+  if (preview) return NextResponse.json({ ok: true, preview: text, remaining });
   const r = await pushText(appt.line_user_id, text);
   return NextResponse.json({ ok: r.ok, remaining, error: r.ok ? undefined : r.error });
 }

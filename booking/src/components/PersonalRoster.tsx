@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr } from "@/lib/booking";
 import type { Staff } from "@/lib/types";
+import SendMessageModal from "@/components/SendMessageModal";
 
 // パーソナルトレーニング 回数券。体幹教室と同じ仕組み：
 // 「パーソナル回数券対象」メニューの予約が患者名で自動的にここに並び、
@@ -53,7 +54,11 @@ export default function PersonalRoster() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [hasPersonalMenu, setHasPersonalMenu] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
+  // 終了通知の送信前プレビュー＆編集
+  const [sendMsg, setSendMsg] = useState<
+    | { title: string; endpoint: string; payload: Record<string, unknown>; note?: string; afterSend?: () => void | Promise<void> }
+    | null
+  >(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [staffFilter, setStaffFilter] = useState<string>("all");
   // 来院（予約）の編集ポップアップ：氏名・日付・時刻を直せる（同姓同名/兄弟の付け替え）
@@ -219,41 +224,6 @@ export default function PersonalRoster() {
     await supabase.from("personal_tickets").delete().eq("id", id);
   }
 
-  // 終了：予約を done にし、本人へお礼＋残り回数をLINE送信（体幹教室と同じ）
-  async function finish(v: Visit, name: string) {
-    setBusy(v.id);
-    setMsg(null);
-    await supabase.from("appointments").update({ status: "done" }).eq("id", v.id);
-    const nm = name?.trim() || "この方";
-    let note = "終了にしました";
-    if (v.line_user_id) {
-      try {
-        const res = await fetch("/api/personal/done", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ appointmentId: v.id }),
-        });
-        const j = (await res.json()) as { ok: boolean; reason?: string; remaining?: number };
-        if (j.ok) {
-          note = `${nm}：終了＋LINEを送信（残り${j.remaining ?? "?"}回）`;
-        } else {
-          note = `${nm}：終了しました（LINE送信できませんでした：${j.reason ?? "?"}）`;
-          alert(`${nm} を終了しました。\n⚠️ LINE通知は送信できませんでした（${j.reason ?? "エラー"}）。`);
-        }
-      } catch {
-        note = `${nm}：終了しました（LINE送信エラー）`;
-        alert(`${nm} を終了しました。\n⚠️ LINE通知の送信中にエラーが発生しました。`);
-      }
-    } else {
-      // LINE未連携（運営側で取った予約など）＝通知は送られない。安心のため明示。
-      note = `${nm}：終了しました（LINE未連携のため通知なし）`;
-      alert(`${nm} を終了しました。\n📵 この方はLINE未連携のため、通知は送られません。`);
-    }
-    setBusy(null);
-    setMsg(note);
-    reload();
-  }
-
   // ポップアップから：氏名・日付・時刻を保存（所要時間は維持）
   async function saveVisit() {
     if (!ev) return;
@@ -270,13 +240,30 @@ export default function PersonalRoster() {
   // ポップアップから：終了＋LINE
   async function finishFromPopup() {
     if (!ev) return;
-    const ask = ev.line_user_id
-      ? `${ev.name || "この方"} を終了して、LINEで通知しますか？`
-      : `${ev.name || "この方"} を終了しますか？\n（LINE未連携のため通知は送られません）`;
-    if (!confirm(ask)) return;
-    const v: Visit = { id: ev.id, patient_name: ev.name, date: ev.date, start_min: ev.start_min, end_min: ev.end_min, status: "booked", staff_id: null, service_id: null, line_user_id: ev.line_user_id };
+    const id = ev.id;
+    const nm = ev.name?.trim() || "この方";
+    if (ev.line_user_id) {
+      // LINE連携あり → 送信本文をプレビュー＆編集してから送信。送信成功で「終了」に。
+      setEv(null);
+      setSendMsg({
+        title: "パーソナル 終了＋LINE",
+        endpoint: "/api/personal/done",
+        payload: { appointmentId: id },
+        note: "送信すると、この予約は「終了」になり回数券を消費します。",
+        afterSend: async () => {
+          await supabase.from("appointments").update({ status: "done" }).eq("id", id);
+          setMsg(`${nm}：終了＋LINEを送信しました`);
+          reload();
+        },
+      });
+      return;
+    }
+    // LINE未連携 → 確認して終了のみ（通知なし）
+    if (!confirm(`${nm} を終了しますか？\n（LINE未連携のため通知は送られません）`)) return;
     setEv(null);
-    await finish(v, ev.name);
+    await supabase.from("appointments").update({ status: "done" }).eq("id", id);
+    setMsg(`${nm}：終了しました（LINE未連携のため通知なし）`);
+    reload();
   }
 
   const amt = "w-full rounded border border-slate-300 px-1 py-0.5 text-sm focus:border-blue-400 focus:outline-none";
@@ -547,7 +534,7 @@ export default function PersonalRoster() {
             </div>
             <div className="mt-4 flex items-center gap-2">
               {!ev.done && (
-                <button onClick={finishFromPopup} disabled={busy === ev.id}
+                <button onClick={finishFromPopup}
                   className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white active:bg-green-700 disabled:bg-slate-300">
                   終了＋LINE
                 </button>
@@ -558,6 +545,18 @@ export default function PersonalRoster() {
             </div>
           </div>
         </div>
+      )}
+
+      {sendMsg && (
+        <SendMessageModal
+          title={sendMsg.title}
+          endpoint={sendMsg.endpoint}
+          payload={sendMsg.payload}
+          note={sendMsg.note}
+          sendLabel="終了＋送信"
+          onClose={() => setSendMsg(null)}
+          onSent={async () => { await sendMsg.afterSend?.(); }}
+        />
       )}
     </div>
   );
