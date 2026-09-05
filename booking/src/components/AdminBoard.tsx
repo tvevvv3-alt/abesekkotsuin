@@ -286,6 +286,16 @@ export default function AdminBoard({ date }: { date: string }) {
   const BREAK_SCALE = 1;
   const breakGap = useMemo<[number, number] | null>(() => null, []);
 
+  // 1分あたりの高さ。予約が短い日はボード枠（画面下端まで）いっぱいに引き伸ばし、
+  // 余白をなくす。範囲が長い日は基準スケール(PX_PER_MIN)のままスクロールで見せる。
+  const HEADER_H = 32; // 上部の固定ヘッダー(h-8)ぶん
+  const ppm = useMemo(() => {
+    const total = maxMin - minMin;
+    if (!boardMaxH || total <= 0) return PX_PER_MIN;
+    const fit = (boardMaxH - HEADER_H - 4) / total;
+    return Math.max(PX_PER_MIN, fit);
+  }, [boardMaxH, minMin, maxMin]);
+
   // 現在時刻バー（今日の表示のときだけ・Googleカレンダー風）。1分ごとに更新。
   const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   useEffect(() => {
@@ -297,25 +307,25 @@ export default function AdminBoard({ date }: { date: string }) {
   const yFor = useCallback(
     (m: number) => {
       const x = Math.max(minMin, Math.min(maxMin, m));
-      if (!breakGap) return (x - minMin) * PX_PER_MIN;
+      if (!breakGap) return (x - minMin) * ppm;
       const [gs, ge] = breakGap;
-      if (x <= gs) return (x - minMin) * PX_PER_MIN;
-      if (x >= ge) return (gs - minMin + (ge - gs) * BREAK_SCALE + (x - ge)) * PX_PER_MIN;
-      return (gs - minMin + (x - gs) * BREAK_SCALE) * PX_PER_MIN;
+      if (x <= gs) return (x - minMin) * ppm;
+      if (x >= ge) return (gs - minMin + (ge - gs) * BREAK_SCALE + (x - ge)) * ppm;
+      return (gs - minMin + (x - gs) * BREAK_SCALE) * ppm;
     },
-    [minMin, maxMin, breakGap]
+    [minMin, maxMin, breakGap, ppm]
   );
   const minForY = useCallback(
     (y: number) => {
-      if (!breakGap) return minMin + y / PX_PER_MIN;
+      if (!breakGap) return minMin + y / ppm;
       const [gs, ge] = breakGap;
-      const yGs = (gs - minMin) * PX_PER_MIN;
-      const yGe = yGs + (ge - gs) * BREAK_SCALE * PX_PER_MIN;
-      if (y <= yGs) return minMin + y / PX_PER_MIN;
-      if (y >= yGe) return ge + (y - yGe) / PX_PER_MIN;
-      return gs + (y - yGs) / (PX_PER_MIN * BREAK_SCALE);
+      const yGs = (gs - minMin) * ppm;
+      const yGe = yGs + (ge - gs) * BREAK_SCALE * ppm;
+      if (y <= yGs) return minMin + y / ppm;
+      if (y >= yGe) return ge + (y - yGe) / ppm;
+      return gs + (y - yGs) / (ppm * BREAK_SCALE);
     },
-    [minMin, maxMin, breakGap]
+    [minMin, maxMin, breakGap, ppm]
   );
 
   const height = yFor(maxMin);
