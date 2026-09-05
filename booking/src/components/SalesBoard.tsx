@@ -1067,7 +1067,7 @@ export default function SalesBoard() {
                 </div>
                 {rp > 0 && (
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1 gap-y-0 text-[10px] text-amber-600">
-                    <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">物販 +{yen(rp)}</span>
+                    <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">物販 ➕{rp.toLocaleString()}</span>
                     <span className="text-amber-500">込 <b className="tabnum">{yen(tot + rp)}</b></span>
                   </div>
                 )}
