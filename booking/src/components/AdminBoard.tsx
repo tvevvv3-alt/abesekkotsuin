@@ -275,12 +275,14 @@ export default function AdminBoard({ date }: { date: string }) {
   const [minMin, maxMin] = useMemo(() => {
     const bStart = Math.min(540, settings?.board_start_min ?? 540); // 9時スタート（早番があればさらに前へ）
     const bEnd = settings?.board_end_min ?? 1320;
-    if (daySchedules.length === 0) return [bStart, bEnd];
-    return [
-      Math.min(bStart, ...daySchedules.map((s) => s.start_min)),
-      Math.max(bEnd, ...daySchedules.map((s) => s.end_min)),
-    ];
-  }, [daySchedules, settings]);
+    let lo = bStart;
+    let hi = bEnd;
+    daySchedules.forEach((s) => { lo = Math.min(lo, s.start_min); hi = Math.max(hi, s.end_min); });
+    // 夜の時間外予約などが範囲外に切れないよう、その日の予約・解放枠も必ず収める
+    appts.forEach((a) => { lo = Math.min(lo, a.start_min); hi = Math.max(hi, a.end_min ?? a.start_min + 30); });
+    openings.forEach((o) => { lo = Math.min(lo, o.start_min); hi = Math.max(hi, o.end_min); });
+    return [lo, hi];
+  }, [daySchedules, settings, appts, openings]);
 
   // 昼(13-16)などの内部ギャップも圧縮せず、カレンダーと同じ一定スケールで表示する
   const BREAK_SCALE = 1;
@@ -724,7 +726,8 @@ export default function AdminBoard({ date }: { date: string }) {
         <div
           ref={boardScrollRef}
           className="overflow-auto overscroll-contain rounded-xl border bg-white"
-          style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : "calc(100dvh - 200px)" }}
+          // 枠を画面下端まで固定（内容が短い日でも縮まず画面いっぱいに）。
+          style={{ height: boardMaxH ? `${boardMaxH}px` : "calc(100dvh - 200px)" }}
         >
           <div className="flex w-full">
             {/* 時間ラベル列 */}
