@@ -147,7 +147,7 @@ export default function AdminBoard({ date }: { date: string }) {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [, setSettings] = useState<Settings | null>(null);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [closures, setClosures] = useState<Closure[]>([]);
   const [openings, setOpenings] = useState<Opening[]>([]);
@@ -273,16 +273,15 @@ export default function AdminBoard({ date }: { date: string }) {
   // ボード表示範囲。勤務時間外（例: 20:30以降の時間外予約）もドラッグで追加できるよう
   // 設定の board_start/board_end まで常に広げて表示する。
   const [minMin, maxMin] = useMemo(() => {
-    const bStart = Math.min(540, settings?.board_start_min ?? 540); // 9時スタート（早番があればさらに前へ）
-    const bEnd = settings?.board_end_min ?? 1320;
-    let lo = bStart;
-    let hi = bEnd;
+    // 基準表示は 9:00〜21:00。シフト・予約・解放枠が外側にあるぶんだけ広げる
+    // （夜の時間外予約なども切れずに収まる）。
+    let lo = 540; // 9:00 ベース
+    let hi = 1260; // 21:00 ベース
     daySchedules.forEach((s) => { lo = Math.min(lo, s.start_min); hi = Math.max(hi, s.end_min); });
-    // 夜の時間外予約などが範囲外に切れないよう、その日の予約・解放枠も必ず収める
     appts.forEach((a) => { lo = Math.min(lo, a.start_min); hi = Math.max(hi, a.end_min ?? a.start_min + 30); });
     openings.forEach((o) => { lo = Math.min(lo, o.start_min); hi = Math.max(hi, o.end_min); });
     return [lo, hi];
-  }, [daySchedules, settings, appts, openings]);
+  }, [daySchedules, appts, openings]);
 
   // 昼(13-16)などの内部ギャップも圧縮せず、カレンダーと同じ一定スケールで表示する
   const BREAK_SCALE = 1;

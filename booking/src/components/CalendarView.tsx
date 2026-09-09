@@ -164,7 +164,7 @@ export default function CalendarView({
   const [staff, setStaff] = useState<Staff[]>([]);
   const [services, setServices] = useState<ServiceWithSteps[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [, setSettings] = useState<Settings | null>(null);
   const [appts, setAppts] = useState<ApptWithSteps[]>([]);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
   // シフトの受付・学生を日付別に（終日帯へ自動表示）
@@ -323,8 +323,10 @@ export default function CalendarView({
     return Array.from(new Set([...staffCols, ...extras]));
   }, [staff]);
 
-  const boardStart = settings?.board_start_min ?? 540;
-  const boardEnd = Math.max(boardStart + 60, settings?.board_end_min ?? 1290);
+  // 既定の基準表示は 9:00〜21:00（ズーム1でこの範囲が画面に収まる）。
+  // VIEW_START/END(6:00〜24:00)はスクロールで見られる全体レンジ。
+  const boardStart = 540; // 9:00
+  const boardEnd = 1260; // 21:00
   const boardRange = boardEnd - boardStart;
 
   // グリッド枠の高さを計測
@@ -349,14 +351,6 @@ export default function CalendarView({
   useEffect(() => {
     setZoom((z) => (z < zoomMin ? zoomMin : z));
   }, [zoomMin]);
-
-  // 既定表示は「1日全体が収まる」縮小状態（＝最小ズーム）。初回だけ設定。
-  const didZoomInit = useRef(false);
-  useEffect(() => {
-    if (didZoomInit.current || boxH <= 0) return;
-    didZoomInit.current = true;
-    setZoom(zoomMin);
-  }, [boxH, zoomMin]);
 
   useLayoutEffect(() => {
     if (didInit.current || boxH <= 0) return;
