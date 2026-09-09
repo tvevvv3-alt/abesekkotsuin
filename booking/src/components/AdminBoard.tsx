@@ -889,10 +889,11 @@ export default function AdminBoard({ date }: { date: string }) {
                     <button
                       key={a.id}
                       onClick={(e) => { e.stopPropagation(); setModal({ mode: "edit", appt: a }); }}
-                      className="flex w-full items-center gap-1 text-left text-[10px] font-medium text-white hover:underline"
+                      className="flex w-full items-start gap-1 text-left text-[10px] font-medium leading-tight text-white hover:underline"
                       style={{ textShadow: TEXT_SHADOW }}
                     >
-                      <span className="min-w-0 flex-1 truncate">{a.patient_name || "（未登録）"}</span>
+                      {/* フルネーム表示（省略せず折り返す） */}
+                      <span className="min-w-0 flex-1 whitespace-normal break-words">{a.patient_name || "（未登録）"}</span>
                       {a.status === "done" &&
                         (a.line_user_id ? <span className="shrink-0">✅</span> : <span className="shrink-0 text-[9px] opacity-80">済</span>)}
                     </button>
@@ -912,11 +913,10 @@ export default function AdminBoard({ date }: { date: string }) {
                       }}
                     >
                       {multi && !expanded ? (
-                        // 畳んだ表示：1人目の名前 ＋ 人数（満なら満マーク）。タップで展開。
-                        <div className="flex items-center gap-1" style={{ textShadow: TEXT_SHADOW }}>
+                        // 畳んだ表示：人数だけ（満なら満マーク）。タップで下にフルネーム展開。
+                        <div className="flex items-center justify-center gap-1" style={{ textShadow: TEXT_SHADOW }}>
                           {full && <span className="shrink-0 rounded bg-white/25 px-0.5 text-[9px] font-bold text-white">満</span>}
-                          <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-white">{g.list[0].patient_name || "（未登録）"}</span>
-                          <span className="shrink-0 rounded bg-white/30 px-1 text-[10px] font-bold text-white">{g.list.length}人▾</span>
+                          <span className="rounded bg-white/30 px-1.5 text-[11px] font-bold text-white">{g.list.length}人 ▾</span>
                         </div>
                       ) : (
                         <>
