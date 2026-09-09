@@ -184,6 +184,8 @@ export default function AdminBoard({ date }: { date: string }) {
   const cardDraggedRef = useRef(false);
   const cardLatestRef = useRef<{ targetStart: number; targetStaffId: string | null } | null>(null);
   const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
+  // 体幹教室フリーパスの会員名（LINE不要 → ♾️表示）
+  const [freePassNames, setFreePassNames] = useState<Set<string>>(new Set());
   // 体幹教室（定員制）の同時刻グループ：多人数は畳んで「1人目＋人数」表示、タップで展開
   const [expandedClass, setExpandedClass] = useState<Set<string>>(new Set());
   const toggleClassGroup = (key: string) =>
@@ -235,6 +237,16 @@ export default function AdminBoard({ date }: { date: string }) {
       setServices(sv);
       setSchedules(sc);
       setSettings(se);
+      // 体幹教室フリーパスの会員名（LINE不要 → ♾️表示）
+      const { data: mem } = await supabase.from("class_members").select("name, pass_type");
+      setFreePassNames(
+        new Set(
+          ((mem as { name: string; pass_type: string }[] | null) ?? [])
+            .filter((m) => m.pass_type === "free")
+            .map((m) => (m.name || "").trim())
+            .filter(Boolean)
+        )
+      );
     })();
   }, [supabase]);
 
@@ -893,8 +905,13 @@ export default function AdminBoard({ date }: { date: string }) {
                     >
                       {/* 1行表示（収まらなければ省略。担当列と同じスタイル） */}
                       <span className="min-w-0 flex-1 truncate">{a.patient_name || "（未登録）"}</span>
-                      {a.status === "done" &&
-                        (a.line_user_id ? <span className="shrink-0">✅</span> : <span className="shrink-0 text-[9px] opacity-80">済</span>)}
+                      {freePassNames.has((a.patient_name || "").trim()) ? (
+                        // フリーパス＝LINE不要
+                        <span className="shrink-0" title="フリーパス（LINE不要）">♾️</span>
+                      ) : (
+                        a.status === "done" &&
+                        (a.line_user_id ? <span className="shrink-0">✅</span> : <span className="shrink-0 text-[9px] opacity-80">済</span>)
+                      )}
                     </button>
                   );
                   // 多人数を畳んでいるときは高さを1行ぶんに抑える（下の枠と重ならない）
