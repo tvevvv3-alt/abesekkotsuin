@@ -884,16 +884,15 @@ export default function AdminBoard({ date }: { date: string }) {
                   const gkey = `${cls.id}-${g.start}-${g.end}`;
                   const multi = g.list.length >= 2;
                   const expanded = expandedClass.has(gkey);
-                  const full = g.list.length >= cls.capacity;
                   const nameBtn = (a: ApptWithSteps) => (
                     <button
                       key={a.id}
                       onClick={(e) => { e.stopPropagation(); setModal({ mode: "edit", appt: a }); }}
-                      className="flex w-full items-start gap-1 text-left text-[10px] font-medium leading-tight text-white hover:underline"
+                      className="flex w-full items-center gap-1 text-left text-[10px] font-medium leading-tight text-white hover:underline"
                       style={{ textShadow: TEXT_SHADOW }}
                     >
-                      {/* フルネーム表示（省略せず折り返す） */}
-                      <span className="min-w-0 flex-1 whitespace-normal break-words">{a.patient_name || "（未登録）"}</span>
+                      {/* 1行表示（収まらなければ省略。担当列と同じスタイル） */}
+                      <span className="min-w-0 flex-1 truncate">{a.patient_name || "（未登録）"}</span>
                       {a.status === "done" &&
                         (a.line_user_id ? <span className="shrink-0">✅</span> : <span className="shrink-0 text-[9px] opacity-80">済</span>)}
                     </button>
@@ -913,18 +912,16 @@ export default function AdminBoard({ date }: { date: string }) {
                       }}
                     >
                       {multi && !expanded ? (
-                        // 畳んだ表示：人数だけ（満なら満マーク）。タップで下にフルネーム展開。
-                        <div className="flex items-center justify-center gap-1" style={{ textShadow: TEXT_SHADOW }}>
-                          {full && <span className="shrink-0 rounded bg-white/25 px-0.5 text-[9px] font-bold text-white">満</span>}
-                          <span className="rounded bg-white/30 px-1.5 text-[11px] font-bold text-white">{g.list.length}人 ▾</span>
+                        // 畳んだ表示：人数だけ（1行）。タップで下に名前を展開。
+                        <div className="flex items-center justify-center" style={{ textShadow: TEXT_SHADOW }}>
+                          <span className="whitespace-nowrap rounded bg-white/30 px-1.5 text-[11px] font-bold text-white">{g.list.length}人 ▾</span>
                         </div>
                       ) : (
                         <>
-                          {(full || multi) && (
-                            <div className="mb-0.5 flex items-center gap-1" style={{ textShadow: TEXT_SHADOW }}>
-                              {full && <span className="rounded bg-white/25 px-1 text-[9px] font-bold text-white">満</span>}
-                              {/* 展開中の畳むボタン（人数は出さない） */}
-                              {multi && <span className="ml-auto rounded bg-white/30 px-1 text-[10px] font-bold text-white">▴</span>}
+                          {/* 展開中の畳むボタン（人数・満は出さない） */}
+                          {multi && (
+                            <div className="mb-0.5 flex items-center" style={{ textShadow: TEXT_SHADOW }}>
+                              <span className="ml-auto rounded bg-white/30 px-1 text-[10px] font-bold text-white">▴</span>
                             </div>
                           )}
                           {g.list.map((a) => nameBtn(a))}
