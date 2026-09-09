@@ -325,8 +325,8 @@ export default function CalendarView({
 
   // 既定の基準表示は 9:00〜21:00（ズーム1でこの範囲が画面に収まる）。
   // VIEW_START/END(6:00〜24:00)はスクロールで見られる全体レンジ。
-  const boardStart = 540; // 9:00
-  const boardEnd = 1260; // 21:00
+  const boardStart = 480; // 8:00
+  const boardEnd = 1320; // 22:00
   const boardRange = boardEnd - boardStart;
 
   // グリッド枠の高さを計測

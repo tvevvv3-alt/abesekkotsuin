@@ -289,10 +289,10 @@ export default function AdminBoard({ date }: { date: string }) {
   // ボード表示範囲。勤務時間外（例: 20:30以降の時間外予約）もドラッグで追加できるよう
   // 設定の board_start/board_end まで常に広げて表示する。
   const [minMin, maxMin] = useMemo(() => {
-    // 基準表示は 9:00〜21:00。シフト・予約・解放枠が外側にあるぶんだけ広げる
+    // 基準表示は 8:00〜22:00。シフト・予約・解放枠が外側にあるぶんだけ広げる
     // （夜の時間外予約なども切れずに収まる）。
-    let lo = 540; // 9:00 ベース
-    let hi = 1260; // 21:00 ベース
+    let lo = 480; // 8:00 ベース
+    let hi = 1320; // 22:00 ベース
     daySchedules.forEach((s) => { lo = Math.min(lo, s.start_min); hi = Math.max(hi, s.end_min); });
     appts.forEach((a) => { lo = Math.min(lo, a.start_min); hi = Math.max(hi, a.end_min ?? a.start_min + 30); });
     openings.forEach((o) => { lo = Math.min(lo, o.start_min); hi = Math.max(hi, o.end_min); });
