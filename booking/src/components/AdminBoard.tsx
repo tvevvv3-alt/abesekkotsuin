@@ -184,6 +184,10 @@ export default function AdminBoard({ date }: { date: string }) {
   const cardDraggedRef = useRef(false);
   const cardLatestRef = useRef<{ targetStart: number; targetStaffId: string | null } | null>(null);
   const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
+  // 体幹教室（定員制）の同時刻グループ：多人数は畳んで「1人目＋人数」表示、タップで展開
+  const [expandedClass, setExpandedClass] = useState<Set<string>>(new Set());
+  const toggleClassGroup = (key: string) =>
+    setExpandedClass((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   // カードのドラッグ中はボードのスクロールを止める（タッチでテーブルごと動くのを防ぐ）
   useEffect(() => {
     const el = boardScrollRef.current;
@@ -876,42 +880,60 @@ export default function AdminBoard({ date }: { date: string }) {
                 onPointerUpTrack={endDrag}
                 onPointerCancelTrack={cancelDrag}
               >
-                {classGroups(cls.id).map((g, i) => (
-                  <div
-                    key={i}
-                    className="absolute left-0.5 right-0.5 z-20 rounded-[4px] px-1 py-1"
-                    style={{
-                      top: yFor(g.start),
-                      minHeight: yFor(g.end) - yFor(g.start) - 2,
-                      backgroundColor: CLASS_COLOR,
-                      border: "0.5px solid rgba(255,255,255,.95)",
-                    }}
-                  >
-                    {g.list.length >= cls.capacity && (
-                      <div className="mb-0.5" style={{ textShadow: TEXT_SHADOW }}>
-                        <span className="rounded bg-white/25 px-1 text-[9px] font-bold text-white">満</span>
-                      </div>
-                    )}
-                    {g.list.map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => setModal({ mode: "edit", appt: a })}
-                        className="flex w-full items-center gap-1 text-left text-[10px] font-medium text-white hover:underline"
-                        style={{ textShadow: TEXT_SHADOW }}
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          {a.patient_name || "（未登録）"}
-                        </span>
-                        {a.status === "done" &&
-                          (a.line_user_id ? (
-                            <span className="shrink-0">✅</span>
-                          ) : (
-                            <span className="shrink-0 text-[9px] opacity-80">済</span>
-                          ))}
-                      </button>
-                    ))}
-                  </div>
-                ))}
+                {classGroups(cls.id).map((g, i) => {
+                  const gkey = `${cls.id}-${g.start}-${g.end}`;
+                  const multi = g.list.length >= 2;
+                  const expanded = expandedClass.has(gkey);
+                  const full = g.list.length >= cls.capacity;
+                  const nameBtn = (a: ApptWithSteps) => (
+                    <button
+                      key={a.id}
+                      onClick={(e) => { e.stopPropagation(); setModal({ mode: "edit", appt: a }); }}
+                      className="flex w-full items-center gap-1 text-left text-[10px] font-medium text-white hover:underline"
+                      style={{ textShadow: TEXT_SHADOW }}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{a.patient_name || "（未登録）"}</span>
+                      {a.status === "done" &&
+                        (a.line_user_id ? <span className="shrink-0">✅</span> : <span className="shrink-0 text-[9px] opacity-80">済</span>)}
+                    </button>
+                  );
+                  // 多人数を畳んでいるときは高さを1行ぶんに抑える（下の枠と重ならない）
+                  const collapsedHeight = multi && !expanded;
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => { if (multi) toggleClassGroup(gkey); }}
+                      className={`absolute left-0.5 right-0.5 rounded-[4px] px-1 py-1 ${expanded ? "z-40 shadow-lg" : "z-20"} ${multi ? "cursor-pointer" : ""}`}
+                      style={{
+                        top: yFor(g.start),
+                        minHeight: collapsedHeight ? undefined : yFor(g.end) - yFor(g.start) - 2,
+                        backgroundColor: CLASS_COLOR,
+                        border: "0.5px solid rgba(255,255,255,.95)",
+                      }}
+                    >
+                      {multi && !expanded ? (
+                        // 畳んだ表示：1人目の名前 ＋ 人数（満なら満マーク）。タップで展開。
+                        <div className="flex items-center gap-1" style={{ textShadow: TEXT_SHADOW }}>
+                          {full && <span className="shrink-0 rounded bg-white/25 px-0.5 text-[9px] font-bold text-white">満</span>}
+                          <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-white">{g.list[0].patient_name || "（未登録）"}</span>
+                          <span className="shrink-0 rounded bg-white/30 px-1 text-[10px] font-bold text-white">{g.list.length}人▾</span>
+                        </div>
+                      ) : (
+                        <>
+                          {(full || multi) && (
+                            <div className="mb-0.5 flex items-center gap-1" style={{ textShadow: TEXT_SHADOW }}>
+                              {full && <span className="rounded bg-white/25 px-1 text-[9px] font-bold text-white">満</span>}
+                              {multi && (
+                                <span className="ml-auto rounded bg-white/30 px-1 text-[10px] font-bold text-white">{g.list.length}人▴</span>
+                              )}
+                            </div>
+                          )}
+                          {g.list.map((a) => nameBtn(a))}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </Column>
               );
             })}
