@@ -200,7 +200,8 @@ export interface Settings {
   // LINE メッセージ設定（null は既定テンプレートを使用）
   confirm_text: string | null; // 予約確認メッセージの本文
   cancel_text: string | null; // キャンセル完了メッセージの本文
-  questionnaire_url: string | null; // 問診票（Googleフォーム等）リンク。メニュー「問診票」から開く
+  questionnaire_url: string | null; // 問診票（Googleフォーム等）リンク。患者へLINE送信する回答フォーム
+  questionnaire_admin_url: string | null; // 管理用の回答閲覧ページ。メニュー「問診票」から開く（無ければ questionnaire_url）
   questionnaire_text: string | null; // 問診票LINE送信の本文（null=既定）。{URL}にリンク挿入
   class_application_url: string | null; // 体幹教室 申込書（Googleフォーム等）リンク。予約変更から本人へLINE送信
   class_application_text: string | null; // 体幹教室 申込書LINE送信の本文（null=既定）。{URL}にリンク挿入

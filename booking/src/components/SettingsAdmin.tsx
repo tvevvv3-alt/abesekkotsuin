@@ -39,7 +39,7 @@ export default function SettingsAdmin() {
     setBusy(true);
     setSaved(false);
     setError(null);
-    const { error: saveErr } = await supabase.from("settings").upsert({
+    const payload: Record<string, unknown> = {
       id: 1,
       slot_unit: s.slot_unit,
       same_day_ok: s.same_day_ok,
@@ -53,6 +53,7 @@ export default function SettingsAdmin() {
       confirm_text: s.confirm_text,
       cancel_text: s.cancel_text,
       questionnaire_url: s.questionnaire_url,
+      questionnaire_admin_url: s.questionnaire_admin_url,
       questionnaire_text: s.questionnaire_text,
       class_application_url: s.class_application_url,
       class_application_text: s.class_application_text,
@@ -67,7 +68,14 @@ export default function SettingsAdmin() {
       notice_ibaraki: s.notice_ibaraki,
       notice_kawanishi: s.notice_kawanishi,
       updated_at: new Date().toISOString(),
-    });
+    };
+    let { error: saveErr } = await supabase.from("settings").upsert(payload);
+    // questionnaire_admin_url 列が未マイグレーションでも他の設定は保存できるよう再試行
+    if (saveErr && /questionnaire_admin_url/.test(saveErr.message)) {
+      const { questionnaire_admin_url: _omit, ...rest } = payload;
+      void _omit;
+      ({ error: saveErr } = await supabase.from("settings").upsert(rest));
+    }
     setBusy(false);
     if (saveErr) {
       setError(`保存できませんでした：${saveErr.message}（該当のSQLマイグレーションが未実行の可能性があります）`);
@@ -180,15 +188,23 @@ export default function SettingsAdmin() {
 
       <div className="mb-4 rounded-xl border bg-white p-4">
         <label className="block text-sm font-bold text-slate-700">問診票</label>
-        <p className="mt-1 text-[11px] text-slate-500">左メニュー「患者管理 → 問診票」から開くほか、治療の予約変更画面「問診票を送る」で本人へLINE送信します。</p>
-        <span className="mt-2 block text-xs font-bold text-slate-500">リンク（Googleフォーム等）</span>
+        <p className="mt-1 text-[11px] text-slate-500">患者用フォームは「問診票を送る」で本人へLINE送信、左メニュー「患者管理 → 問診票」からは<b>管理用（回答閲覧）ページ</b>を開きます。</p>
+        <span className="mt-2 block text-xs font-bold text-slate-500">患者用フォームのリンク（LINE送信）</span>
         <input
           value={s.questionnaire_url ?? ""}
           onChange={(e) => up({ questionnaire_url: e.target.value })}
           placeholder="https://docs.google.com/forms/d/…/viewform"
           className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
         />
-        <p className="mt-1 text-[11px] text-slate-400">患者用は末尾 <code className="rounded bg-slate-100 px-1">/viewform</code>、確認・編集用は <code className="rounded bg-slate-100 px-1">/edit</code>。</p>
+        <p className="mt-1 text-[11px] text-slate-400">患者に送るのはこちら（末尾 <code className="rounded bg-slate-100 px-1">/viewform</code>）。</p>
+        <span className="mt-3 block text-xs font-bold text-slate-500">管理用の回答閲覧ページ（メニュー「問診票」から開く）</span>
+        <input
+          value={s.questionnaire_admin_url ?? ""}
+          onChange={(e) => up({ questionnaire_admin_url: e.target.value })}
+          placeholder="回答一覧ページのURL（例：…/edit#responses）"
+          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+        />
+        <p className="mt-1 text-[11px] text-slate-400">回答を確認するページのURL。未入力なら患者用フォームを開きます。</p>
         <span className="mt-3 block text-xs font-bold text-slate-500">LINEメッセージ本文</span>
         <textarea
           value={s.questionnaire_text ?? ""}

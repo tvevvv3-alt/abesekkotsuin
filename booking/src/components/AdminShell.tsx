@@ -57,7 +57,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       const s = localStorage.getItem(NAV_ORDER_KEY);
       if (s) setOrder(JSON.parse(s) as string[]);
     } catch { /* noop */ }
-    loadSettings(supabase).then((st) => setFormUrl(st.questionnaire_url?.trim() || null)).catch(() => {});
+    // メニュー「問診票」は管理用の回答閲覧ページを開く（無ければ患者用フォーム）
+    loadSettings(supabase)
+      .then((st) => setFormUrl(st.questionnaire_admin_url?.trim() || st.questionnaire_url?.trim() || null))
+      .catch(() => {});
   }, [supabase]);
 
   async function logout() {
