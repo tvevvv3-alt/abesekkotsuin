@@ -923,9 +923,8 @@ export default function AdminBoard({ date }: { date: string }) {
                           {(full || multi) && (
                             <div className="mb-0.5 flex items-center gap-1" style={{ textShadow: TEXT_SHADOW }}>
                               {full && <span className="rounded bg-white/25 px-1 text-[9px] font-bold text-white">満</span>}
-                              {multi && (
-                                <span className="ml-auto rounded bg-white/30 px-1 text-[10px] font-bold text-white">{g.list.length}人▴</span>
-                              )}
+                              {/* 展開中の畳むボタン（人数は出さない） */}
+                              {multi && <span className="ml-auto rounded bg-white/30 px-1 text-[10px] font-bold text-white">▴</span>}
                             </div>
                           )}
                           {g.list.map((a) => nameBtn(a))}
