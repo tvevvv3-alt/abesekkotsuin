@@ -350,6 +350,14 @@ export default function CalendarView({
     setZoom((z) => (z < zoomMin ? zoomMin : z));
   }, [zoomMin]);
 
+  // 既定表示は「1日全体が収まる」縮小状態（＝最小ズーム）。初回だけ設定。
+  const didZoomInit = useRef(false);
+  useEffect(() => {
+    if (didZoomInit.current || boxH <= 0) return;
+    didZoomInit.current = true;
+    setZoom(zoomMin);
+  }, [boxH, zoomMin]);
+
   useLayoutEffect(() => {
     if (didInit.current || boxH <= 0) return;
     const el = gridRef.current;
