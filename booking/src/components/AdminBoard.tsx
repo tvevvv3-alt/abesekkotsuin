@@ -204,19 +204,33 @@ export default function AdminBoard({ date }: { date: string }) {
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const [boardMaxH, setBoardMaxH] = useState<number | null>(null);
   useEffect(() => {
+    let raf = 0;
     const measure = () => {
       const el = boardScrollRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
-      const vh = window.visualViewport?.height ?? window.innerHeight;
-      setBoardMaxH(Math.max(260, vh - top - 12));
+      // 画面高さは innerHeight を優先（visualViewport はズーム等で小さく出ることがある）
+      const vh = Math.max(
+        window.innerHeight || 0,
+        document.documentElement?.clientHeight || 0,
+        window.visualViewport?.height || 0
+      );
+      const h = vh - top - 8;
+      // 一時的に極端に小さい値が取れても採用しない（枠が縮む不具合の防止）
+      if (h > 240) setBoardMaxH(h);
     };
     measure();
+    raf = requestAnimationFrame(measure);
+    const t = window.setTimeout(measure, 200);
     const vv = window.visualViewport;
     window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
     vv?.addEventListener("resize", measure);
     return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
       window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
       vv?.removeEventListener("resize", measure);
     };
   }, [loading]);
