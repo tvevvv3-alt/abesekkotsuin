@@ -1051,8 +1051,9 @@ export default function SalesBoard() {
         })()}
         <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
           {assignees.map((s) => {
-            const tot = staffTotal(s.id);
-            const rp = retailProfitByStaff(s.id);
+            const svc = staffTotal(s.id); // 施術売上（自費+保険）
+            const rp = retailProfitByStaff(s.id); // 物販利益
+            const tot = svc + rp; // 個別合計に物販利益を含める
             const target = targets[s.id] ?? 0;
             const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
             return (
@@ -1083,8 +1084,8 @@ export default function SalesBoard() {
                 </div>
                 {rp > 0 && (
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1 gap-y-0 text-[10px] text-amber-600">
-                    <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">物販 ➕{rp.toLocaleString()}</span>
-                    <span className="text-amber-500">込 <b className="tabnum">{yen(tot + rp)}</b></span>
+                    <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">うち物販利益 ➕{rp.toLocaleString()}</span>
+                    <span className="text-amber-500">施術 {yen(svc)}</span>
                   </div>
                 )}
                 {target > 0 && (
