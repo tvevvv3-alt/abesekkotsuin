@@ -223,6 +223,10 @@ export default function CalendarView({
   const [pop, setPop] = useState<{ date: string; startMin: number; x: number; y: number } | null>(
     null
   );
+  // 体幹教室（定員制）の枠：多人数は「N人▾」に畳み、タップで名前を展開
+  const [expandedClassCal, setExpandedClassCal] = useState<Set<string>>(new Set());
+  const toggleClassCal = (k: string) =>
+    setExpandedClassCal((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
   useEffect(() => {
     (async () => {
@@ -833,23 +837,47 @@ export default function CalendarView({
             );
           }
           if (it.kind === "class") {
-            const h = yFor(it.e) - top;
+            const gkey = `${ds}-${it.s}`;
+            const multi = it.appts.length >= 2;
+            const expanded = expandedClassCal.has(gkey);
+            const collapsed = multi && !expanded;
             return (
               <div
                 key={"class-" + it.s}
-                className="absolute overflow-hidden rounded-[4px] px-1 py-0.5 text-left"
-                style={{ ...style, backgroundColor: CLASS_COLOR, border: HAIRLINE }}
+                onClick={(ev) => { if (multi) { ev.stopPropagation(); toggleClassCal(gkey); } }}
+                className={`absolute rounded-[4px] px-1 py-0.5 text-left ${expanded ? "z-30 overflow-visible shadow-lg" : "overflow-hidden"} ${multi ? "cursor-pointer" : ""}`}
+                style={{
+                  ...style,
+                  // 展開時は名前ぶん下に伸ばす（枠の高さを最低値に）
+                  ...(expanded ? { height: undefined as unknown as number, minHeight: style.height } : {}),
+                  backgroundColor: CLASS_COLOR,
+                  border: HAIRLINE,
+                }}
               >
-                {it.appts.map((ca) => (
-                  <button
-                    key={ca.id}
-                    onClick={(ev) => { ev.stopPropagation(); setModal({ mode: "edit", appt: ca }); }}
-                    className="block w-full truncate text-left text-[12.5px] font-semibold leading-[1.3] text-white hover:underline"
-                    style={{ textShadow: TEXT_SHADOW }}
-                  >
-                    {ca.patient_name || "（未登録）"}{ca.status === "done" ? "✅" : ""}
-                  </button>
-                ))}
+                {collapsed ? (
+                  // 畳んだ表示：人数だけ（タップで展開）
+                  <div className="flex h-full items-center justify-center">
+                    <span className="whitespace-nowrap rounded bg-white/30 px-1.5 text-[12px] font-bold text-white" style={{ textShadow: TEXT_SHADOW }}>{it.appts.length}人 ▾</span>
+                  </div>
+                ) : (
+                  <>
+                    {multi && (
+                      <div className="flex" style={{ textShadow: TEXT_SHADOW }}>
+                        <span className="ml-auto rounded bg-white/30 px-1 text-[11px] font-bold text-white">▴</span>
+                      </div>
+                    )}
+                    {it.appts.map((ca) => (
+                      <button
+                        key={ca.id}
+                        onClick={(ev) => { ev.stopPropagation(); setModal({ mode: "edit", appt: ca }); }}
+                        className="block w-full truncate text-left text-[12.5px] font-semibold leading-[1.3] text-white hover:underline"
+                        style={{ textShadow: TEXT_SHADOW }}
+                      >
+                        {ca.patient_name || "（未登録）"}{ca.status === "done" ? "✅" : ""}
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             );
           }
