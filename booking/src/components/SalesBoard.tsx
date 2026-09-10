@@ -916,6 +916,21 @@ export default function SalesBoard() {
     [monthDaily]
   );
   const monthSp = monthSum.ho1 + monthSum.ho2 + monthSum.ho3 + monthSum.ho4;
+  // 物販の当月原価（サマリー・総売上では物販を「利益」で計上するため差し引く）。
+  // ※日計表(レセコン)は販売そのままなので monthDaily/monthSum は変更しない。
+  const retailCostMonth = useMemo(
+    () =>
+      sales.reduce(
+        (x, s) =>
+          s.retail && s.retail_kind !== "purchase" && !isOrphanDup(s) && !isCancelledSale(s)
+            ? x + (s.cost ?? 0)
+            : x,
+        0
+      ),
+    [sales, isOrphanDup, isCancelledSale]
+  );
+  // 物販を利益で見た自費計（総売上に使用）
+  const monthSpProfit = monthSp - retailCostMonth;
 
   // 年間集計：担当×月の 保険(insurance)/自費(selfpay)、川西院、物販・その他。
   const yearData = useMemo(() => {
@@ -999,14 +1014,15 @@ export default function SalesBoard() {
       {view !== "year" && (
       <div className="mb-3 rounded-xl border bg-white p-2">
         {(() => {
-          const clinicTotal = monthSp + monthSum.kawa + monthSum.ins;
+          // 物販は利益で計上（売上ではなく）→ 原価を差し引いた自費で総売上を出す
+          const clinicTotal = monthSpProfit + monthSum.kawa + monthSum.ins;
           const pct = clinicTarget > 0 ? Math.round((clinicTotal / clinicTarget) * 1000) / 10 : 0;
           return (
             <>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[13px]">
                 <span className="font-bold text-slate-700">{monthLabel} 当月</span>
                 <span className="text-slate-500">保険 <b className="tabnum text-slate-700">{yen(monthSum.ins)}</b></span>
-                <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSp + monthSum.kawa)}</b></span>
+                <span className="text-slate-500">自費 <b className="tabnum text-slate-700">{yen(monthSpProfit + monthSum.kawa)}</b></span>
                 <span className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
                   院目標
                   <input type="number" min={0} value={clinicTarget ? clinicTarget / 10000 : ""} placeholder="0"
@@ -1083,9 +1099,10 @@ export default function SalesBoard() {
             <div className="flex items-center gap-1">
               <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
               <span className="text-[13px] font-bold text-slate-800">物販・その他</span>
+              <span className="text-[9px] text-amber-600">利益</span>
             </div>
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
-              <span className="text-[15px] font-bold tabnum text-slate-800">{yen(monthSum.ho4)}</span>
+              <span className="text-[15px] font-bold tabnum text-slate-800">{yen(monthSum.ho4 - retailCostMonth)}</span>
               <span className="text-[9px] text-slate-400">当月</span>
               {view === "day" && (
                 <span className="ml-auto flex items-baseline gap-0.5">
