@@ -48,6 +48,17 @@ import WeekCalendar from "./WeekCalendar";
 
 const STORAGE_KEY = "abe_booking_patient";
 const STORAGE_KEY_LIST = "abe_booking_patients"; // 端末に保存した家族分の一覧
+const STORAGE_KEY_LAST_STAFF = "abe_booking_last_staff"; // 前回担当した人（次回の初期選択に）
+
+// hex色を薄い背景色に（未選択の担当ピル用）。#rgb / #rrggbb 対応。
+function hexToRgba(hex: string, a: number): string {
+  const h = (hex || "").replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16) || 51;
+  const g = parseInt(n.slice(2, 4), 16) || 65;
+  const b = parseInt(n.slice(4, 6), 16) || 85;
+  return `rgba(${r},${g},${b},${a})`;
+}
 
 // LIFF SDK の最小型（CDN読み込みのため型定義だけ用意）
 interface LiffApi {
@@ -636,12 +647,15 @@ export default function BookingWizard() {
     setFromServiceId(from);
     setServiceId(id);
     setSelected(null);
-    // 対応できるスタッフの先頭を初期選択（クラスは担当者を使わない）
+    // 初期選択：前回担当した人が対応可能ならその人、いなければ対応できる先頭（クラスは担当者不使用）
     const ids = new Set(links.filter((l) => l.service_id === id).map((l) => l.staff_id));
-    const first = allStaff.find(
+    const capable = allStaff.filter(
       (s) => ids.has(s.id) && s.patient_visible && s.bookable && s.status === "active"
     );
-    setStaffId(first?.id || "");
+    let last: string | null = null;
+    try { last = localStorage.getItem(STORAGE_KEY_LAST_STAFF); } catch { /* noop */ }
+    const chosen = (last && capable.some((s) => s.id === last) ? last : capable[0]?.id) || "";
+    setStaffId(chosen);
     setShowAfterHours(false);
     setStep(2);
   }
@@ -722,6 +736,8 @@ export default function BookingWizard() {
       ].slice(0, 8);
       setSavedList(merged);
       localStorage.setItem(STORAGE_KEY_LIST, JSON.stringify(merged));
+      // 前回担当した人を記憶（次回の初期選択に）。体幹教室など担当者なしは保存しない。
+      if (!isClass && staffId) { try { localStorage.setItem(STORAGE_KEY_LAST_STAFF, staffId); } catch { /* noop */ } }
       setLastAppointmentId(res.appointment_id ?? null);
       // 変更（リスケ）で来た場合：新しい予約が取れたので、元の予約をキャンセル。
       // LIFF内なら idToken、/my からのCookieログインなら line_uid Cookie で本人確認される
@@ -1081,14 +1097,18 @@ export default function BookingWizard() {
             <div className="mb-3 grid grid-cols-4 gap-2">
               {capableStaff.map((s) => {
                 const active = s.id === staffId;
+                const col = s.color || "#334155";
                 return (
                   <button
                     key={s.id}
                     onClick={() => pickStaff(s.id)}
-                    className="rounded-lg py-2 text-sm font-bold text-white transition"
-                    style={{
-                      backgroundColor: active ? s.color || "#334155" : "#cbd5e1",
-                    }}
+                    className="rounded-lg py-2 text-sm font-bold transition"
+                    // 選択＝従来の濃い色＋白文字。未選択＝薄く色付け（グレーで不在に見えないように）
+                    style={
+                      active
+                        ? { backgroundColor: col, color: "#fff", border: `1.5px solid ${col}` }
+                        : { backgroundColor: hexToRgba(col, 0.14), color: col, border: `1.5px solid ${hexToRgba(col, 0.45)}` }
+                    }
                   >
                     {s.display_name || s.name}
                   </button>
