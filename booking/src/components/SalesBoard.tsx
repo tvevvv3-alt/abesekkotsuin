@@ -37,6 +37,8 @@ interface Sale {
   retail?: boolean; // 物販（物販ページにも表示）
   retail_kind?: "sale" | "purchase"; // 物販の行種別。purchase(まとめ仕入)は日計表に出さない
   retail_buyer?: string | null; // 物販の購入者名（商品名は patient_name）
+  product_id?: string | null; // 物販の商品（原価をマスタから引くのに使う）
+  qty?: number; // 数量
 }
 const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | "patient_name"> => ({
   selfpay: 0,
@@ -86,6 +88,8 @@ export default function SalesBoard() {
   const [taikan, setTaikan] = useState<{ id: string; name: string; color: string } | null>(null);
   const [appts, setAppts] = useState<Appt[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  // 物販の商品マスタ（原価をIDや商品名から引く用）
+  const [products, setProducts] = useState<{ id: string; name: string; cost: number }[]>([]);
   const salesRef = useRef(sales);
   salesRef.current = sales;
   const [targets, setTargets] = useState<Record<string, number>>({});
@@ -133,6 +137,8 @@ export default function SalesBoard() {
       if (kw) setKawa({ id: kw.id, name: kw.name, color: KAWANISHI_COLOR });
       const tk = sv.find((s) => s.category === "体幹教室" || (s.capacity ?? 0) > 1);
       if (tk) setTaikan({ id: tk.id, name: "体幹教室", color: TAIKAN_COLOR });
+      const { data: prod } = await supabase.from("products").select("id, name, cost");
+      setProducts((prod as { id: string; name: string; cost: number }[] | null) ?? []);
       const { data: cfg } = await supabase.from("settings").select("clinic_sales_target, self_options").eq("id", 1).maybeSingle();
       if (cfg) {
         setClinicTarget((cfg as { clinic_sales_target?: number }).clinic_sales_target || 4_000_000);
@@ -162,7 +168,7 @@ export default function SalesBoard() {
         .order("start_min"),
       supabase
         .from("sales")
-        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, retail_buyer, anchor_appointment_id, sort_order, payment")
+        .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, retail_buyer, anchor_appointment_id, sort_order, payment, product_id, qty")
         .gte("date", monthStart)
         .lt("date", monthEnd),
     ]);
@@ -635,11 +641,25 @@ export default function SalesBoard() {
       sales.reduce((sum, s) => (s.date === date && s.staff_id === staffId && !s.retail && !isOrphanDup(s) && !isCancelledSale(s) ? sum + total(s) : sum), 0),
     [sales, date, isOrphanDup, isCancelledSale]
   );
+  // 物販の実効原価：手入力(cost>0)優先、無ければ商品ID→商品名でマスタから引く（物販ページと同じ）
+  const prodById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const prodByName = useMemo(() => {
+    const m = new Map<string, { cost: number }>();
+    products.forEach((p) => { const k = (p.name || "").trim(); if (k) m.set(k, { cost: p.cost }); });
+    return m;
+  }, [products]);
+  const retailCostOf = useCallback((s: Sale) => {
+    if ((s.cost ?? 0) > 0) return s.cost ?? 0;
+    const byId = s.product_id ? prodById.get(s.product_id) : undefined;
+    if (byId && byId.cost > 0) return byId.cost * (s.qty || 1);
+    const byName = prodByName.get((s.patient_name ?? "").trim());
+    return byName && byName.cost > 0 ? byName.cost * (s.qty || 1) : (s.cost ?? 0);
+  }, [prodById, prodByName]);
   // 担当ごとの物販利益（差額＝販売−仕入）。当月分。
   const retailProfitByStaff = useCallback(
     (staffId: string | null) =>
-      sales.reduce((sum, s) => (s.staff_id === staffId && s.retail && s.retail_kind !== "purchase" && !isOrphanDup(s) && !isCancelledSale(s) ? sum + (s.selfpay - (s.cost ?? 0)) : sum), 0),
-    [sales, isOrphanDup, isCancelledSale]
+      sales.reduce((sum, s) => (s.staff_id === staffId && s.retail && s.retail_kind !== "purchase" && !isOrphanDup(s) && !isCancelledSale(s) ? sum + (s.selfpay - retailCostOf(s)) : sum), 0),
+    [sales, isOrphanDup, isCancelledSale, retailCostOf]
   );
   // Enterで次の金額欄へ移動（保険外→合計額→負担額→次の行の保険外…）。表示中の欄だけ辿る。
   function onAmountKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -923,11 +943,11 @@ export default function SalesBoard() {
       sales.reduce(
         (x, s) =>
           s.retail && s.retail_kind !== "purchase" && !isOrphanDup(s) && !isCancelledSale(s)
-            ? x + (s.cost ?? 0)
+            ? x + retailCostOf(s)
             : x,
         0
       ),
-    [sales, isOrphanDup, isCancelledSale]
+    [sales, isOrphanDup, isCancelledSale, retailCostOf]
   );
   // 物販を利益で見た自費計（総売上に使用）
   const monthSpProfit = monthSp - retailCostMonth;
