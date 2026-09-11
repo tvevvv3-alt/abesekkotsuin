@@ -139,9 +139,13 @@ export default function RetailBoard() {
     products.forEach((p) => { const k = (p.name || "").trim(); if (k) m.set(k, { cost: p.cost, price: p.price }); });
     return m;
   }, [products]);
-  // 実効原価：手入力(cost>0)があればそれ、無ければ商品名でマスタの仕入単価×数量を使う
+  // 商品ID → 商品マスタ（患者名が購入者名/空でも product_id で原価を引けるように）
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  // 実効原価：手入力(cost>0)を最優先。無ければ product_id → 商品名の順でマスタの仕入単価×数量。
   const costOf = (s: RSale) => {
     if (s.cost > 0) return s.cost;
+    const byId = s.product_id ? productById.get(s.product_id) : undefined;
+    if (byId && byId.cost > 0) return byId.cost * (s.qty || 1);
     const p = productByName.get((s.patient_name ?? "").trim());
     return p && p.cost > 0 ? p.cost * (s.qty || 1) : s.cost;
   };
@@ -166,10 +170,10 @@ export default function RetailBoard() {
     const m = new Map<string, number>();
     sales.filter((s) => s.retail_kind !== "purchase").forEach((s) => { const k = s.staff_id ?? "__none"; m.set(k, (m.get(k) ?? 0) + profit(s)); });
     return m;
-  }, [sales]);
+  }, [sales, productById, productByName]);
   const saleRows = useMemo(() => sales.filter((s) => s.retail_kind !== "purchase"), [sales]);
   const purchaseRows = useMemo(() => sales.filter((s) => s.retail_kind === "purchase"), [sales]);
-  const totalProfit = useMemo(() => saleRows.reduce((x, s) => x + profit(s), 0), [saleRows]);
+  const totalProfit = useMemo(() => saleRows.reduce((x, s) => x + profit(s), 0), [saleRows, productById, productByName]);
   const totalSales = useMemo(() => saleRows.reduce((x, s) => x + s.selfpay, 0), [saleRows]);
   const totalPurchase = useMemo(() => purchaseRows.reduce((x, s) => x + s.cost, 0), [purchaseRows]);
 
