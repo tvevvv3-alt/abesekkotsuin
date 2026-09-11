@@ -356,6 +356,30 @@ export default function RetailBoard() {
           </tbody>
         </table>
       </div>
+
+      {/* 下のリストの利益を担当者別に合計 */}
+      <div className="mt-2 rounded-xl border bg-white p-2">
+        <div className="mb-1 text-[11px] font-bold text-slate-500">担当者別 利益合計（当月）</div>
+        <div className="flex flex-wrap gap-1.5">
+          {assignees.map((a) => (
+            <span key={a.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px]">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: a.color }} />
+              <span className="font-bold text-slate-700">{a.name}</span>
+              <span className="tabnum font-bold text-emerald-700">{yen(byStaff.get(a.id) ?? 0)}</span>
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px]">
+            <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+            <span className="font-bold text-slate-700">未割当</span>
+            <span className="tabnum font-bold text-slate-600">{yen(byStaff.get("__none") ?? 0)}</span>
+          </span>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[12px]">
+            <span className="font-bold text-emerald-700">合計</span>
+            <span className="tabnum font-bold text-emerald-700">{yen(totalProfit)}</span>
+          </span>
+        </div>
+      </div>
+
       <p className="mt-3 text-xs text-slate-400">
         <b>売上（購入者）</b>…販売と利益を入力（担当を選ぶと個別売上に反映）。<b>仕入（まとめ買い）</b>…仕入だけ入力。商品を選ぶと単価が自動で入り、行ごとに編集できます。物販の利益は個別売上（担当ごとの集計・年間一覧）に反映されます。
       </p>
