@@ -1149,6 +1149,34 @@ export default function SalesBoard() {
             </div>
           </div>
         </div>
+
+        {/* 1時間単価（担当別・当月）＝施術売上 ÷ 施術時間 のランキング */}
+        <div className="mt-2 border-t pt-2">
+          <div className="mb-1 text-[11px] font-bold text-slate-500">
+            1時間単価（担当別・{monthLabel}）
+            <span className="ml-1 font-normal text-slate-400">＝施術売上 ÷ 施術時間</span>
+          </div>
+          {(() => {
+            const rows = assignees
+              .map((s) => { const m = staffMinutes(s.id); return { s, per: m > 0 ? Math.round((staffTotal(s.id) / m) * 60) : 0, h: m / 60 }; })
+              .filter((x) => x.h > 0)
+              .sort((a, b) => b.per - a.per);
+            if (rows.length === 0) return <p className="text-[11px] text-slate-400">この月の施術データがありません。</p>;
+            return (
+              <div className="flex flex-col gap-1">
+                {rows.map(({ s, per, h }, i) => (
+                  <div key={s.id} className="flex items-center gap-2 text-[12px]">
+                    <span className="w-4 text-center text-[10px] font-bold text-slate-400">{i + 1}</span>
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+                    <span className="font-bold text-slate-700">{s.name}</span>
+                    <span className="ml-auto tabnum font-bold text-slate-800">{yen(per)}/時</span>
+                    <span className="w-14 text-right text-[10px] text-slate-400">{h.toFixed(1)}h</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
       </div>
       )}
 
