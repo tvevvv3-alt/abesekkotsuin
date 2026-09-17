@@ -15,6 +15,7 @@ interface Appt {
   id: string;
   date: string;
   start_min: number;
+  end_min?: number | null; // 所要時間（1時間単価の計算に使う）
   staff_id: string | null;
   service_id: string | null;
   service_name: string | null;
@@ -160,7 +161,7 @@ export default function SalesBoard() {
     const [{ data: ap }, { data: sl }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, date, start_min, staff_id, service_id, service_name, patient_id, patient_name")
+        .select("id, date, start_min, end_min, staff_id, service_id, service_name, patient_id, patient_name")
         .neq("status", "cancelled")
         .gte("date", monthStart)
         .lt("date", monthEnd)
@@ -635,6 +636,12 @@ export default function SalesBoard() {
       sales.reduce((sum, s) => (s.staff_id === staffId && !s.retail && !isOrphanDup(s) && !isCancelledSale(s) ? sum + total(s) : sum), 0),
     [sales, isOrphanDup, isCancelledSale]
   );
+  // 担当ごとの施術時間（当月・予約の所要時間の合計・分）。1時間単価の分母。
+  const staffMinutes = useCallback(
+    (staffId: string | null) =>
+      appts.reduce((sum, a) => (a.staff_id === staffId && a.end_min != null ? sum + Math.max(0, a.end_min - a.start_min) : sum), 0),
+    [appts]
+  );
   // その日の担当別売上（自費＋保険。物販除く）
   const dayStaffTotal = useCallback(
     (staffId: string | null) =>
@@ -1076,6 +1083,8 @@ export default function SalesBoard() {
             const tot = svc + rp; // 個別合計に物販利益を含める
             const target = targets[s.id] ?? 0;
             const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
+            const mins = staffMinutes(s.id); // 当月の施術時間（分）
+            const perHour = mins > 0 ? Math.round((svc / mins) * 60) : 0; // 施術売上の1時間単価
             return (
               <div key={s.id} className="rounded-lg border px-2 py-1">
                 <div className="flex items-center gap-1">
@@ -1106,6 +1115,12 @@ export default function SalesBoard() {
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1 gap-y-0 text-[10px] text-amber-600">
                     <span className="rounded bg-amber-100 px-1 font-bold text-amber-700">うち物販利益 ➕{rp.toLocaleString()}</span>
                     <span className="text-amber-500">施術 {yen(svc)}</span>
+                  </div>
+                )}
+                {perHour > 0 && (
+                  <div className="mt-0.5 flex items-baseline gap-1 text-[10px] text-slate-500" title="施術売上 ÷ 施術時間（当月）">
+                    <span className="rounded bg-slate-100 px-1 font-bold text-slate-600">1時間単価 {yen(perHour)}/時</span>
+                    <span className="text-slate-400">{(mins / 60).toFixed(1)}h</span>
                   </div>
                 )}
                 {target > 0 && (
