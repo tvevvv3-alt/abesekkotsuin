@@ -15,7 +15,6 @@ interface Appt {
   id: string;
   date: string;
   start_min: number;
-  end_min?: number | null; // 所要時間（1時間単価の計算に使う）
   staff_id: string | null;
   service_id: string | null;
   service_name: string | null;
@@ -161,7 +160,7 @@ export default function SalesBoard() {
     const [{ data: ap }, { data: sl }] = await Promise.all([
       supabase
         .from("appointments")
-        .select("id, date, start_min, end_min, staff_id, service_id, service_name, patient_id, patient_name")
+        .select("id, date, start_min, staff_id, service_id, service_name, patient_id, patient_name")
         .neq("status", "cancelled")
         .gte("date", monthStart)
         .lt("date", monthEnd)
@@ -636,12 +635,6 @@ export default function SalesBoard() {
       sales.reduce((sum, s) => (s.staff_id === staffId && !s.retail && !isOrphanDup(s) && !isCancelledSale(s) ? sum + total(s) : sum), 0),
     [sales, isOrphanDup, isCancelledSale]
   );
-  // 担当ごとの施術時間（当月・予約の所要時間の合計・分）。1時間単価の分母。
-  const staffMinutes = useCallback(
-    (staffId: string | null) =>
-      appts.reduce((sum, a) => (a.staff_id === staffId && a.end_min != null ? sum + Math.max(0, a.end_min - a.start_min) : sum), 0),
-    [appts]
-  );
   // その日の担当別売上（自費＋保険。物販除く）
   const dayStaffTotal = useCallback(
     (staffId: string | null) =>
@@ -1083,8 +1076,6 @@ export default function SalesBoard() {
             const tot = svc + rp; // 個別合計に物販利益を含める
             const target = targets[s.id] ?? 0;
             const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
-            const mins = staffMinutes(s.id); // 当月の施術時間（分）
-            const perHour = mins > 0 ? Math.round((svc / mins) * 60) : 0; // 施術売上の1時間単価
             return (
               <div key={s.id} className="rounded-lg border px-2 py-1">
                 <div className="flex items-center gap-1">
@@ -1117,12 +1108,6 @@ export default function SalesBoard() {
                     <span className="text-amber-500">施術 {yen(svc)}</span>
                   </div>
                 )}
-                {perHour > 0 && (
-                  <div className="mt-0.5 flex items-baseline gap-1 text-[10px] text-slate-500" title="施術売上 ÷ 施術時間（当月）">
-                    <span className="rounded bg-slate-100 px-1 font-bold text-slate-600">1時間単価 {yen(perHour)}/時</span>
-                    <span className="text-slate-400">{(mins / 60).toFixed(1)}h</span>
-                  </div>
-                )}
                 {target > 0 && (
                   <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-slate-100">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: s.color }} />
@@ -1148,34 +1133,6 @@ export default function SalesBoard() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* 1時間単価（担当別・当月）＝施術売上 ÷ 施術時間 のランキング */}
-        <div className="mt-2 border-t pt-2">
-          <div className="mb-1 text-[11px] font-bold text-slate-500">
-            1時間単価（担当別・{monthLabel}）
-            <span className="ml-1 font-normal text-slate-400">＝施術売上 ÷ 施術時間</span>
-          </div>
-          {(() => {
-            const rows = assignees
-              .map((s) => { const m = staffMinutes(s.id); return { s, per: m > 0 ? Math.round((staffTotal(s.id) / m) * 60) : 0, h: m / 60 }; })
-              .filter((x) => x.h > 0)
-              .sort((a, b) => b.per - a.per);
-            if (rows.length === 0) return <p className="text-[11px] text-slate-400">この月の施術データがありません。</p>;
-            return (
-              <div className="flex flex-col gap-1">
-                {rows.map(({ s, per, h }, i) => (
-                  <div key={s.id} className="flex items-center gap-2 text-[12px]">
-                    <span className="w-4 text-center text-[10px] font-bold text-slate-400">{i + 1}</span>
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                    <span className="font-bold text-slate-700">{s.name}</span>
-                    <span className="ml-auto tabnum font-bold text-slate-800">{yen(per)}/時</span>
-                    <span className="w-14 text-right text-[10px] text-slate-400">{h.toFixed(1)}h</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
         </div>
       </div>
       )}
