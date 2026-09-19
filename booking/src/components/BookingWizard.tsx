@@ -1261,6 +1261,7 @@ export default function BookingWizard() {
               selected={selected}
               onSelect={onSelectSlot}
               accentColor={!isClass ? selectedStaff?.color : null}
+              excludeApptId={rescheduleId}
             />
           )}
 
@@ -1333,6 +1334,7 @@ export default function BookingWizard() {
                     selected={selected}
                     onSelect={selectAfterHours}
                     accentColor={selectedStaff?.color}
+                    excludeApptId={rescheduleId}
                   />
                 </div>
               )}

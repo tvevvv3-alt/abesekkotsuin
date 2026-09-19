@@ -52,6 +52,7 @@ interface Props {
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
   accentColor?: string | null; // 担当カラー（空き○の色分け）
+  excludeApptId?: string | null; // 変更(リスケ)中の予約ID。空き判定から除外（自分の枠を埋まり扱いしない）
 }
 
 // セル表示の種類
@@ -89,6 +90,7 @@ export default function WeekCalendar({
   selected,
   onSelect,
   accentColor,
+  excludeApptId = null,
 }: Props) {
   const isClass = isClassService(capacity);
   const bhByWeekday = useMemo(
@@ -153,7 +155,11 @@ export default function WeekCalendar({
           ]
         : baseSchedules;
       const dayClosures = closures.filter((c) => c.date === dateStr);
-      const dayApptSteps = apptSteps.filter((a) => a.date === dateStr);
+      // 変更中(リスケ)の予約は空き判定から除外＝自分の枠を「埋まってる」と数えない
+      // （時間外のカスケードで自分の21:00を埋まり扱いして21:30が開く不具合の防止）
+      const dayApptSteps = apptSteps.filter(
+        (a) => a.date === dateStr && (!excludeApptId || a.appointment_id !== excludeApptId)
+      );
       const isPastDay = dateStr < todayStr;
       const isToday = dateStr === todayStr;
       const win = windowByMonth[monthKey(dateStr)];
@@ -314,6 +320,8 @@ export default function WeekCalendar({
     windowByMonth,
     sameDayOk,
     lastAcceptMin,
+    excludeApptId,
+    roomBusyByDate,
   ]);
 
   if (rows.length === 0) {
