@@ -394,8 +394,10 @@ export default function ShiftBoard() {
         if (ws != null) cl.push({ date: ds, staff_id: staffId, service_id: null, start_min: null, end_min: null, reason: null, source: "shift" });
         return;
       }
-      const dsS = sh.start_min ?? span.start; // 終日(null)は営業時間
-      const dsE = sh.end_min ?? span.end;
+      // 終日(時刻null)はそのスタッフ自身の通常勤務(ws/we)を使う。営業時間の幅(span)と
+      // 勤務時間がズレていても余計な午前/午後休診closureを作らないため。通常オフの曜日(ws/we=null)は営業時間。
+      const dsS = sh.start_min ?? ws ?? span.start;
+      const dsE = sh.end_min ?? we ?? span.end;
       if (dsS == null || dsE == null) return; // 営業時間不明なら安全側でスキップ
       if (ws == null || we == null) {
         // 通常はオフの曜日に出る → その枠を開放
