@@ -332,6 +332,21 @@ export default function BookingWizard() {
     });
     return set;
   }, [clinicServices]);
+  // 川西整体院メニューが開放されている日＝担当（阿部）が川西へ行くため茨木は休診。
+  // 茨木側カレンダーの列見出しに「川西院」と出して、休診理由が分かるようにする。
+  const kawanishiOpenDates = useMemo(() => {
+    const kawaIds = new Set(
+      services.filter((s) => s.category === "川西整体院").map((s) => s.id)
+    );
+    if (kawaIds.size === 0) return [];
+    return Array.from(
+      new Set(
+        openings
+          .filter((o) => o.service_id != null && kawaIds.has(o.service_id))
+          .map((o) => o.date)
+      )
+    );
+  }, [services, openings]);
   const shownServices = useMemo(() => {
     const base =
       category === "all"
@@ -1258,6 +1273,7 @@ export default function BookingWizard() {
               businessHours={businessHours}
               restrictToBusinessHours={isPersonal}
               openingOnly={service.category === "川西整体院"}
+              kawanishiDates={service.category === "川西整体院" ? undefined : kawanishiOpenDates}
               selected={selected}
               onSelect={onSelectSlot}
               accentColor={!isClass ? selectedStaff?.color : null}
@@ -1331,6 +1347,7 @@ export default function BookingWizard() {
                     windows={windows}
                     maxMonth={lastReleasedMonth}
                     roomBusyByDate={roomBusyByDate}
+                    kawanishiDates={kawanishiOpenDates}
                     selected={selected}
                     onSelect={selectAfterHours}
                     accentColor={selectedStaff?.color}

@@ -49,6 +49,7 @@ interface Props {
   businessHours?: BusinessHours[]; // 医院の営業時間（曜日ごと）
   restrictToBusinessHours?: boolean; // true=営業時間内のみ予約可（パーソナル用。時間外は×）
   openingOnly?: boolean; // true=解放枠がある日だけ予約可（川西院用。基本休診）
+  kawanishiDates?: string[]; // 川西整体院が開いている日（担当が川西へ＝茨木は休診）。列見出しに「川西院」表示
   selected: { date: string; startMin: number } | null;
   onSelect: (date: string, startMin: number) => void;
   accentColor?: string | null; // 担当カラー（空き○の色分け）
@@ -87,6 +88,7 @@ export default function WeekCalendar({
   businessHours = [],
   restrictToBusinessHours = false,
   openingOnly = false,
+  kawanishiDates,
   selected,
   onSelect,
   accentColor,
@@ -324,6 +326,19 @@ export default function WeekCalendar({
     roomBusyByDate,
   ]);
 
+  // 川西院が開いている日＝担当が川西へ行くため茨木は予約不可。
+  // その日にこの担当の空きが1つも無ければ列見出しに「川西院」を表示。
+  const kawaSet = useMemo(() => new Set(kawanishiDates ?? []), [kawanishiDates]);
+  const kawaDayFlags = useMemo(
+    () =>
+      days.map(
+        (d, di) =>
+          kawaSet.has(toDateStr(d)) &&
+          !grid[di].some((c) => c.kind === "ok" || c.kind === "class-ok")
+      ),
+    [days, grid, kawaSet]
+  );
+
   if (rows.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-slate-500">
@@ -342,7 +357,7 @@ export default function WeekCalendar({
             <th className="sticky left-0 z-10 bg-slate-50 p-1 text-xs font-normal text-slate-400">
               時間
             </th>
-            {days.map((d) => {
+            {days.map((d, di) => {
               const ds = toDateStr(d);
               const isToday = ds === today;
               const isPast = ds < today;
@@ -357,6 +372,11 @@ export default function WeekCalendar({
                   <div className={isToday ? "font-bold" : ""}>
                     {d.getMonth() + 1}/{d.getDate()}
                   </div>
+                  {kawaDayFlags[di] && (
+                    <div className="mt-0.5 rounded bg-emerald-100 px-0.5 py-px text-[9px] font-bold leading-tight text-emerald-700">
+                      川西院
+                    </div>
+                  )}
                 </th>
               );
             })}
