@@ -76,7 +76,7 @@ export default function ShiftBoard() {
   const [rosterOpen, setRosterOpen] = useState(false);
   const [edit, setEdit] = useState<string | null>(null); // 編集中の日付
   const [draft, setDraft] = useState<Draft>({});
-  const [dayClosure, setDayClosure] = useState<"none" | "full" | "am" | "pm">("none");
+  const [dayClosure, setDayClosure] = useState<"none" | "full" | "am" | "pm" | "training">("none");
   const [clip, setClip] = useState<Clip[] | null>(null); // コピー中のシフト（貼り付けモード）
 
   const monthStart = useMemo(() => date.slice(0, 8) + "01", [date]);
@@ -247,13 +247,14 @@ export default function ShiftBoard() {
             const hol = holidayName(ds);
             const dayCl = closuresByDate.get(ds) ?? [];
             const fullClosed = dayCl.some((c) => c.start_min == null);
+            const clReason = (dayCl.find((c) => c.start_min == null)?.reason ?? "").trim();
             const wdClosed = bhByWd.get(dow)?.is_open === false;
             const closed = wdClosed || fullClosed;
             const dcolor = dow === 0 || hol ? "#c0392b" : dow === 6 ? "#1d4ed8" : "#333";
             const bandBg = hol ? "#fdecec" : "#f7efd6";
             const head = `<div class="band" style="background:${bandBg}"><span class="dn" style="color:${dcolor}">${d.getDate()}</span>${hol ? `<span class="hol">${esc(hol)}</span>` : ""}</div>`;
             if (closed) {
-              return `<td>${head}<div class="cell closedcell"><span class="closed">休 診</span></div></td>`;
+              return `<td>${head}<div class="cell closedcell"><span class="closed">${clReason ? esc(clReason) : "休 診"}</span></div></td>`;
             }
             const partial: string[] = [];
             const full: string[] = [];
@@ -349,7 +350,14 @@ export default function ShiftBoard() {
     });
     // 院全体の休診状態を反映
     const cls = closuresByDate.get(ds) ?? [];
-    setDayClosure(cls.some((c) => c.start_min == null) ? "full" : cls.some((c) => closureLabel(c) === "午前休診") ? "am" : cls.some((c) => closureLabel(c) === "午後休診") ? "pm" : "none");
+    const fullCl = cls.find((c) => c.start_min == null);
+    setDayClosure(
+      fullCl
+        ? ((fullCl.reason ?? "").trim() === "院内研修" ? "training" : "full")
+        : cls.some((c) => closureLabel(c) === "午前休診") ? "am"
+        : cls.some((c) => closureLabel(c) === "午後休診") ? "pm"
+        : "none"
+    );
     setDraft(d); setEdit(ds);
   }
   function draftRows(ds: string) {
@@ -535,8 +543,10 @@ export default function ShiftBoard() {
       // 院全体の休診（予約側の closures と共通）
       await supabase.from("closures").delete().eq("date", target).is("staff_id", null).is("service_id", null);
       if (dayClosure !== "none") {
-        const t = dayClosure === "full" ? { start: null, end: null } : segTimes(target, dayClosure);
-        await supabase.from("closures").insert({ date: target, staff_id: null, service_id: null, start_min: t.start, end_min: t.end, reason: null });
+        const isFull = dayClosure === "full" || dayClosure === "training";
+        const t = isFull ? { start: null, end: null } : segTimes(target, dayClosure as "am" | "pm");
+        const reason = dayClosure === "training" ? "院内研修" : null;
+        await supabase.from("closures").insert({ date: target, staff_id: null, service_id: null, start_min: t.start, end_min: t.end, reason });
       }
       // この日のシフト由来の予約枠も更新（直前の締め/開けが即反映）
       await applyShiftAvail([{ ds: target, shifts: rows }]);
@@ -736,7 +746,7 @@ export default function ShiftBoard() {
                       {/* 内容：施術スタッフ／受付／学生 の3段 */}
                       <div className={`flex flex-1 flex-col justify-center gap-0.5 px-0.5 py-1 ${closed ? "bg-slate-100" : ""}`}>
                         {!inMonth ? null : closed ? (
-                          <span className="text-center text-xs font-bold tracking-[0.2em] text-rose-500">休診</span>
+                          <span className={`text-center font-bold text-rose-500 ${reason ? "text-[11px]" : "text-xs tracking-[0.2em]"}`}>{reason || "休診"}</span>
                         ) : (
                           <>
                             {/* ① 施術スタッフ */}
@@ -876,14 +886,14 @@ export default function ShiftBoard() {
             {/* 休診（この日を院全体で休みに） */}
             <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 p-2">
               <span className="mr-1 text-[12px] font-bold text-slate-600">休診</span>
-              {(["none", "full", "am", "pm"] as const).map((v) => (
+              {(["none", "full", "am", "pm", "training"] as const).map((v) => (
                 <button key={v} onClick={() => setDayClosure(v)}
-                  className={`rounded border px-2 py-1 text-[11px] font-bold ${dayClosure === v ? "border-rose-500 bg-rose-500 text-white" : "border-slate-300 text-slate-600"}`}>
-                  {v === "none" ? "通常" : v === "full" ? "終日休診" : v === "am" ? "午前休診" : "午後休診"}
+                  className={`rounded border px-2 py-1 text-[11px] font-bold ${dayClosure === v ? (v === "training" ? "border-indigo-500 bg-indigo-500 text-white" : "border-rose-500 bg-rose-500 text-white") : "border-slate-300 text-slate-600"}`}>
+                  {v === "none" ? "通常" : v === "full" ? "終日休診" : v === "am" ? "午前休診" : v === "pm" ? "午後休診" : "院内研修"}
                 </button>
               ))}
             </div>
-            <div className={`space-y-1.5 ${dayClosure === "full" ? "opacity-40" : ""}`}>
+            <div className={`space-y-1.5 ${dayClosure === "full" || dayClosure === "training" ? "opacity-40" : ""}`}>
               {activeMembers.map((m) => {
                 const dr = draft[m.id] ?? { on: false, seg: "all" as Seg, start: "", end: "", clinic: false };
                 return (
