@@ -56,7 +56,7 @@ export default function ShiftBoard() {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [staffNames, setStaffNames] = useState<Map<string, string>>(new Map());
   const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>([]);
-  const [kawa, setKawa] = useState<{ id: string; start: number; end: number } | null>(null); // 川西院メニューの解放窓
+  const [kawa, setKawa] = useState<{ id: string; starts: number[]; dur: number } | null>(null); // 川西院メニューの解放（開始時刻ごと）
   const [applying, setApplying] = useState(false);
   const [savingDay, setSavingDay] = useState(false); // 日別シフト保存中（連打ガード）
   const [toast, setToast] = useState<string | null>(null); // 保存完了などの一時通知
@@ -103,7 +103,7 @@ export default function ShiftBoard() {
         const arr = k.class_starts.split(",").map((x) => parseInt(x.trim(), 10)).filter((n) => !isNaN(n));
         if (!arr.length) return;
         const dur = Math.max(totalDuration(k.steps ?? []), 60);
-        setKawa({ id: k.id, start: Math.min(...arr), end: Math.max(...arr) + dur });
+        setKawa({ id: k.id, starts: arr, dur });
       })
       .catch(() => {});
   }, [loadMembers, supabase]);
@@ -409,9 +409,11 @@ export default function ShiftBoard() {
         if (dsE > we) op.push({ date: ds, staff_id: staffId, start_min: we, end_min: dsE, source: "shift" }); // 通常より後まで→開放
       }
     });
-    // 川西院：その日に「川西」チェックのシフトが1つでもあれば、川西メニューを解放
+    // 川西院：その日に「川西」チェックのシフトが1つでもあれば、川西メニューを開始時刻ごとに解放
     if (kawa && dayShifts.some((s) => s.clinic === "kawanishi")) {
-      op.push({ date: ds, staff_id: null, service_id: kawa.id, start_min: kawa.start, end_min: kawa.end, source: "shift" });
+      kawa.starts.forEach((cs) => {
+        op.push({ date: ds, staff_id: null, service_id: kawa.id, start_min: cs, end_min: cs + kawa.dur, source: "shift" });
+      });
     }
     return { cl, op };
   }, [members, nameToStaff, staffSchedules, bhSpan, kawa]);
