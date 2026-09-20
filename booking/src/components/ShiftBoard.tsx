@@ -421,6 +421,9 @@ export default function ShiftBoard() {
     const dates = entries.map((e) => e.ds);
     if (dates.length === 0) return;
     await supabase.from("closures").delete().in("date", dates).eq("source", "shift");
+    // 過去の自動生成で source が付いていない“個別の休診”（staff指定・service_null・source=null）も掃除。
+    // ＝終日勤務なのに午後休診が残る不具合の原因。院全体の休診(staff_id null)や院内研修等は残す。
+    await supabase.from("closures").delete().in("date", dates).not("staff_id", "is", null).is("service_id", null).is("source", null);
     await supabase.from("openings").delete().in("date", dates).eq("source", "shift");
     const cls: GenCl[] = []; const ops: GenOp[] = [];
     entries.forEach((e) => { const r = genShiftAvail(e.ds, e.shifts); cls.push(...r.cl); ops.push(...r.op); });
@@ -430,7 +433,7 @@ export default function ShiftBoard() {
 
   // 当月のシフトカレンダー通りに予約枠を一括反映（20日頃の翌月解放用）
   async function applyMonthToAvailability() {
-    if (!confirm(`${monthLabel} のシフトカレンダー通りに予約枠を反映します。\n・施術者の勤務時間に合わせて空きを開閉\n・シフトが無い施術者はその日オフ\n※シフト由来の枠を作り直します（手動の休み・開放は残ります）`)) return;
+    if (!confirm(`${monthLabel} のシフトカレンダー通りに予約枠を反映します。\n・施術者の勤務時間に合わせて空きを開閉\n・シフトが無い施術者はその日オフ\n・古い個別休診（終日勤務なのに残る午前/午後休診など）を掃除して作り直し\n※院全体の休診・院内研修は残ります`)) return;
     setApplying(true);
     try {
       const { data: sh } = await supabase.from("shifts").select("date, member_id, start_min, end_min, clinic").gte("date", monthStart).lt("date", monthEnd);
