@@ -68,7 +68,8 @@ begin
   --   基本は休診。openings（解放枠）がある日・時間だけ予約可。
   --   拠点が別なので茨木の勤務/休診には縛られない（同担当の同時刻重複だけ見る）。
   if v_opening_only then
-    if not exists (
+    -- 患者は解放枠(openings)がある日・時間のみ予約可。管理(p_ignore_hours)は時間外もOK。
+    if not p_ignore_hours and not exists (
       select 1 from openings o
        where o.service_id = p_service_id and o.date = p_date
          and o.start_min <= p_start_min and o.end_min >= v_end
