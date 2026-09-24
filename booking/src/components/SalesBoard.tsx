@@ -157,29 +157,47 @@ export default function SalesBoard() {
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [{ data: ap }, { data: sl }] = await Promise.all([
-      supabase
+    // 件数の多い月（例：移行分の一括取込）でもサーバ行上限で取りこぼさないよう1000件ずつ全件取得。
+    const PAGE = 1000;
+    const ap: Appt[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
         .from("appointments")
         .select("id, date, start_min, staff_id, service_id, service_name, patient_id, patient_name")
         .neq("status", "cancelled")
         .gte("date", monthStart)
         .lt("date", monthEnd)
         .order("date")
-        .order("start_min"),
-      supabase
+        .order("start_min")
+        .range(from, from + PAGE - 1);
+      if (error || !data) break;
+      ap.push(...(data as Appt[]));
+      if (data.length < PAGE) break;
+    }
+    const sl: Sale[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
         .from("sales")
         .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, retail_buyer, anchor_appointment_id, sort_order, payment, product_id, qty")
         .gte("date", monthStart)
-        .lt("date", monthEnd),
-    ]);
-    setAppts((ap as Appt[]) ?? []);
-    setSales((sl as Sale[]) ?? []);
+        .lt("date", monthEnd)
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error || !data) break;
+      sl.push(...(data as Sale[]));
+      if (data.length < PAGE) break;
+    }
+    setAppts(ap);
+    setSales(sl);
     // 患者の生年月日（学生/一般の判定用）
-    const pids = Array.from(new Set(((ap as Appt[]) ?? []).map((a) => a.patient_id).filter((x): x is string => !!x)));
+    const pids = Array.from(new Set(ap.map((a) => a.patient_id).filter((x): x is string => !!x)));
     if (pids.length) {
-      const { data: pts } = await supabase.from("patients").select("id, birth_date").in("id", pids);
       const bm: Record<string, string> = {};
-      (pts as { id: string; birth_date: string | null }[] | null)?.forEach((p) => { if (p.birth_date) bm[p.id] = p.birth_date; });
+      for (let i = 0; i < pids.length; i += 500) {
+        const { data: pts } = await supabase.from("patients").select("id, birth_date").in("id", pids.slice(i, i + 500));
+        (pts as { id: string; birth_date: string | null }[] | null)?.forEach((p) => { if (p.birth_date) bm[p.id] = p.birth_date; });
+      }
       setBirth(bm);
     } else {
       setBirth({});
@@ -193,8 +211,8 @@ export default function SalesBoard() {
 
   // 年間ビュー用：その年の売上を丸ごと取得（月別集計に使う）
   const [yearSales, setYearSales] = useState<Sale[]>([]);
-  // 年間ビュー用：その年のキャンセル済み予約ID（紐づく売上を年間集計から外す）。
-  const [yearAppts, setYearAppts] = useState<{ id: string }[]>([]);
+  // 年間ビュー用：その年の予約（キャンセル判定＋はぐれ売上の重複判定に使う）。
+  const [yearAppts, setYearAppts] = useState<{ id: string; date: string; patient_name: string | null; status: string }[]>([]);
   const [yearLoading, setYearLoading] = useState(false);
   const year = useMemo(() => date.slice(0, 4), [date]);
   useEffect(() => {
@@ -202,32 +220,60 @@ export default function SalesBoard() {
     let alive = true;
     (async () => {
       setYearLoading(true);
-      const [salesRes, apptRes] = await Promise.all([
-        supabase
+      // ★年間は1年ぶんを丸ごと集計する。サーバのデフォルト行上限(db-max-rows=1000など)で
+      //   途中で打ち切られると特定の月（例：9月）が過少集計になるため、1000件ずつページングして全件取得する。
+      const PAGE = 1000;
+      const allSales: Sale[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
           .from("sales")
-          .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, anchor_appointment_id, sort_order, payment")
+          .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_kind, anchor_appointment_id, sort_order, payment, product_id, qty")
           .gte("date", `${year}-01-01`)
           .lte("date", `${year}-12-31`)
-          .limit(50000),
-        // ★キャンセル済みの予約だけ取得（＝これに紐づく売上だけ除外する）。
-        //   「予約が新システムに存在しない（8月=RERE移行分など）」ものは除外しない。
-        supabase
+          .order("date", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error || !data) break;
+        allSales.push(...(data as Sale[]));
+        if (data.length < PAGE) break;
+      }
+      // 予約は全件取得。キャンセル済み → 紐づく売上を除外、それ以外 → はぐれ売上の重複判定に使う。
+      // 「予約が新システムに存在しない（8月=RERE移行分など）」売上は除外しない（当月ビューと同じ扱い）。
+      const yAppts: { id: string; date: string; patient_name: string | null; status: string }[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
           .from("appointments")
-          .select("id")
-          .eq("status", "cancelled")
+          .select("id, date, patient_name, status")
           .gte("date", `${year}-01-01`)
           .lte("date", `${year}-12-31`)
-          .limit(5000),
-      ]);
+          .order("id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error || !data) break;
+        yAppts.push(...(data as { id: string; date: string; patient_name: string | null; status: string }[]));
+        if (data.length < PAGE) break;
+      }
       if (!alive) return;
-      setYearSales((salesRes.data as Sale[]) ?? []);
-      setYearAppts((apptRes.data as { id: string }[]) ?? []);
+      setYearSales(allSales);
+      setYearAppts(yAppts);
       setYearLoading(false);
     })();
     return () => { alive = false; };
   }, [view, year, supabase]);
   // 年間用：キャンセル済み予約ID（これに紐づく売上だけ集計から外す）
-  const yearCancelledIds = useMemo(() => new Set(yearAppts.map((a) => a.id)), [yearAppts]);
+  const yearCancelledIds = useMemo(
+    () => new Set(yearAppts.filter((a) => a.status === "cancelled").map((a) => a.id)),
+    [yearAppts]
+  );
+  // 年間用：予約(未キャンセル)の「日付＋氏名」集合。予約に紐づかない同名“はぐれ売上”の二重計上を防ぐ（当月ビューと同じ）。
+  const yearApptKeys = useMemo(() => {
+    const set = new Set<string>();
+    yearAppts.forEach((a) => {
+      if (a.status === "cancelled") return;
+      const nn = normName(a.patient_name);
+      if (nn) set.add(a.date + "|" + nn);
+    });
+    return set;
+  }, [yearAppts]);
 
   const saleByAppt = useMemo(() => {
     const m: Record<string, Sale> = {};
@@ -972,8 +1018,11 @@ export default function SalesBoard() {
       if (s.retail_kind === "purchase") return;
       // 明確にキャンセル済みの予約に紐づく売上だけ除外（予約が存在しないものは除外しない）
       if (s.appointment_id && yearCancelledIds.has(s.appointment_id)) return;
-      // 物販は担当が付いていても「物販」行へ（担当の自費には入れない）
-      if (s.retail) { busM[m] += s.selfpay + s.insurance; return; }
+      // 予約に同名がいる“はぐれ売上”は二重計上しない（当月ビューと同じ）
+      const nn = normName(s.patient_name);
+      if (!s.appointment_id && nn && yearApptKeys.has(s.date + "|" + nn)) return;
+      // 物販は担当が付いていても「物販」行へ。総売上と一致させるため利益(販売−仕入)で計上する。
+      if (s.retail) { busM[m] += s.selfpay + s.insurance - retailCostOf(s); return; }
       if (kawa && s.staff_id === kawa.id) {
         kawaM[m] += s.selfpay + s.insurance; // 川西院（内訳表示用）
         // 川西は全て阿部が担当 → 阿部の保険/自費にも合算（スプレッドシートと一致させる）
@@ -993,7 +1042,7 @@ export default function SalesBoard() {
     const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + taikanM[m]);
     const busKomi = perMonth((m) => sougou[m] + busM[m]);
     return { rows, kawaM, taikanM, busM, hokenTotal, jihiTotal, sougou, busKomi };
-  }, [yearSales, staff, kawa, taikan, yearCancelledIds, bucket]);
+  }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, bucket, retailCostOf]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
@@ -1201,7 +1250,7 @@ export default function SalesBoard() {
                       {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700")}
                       {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700")}
                       {aggRow("総合計", yearData.sougou, "bg-amber-50 text-amber-800")}
-                      {aggRow("物販", yearData.busM, "bg-slate-50 text-slate-600")}
+                      {aggRow("物販利益", yearData.busM, "bg-slate-50 text-slate-600")}
                       {aggRow("物販込総計", yearData.busKomi, "bg-amber-100 text-amber-900")}
                     </>
                   );
