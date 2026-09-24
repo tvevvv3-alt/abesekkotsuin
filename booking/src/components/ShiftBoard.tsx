@@ -423,9 +423,10 @@ export default function ShiftBoard() {
     const dates = entries.map((e) => e.ds);
     if (dates.length === 0) return;
     await supabase.from("closures").delete().in("date", dates).eq("source", "shift");
-    // 過去の自動生成で source が付いていない“個別の休診”（staff指定・service_null・source=null）も掃除。
-    // ＝終日勤務なのに午後休診が残る不具合の原因。院全体の休診(staff_id null)や院内研修等は残す。
-    await supabase.from("closures").delete().in("date", dates).not("staff_id", "is", null).is("service_id", null).is("source", null);
+    // 施術者個別の休診（staff指定・service_null）は source を問わず全部掃除してシフトから作り直す。
+    // ＝終日勤務なのに午前/午後休診が残る不具合の原因（古い自動生成や手動分の食い違い）を根絶。
+    // 院全体の休診(staff_id null)・院内研修や、川西など service 指定(service_null でない)は残す。
+    await supabase.from("closures").delete().in("date", dates).not("staff_id", "is", null).is("service_id", null);
     await supabase.from("openings").delete().in("date", dates).eq("source", "shift");
     const cls: GenCl[] = []; const ops: GenOp[] = [];
     entries.forEach((e) => { const r = genShiftAvail(e.ds, e.shifts); cls.push(...r.cl); ops.push(...r.op); });
