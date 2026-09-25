@@ -185,7 +185,7 @@ export default function CalendarView({
   const pressRef = useRef<null | {
     id: string; kind: DragKind; startX: number; startY: number;
     origStart: number; origEnd: number; origDate: string; origStaff: string | null;
-    appt: ApptWithSteps; timer: number | null; source: "touch" | "mouse";
+    appt: ApptWithSteps | null; note?: CalendarNote | null; timer: number | null; source: "touch" | "mouse";
   }>(null);
   const dragActiveRef = useRef(false);
   const draggedRef = useRef(false); // ドラッグ直後のクリック（モーダル）を抑止
@@ -458,6 +458,19 @@ export default function CalendarView({
       appt, timer: window.setTimeout(activatePress, 240), source,
     };
   }
+  function beginPressNote(note: CalendarNote, x: number, y: number, source: "touch" | "mouse") {
+    if (note.start_min == null) return; // 終日メモはドラッグ対象外
+    cancelPress();
+    draggedRef.current = false;
+    latestXYRef.current = { x, y };
+    const s = note.start_min;
+    const e = note.end_min ?? s + 30;
+    pressRef.current = {
+      id: note.id, kind: "move", startX: x, startY: y,
+      origStart: s, origEnd: e, origDate: note.date, origStaff: null,
+      appt: null, note, timer: window.setTimeout(activatePress, 240), source,
+    };
+  }
   function movePress(x: number, y: number) {
     const p = pressRef.current;
     if (!p) return;
@@ -494,9 +507,11 @@ export default function CalendarView({
       targetDate = center[Math.max(0, Math.min(days - 1, idx))] ?? p.origDate;
     }
     let onStaff: string | null = null;
-    const under = document.elementFromPoint(x, y) as HTMLElement | null;
-    const chip = under?.closest?.("[data-staff-id]") as HTMLElement | null;
-    if (chip) onStaff = chip.getAttribute("data-staff-id");
+    if (!p.note) {
+      const under = document.elementFromPoint(x, y) as HTMLElement | null;
+      const chip = under?.closest?.("[data-staff-id]") as HTMLElement | null;
+      if (chip) onStaff = chip.getAttribute("data-staff-id");
+    }
     const ds: DragState = { id: p.id, kind: "move", origStart: p.origStart, origEnd: p.origEnd, origDate: p.origDate, targetStart, targetDate, dyPx, onStaff };
     latestDragRef.current = ds;
     setDragging(ds);
@@ -510,22 +525,36 @@ export default function CalendarView({
     setDragging(null);
     latestDragRef.current = null;
     if (!wasActive || !p) return;
-    const nm = p.appt.patient_name || "（未登録）";
     const fmtDT = (d: string, m: number) => `${d.slice(5).replace("-", "/")} ${minToLabel(m)}`;
+    // メモのドラッグ移動（時刻・日付）
+    if (p.note) {
+      const note = p.note;
+      let changedN = false;
+      if (dd && (dd.targetStart !== p.origStart || dd.targetDate !== p.origDate)) {
+        const ts = dd.targetStart, td = dd.targetDate;
+        setConfirmMove({ title: "メモを移動", detail: `${note.text}\n${fmtDT(p.origDate, p.origStart)} → ${fmtDT(td, ts)}`, run: () => commitNoteMove(note, ts, td) });
+        changedN = true;
+      }
+      draggedRef.current = changedN;
+      return;
+    }
+    if (!p.appt) return;
+    const appt = p.appt;
+    const nm = appt.patient_name || "（未登録）";
     let changed = false;
     if (p.kind === "move" && dd) {
       if (dd.onStaff && dd.onStaff !== p.origStaff) {
         const to = dd.onStaff;
-        setConfirmMove({ title: "担当を変更", detail: `${nm}\n担当：${staffName(p.origStaff) || "-"} → ${staffName(to) || "-"}`, run: () => commitStaff(p.appt, to) });
+        setConfirmMove({ title: "担当を変更", detail: `${nm}\n担当：${staffName(p.origStaff) || "-"} → ${staffName(to) || "-"}`, run: () => commitStaff(appt, to) });
         changed = true;
       } else if (dd.targetStart !== p.origStart || dd.targetDate !== p.origDate) {
         const ts = dd.targetStart, td = dd.targetDate;
-        setConfirmMove({ title: "予約を移動", detail: `${nm}\n${fmtDT(p.origDate, p.origStart)} → ${fmtDT(td, ts)}`, run: () => commitMove(p.appt, ts, td) });
+        setConfirmMove({ title: "予約を移動", detail: `${nm}\n${fmtDT(p.origDate, p.origStart)} → ${fmtDT(td, ts)}`, run: () => commitMove(appt, ts, td) });
         changed = true;
       }
     } else if (p.kind === "denden" && dd) {
       if (Math.abs(dd.dyPx / pxRef.current) >= 20) {
-        setConfirmMove({ title: "通電の順番を入れ替え", detail: nm, run: () => commitSwap(p.appt) });
+        setConfirmMove({ title: "通電の順番を入れ替え", detail: nm, run: () => commitSwap(appt) });
         changed = true;
       }
     }
@@ -537,6 +566,11 @@ export default function CalendarView({
     await Promise.all((appt.steps ?? []).map((st) =>
       supabase.from("appointment_steps").update({ start_min: st.start_min + delta, end_min: st.end_min + delta, date: newDate }).eq("id", st.id)
     ));
+    reload();
+  }
+  async function commitNoteMove(note: CalendarNote, newStart: number, newDate: string) {
+    const dur = (note.end_min ?? (note.start_min ?? 0) + 30) - (note.start_min ?? 0);
+    await supabase.from("calendar_notes").update({ start_min: newStart, end_min: newStart + dur, date: newDate }).eq("id", note.id);
     reload();
   }
   async function commitStaff(appt: ApptWithSteps, staffId: string) {
@@ -571,6 +605,15 @@ export default function CalendarView({
         if (appt) {
           const kind: DragKind = tEl.closest?.("[data-denden]") ? "denden" : "move";
           beginPress(appt, kind, e.touches[0].clientX, e.touches[0].clientY, "touch");
+          return;
+        }
+      }
+      const nblk = tEl.closest?.("[data-note-id]") as HTMLElement | null;
+      if (nblk) {
+        const nid = nblk.getAttribute("data-note-id");
+        const note = nid ? notes.find((n) => n.id === nid) : undefined;
+        if (note && note.start_min != null) {
+          beginPressNote(note, e.touches[0].clientX, e.touches[0].clientY, "touch");
           return;
         }
       }
@@ -816,16 +859,46 @@ export default function CalendarView({
           if (it.kind === "note") {
             const h = yFor(it.e) - top;
             const ml = it.full && h >= 40;
+            const ndrg = dragging && dragging.id === it.note.id ? dragging : null;
+            let noteDragStyle: React.CSSProperties = {};
+            if (ndrg && ndrg.kind === "move") {
+              const center = lists[1];
+              const oi = center.indexOf(ndrg.origDate);
+              const ti = center.indexOf(ndrg.targetDate);
+              const gEl = gridRef.current;
+              const colW = gEl ? (gEl.getBoundingClientRect().width - GUTTER) / days : 0;
+              const dxPx = oi >= 0 && ti >= 0 ? (ti - oi) * colW : 0;
+              const dyPx = yFor(ndrg.targetStart) - yFor(ndrg.origStart);
+              noteDragStyle = { transform: `translate3d(${dxPx}px, ${dyPx}px, 0)`, zIndex: 60, opacity: 0.92, boxShadow: "0 12px 26px rgba(0,0,0,.3)" };
+            }
             return (
               <button
                 key={it.note.id}
+                data-note-id={it.note.id}
                 onClick={(ev) => {
                   ev.stopPropagation();
+                  if (draggedRef.current) { draggedRef.current = false; return; }
                   setNoteModal({ mode: "edit", note: it.note });
                 }}
+                onPointerDown={(ev) => {
+                  if (ev.pointerType !== "mouse" || ev.button !== 0) return;
+                  try { (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId); } catch {}
+                  beginPressNote(it.note, ev.clientX, ev.clientY, "mouse");
+                }}
+                onPointerMove={(ev) => {
+                  if (ev.pointerType !== "mouse") return;
+                  if (dragActiveRef.current) ev.preventDefault();
+                  movePress(ev.clientX, ev.clientY);
+                }}
+                onPointerUp={(ev) => { if (ev.pointerType === "mouse") endPress(); }}
                 className="absolute flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
-                style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE }}
+                style={{ ...style, backgroundColor: segColor(it.note.color || "#64748b", "dark"), border: HAIRLINE, ...noteDragStyle }}
               >
+                {ndrg && ndrg.kind === "move" && (
+                  <span className="absolute -top-5 left-0 z-20 whitespace-nowrap rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {ndrg.targetDate.slice(5).replace("-", "/")} {minToLabel(ndrg.targetStart)}
+                  </span>
+                )}
                 <span
                   className={`${ml ? "overflow-hidden text-[13px] leading-[1.25]" : "w-full overflow-hidden whitespace-nowrap text-[12.5px] leading-[1.2]"} font-semibold text-white`}
                   style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
@@ -1249,9 +1322,10 @@ function NoteModal({
   const [text, setText] = useState(editing?.text ?? "");
   const [color, setColor] = useState(editing?.color ?? colors[0]);
   const allDay = editing ? editing.start_min == null : data.mode === "add" && data.allDay;
+  const round15 = (m: number) => Math.round(m / 15) * 15;
   const initStart = editing?.start_min ?? (data.mode === "add" ? data.startMin : 600);
-  const [startMin, setStartMin] = useState<number>(initStart ?? 600);
-  const [endMin, setEndMin] = useState<number>(editing?.end_min ?? (initStart ?? 600) + 60);
+  const [startMin, setStartMin] = useState<number>(round15(initStart ?? 600));
+  const [endMin, setEndMin] = useState<number>(round15(editing?.end_min ?? (initStart ?? 600) + 60));
   const [busy, setBusy] = useState(false);
   // 繰り返し（追加時のみ）：なし/毎日/毎週/毎月 × 回数ぶん行を作成
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly">("none");
@@ -1300,14 +1374,16 @@ function NoteModal({
     onDone();
   }
 
+  // 分は 0/15/30/45 の単位に丸める
+  const r15 = (m: number) => Math.round(m / 15) * 15;
   const timeInput = (val: number, set: (n: number) => void) => (
     <input
       type="time"
-      step={300}
-      value={minToLabel(val)}
+      step={900}
+      value={minToLabel(r15(val))}
       onChange={(e) => {
         const [h, m] = e.target.value.split(":").map(Number);
-        if (!isNaN(h)) set(h * 60 + (m || 0));
+        if (!isNaN(h)) set(r15(h * 60 + (m || 0)));
       }}
       className="rounded-md border px-2 py-1 text-sm"
     />
