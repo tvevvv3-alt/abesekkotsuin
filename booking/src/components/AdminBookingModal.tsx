@@ -370,11 +370,11 @@ export default function AdminBookingModal({
           <div className="flex items-center gap-2">
             <input
               type="time"
-              step={300}
-              value={startMin !== null ? minToLabel(startMin) : ""}
+              step={900}
+              value={startMin !== null ? minToLabel(Math.round(startMin / 15) * 15) : ""}
               onChange={(e) => {
                 const [h, mm] = e.target.value.split(":").map(Number);
-                if (!isNaN(h)) setStartMin(h * 60 + (mm || 0));
+                if (!isNaN(h)) setStartMin(Math.round((h * 60 + (mm || 0)) / 15) * 15);
               }}
               className="rounded-md border px-2 py-1.5 text-sm tabnum"
             />
