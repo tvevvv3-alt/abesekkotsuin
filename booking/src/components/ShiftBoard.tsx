@@ -203,15 +203,17 @@ export default function ShiftBoard() {
   }, [date]);
 
   // その日・そのメンバーが午前/午後どちらに出るか
-  const covFor = (ds: string, dow: number, memberId: string, s: Shift) => {
+  const covFor = (ds: string, dow: number, _memberId: string, s: Shift) => {
     // 午前/午後の境目は「昼休みの入口」。2部制(seg2あり)かつ妥当な昼休みならseg1_end、
     // それ以外（1部制・seg1_endが閉院時刻など）は13:00固定。終日勤務を午後休診と誤判定しないため。
     const b = bhByWd.get(dow);
     const split = b && b.seg2_start != null && b.seg1_end != null && b.seg1_end < b.seg2_start ? b.seg1_end : 780;
     let am = s.start_min == null ? true : s.start_min < split;
     let pm = s.start_min == null ? true : s.end_min == null || s.end_min > split;
+    // ★シフト表示はシフトの勤務時間を正とする。半休はシフトの開始/終了で表す。
+    //   院全体の休診(午前/午後)だけは全員に効かせる。個別の休診(予約側で付けたもの/古い残り)は
+    //   シフト表示に反映しない＝終日勤務なのに「午後休診」と出続ける不具合を根絶する。
     (closuresByDate.get(ds) ?? []).forEach((c) => { if (c.start_min != null) { const l = closureLabel(c); if (l === "午前休診") am = false; if (l === "午後休診") pm = false; } });
-    (indivByDate.get(ds) ?? []).filter((x) => x.member.id === memberId).forEach((x) => { if (x.label === "午前休") am = false; if (x.label === "午後休") pm = false; });
     return { am, pm };
   };
 
