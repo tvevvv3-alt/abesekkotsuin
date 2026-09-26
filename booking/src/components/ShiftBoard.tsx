@@ -424,11 +424,10 @@ export default function ShiftBoard() {
   const applyShiftAvail = useCallback(async (entries: { ds: string; shifts: ShiftLite[] }[]) => {
     const dates = entries.map((e) => e.ds);
     if (dates.length === 0) return;
+    // ★シフト由来(source='shift')の枠だけ作り直す。手動で付けた休診(source=null)は消さない
+    //   ＝「予約枠に反映」を押すたびに手動の休診枠が消えて開いてしまう不具合を防ぐ。
+    //   （終日勤務なのに午後休診と“表示”される件は covFor 側でシフト優先にして解消済み）
     await supabase.from("closures").delete().in("date", dates).eq("source", "shift");
-    // 施術者個別の休診（staff指定・service_null）は source を問わず全部掃除してシフトから作り直す。
-    // ＝終日勤務なのに午前/午後休診が残る不具合の原因（古い自動生成や手動分の食い違い）を根絶。
-    // 院全体の休診(staff_id null)・院内研修や、川西など service 指定(service_null でない)は残す。
-    await supabase.from("closures").delete().in("date", dates).not("staff_id", "is", null).is("service_id", null);
     await supabase.from("openings").delete().in("date", dates).eq("source", "shift");
     const cls: GenCl[] = []; const ops: GenOp[] = [];
     entries.forEach((e) => { const r = genShiftAvail(e.ds, e.shifts); cls.push(...r.cl); ops.push(...r.op); });
