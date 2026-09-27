@@ -368,16 +368,34 @@ export default function AdminBookingModal({
         <div className="mb-3">
           <span className="mb-1 block text-xs font-medium text-slate-600">来院時刻</span>
           <div className="flex items-center gap-2">
-            <input
-              type="time"
-              step={900}
-              value={startMin !== null ? minToLabel(Math.round(startMin / 15) * 15) : ""}
-              onChange={(e) => {
-                const [h, mm] = e.target.value.split(":").map(Number);
-                if (!isNaN(h)) setStartMin(Math.round((h * 60 + (mm || 0)) / 15) * 15);
-              }}
-              className="rounded-md border px-2 py-1.5 text-sm tabnum"
-            />
+            {(() => {
+              const cur = startMin ?? 600;
+              const h = Math.floor(cur / 60);
+              const mnRaw = cur % 60;
+              const mn = [0, 15, 30, 45].reduce((a, b) => (Math.abs(b - mnRaw) < Math.abs(a - mnRaw) ? b : a), 0);
+              return (
+                <div className="flex items-center gap-1 tabnum">
+                  <select
+                    value={h}
+                    onChange={(e) => setStartMin(parseInt(e.target.value, 10) * 60 + mn)}
+                    className="rounded-md border px-2 py-1.5 text-sm"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => i).map((i) => (
+                      <option key={i} value={i}>{i}時</option>
+                    ))}
+                  </select>
+                  <select
+                    value={mn}
+                    onChange={(e) => setStartMin(h * 60 + parseInt(e.target.value, 10))}
+                    className="rounded-md border px-2 py-1.5 text-sm"
+                  >
+                    {[0, 15, 30, 45].map((m) => (
+                      <option key={m} value={m}>{String(m).padStart(2, "0")}分</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
             <span className="text-[11px] text-slate-400">時間外もOK・あとからドラッグで変更できます</span>
           </div>
         </div>

@@ -1374,20 +1374,26 @@ function NoteModal({
     onDone();
   }
 
-  // 分は 0/15/30/45 の単位に丸める
-  const r15 = (m: number) => Math.round(m / 15) * 15;
-  const timeInput = (val: number, set: (n: number) => void) => (
-    <input
-      type="time"
-      step={900}
-      value={minToLabel(r15(val))}
-      onChange={(e) => {
-        const [h, m] = e.target.value.split(":").map(Number);
-        if (!isNaN(h)) set(r15(h * 60 + (m || 0)));
-      }}
-      className="rounded-md border px-2 py-1 text-sm"
-    />
-  );
+  // 時・分をプルダウンで選択（iOSのtimeピッカーはstepを無視するため）。分は 0/15/30/45。
+  const timeInput = (val: number, set: (n: number) => void) => {
+    const h = Math.floor(val / 60);
+    const mnRaw = val % 60;
+    const mn = [0, 15, 30, 45].reduce((a, b) => (Math.abs(b - mnRaw) < Math.abs(a - mnRaw) ? b : a), 0);
+    return (
+      <span className="inline-flex items-center gap-1 tabnum">
+        <select value={h} onChange={(e) => set(parseInt(e.target.value, 10) * 60 + mn)} className="rounded-md border px-2 py-1 text-sm">
+          {Array.from({ length: 24 }, (_, i) => i).map((i) => (
+            <option key={i} value={i}>{i}時</option>
+          ))}
+        </select>
+        <select value={mn} onChange={(e) => set(h * 60 + parseInt(e.target.value, 10))} className="rounded-md border px-2 py-1 text-sm">
+          {[0, 15, 30, 45].map((m) => (
+            <option key={m} value={m}>{String(m).padStart(2, "0")}分</option>
+          ))}
+        </select>
+      </span>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-6">
