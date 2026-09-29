@@ -736,6 +736,14 @@ export default function SalesBoard() {
   );
 
   const yen = (n: number) => "¥" + n.toLocaleString();
+  // 年間表の左固定列に使う不透明色（半透明だとスクロール中の数字が透けるため白に重ねる）
+  const overWhite = (hex: string, a: number) => {
+    const h = (hex || "#64748b").replace("#", "");
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const mix = (c: number) => Math.round(255 * (1 - a) + (isNaN(c) ? 255 : c) * a);
+    return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+  };
+  const NAME_W = 46, LABEL_W = 34; // 左固定列の幅
   const d = new Date(date + "T00:00:00");
   const monthLabel = `${d.getFullYear()}年${d.getMonth() + 1}月`;
   // ‹ › の移動幅：日=1日 / 月=1ヶ月 / 年=1年
@@ -1196,7 +1204,7 @@ export default function SalesBoard() {
             <table className="min-w-[760px] w-full border-collapse text-[11px]">
               <thead>
                 <tr className="border-b bg-slate-50 text-slate-500">
-                  <th className="px-1 py-1.5 text-left" colSpan={2}>担当</th>
+                  <th className="sticky left-0 z-20 border-r bg-slate-50 px-1 py-1.5 text-left" colSpan={2} style={{ minWidth: NAME_W + LABEL_W }}>担当</th>
                   {Array.from({ length: 12 }, (_, m) => (
                     <th key={m} className="px-1 py-1.5 text-right font-bold">{m + 1}月</th>
                   ))}
@@ -1212,20 +1220,20 @@ export default function SalesBoard() {
                   return (
                     <Fragment key={r.id}>
                       <tr className="border-t" style={{ backgroundColor: r.color + "10" }}>
-                        <td rowSpan={3} className="px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: r.color + "22" }}>
+                        <td rowSpan={3} className="sticky left-0 z-10 px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: overWhite(r.color, 0.2), width: NAME_W, minWidth: NAME_W }}>
                           <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: r.color }} />{r.name}
                         </td>
-                        <td className="whitespace-nowrap px-1 py-0.5 text-slate-400">保険</td>
+                        <td className="sticky z-10 whitespace-nowrap border-r px-1 py-0.5 text-slate-400" style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>保険</td>
                         {r.hoken.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
                         {cell(sum12(r.hoken), true)}
                       </tr>
                       <tr style={{ backgroundColor: r.color + "10" }}>
-                        <td className="whitespace-nowrap px-1 py-0.5 text-slate-400">自費</td>
+                        <td className="sticky z-10 whitespace-nowrap border-r px-1 py-0.5 text-slate-400" style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>自費</td>
                         {r.jihi.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
                         {cell(sum12(r.jihi), true)}
                       </tr>
                       <tr className="border-b" style={{ backgroundColor: r.color + "10" }}>
-                        <td className="whitespace-nowrap px-1 py-0.5 font-bold text-slate-600">総計</td>
+                        <td className="sticky z-10 whitespace-nowrap border-r px-1 py-0.5 font-bold text-slate-600" style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>総計</td>
                         {sokei.map((v, m) => <Fragment key={m}>{cell(v, true)}</Fragment>)}
                         {cell(sum12(sokei), true)}
                       </tr>
@@ -1234,9 +1242,9 @@ export default function SalesBoard() {
                 })}
                 {/* 集計行 */}
                 {(() => {
-                  const aggRow = (label: string, arr: number[], cls: string) => (
+                  const aggRow = (label: string, arr: number[], cls: string, bg: string) => (
                     <tr className={`border-t ${cls}`}>
-                      <td colSpan={2} className="whitespace-nowrap px-1.5 py-1 font-bold">{label}</td>
+                      <td colSpan={2} className="sticky left-0 z-10 whitespace-nowrap border-r px-1.5 py-1 font-bold" style={{ backgroundColor: bg, minWidth: NAME_W + LABEL_W }}>{label}</td>
                       {arr.map((v, m) => (
                         <td key={m} className={`px-1 py-1 text-right tabnum font-bold ${v ? "" : "opacity-40"}`}>{v.toLocaleString()}</td>
                       ))}
@@ -1245,13 +1253,13 @@ export default function SalesBoard() {
                   );
                   return (
                     <>
-                      {aggRow("保険総計", yearData.hokenTotal, "bg-slate-50 text-slate-600")}
-                      {aggRow("自費総計", yearData.jihiTotal, "bg-slate-50 text-slate-600")}
-                      {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700")}
-                      {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700")}
-                      {aggRow("総合計", yearData.sougou, "bg-amber-50 text-amber-800")}
-                      {aggRow("物販利益", yearData.busM, "bg-slate-50 text-slate-600")}
-                      {aggRow("物販込総計", yearData.busKomi, "bg-amber-100 text-amber-900")}
+                      {aggRow("保険総計", yearData.hokenTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
+                      {aggRow("自費総計", yearData.jihiTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
+                      {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700", "#eef2ff")}
+                      {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700", "#fff7ed")}
+                      {aggRow("総合計", yearData.sougou, "bg-amber-50 text-amber-800", "#fffbeb")}
+                      {aggRow("物販利益", yearData.busM, "bg-slate-50 text-slate-600", "#f8fafc")}
+                      {aggRow("物販込総計", yearData.busKomi, "bg-amber-100 text-amber-900", "#fef3c7")}
                     </>
                   );
                 })()}
