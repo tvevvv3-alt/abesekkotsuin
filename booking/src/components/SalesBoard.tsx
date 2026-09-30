@@ -11,6 +11,18 @@ import { DEFAULT_OPTIONS, defaultPrices, ageAt, JIKANGAI_MIN, menuIs60, menuHasT
 const KAWANISHI_COLOR = "#3F51B5"; // 川西整体院のカラー（ボード/カレンダーに合わせる）
 const TAIKAN_COLOR = "#EF6C00"; // 体幹教室のカラー（カレンダーに合わせるオレンジ）
 
+// ▼ 2026年 1〜7月の実績（システム移行前でDBに無いぶん）。年間表にだけ手入力の数字を反映する。
+//   スプレッドシートの担当別 保険/自費、川西院、物販売上（＝各月 [1月..7月]）。
+const HIST_2026_STAFF: Record<string, { hoken: number[]; jihi: number[] }> = {
+  阿部: { hoken: [209066, 197650, 219919, 202745, 192138, 147088, 72575], jihi: [1393550, 1300950, 1411550, 1381900, 1492500, 1522100, 1515450] },
+  澁谷: { hoken: [197807, 183833, 202056, 248363, 214240, 173655, 95959], jihi: [844350, 828700, 854700, 1156800, 1164750, 1003850, 1156600] },
+  渋谷: { hoken: [197807, 183833, 202056, 248363, 214240, 173655, 95959], jihi: [844350, 828700, 854700, 1156800, 1164750, 1003850, 1156600] },
+  萩原: { hoken: [83882, 73305, 133831, 112541, 193154, 118585, 51288], jihi: [239250, 322650, 516450, 458150, 809050, 640750, 445200] },
+  林: { hoken: [0, 0, 0, 0, 0, 0, 4853], jihi: [37500, 43450, 142200, 176700, 158200, 162600, 205850] },
+};
+const HIST_2026_KAWA = [96000, 94000, 139500, 143000, 116050, 99500, 66050];
+const HIST_2026_BUSSALES = [219350, 136850, 135158, 247330, 353415, 422780, 189612];
+
 interface Appt {
   id: string;
   date: string;
@@ -1046,6 +1058,23 @@ export default function SalesBoard() {
       if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay; }
       else busM[m] += s.selfpay + s.insurance; // その他（担当なしの非物販）は売上で計上
     });
+    // ▼ 2026年 1〜7月はシステム移行前でDBに無いので、スプレッドシートの実績で上書きする（年間表専用）。
+    if (year === "2026") {
+      rows.forEach((r) => {
+        const h = HIST_2026_STAFF[r.name.trim()];
+        for (let m = 0; m < 7; m++) {
+          r.hoken[m] = h ? h.hoken[m] : 0;
+          r.jihi[m] = h ? h.jihi[m] : 0;
+          r.bus[m] = 0; // 旧月の物販利益は原価不明のため0
+        }
+      });
+      for (let m = 0; m < 7; m++) {
+        kawaM[m] = HIST_2026_KAWA[m];
+        taikanM[m] = 0; // 体幹は林の自費に含めて記録されているため独立行は0
+        busM[m] = 0;
+        busSales[m] = HIST_2026_BUSSALES[m];
+      }
+    }
     const perMonth = (fn: (m: number) => number) => new Array(12).fill(0).map((_, m) => fn(m));
     const hokenTotal = perMonth((m) => rows.reduce((x, r) => x + r.hoken[m], 0));
     const jihiTotal = perMonth((m) => rows.reduce((x, r) => x + r.jihi[m], 0));
@@ -1054,7 +1083,7 @@ export default function SalesBoard() {
     // 総合計＝施術(保険+自費)＋物販利益＋川西＋体幹（＝当月サマリーの総売上と一致）
     const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + busTotal[m] + taikanM[m] + kawaM[m]);
     return { rows, kawaM, taikanM, busTotal, busSales, hokenTotal, jihiTotal, sougou };
-  }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, retailCostOf]);
+  }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, retailCostOf, year]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
