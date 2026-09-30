@@ -1014,11 +1014,12 @@ export default function SalesBoard() {
       color: s.color || "#64748b",
       hoken: new Array(12).fill(0) as number[],
       jihi: new Array(12).fill(0) as number[],
+      bus: new Array(12).fill(0) as number[], // 物販利益（担当ごと）
     }));
     const byId = new Map(rows.map((r) => [r.id, r]));
     const kawaM = new Array(12).fill(0) as number[]; // 川西院（自費+保険）
     const taikanM = new Array(12).fill(0) as number[]; // 体幹教室（自費+保険）
-    const busM = new Array(12).fill(0) as number[]; // 物販・その他（担当なし）
+    const busM = new Array(12).fill(0) as number[]; // 担当なしの物販利益＋その他売上
     yearSales.forEach((s) => {
       const m = Number(s.date.slice(5, 7)) - 1;
       if (m < 0 || m > 11) return;
@@ -1029,23 +1030,29 @@ export default function SalesBoard() {
       // 予約に同名がいる“はぐれ売上”は二重計上しない（当月ビューと同じ）
       const nn = normName(s.patient_name);
       if (!s.appointment_id && nn && yearApptKeys.has(s.date + "|" + nn)) return;
-      // 物販は担当が付いていても「物販」行へ。年間は売上(総額)で表示する（月別サマリーは利益）。
-      if (s.retail) { busM[m] += s.selfpay + s.insurance; return; }
+      // 物販は利益（販売−仕入）で計上。担当が付いていればその担当の物販利益へ、なければ物販行へ。
+      if (s.retail) {
+        const profit = s.selfpay - retailCostOf(s);
+        const r = s.staff_id ? byId.get(s.staff_id) : undefined;
+        if (r) r.bus[m] += profit; else busM[m] += profit;
+        return;
+      }
       // 川西院は独立行にだけ計上（阿部には足さない＝月別カードの担当別と一致させる）
       if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
       if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
       const r = s.staff_id ? byId.get(s.staff_id) : undefined;
       if (r) { r.hoken[m] += s.insurance; r.jihi[m] += s.selfpay; }
-      else busM[m] += s.selfpay + s.insurance;
+      else busM[m] += s.selfpay + s.insurance; // その他（担当なしの非物販）は売上で計上
     });
     const perMonth = (fn: (m: number) => number) => new Array(12).fill(0).map((_, m) => fn(m));
     const hokenTotal = perMonth((m) => rows.reduce((x, r) => x + r.hoken[m], 0));
     const jihiTotal = perMonth((m) => rows.reduce((x, r) => x + r.jihi[m], 0));
-    // 川西は独立行にしたので、総合計に kawaM を明示的に加える（施術＋体幹＋川西）
-    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + taikanM[m] + kawaM[m]);
-    const busKomi = perMonth((m) => sougou[m] + busM[m]);
-    return { rows, kawaM, taikanM, busM, hokenTotal, jihiTotal, sougou, busKomi };
-  }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys]);
+    // 物販利益 総計＝各担当の物販利益＋担当なし物販利益＋その他売上
+    const busTotal = perMonth((m) => rows.reduce((x, r) => x + r.bus[m], 0) + busM[m]);
+    // 総合計＝施術(保険+自費)＋物販利益＋川西＋体幹（＝当月サマリーの総売上と一致）
+    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + busTotal[m] + taikanM[m] + kawaM[m]);
+    return { rows, kawaM, taikanM, busTotal, hokenTotal, jihiTotal, sougou };
+  }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, retailCostOf]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
@@ -1208,27 +1215,35 @@ export default function SalesBoard() {
               </thead>
               <tbody>
                 {yearData.rows.map((r) => {
-                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m]);
+                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m] + r.bus[m]);
                   const cell = (v: number, bold = false) => (
                     <td className={`px-1 py-0.5 text-right tabnum ${v ? "text-slate-700" : "text-slate-300"} ${bold ? "font-bold" : ""}`}>{v.toLocaleString()}</td>
+                  );
+                  const labelTd = (t: string, bold = false) => (
+                    <td className={`sticky z-10 whitespace-nowrap border-r px-1 py-0.5 ${bold ? "font-bold text-slate-600" : "text-slate-400"}`} style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>{t}</td>
                   );
                   return (
                     <Fragment key={r.id}>
                       <tr className="border-t" style={{ backgroundColor: r.color + "10" }}>
-                        <td rowSpan={3} className="sticky left-0 z-10 px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: overWhite(r.color, 0.2), width: NAME_W, minWidth: NAME_W }}>
+                        <td rowSpan={4} className="sticky left-0 z-10 px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: overWhite(r.color, 0.2), width: NAME_W, minWidth: NAME_W }}>
                           <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: r.color }} />{r.name}
                         </td>
-                        <td className="sticky z-10 whitespace-nowrap border-r px-1 py-0.5 text-slate-400" style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>保険</td>
+                        {labelTd("保険")}
                         {r.hoken.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
                         {cell(sum12(r.hoken), true)}
                       </tr>
                       <tr style={{ backgroundColor: r.color + "10" }}>
-                        <td className="sticky z-10 whitespace-nowrap border-r px-1 py-0.5 text-slate-400" style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>自費</td>
+                        {labelTd("自費")}
                         {r.jihi.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
                         {cell(sum12(r.jihi), true)}
                       </tr>
+                      <tr style={{ backgroundColor: r.color + "10" }}>
+                        {labelTd("物販")}
+                        {r.bus.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
+                        {cell(sum12(r.bus), true)}
+                      </tr>
                       <tr className="border-b" style={{ backgroundColor: r.color + "10" }}>
-                        <td className="sticky z-10 whitespace-nowrap border-r px-1 py-0.5 font-bold text-slate-600" style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>総計</td>
+                        {labelTd("総計", true)}
                         {sokei.map((v, m) => <Fragment key={m}>{cell(v, true)}</Fragment>)}
                         {cell(sum12(sokei), true)}
                       </tr>
@@ -1250,18 +1265,17 @@ export default function SalesBoard() {
                     <>
                       {aggRow("保険総計", yearData.hokenTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("自費総計", yearData.jihiTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
+                      {aggRow("物販利益", yearData.busTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700", "#eef2ff")}
                       {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700", "#fff7ed")}
-                      {aggRow("総合計", yearData.sougou, "bg-amber-50 text-amber-800", "#fffbeb")}
-                      {aggRow("物販売上", yearData.busM, "bg-slate-50 text-slate-600", "#f8fafc")}
-                      {aggRow("物販込総計", yearData.busKomi, "bg-amber-100 text-amber-900", "#fef3c7")}
+                      {aggRow("総合計", yearData.sougou, "bg-amber-100 text-amber-900", "#fef3c7")}
                     </>
                   );
                 })()}
               </tbody>
             </table>
             <p className="mt-2 px-1 text-[11px] text-slate-400">
-              保険＝合計額（保険総額）／自費＝保険外／総計＝自費＋保険。川西院は自費＋保険。物販・その他は担当なしの入力分。‹ › で年を移動できます。
+              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費＋物販利益。川西院は自費＋保険。総合計＝当月サマリーの総売上と一致。‹ › で年を移動できます。
             </p>
           </div>
         )
