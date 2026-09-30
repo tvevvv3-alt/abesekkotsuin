@@ -1029,8 +1029,8 @@ export default function SalesBoard() {
       // 予約に同名がいる“はぐれ売上”は二重計上しない（当月ビューと同じ）
       const nn = normName(s.patient_name);
       if (!s.appointment_id && nn && yearApptKeys.has(s.date + "|" + nn)) return;
-      // 物販は担当が付いていても「物販」行へ。総売上と一致させるため利益(販売−仕入)で計上する。
-      if (s.retail) { busM[m] += s.selfpay + s.insurance - retailCostOf(s); return; }
+      // 物販は担当が付いていても「物販」行へ。年間は売上(総額)で表示する（月別サマリーは利益）。
+      if (s.retail) { busM[m] += s.selfpay + s.insurance; return; }
       // 川西院は独立行にだけ計上（阿部には足さない＝月別カードの担当別と一致させる）
       if (kawa && s.staff_id === kawa.id) { kawaM[m] += s.selfpay + s.insurance; return; }
       if (taikan && s.staff_id === taikan.id) { taikanM[m] += s.selfpay + s.insurance; return; }
@@ -1045,7 +1045,7 @@ export default function SalesBoard() {
     const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + taikanM[m] + kawaM[m]);
     const busKomi = perMonth((m) => sougou[m] + busM[m]);
     return { rows, kawaM, taikanM, busM, hokenTotal, jihiTotal, sougou, busKomi };
-  }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, retailCostOf]);
+  }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
@@ -1253,7 +1253,7 @@ export default function SalesBoard() {
                       {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700", "#eef2ff")}
                       {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700", "#fff7ed")}
                       {aggRow("総合計", yearData.sougou, "bg-amber-50 text-amber-800", "#fffbeb")}
-                      {aggRow("物販利益", yearData.busM, "bg-slate-50 text-slate-600", "#f8fafc")}
+                      {aggRow("物販売上", yearData.busM, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("物販込総計", yearData.busKomi, "bg-amber-100 text-amber-900", "#fef3c7")}
                     </>
                   );
