@@ -45,7 +45,7 @@ interface Sale {
   cost: number; // 仕入れ（原価）。物販のみ。スタッフ売上は selfpay−cost（粗利）で計上
   anchor_appointment_id?: string | null; // 物販をこの予約(購入者)の下に置く
   sort_order?: number | null; // 手動並び替え用
-  payment: "cash" | "cashless"; // 窓口徴収の支払方法
+  payment: "cash" | "cashless" | null; // 窓口徴収の支払方法（null＝未選択。ボタン押下で確定）
   retail?: boolean; // 物販（物販ページにも表示）
   retail_kind?: "sale" | "purchase"; // 物販の行種別。purchase(まとめ仕入)は日計表に出さない
   retail_buyer?: string | null; // 物販の購入者名（商品名は patient_name）
@@ -57,7 +57,7 @@ const zeroSale = (): Omit<Sale, "id" | "appointment_id" | "date" | "staff_id" | 
   insurance: 0,
   burden: 0,
   cost: 0,
-  payment: "cash",
+  payment: null,
   retail: false,
 });
 
@@ -394,7 +394,7 @@ export default function SalesBoard() {
   async function addManual(anchor?: string) {
     const { data } = await supabase
       .from("sales")
-      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, cost: 0, retail: true, payment: "cash", anchor_appointment_id: anchor ?? null })
+      .insert({ date, staff_id: null, patient_name: "", selfpay: 0, insurance: 0, burden: 0, cost: 0, retail: true, payment: null, anchor_appointment_id: anchor ?? null })
       .select("id, appointment_id, date, staff_id, patient_name, selfpay, insurance, burden, cost, retail, retail_buyer, anchor_appointment_id, payment")
       .single();
     if (data) setSales((prev) => [...prev, data as Sale]);
@@ -428,10 +428,11 @@ export default function SalesBoard() {
     await supabase.from("appointment_steps").delete().eq("appointment_id", a.id);
     await supabase.from("appointments").update({ status: "cancelled" }).eq("id", a.id);
   }
-  // 支払方法（現金⇄キャッシュレス）切替。予約行は無ければ会計を作成して保存。
-  async function toggleApptPayment(a: Appt) {
+  // 支払方法を確定（現金 or キャッシュレスのボタン押下で確定）。同じ方法を再度押すと未選択に戻す。
+  // 予約行は会計が無ければ作成して保存。
+  async function setApptPayment(a: Appt, method: "cash" | "cashless") {
     const cur = salesRef.current.find((x) => x.appointment_id === a.id) ?? apptVal(a);
-    const next: "cash" | "cashless" = cur.payment === "cashless" ? "cash" : "cashless";
+    const next: "cash" | "cashless" | null = cur.payment === method ? null : method;
     setSales((prev) => {
       const idx = prev.findIndex((s) => s.appointment_id === a.id);
       if (idx >= 0) { const n = [...prev]; n[idx] = { ...n[idx], payment: next }; return n; }
@@ -445,8 +446,8 @@ export default function SalesBoard() {
       { onConflict: "appointment_id" }
     );
   }
-  async function toggleManualPayment(m: Sale) {
-    const next: "cash" | "cashless" = m.payment === "cashless" ? "cash" : "cashless";
+  async function setManualPayment(m: Sale, method: "cash" | "cashless") {
+    const next: "cash" | "cashless" | null = m.payment === method ? null : method;
     setManualLocal(m.id, { payment: next });
     await supabase.from("sales").update({ payment: next }).eq("id", m.id);
   }
@@ -509,7 +510,7 @@ export default function SalesBoard() {
         const s = saleByAppt[a.id];
         return {
           appointment_id: a.id, date: a.date, staff_id: a.staff_id ?? defStaffId(a), patient_name: a.patient_name,
-          selfpay: suggestSelf(a), insurance: s?.insurance ?? 0, burden: s?.burden ?? 0, payment: s?.payment ?? "cash",
+          selfpay: suggestSelf(a), insurance: s?.insurance ?? 0, burden: s?.burden ?? 0, payment: s?.payment ?? null,
         };
       })
       .filter((u) => u.selfpay > 0);
@@ -648,7 +649,7 @@ export default function SalesBoard() {
     // 物販行を挿入（担当なし＝物販バケット）
     if (activeRetail.length) {
       const inserts = activeRetail.map((r) => ({
-        date, staff_id: null, patient_name: `${r.name} ${r.item}`.trim(), selfpay: r.amount, insurance: 0, burden: 0, payment: "cash" as const,
+        date, staff_id: null, patient_name: `${r.name} ${r.item}`.trim(), selfpay: r.amount, insurance: 0, burden: 0, payment: null,
       }));
       await supabase.from("sales").insert(inserts);
     }
@@ -930,10 +931,14 @@ export default function SalesBoard() {
 
   // 当日の合計
   const daySum = useMemo(() => {
-    let sp = 0, ins = 0, bur = 0, cnt = 0, cash = 0, cashless = 0;
+    let sp = 0, ins = 0, bur = 0, cnt = 0, cash = 0, cashless = 0, unpaid = 0, unpaidCnt = 0;
     const addPay = (s: Sale) => {
       const p = s.selfpay + s.burden; // 窓口徴収
-      if (s.payment === "cashless") cashless += p; else cash += p;
+      if (p <= 0) return;
+      // 支払方法を選んだものだけ現金/キャッシュレスに計上。未選択(null)は「未確定」に分けて締めの現金を狂わせない。
+      if (s.payment === "cashless") cashless += p;
+      else if (s.payment === "cash") cash += p;
+      else { unpaid += p; unpaidCnt++; }
     };
     dayRows.forEach((a) => {
       const s = saleByAppt[a.id];
@@ -941,7 +946,7 @@ export default function SalesBoard() {
       cnt++;
     });
     dayManual.forEach((s) => { sp += s.selfpay; ins += s.insurance; bur += s.burden; addPay(s); cnt++; });
-    return { sp, ins, bur, cnt, cash, cashless, paid: sp + bur, gou: sp + ins };
+    return { sp, ins, bur, cnt, cash, cashless, unpaid, unpaidCnt, paid: sp + bur, gou: sp + ins };
   }, [dayRows, dayManual, saleByAppt]);
 
   // 保険外の担当バケット（1=阿部/2=澁谷/3=萩原・林/4=物販・その他）
@@ -975,9 +980,9 @@ export default function SalesBoard() {
       if (isOrphanDup(s)) return; // 予約に同名がいる“はぐれ売上”は二重計上しない
       if (isCancelledSale(s)) return; // キャンセル済み予約に残った売上は集計に入れない
       const e = get(s.date);
-      // 窓口徴収(=保険外+負担額)の現金/キャッシュレス仕訳（全会計対象）
+      // 窓口徴収(=保険外+負担額)の現金/キャッシュレス仕訳。未選択(null)は現金にもレスにも入れない。
       const pay = s.selfpay + s.burden;
-      if (s.payment === "cashless") e.cashless += pay; else e.cash += pay;
+      if (pay > 0) { if (s.payment === "cashless") e.cashless += pay; else if (s.payment === "cash") e.cash += pay; }
       if (kawa && s.staff_id === kawa.id) { e.kawa += s.selfpay + s.insurance; return; }
       e.ins += s.insurance;
       e.bur += s.burden;
@@ -1088,13 +1093,25 @@ export default function SalesBoard() {
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
   const amt = "w-[60px] rounded border border-slate-300 px-1 py-0 text-right text-[13px] leading-tight tabnum focus:border-blue-400 focus:outline-none";
-  const payBtn = (payment: "cash" | "cashless", onClick: () => void) => (
-    <button onClick={onClick}
-      className={`whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${payment === "cashless" ? "border-indigo-300 bg-indigo-50 text-indigo-600" : "border-slate-300 bg-slate-50 text-slate-500"}`}
-      title="現金／キャッシュレス切替">
-      {payment === "cashless" ? "💳レス" : "💴現金"}
-    </button>
-  );
+  // 支払方法を「現金」「レス」の2ボタンで選択。金額(窓口徴収)があるのに未選択なら赤で警告。
+  const payChoice = (
+    payment: "cash" | "cashless" | null,
+    hasAmount: boolean,
+    onPick: (m: "cash" | "cashless") => void
+  ) => {
+    const need = hasAmount && payment == null; // 金額ありなのに未選択
+    const base = "whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-bold";
+    return (
+      <div className="flex items-center justify-center gap-0.5">
+        <button onClick={() => onPick("cash")}
+          className={`${base} ${payment === "cash" ? "border-emerald-400 bg-emerald-500 text-white" : need ? "border-red-400 bg-red-50 text-red-500" : "border-slate-300 bg-white text-slate-400"}`}
+          title="現金で確定">💴</button>
+        <button onClick={() => onPick("cashless")}
+          className={`${base} ${payment === "cashless" ? "border-indigo-400 bg-indigo-500 text-white" : need ? "border-red-400 bg-red-50 text-red-500" : "border-slate-300 bg-white text-slate-400"}`}
+          title="キャッシュレスで確定">💳</button>
+      </div>
+    );
+  };
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -1478,7 +1495,7 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-0.5 text-right tabnum text-slate-500">{paid(s).toLocaleString()}</td>
                           <td className="px-2 py-0.5 text-right font-bold tabnum text-slate-800">{total(s).toLocaleString()}</td>
-                          <td className="px-1 py-0.5 text-center">{payBtn(s.payment, () => toggleApptPayment(a))}</td>
+                          <td className="px-1 py-0.5 text-center">{payChoice(s.payment, paid(s) > 0, (mtd) => setApptPayment(a, mtd))}</td>
                           <td className="whitespace-nowrap px-1 py-0.5 text-center">
                             {saleByAppt[a.id]
                               ? <button onClick={() => deleteApptSale(a)} className="text-[11px] font-bold text-red-400">売上削除</button>
@@ -1529,7 +1546,7 @@ export default function SalesBoard() {
                           </td>
                           <td className="px-1 py-0.5 text-right tabnum text-slate-500">{paid(m).toLocaleString()}</td>
                           <td className="px-2 py-0.5 text-right font-bold tabnum text-slate-800">{total(m).toLocaleString()}</td>
-                          <td className="px-1 py-0.5 text-center">{payBtn(m.payment, () => toggleManualPayment(m))}</td>
+                          <td className="px-1 py-0.5 text-center">{payChoice(m.payment, paid(m) > 0, (mtd) => setManualPayment(m, mtd))}</td>
                           <td className="whitespace-nowrap px-1 py-0.5 text-center">
                             <button onClick={() => deleteManual(m.id)} className="text-[11px] font-bold text-red-400">削除</button>
                           </td>
@@ -1561,6 +1578,9 @@ export default function SalesBoard() {
             <span className="font-bold text-slate-700">窓口額計 <span className="tabnum text-slate-800">{yen(daySum.paid)}</span></span>
             <span className="text-slate-500">💴 現金 <b className="tabnum text-slate-800">{yen(daySum.cash)}</b></span>
             <span className="text-indigo-600">💳 キャッシュレス <b className="tabnum">{yen(daySum.cashless)}</b></span>
+            {daySum.unpaidCnt > 0 && (
+              <span className="rounded-md bg-red-50 px-2 py-0.5 font-bold text-red-600">⚠️ 支払未選択 {daySum.unpaidCnt}件（{yen(daySum.unpaid)}）</span>
+            )}
           </div>
         </div>
       )}

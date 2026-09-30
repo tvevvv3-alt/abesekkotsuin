@@ -1477,13 +1477,14 @@ export default function BookingWizard() {
             </div>
           )}
           <div className="space-y-3">
-            <Field label="お名前" required>
+            <Field label="お名前（フルネーム・漢字）" required>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2"
                 placeholder="山田 太郎"
               />
+              <p className="mt-1 text-[11px] text-slate-400">姓と名をフルネーム（漢字）でご入力ください。</p>
             </Field>
             <Field label="フリガナ">
               <input
@@ -1493,7 +1494,7 @@ export default function BookingWizard() {
                 placeholder="ヤマダ タロウ"
               />
             </Field>
-            <Field label="生年月日">
+            <Field label="生年月日" required>
               <input
                 type="date"
                 value={birth}
@@ -1512,7 +1513,7 @@ export default function BookingWizard() {
             </Field>
           </div>
           <button
-            disabled={!name.trim() || !phone.trim()}
+            disabled={!name.trim() || !phone.trim() || !birth}
             onClick={() => setStep(4)}
             className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-300"
           >
