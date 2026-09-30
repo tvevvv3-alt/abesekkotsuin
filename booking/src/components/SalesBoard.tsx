@@ -1020,6 +1020,7 @@ export default function SalesBoard() {
     const kawaM = new Array(12).fill(0) as number[]; // 川西院（自費+保険）
     const taikanM = new Array(12).fill(0) as number[]; // 体幹教室（自費+保険）
     const busM = new Array(12).fill(0) as number[]; // 担当なしの物販利益＋その他売上
+    const busSales = new Array(12).fill(0) as number[]; // 物販の売上(総額)＝確定申告用
     yearSales.forEach((s) => {
       const m = Number(s.date.slice(5, 7)) - 1;
       if (m < 0 || m > 11) return;
@@ -1032,6 +1033,7 @@ export default function SalesBoard() {
       if (!s.appointment_id && nn && yearApptKeys.has(s.date + "|" + nn)) return;
       // 物販は利益（販売−仕入）で計上。担当が付いていればその担当の物販利益へ、なければ物販行へ。
       if (s.retail) {
+        busSales[m] += s.selfpay + s.insurance; // 売上(総額)＝確定申告用
         const profit = s.selfpay - retailCostOf(s);
         const r = s.staff_id ? byId.get(s.staff_id) : undefined;
         if (r) r.bus[m] += profit; else busM[m] += profit;
@@ -1051,7 +1053,7 @@ export default function SalesBoard() {
     const busTotal = perMonth((m) => rows.reduce((x, r) => x + r.bus[m], 0) + busM[m]);
     // 総合計＝施術(保険+自費)＋物販利益＋川西＋体幹（＝当月サマリーの総売上と一致）
     const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + busTotal[m] + taikanM[m] + kawaM[m]);
-    return { rows, kawaM, taikanM, busTotal, hokenTotal, jihiTotal, sougou };
+    return { rows, kawaM, taikanM, busTotal, busSales, hokenTotal, jihiTotal, sougou };
   }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, retailCostOf]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
@@ -1269,13 +1271,14 @@ export default function SalesBoard() {
                       {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700", "#eef2ff")}
                       {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700", "#fff7ed")}
                       {aggRow("総合計", yearData.sougou, "bg-amber-100 text-amber-900", "#fef3c7")}
+                      {aggRow("物販売上", yearData.busSales, "bg-slate-100 text-slate-500", "#f1f5f9")}
                     </>
                   );
                 })()}
               </tbody>
             </table>
             <p className="mt-2 px-1 text-[11px] text-slate-400">
-              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費＋物販利益。川西院は自費＋保険。総合計＝当月サマリーの総売上と一致。‹ › で年を移動できます。
+              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費＋物販利益。川西院は自費＋保険。総合計＝当月サマリーの総売上と一致（物販は利益で計上）。物販売上＝物販の販売総額（確定申告用・総合計には含めない）。‹ › で年を移動できます。
             </p>
           </div>
         )
