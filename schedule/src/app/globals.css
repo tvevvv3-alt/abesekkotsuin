@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #fff;
+  color: #111827;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 仮の予定：淡い色＋斜めストライプ（元のカレンダーアプリの見た目に合わせる） */
+.tentative {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.55) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.sheet-enter {
+  animation: sheet-up 0.22s ease-out;
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-base outline-none focus:border-gray-400;
+  }
+}
