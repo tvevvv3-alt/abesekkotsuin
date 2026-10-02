@@ -34,6 +34,9 @@ python3 -m http.server 8000
 │  ├─ css/style.css        … デザイン・レイアウト・アニメーション
 │  ├─ js/main.js           … スクロール演出・横スクロール・LINEリンク等
 │  └─ images/              … 写真（現在はプレースホルダー画像）
+├─ booking/                … 予約システム（Next.js）
+├─ emr/                    … 電子カルテ（Next.js）
+├─ schedule/               … 阿部家の予定・献立アプリ（家庭用。接骨院とは別。schedule/README.md 参照）
 └─ README.md
 ```
 
