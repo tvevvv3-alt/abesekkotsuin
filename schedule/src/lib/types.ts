@@ -32,6 +32,8 @@ export type MealOption = {
   dishes: string[]; // 副菜・汁物など
   rice: boolean; // お米を食べる献立か（1週間のバランス計算に使う）
   toddler_note: string | null; // 三男向けの味付け・硬さ・大きさの調整
+  uses?: string[]; // 使う「家にある食材」
+  missing?: string[]; // 足りない食材（選んだら買い物リストへ）
 };
 
 export type MealPlan = {

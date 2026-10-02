@@ -63,3 +63,11 @@ alter table events enable row level security;
 alter table meal_plans enable row level security;
 alter table pantry_items enable row level security;
 alter table shopping_items enable row level security;
+
+-- 第2段階：設定（阿部家の好み・ルールなど）
+create table if not exists app_settings (
+  id text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default now()
+);
+alter table app_settings enable row level security;

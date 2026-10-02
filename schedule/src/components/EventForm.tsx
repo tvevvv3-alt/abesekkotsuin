@@ -11,7 +11,7 @@ type Props = {
   event?: FamilyEvent;
   members: Member[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (date: string) => void; // 予定が変わった日（日付変更時は早いほう）
 };
 
 // 予定の追加・編集。外出/帰宅時刻と「家で食べない食事」もここで登録する。
@@ -46,7 +46,7 @@ export default function EventForm({ date, event, members, onClose, onSaved }: Pr
     try {
       if (event) await api.update<FamilyEvent>("events", event.id, values);
       else await api.create<FamilyEvent>("events", values);
-      onSaved();
+      onSaved(event && event.date < values.date ? event.date : values.date);
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -57,7 +57,7 @@ export default function EventForm({ date, event, members, onClose, onSaved }: Pr
     if (!event || !confirm("この予定を削除しますか？")) return;
     setBusy(true);
     await api.remove("events", event.id);
-    onSaved();
+    onSaved(event.date);
   };
 
   return (

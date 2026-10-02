@@ -29,3 +29,19 @@ export const api = {
     return call<{ ok: true }>(`/api/${table}/${id}`, { method: "DELETE" });
   },
 };
+
+export function makePlan(from: string, to: string, today: string) {
+  return call<{ saved: number; note: string }>("/api/plan", {
+    method: "POST",
+    body: JSON.stringify({ from, to, today }),
+  });
+}
+
+export const settings = {
+  get(key: string) {
+    return call<{ value: string }>(`/api/settings/${key}`);
+  },
+  put(key: string, value: string) {
+    return call<{ ok: true }>(`/api/settings/${key}`, { method: "PUT", body: JSON.stringify({ value }) });
+  },
+};

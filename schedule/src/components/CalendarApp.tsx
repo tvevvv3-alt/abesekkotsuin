@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/lib/api";
-import { WEEKDAYS, isBentoDay, monthGrid, toDateStr, weekday } from "@/lib/date";
+import { api, makePlan } from "@/lib/api";
+import { WEEKDAYS, addDays, isBentoDay, monthGrid, parseDateStr, toDateStr, weekday } from "@/lib/date";
 import { holidayName } from "@/lib/holidays";
 import { AWAY_MEAL_LABEL, eventBackground } from "@/lib/labels";
+import { dayHasRice } from "@/lib/rice";
 import type { FamilyEvent, MealPlan, Member } from "@/lib/types";
 import Drawer, { DrawerTab } from "./Drawer";
 import DaySheet from "./DaySheet";
@@ -23,6 +24,9 @@ export default function CalendarApp() {
   const [drawer, setDrawer] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ date: string; event?: FamilyEvent } | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [replanFrom, setReplanFrom] = useState<string | null>(null);
 
   const weeks = useMemo(() => monthGrid(ym.y, ym.m), [ym]);
   const range = useMemo(() => ({ from: weeks[0][0], to: weeks[weeks.length - 1][6] }), [weeks]);
@@ -47,6 +51,33 @@ export default function CalendarApp() {
     reload();
   }, [reload]);
 
+  // AI に献立を作ってもらう（既定は from から7日間）。選んだ献立は残る
+  const runPlan = async (from: string, to = addDays(from, 6)) => {
+    setReplanFrom(null);
+    setPlanning(true);
+    try {
+      const r = await makePlan(from, to, today);
+      setNotice(r.note);
+      setError(null);
+      await reload();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPlanning(false);
+    }
+  };
+
+  // 予定を変えた日以降に献立があれば、組み替えを提案する
+  const afterEventSaved = (date: string) => {
+    if (date < today) return;
+    if (plans.some((p) => p.date >= date)) setReplanFrom(date);
+  };
+  const replanTo = (from: string) => {
+    const last = plans.reduce((m, p) => (p.date > m ? p.date : m), from);
+    const cap = addDays(from, 13);
+    return last > cap ? cap : last < addDays(from, 6) ? addDays(from, 6) : last;
+  };
+
   const shiftMonth = (n: number) =>
     setYm(({ y, m }) => {
       const d = new Date(y, m + n, 1);
@@ -69,7 +100,11 @@ export default function CalendarApp() {
     return map;
   }, [events]);
 
-  const plannedDates = useMemo(() => new Set(plans.map((p) => p.date)), [plans]);
+  const plansByDate = useMemo(() => {
+    const map: Record<string, MealPlan[]> = {};
+    for (const p of plans) (map[p.date] ??= []).push(p);
+    return map;
+  }, [plans]);
 
   return (
     <div className="pb-28" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -90,6 +125,14 @@ export default function CalendarApp() {
             }}
           />
         </label>
+        <div className="flex gap-2">
+        <button
+          onClick={() => runPlan(today)}
+          disabled={planning}
+          className="flex h-12 items-center justify-center rounded-full bg-black px-4 text-sm font-bold text-white shadow-[0_2px_12px_rgba(0,0,0,0.12)] disabled:opacity-50"
+        >
+          🍳 献立
+        </button>
         <button
           onClick={() => setYm({ y: new Date().getFullYear(), m: new Date().getMonth() })}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-sm font-bold shadow-[0_2px_12px_rgba(0,0,0,0.12)]"
@@ -97,9 +140,39 @@ export default function CalendarApp() {
         >
           今日
         </button>
+        </div>
       </header>
 
       {error && <p className="mx-4 mb-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {notice && (
+        <div className="mx-4 mb-2 flex gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="flex-1">
+            <span className="font-bold">献立を作りました。</span>
+            {notice}
+          </p>
+          <button onClick={() => setNotice(null)} aria-label="閉じる" className="self-start text-amber-700">
+            ✕
+          </button>
+        </div>
+      )}
+      {replanFrom && !planning && (
+        <div className="mx-4 mb-2 rounded-xl bg-blue-50 p-3 text-sm text-blue-900">
+          <p>
+            予定が変わりました。{fmt(replanFrom)}以降の、まだ選んでいない献立を組み替えますか？
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => runPlan(replanFrom, replanTo(replanFrom))}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 font-bold text-white"
+            >
+              組み替える
+            </button>
+            <button onClick={() => setReplanFrom(null)} className="rounded-lg px-3 py-1.5 text-blue-700">
+              あとで
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-7 border-b border-gray-200 text-center text-sm">
         {WEEKDAYS.map((w, i) => (
@@ -142,7 +215,7 @@ export default function CalendarApp() {
                 )}
                 <span className="mt-auto flex flex-wrap justify-center gap-x-1 text-[10px] leading-tight text-gray-500">
                   {isBentoDay(date) && !holiday && <span>🍙</span>}
-                  {plannedDates.has(date) && <span>🍚</span>}
+                  {plansByDate[date] && <span>{dayHasRice(plansByDate[date]) ? "🍚" : "🍽"}</span>}
                   {away && <span className="text-gray-600">{away}</span>}
                 </span>
               </button>
@@ -165,11 +238,28 @@ export default function CalendarApp() {
           members={members}
           events={eventsByDate[selected] ?? []}
           plans={plans.filter((p) => p.date === selected)}
+          allPlans={plans}
+          planning={planning}
+          onPlan={(from) => {
+            setSelected(null);
+            const hasLater = plans.some((p) => p.date >= from);
+            runPlan(from, hasLater ? replanTo(from) : addDays(from, 6));
+          }}
           onClose={() => setSelected(null)}
           onAddEvent={() => setEditing({ date: selected })}
           onEditEvent={(event) => setEditing({ date: event.date, event })}
           onChanged={reload}
         />
+      )}
+
+      {planning && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-white/80 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-black" />
+            <p className="font-bold">献立を考えています…</p>
+            <p className="mt-1 text-sm text-gray-500">予定と食材を見ながら作るので、1〜2分かかります</p>
+          </div>
+        </div>
       )}
 
       {editing && (
@@ -178,9 +268,10 @@ export default function CalendarApp() {
           event={editing.event}
           members={members}
           onClose={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(date) => {
             setEditing(null);
             reload();
+            afterEventSaved(date);
           }}
         />
       )}
@@ -210,6 +301,11 @@ export function EventChip({ event, members }: { event: FamilyEvent; members: Mem
       {event.title}
     </span>
   );
+}
+
+function fmt(date: string): string {
+  const d = parseDateStr(date);
+  return `${d.getMonth() + 1}/${d.getDate()}（${WEEKDAYS[d.getDay()]}）`;
 }
 
 // 「夕✕父」のように、家で食べない人をまとめて表示

@@ -33,7 +33,7 @@ const ORDER: Record<TableName, string> = {
 
 // ---- ローカル JSON ----
 const FILE = path.join(process.cwd(), ".data", "db.json");
-type LocalDb = Record<TableName, Row[]>;
+type LocalDb = Record<TableName, Row[]> & { app_settings?: { id: string; value: string }[] };
 
 async function readLocal(): Promise<LocalDb> {
   try {
@@ -119,5 +119,31 @@ export async function deleteRow(table: TableName, id: string): Promise<void> {
   }
   const db = await readLocal();
   db[table] = (db[table] ?? []).filter((r) => r.id !== id);
+  await writeLocal(db);
+}
+
+// ---- 設定（キーと値。例：preferences = 阿部家の好み・ルール） ----
+export async function getSetting(key: string): Promise<string | null> {
+  const client = sb();
+  if (client) {
+    const { data, error } = await client.from("app_settings").select("value").eq("id", key).maybeSingle();
+    if (error) throw new Error(error.message);
+    return (data?.value as string | undefined) ?? null;
+  }
+  const db = await readLocal();
+  return db.app_settings?.find((r) => r.id === key)?.value ?? null;
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  const client = sb();
+  if (client) {
+    const { error } = await client
+      .from("app_settings")
+      .upsert({ id: key, value, updated_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const db = await readLocal();
+  db.app_settings = [...(db.app_settings ?? []).filter((r) => r.id !== key), { id: key, value }];
   await writeLocal(db);
 }

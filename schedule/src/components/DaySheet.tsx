@@ -2,6 +2,7 @@
 
 import { WEEKDAYS, isBentoDay, parseDateStr, weekday } from "@/lib/date";
 import { holidayName } from "@/lib/holidays";
+import { riceDays, weekRange } from "@/lib/rice";
 import { AWAY_MEAL_LABEL, MEAL_SLOT_LABEL, eventBackground } from "@/lib/labels";
 import type { FamilyEvent, MealPlan, MealSlot, Member } from "@/lib/types";
 import MealCard from "./MealCard";
@@ -12,6 +13,9 @@ type Props = {
   members: Member[];
   events: FamilyEvent[];
   plans: MealPlan[];
+  allPlans: MealPlan[]; // 表示中の月の献立（週のお米の数え上げに使う）
+  planning: boolean;
+  onPlan: (from: string) => void;
   onClose: () => void;
   onAddEvent: () => void;
   onEditEvent: (e: FamilyEvent) => void;
@@ -19,7 +23,7 @@ type Props = {
 };
 
 // カレンダーの日付をタップしたときのポップアップ：その日の予定と献立
-export default function DaySheet({ date, members, events, plans, onClose, onAddEvent, onEditEvent, onChanged }: Props) {
+export default function DaySheet({ date, members, events, plans, allPlans, planning, onPlan, onClose, onAddEvent, onEditEvent, onChanged }: Props) {
   const d = parseDateStr(date);
   const holiday = holidayName(date);
   const slots: MealSlot[] = isBentoDay(date) && !holiday ? ["breakfast", "bento", "dinner"] : ["breakfast", "dinner"];
@@ -38,6 +42,10 @@ export default function DaySheet({ date, members, events, plans, onClose, onAddE
     .filter((m) => m.role === "child")
     .sort((a, b) => (a.birth_date ?? "").localeCompare(b.birth_date ?? ""));
   const bentoKids = kids.slice(0, Math.max(kids.length - 1, 0));
+
+  const week = weekRange(date);
+  const rice = riceDays(allPlans.filter((p) => p.date >= week.from && p.date <= week.to));
+  const hasLater = allPlans.some((p) => p.date >= date);
 
   const title = (
     <span className={weekday(date) === 0 || holiday ? "text-red-600" : ""}>
@@ -97,7 +105,22 @@ export default function DaySheet({ date, members, events, plans, onClose, onAddE
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-bold text-gray-500">献立</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-gray-500">献立</h2>
+          {rice.planned > 0 && (
+            <span className="text-xs text-gray-500">
+              この週のお米 🍚 {rice.rice}/{rice.planned}日
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => onPlan(date)}
+          disabled={planning}
+          className="mb-4 w-full rounded-2xl bg-amber-100 py-3 text-sm font-bold text-amber-900 disabled:opacity-50"
+        >
+          🍳 {hasLater ? "この日以降の献立を組み替える" : "この日から1週間の献立を作る"}
+        </button>
+        <p className="-mt-2 mb-4 text-center text-[11px] text-gray-400">選んだ献立（✓）はそのまま残ります</p>
         <div className="space-y-4">
           {slots.map((slot) => {
             const plan = plans.find((p) => p.slot === slot) ?? null;

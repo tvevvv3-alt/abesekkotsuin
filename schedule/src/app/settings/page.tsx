@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import { api } from "@/lib/api";
+import { api, settings } from "@/lib/api";
 import { ageLabel, toDateStr } from "@/lib/date";
 import { ROLE_LABEL } from "@/lib/labels";
 import type { Member, Role } from "@/lib/types";
@@ -20,6 +20,15 @@ export default function SettingsPage() {
       .catch((e) => setError(e.message));
   useEffect(() => {
     load();
+  }, []);
+
+  const [prefs, setPrefs] = useState("");
+  const [prefsSaved, setPrefsSaved] = useState(false);
+  useEffect(() => {
+    settings
+      .get("preferences")
+      .then((r) => setPrefs(r.value))
+      .catch((e) => setError(e.message));
   }, []);
 
   const patch = async (m: Member, values: Partial<Member>) => {
@@ -151,6 +160,31 @@ export default function SettingsPage() {
           ＋ 家族を追加
         </button>
       </div>
+
+      <section className="px-4 pt-8">
+        <h2 className="text-lg font-extrabold">阿部家の好み・ルール</h2>
+        <p className="mb-2 mt-1 text-xs text-gray-500">
+          献立を作るとき、AI が毎回ここを読みます。好きな料理・苦手なもの・よく使うお店などを自由に書いてください。
+        </p>
+        <textarea
+          value={prefs}
+          onChange={(e) => {
+            setPrefs(e.target.value);
+            setPrefsSaved(false);
+          }}
+          rows={14}
+          className="input text-sm leading-relaxed"
+        />
+        <button
+          onClick={async () => {
+            await settings.put("preferences", prefs);
+            setPrefsSaved(true);
+          }}
+          className="mt-2 w-full rounded-2xl bg-black py-3 font-bold text-white"
+        >
+          {prefsSaved ? "保存しました ✓" : "保存"}
+        </button>
+      </section>
     </main>
   );
 }

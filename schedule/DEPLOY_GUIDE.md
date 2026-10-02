@@ -26,6 +26,7 @@
 | `SUPABASE_URL` | 控えた Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | 控えた service_role キー |
 | `FAMILY_KEY` | 好きな合言葉（英数字で長めに。例：`abe-xxxx-2026`） |
+| `ANTHROPIC_API_KEY` | 献立の提案に使う Claude の API キー（下の「4.」で取得） |
 
 3. **Deploy**
 
@@ -35,3 +36,15 @@
 2. 共有ボタン →「ホーム画面に追加」
 
 1回開けばその端末は1年間そのまま使えます。合言葉なしのURLを他の人が開いても中は見えません。
+
+## 4. 献立の提案（AI）を使えるようにする
+
+1. https://console.anthropic.com でアカウントを作る
+2. **Billing** でクレジットを購入（最初は $5〜10 で十分です）。念のため **Limits** で月の上限（例：$10）も設定しておくと安心です
+3. **API Keys** →「Create Key」で作ったキー（`sk-ant-…`）を、Vercel の環境変数 `ANTHROPIC_API_KEY` に入れる
+4. Vercel で **Redeploy**
+
+費用の目安：1週間分の献立を1回作るのが約30円。週1回＋組み替え数回で、月300〜500円ほどです。
+
+> すでに第1段階で Supabase を設定済みの場合は、`supabase/schema.sql` をもう一度 SQL Editor で **Run** してください
+> （好み・ルールを保存する `app_settings` テーブルが追加されます。何度実行しても安全です）。

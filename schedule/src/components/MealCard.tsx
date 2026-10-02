@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { RATING_LABEL } from "@/lib/labels";
-import type { MealOption, MealPlan, MealSlot, Member, Rating } from "@/lib/types";
+import { ageInMonths, toddlerWarnings } from "@/lib/safety";
+import type { MealOption, MealPlan, MealSlot, Member, Rating, ShoppingItem } from "@/lib/types";
 
 type Props = {
   date: string;
@@ -21,9 +22,27 @@ export default function MealCard({ date, slot, label, subtitle, plan, members, o
   const [manual, setManual] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const children = members.filter((m) => m.role === "child");
-  const youngest = [...children].sort((a, b) => (b.birth_date ?? "").localeCompare(a.birth_date ?? ""))[0];
+  const kids = members.filter((m) => m.role === "child");
+  const youngest = [...kids].sort((a, b) => (b.birth_date ?? "").localeCompare(a.birth_date ?? ""))[0];
+  // お弁当は末っ子以外。「食べた？」もその子たちだけ
+  const children = slot === "bento" ? kids.filter((m) => m.id !== youngest?.id) : kids;
   const option = plan?.options.find((o) => o.label === view) ?? plan?.options[0];
+  const warnings = option && slot !== "bento" ? toddlerWarnings(option, ageInMonths(youngest?.birth_date ?? null, date)) : [];
+  const [added, setAdded] = useState<string[] | null>(null);
+
+  // 選んだら、その案の足りない食材を買い物リストへ（すでにある物は足さない）
+  const choose = async (o: MealOption) => {
+    await save({ chosen: o.label });
+    const missing = o.missing ?? [];
+    if (missing.length === 0) return;
+    const current = await api.list<ShoppingItem>("shopping_items");
+    const have = new Set(current.filter((i) => !i.checked).map((i) => i.name));
+    const toAdd = missing.filter((m) => !have.has(m));
+    await Promise.all(
+      toAdd.map((name) => api.create<ShoppingItem>("shopping_items", { name, quantity: null, checked: false }))
+    );
+    setAdded(toAdd);
+  };
 
   const save = async (values: Partial<MealPlan>) => {
     if (!plan) return;
@@ -96,23 +115,44 @@ export default function MealCard({ date, slot, label, subtitle, plan, members, o
           </p>
           {option.dishes.length > 0 && <p className="mt-1 text-sm text-gray-600">{option.dishes.join(" ／ ")}</p>}
 
+          {((option.uses?.length ?? 0) > 0 || (option.missing?.length ?? 0) > 0) && (
+            <div className="mt-2 space-y-0.5 text-xs">
+              {(option.uses?.length ?? 0) > 0 && (
+                <p className="text-gray-500">🥕 家の食材：{option.uses!.join("、")}</p>
+              )}
+              {(option.missing?.length ?? 0) > 0 && (
+                <p className="text-rose-600">🛒 足りない：{option.missing!.join("、")}</p>
+              )}
+            </div>
+          )}
+
           {option.toddler_note && (
             <div className="mt-3 rounded-xl bg-purple-50 p-3 text-sm leading-relaxed text-purple-900">
               <span className="font-bold">{youngest?.name ?? "末っ子"}向け：</span>
               {option.toddler_note}
             </div>
           )}
+          {warnings.length > 0 && (
+            <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+              ⚠ {youngest?.name}の分は注意：{warnings.join("／")}
+            </p>
+          )}
 
           {plan.chosen !== option.label ? (
             <button
               disabled={busy}
-              onClick={() => save({ chosen: option.label })}
+              onClick={() => choose(option)}
               className="mt-3 w-full rounded-xl bg-black py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
               {plan.options.length > 1 ? `${option.label}にする` : "これにする"}
             </button>
           ) : (
             <div className="mt-4">
+              {added && added.length > 0 && (
+                <p className="mb-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  買い物リストに追加しました：{added.join("、")}
+                </p>
+              )}
               <p className="mb-2 text-xs font-bold text-gray-500">食べた？</p>
               <ul className="space-y-2">
                 {children.map((m) => (
