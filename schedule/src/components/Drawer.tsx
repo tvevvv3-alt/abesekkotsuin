@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "カレンダー", icon: "📅" },
   { href: "/pantry", label: "家にある食材", icon: "🥕" },
   { href: "/shopping", label: "買い物リスト", icon: "🛒" },
+  { href: "/recipes", label: "レシピ集", icon: "📖" },
   { href: "/settings", label: "家族と色の設定", icon: "🎨" },
 ];
 

@@ -24,10 +24,16 @@ export default function SettingsPage() {
 
   const [prefs, setPrefs] = useState("");
   const [prefsSaved, setPrefsSaved] = useState(false);
+  const [avoid, setAvoid] = useState("");
+  const [avoidSaved, setAvoidSaved] = useState(false);
   useEffect(() => {
     settings
       .get("preferences")
       .then((r) => setPrefs(r.value))
+      .catch((e) => setError(e.message));
+    settings
+      .get("avoid")
+      .then((r) => setAvoid(r.value))
       .catch((e) => setError(e.message));
   }, []);
 
@@ -162,9 +168,32 @@ export default function SettingsPage() {
       </div>
 
       <section className="px-4 pt-8">
-        <h2 className="text-lg font-extrabold">阿部家の好み・ルール</h2>
+        <h2 className="text-lg font-extrabold">献立に出さない食材・料理</h2>
+        <p className="mb-2 mt-1 text-xs text-gray-500">カンマ（、）区切り。ここに書いたものを含む料理は提案しません。</p>
+        <input
+          value={avoid}
+          onChange={(e) => {
+            setAvoid(e.target.value);
+            setAvoidSaved(false);
+          }}
+          placeholder="例：なす、ぶり"
+          className="input"
+        />
+        <button
+          onClick={async () => {
+            await settings.put("avoid", avoid);
+            setAvoidSaved(true);
+          }}
+          className="mt-2 w-full rounded-2xl bg-black py-3 font-bold text-white"
+        >
+          {avoidSaved ? "保存しました ✓" : "保存"}
+        </button>
+      </section>
+
+      <section className="px-4 pt-8">
+        <h2 className="text-lg font-extrabold">阿部家の好み・ルール（メモ）</h2>
         <p className="mb-2 mt-1 text-xs text-gray-500">
-          献立を作るとき、AI が毎回ここを読みます。好きな料理・苦手なもの・よく使うお店などを自由に書いてください。
+          写真から分かった傾向などのメモです。好きな料理はレシピ集に追加し、「食べた？」の記録をつけると提案に反映されます。
         </p>
         <textarea
           value={prefs}

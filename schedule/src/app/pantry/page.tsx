@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api";
-import { parseDateStr, toDateStr } from "@/lib/date";
+import { addDays, parseDateStr, toDateStr } from "@/lib/date";
+import { ingredientInfo } from "@/lib/ingredients";
+import { SHORTCUT_NAME } from "@/lib/receipt";
 import type { PantryItem } from "@/lib/types";
 
 const CATEGORIES = ["野菜", "肉", "魚", "卵・乳", "豆腐・大豆", "主食", "調味料", "冷凍", "その他"];
@@ -45,11 +48,29 @@ export default function PantryPage() {
       <PageHeader title="家にある食材" />
       {error && <p className="mx-5 mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
+      <div className="mx-4 mb-3 grid grid-cols-2 gap-2">
+        <a
+          href={`shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}`}
+          className="rounded-2xl bg-black py-3 text-center text-sm font-bold text-white"
+        >
+          📷 レシートを読む
+        </a>
+        <Link href="/pantry/import" className="rounded-2xl bg-gray-100 py-3 text-center text-sm font-bold">
+          📝 文字で登録
+        </Link>
+      </div>
+
       <form onSubmit={add} className="mx-4 space-y-2 rounded-2xl bg-gray-50 p-4">
         <div className="flex gap-2">
           <input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
+            onBlur={(e) => {
+              // 辞書にある食材なら、種類と期限の目安を自動で入れる
+              const info = ingredientInfo(e.target.value);
+              if (info && !form.expires_on)
+                setForm((f) => ({ ...f, category: info.category, expires_on: addDays(toDateStr(new Date()), info.days) }));
+            }}
             placeholder="食材（例：にんじん）"
             className="input flex-[2]"
           />

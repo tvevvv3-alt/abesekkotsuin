@@ -71,3 +71,16 @@ create table if not exists app_settings (
   updated_at timestamptz not null default now()
 );
 alter table app_settings enable row level security;
+
+-- 家族が追加した料理（レシピ集に足される）
+create table if not exists custom_recipes (
+  id uuid primary key default gen_random_uuid(),
+  slot text not null check (slot in ('breakfast', 'bento', 'dinner')),
+  name text not null,
+  ingredients text[] not null default '{}',
+  rice boolean not null default true,
+  minutes int not null default 20,
+  toddler_note text,
+  created_at timestamptz not null default now()
+);
+alter table custom_recipes enable row level security;

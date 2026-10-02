@@ -9,9 +9,14 @@ import { AWAY_MEAL_LABEL, MEAL_SLOT_LABEL } from "./labels";
 import { DEFAULT_PREFERENCES } from "./preferences";
 import { dayHasRice, weekRange } from "./rice";
 import { ageInMonths } from "./safety";
-import type { AwayMeal, FamilyEvent, MealOption, MealPlan, MealSlot, Member, PantryItem } from "./types";
+import { toRecipe } from "./customRecipes";
+import { RECIPES } from "./recipes";
+import { planByRules, type RuleDay } from "./rulePlanner";
+import type { AwayMeal, CustomRecipe, FamilyEvent, MealOption, MealPlan, MealSlot, Member, PantryItem } from "./types";
 
-// 予定・在庫・年齢・好み・食べた記録をもとに、Claude に A/B 献立を作ってもらう。
+// 予定・在庫・年齢・好み・食べた記録をもとに、A/B 献立を作って保存する。
+// ふだんはレシピ集からルールで選ぶ（rulePlanner.ts、無料）。
+// 環境変数 MEAL_PLANNER=ai と ANTHROPIC_API_KEY があるときだけ Claude に作ってもらう（有料）。
 // 組み替えのときは「まだ選んでいない献立」だけを作り直し、選んだ献立は残す。
 
 const OptionSchema = z.object({
@@ -78,19 +83,24 @@ function dates(range: Range): string[] {
   return out;
 }
 
+const RATING_POINT = { ate: 1.5, some: 0, none: -2 } as const;
+
+function aiEnabled(): boolean {
+  return process.env.MEAL_PLANNER === "ai" && !!process.env.ANTHROPIC_API_KEY;
+}
+
 export async function planMeals(range: Range, today: string) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new PlannerError("献立の提案には ANTHROPIC_API_KEY の設定が必要です（DEPLOY_GUIDE.md を参照）");
-  }
 
   const weeks = { from: weekRange(range.from).from, to: weekRange(range.to).to };
-  const [members, events, plans, pantry, history, prefs] = await Promise.all([
+  const [members, events, plans, pantry, history, prefs, avoidText, custom] = await Promise.all([
     listRows("members") as unknown as Promise<Member[]>,
     listRows("events", range) as unknown as Promise<FamilyEvent[]>,
     listRows("meal_plans", weeks) as unknown as Promise<MealPlan[]>,
     listRows("pantry_items") as unknown as Promise<PantryItem[]>,
     listRows("meal_plans", { from: addDays(range.from, -28), to: addDays(range.from, -1) }) as unknown as Promise<MealPlan[]>,
     getSetting("preferences"),
+    getSetting("avoid"),
+    listRows("custom_recipes") as unknown as Promise<CustomRecipe[]>,
   ]);
 
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? "";
@@ -100,6 +110,7 @@ export async function planMeals(range: Range, today: string) {
 
   // 作る対象（日付×食事）と、すでに選んで決まっている食事
   const targets: Target[] = [];
+  const ruleDays: RuleDay[] = [];
   const days = dates(range).map((date) => {
     const dayEvents = events.filter((e) => e.date === date);
     const dayPlans = plans.filter((p) => p.date === date);
@@ -122,6 +133,14 @@ export async function planMeals(range: Range, today: string) {
     }
     targets.push(...slots);
     const lunchHome = eatersFor(members, dayEvents, "lunch");
+    ruleDays.push({
+      date,
+      weekday: weekday(date),
+      holiday: !!holiday,
+      lunchOut: lunchHome.length < members.length,
+      slots: slots.map((x) => x.slot),
+      fixedRice: fixed.some((f) => f.rice && f.slot !== "bento"),
+    });
     return {
       date,
       weekday: WEEKDAYS[weekday(date)],
@@ -146,6 +165,79 @@ export async function planMeals(range: Range, today: string) {
   const outsideDates = Array.from(new Set(outside.map((p) => p.date)));
   const riceOutside = outsideDates.filter((d) => dayHasRice(outside.filter((p) => p.date === d)));
 
+  const chosenOption = (p: MealPlan) => p.options.find((x) => x.label === p.chosen);
+
+  let parsed: { days: { date: string; meals: { slot: MealSlot; options: MealOption[] }[] }[]; note: string };
+  if (aiEnabled()) {
+    parsed = await aiGenerate({ members, toddler, prefs, days, riceOutside, pantry, history, nameOf, today });
+  } else {
+    // 食べた記録 → 料理ごとの点数
+    const ratings: Record<string, number> = {};
+    for (const p of history) {
+      const id = p.chosen ? chosenOption(p)?.recipe_id : undefined;
+      if (!id) continue;
+      for (const r of Object.values(p.ratings ?? {})) ratings[id] = (ratings[id] ?? 0) + RATING_POINT[r];
+    }
+    const noodleDinnersInWeek: Record<string, number> = {};
+    for (const p of outside) {
+      if (p.slot !== "dinner" || !p.chosen || chosenOption(p)?.rice) continue;
+      const wk = weekRange(p.date).from;
+      noodleDinnersInWeek[wk] = (noodleDinnersInWeek[wk] ?? 0) + 1;
+    }
+    parsed = planByRules({
+      days: ruleDays,
+      recipes: [...RECIPES, ...custom.map(toRecipe)],
+      pantry,
+      today,
+      avoid: (avoidText ?? "").split(/[,、\n]/).map((x) => x.trim()),
+      recent: [...history, ...plans]
+        .filter((p) => p.chosen && chosenOption(p)?.recipe_id)
+        .map((p) => ({ date: p.date, recipeId: chosenOption(p)!.recipe_id! })),
+      ratings,
+      noodleDinnersInWeek,
+    });
+  }
+
+  // 保存：対象の食事だけ。まだ選んでいない既存の献立は上書きする
+  const key = (d: string, s: string) => `${d}|${s}`;
+  const wanted = new Set(targets.map((t) => key(t.date, t.slot)));
+  let saved = 0;
+  for (const day of parsed.days) {
+    for (const meal of day.meals) {
+      if (!wanted.has(key(day.date, meal.slot))) continue;
+      wanted.delete(key(day.date, meal.slot));
+      const options: MealOption[] = meal.options.slice(0, 2);
+      const existing = plans.find((p) => p.date === day.date && p.slot === meal.slot);
+      if (existing) await updateRow("meal_plans", existing.id, { options, chosen: null, ratings: {} });
+      else await insertRow("meal_plans", { date: day.date, slot: meal.slot, options, chosen: null, ratings: {} });
+      saved++;
+    }
+  }
+
+  // 予定が変わって不要になった（全員外食など）未選択の献立は消す
+  const needed = new Set(targets.map((t) => key(t.date, t.slot)));
+  for (const p of plans) {
+    if (p.date < range.from || p.date > range.to || p.chosen) continue;
+    if (!needed.has(key(p.date, p.slot))) await deleteRow("meal_plans", p.id);
+  }
+
+  return { saved, note: parsed.note };
+}
+
+type AiInput = {
+  members: Member[];
+  toddler: Member | undefined;
+  prefs: string | null;
+  days: unknown[];
+  riceOutside: string[];
+  pantry: PantryItem[];
+  history: MealPlan[];
+  nameOf: (id: string) => string;
+  today: string;
+};
+
+// Claude に献立を作ってもらう（MEAL_PLANNER=ai のときだけ。有料）
+async function aiGenerate({ members, toddler, prefs, days, riceOutside, pantry, history, nameOf, today }: AiInput) {
   const context = {
     today,
     family: members.map((m) => {
@@ -204,31 +296,14 @@ export async function planMeals(range: Range, today: string) {
   }
   if (!parsed) throw new PlannerError("AI の返答を読み取れませんでした。もう一度お試しください。");
 
-  // 保存：対象の食事だけ。まだ選んでいない既存の献立は上書きする
-  const key = (d: string, s: string) => `${d}|${s}`;
-  const wanted = new Set(targets.map((t) => key(t.date, t.slot)));
-  let saved = 0;
-  for (const day of parsed.days) {
-    for (const meal of day.meals) {
-      if (!wanted.has(key(day.date, meal.slot))) continue;
-      wanted.delete(key(day.date, meal.slot));
-      const options: MealOption[] = meal.options.slice(0, 2).map((o) => ({
-        ...o,
-        toddler_note: o.toddler_note.trim() || null,
-      }));
-      const existing = plans.find((p) => p.date === day.date && p.slot === meal.slot);
-      if (existing) await updateRow("meal_plans", existing.id, { options, chosen: null, ratings: {} });
-      else await insertRow("meal_plans", { date: day.date, slot: meal.slot, options, chosen: null, ratings: {} });
-      saved++;
-    }
-  }
-
-  // 予定が変わって不要になった（全員外食など）未選択の献立は消す
-  const needed = new Set(targets.map((t) => key(t.date, t.slot)));
-  for (const p of plans) {
-    if (p.date < range.from || p.date > range.to || p.chosen) continue;
-    if (!needed.has(key(p.date, p.slot))) await deleteRow("meal_plans", p.id);
-  }
-
-  return { saved, note: parsed.note };
+  return {
+    note: parsed.note,
+    days: parsed.days.map((d) => ({
+      date: d.date,
+      meals: d.meals.map((m) => ({
+        slot: m.slot,
+        options: m.options.map((o) => ({ ...o, toddler_note: o.toddler_note.trim() || null })),
+      })),
+    })),
+  };
 }

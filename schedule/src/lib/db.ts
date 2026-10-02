@@ -29,6 +29,7 @@ const ORDER: Record<TableName, string> = {
   meal_plans: "date",
   pantry_items: "expires_on",
   shopping_items: "created_at",
+  custom_recipes: "created_at",
 };
 
 // ---- ローカル JSON ----

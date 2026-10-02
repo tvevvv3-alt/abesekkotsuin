@@ -34,6 +34,7 @@ export type MealOption = {
   toddler_note: string | null; // 三男向けの味付け・硬さ・大きさの調整
   uses?: string[]; // 使う「家にある食材」
   missing?: string[]; // 足りない食材（選んだら買い物リストへ）
+  recipe_id?: string; // レシピ集の料理（「食べた」記録を次の提案に活かす）
 };
 
 export type MealPlan = {
@@ -60,6 +61,16 @@ export type ShoppingItem = {
   checked: boolean;
 };
 
-export type TableName = "members" | "events" | "meal_plans" | "pantry_items" | "shopping_items";
+export type CustomRecipe = {
+  id: string;
+  slot: "breakfast" | "bento" | "dinner";
+  name: string;
+  ingredients: string[];
+  rice: boolean;
+  minutes: number;
+  toddler_note: string | null;
+};
 
-export const TABLES: TableName[] = ["members", "events", "meal_plans", "pantry_items", "shopping_items"];
+export type TableName = "members" | "events" | "meal_plans" | "pantry_items" | "shopping_items" | "custom_recipes";
+
+export const TABLES: TableName[] = ["members", "events", "meal_plans", "pantry_items", "shopping_items", "custom_recipes"];

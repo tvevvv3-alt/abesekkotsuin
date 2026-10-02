@@ -74,5 +74,6 @@ export function seedData() {
     shopping_items: [
       { id: randomUUID(), name: "牛乳", quantity: "1本", checked: false, created_at: new Date().toISOString() },
     ],
+    custom_recipes: [],
   };
 }

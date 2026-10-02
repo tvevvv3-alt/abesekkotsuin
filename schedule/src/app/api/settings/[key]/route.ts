@@ -4,7 +4,9 @@ import { DEFAULT_PREFERENCES } from "@/lib/preferences";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULTS: Record<string, string> = { preferences: DEFAULT_PREFERENCES };
+// preferences = 阿部家の好み・ルール（メモ。AI を使うときはそのまま渡す）
+// avoid = 献立に出さない食材・料理（カンマ区切り）
+const DEFAULTS: Record<string, string> = { preferences: DEFAULT_PREFERENCES, avoid: "" };
 
 type Ctx = { params: { key: string } };
 

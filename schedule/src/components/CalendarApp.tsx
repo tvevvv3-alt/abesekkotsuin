@@ -257,7 +257,7 @@ export default function CalendarApp() {
           <div className="text-center">
             <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-black" />
             <p className="font-bold">献立を考えています…</p>
-            <p className="mt-1 text-sm text-gray-500">予定と食材を見ながら作るので、1〜2分かかります</p>
+            <p className="mt-1 text-sm text-gray-500">予定と家にある食材から選んでいます</p>
           </div>
         </div>
       )}

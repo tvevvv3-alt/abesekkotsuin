@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { RATING_LABEL } from "@/lib/labels";
+import type { Recipe } from "@/lib/recipes";
+import { optionFromRecipe } from "@/lib/recipeOption";
 import { ageInMonths, toddlerWarnings } from "@/lib/safety";
-import type { MealOption, MealPlan, MealSlot, Member, Rating, ShoppingItem } from "@/lib/types";
+import type { MealOption, MealPlan, MealSlot, Member, PantryItem, Rating, ShoppingItem } from "@/lib/types";
+import RecipePicker from "./RecipePicker";
 
 type Props = {
   date: string;
@@ -21,6 +24,7 @@ export default function MealCard({ date, slot, label, subtitle, plan, members, o
   const [view, setView] = useState(plan?.chosen ?? plan?.options[0]?.label ?? "A");
   const [manual, setManual] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [picker, setPicker] = useState(false);
 
   const kids = members.filter((m) => m.role === "child");
   const youngest = [...kids].sort((a, b) => (b.birth_date ?? "").localeCompare(a.birth_date ?? ""))[0];
@@ -33,7 +37,27 @@ export default function MealCard({ date, slot, label, subtitle, plan, members, o
   // 選んだら、その案の足りない食材を買い物リストへ（すでにある物は足さない）
   const choose = async (o: MealOption) => {
     await save({ chosen: o.label });
-    const missing = o.missing ?? [];
+    await addMissing(o.missing ?? []);
+  };
+
+  // レシピ集から選んだ料理で、この食事を決める（献立と違うものを作った日も）
+  const pickRecipe = async (r: Recipe) => {
+    setPicker(false);
+    setBusy(true);
+    try {
+      const pantry = await api.list<PantryItem>("pantry_items");
+      const o = optionFromRecipe(r, pantry, date);
+      if (plan) await api.update<MealPlan>("meal_plans", plan.id, { options: [o], chosen: "A", ratings: {} });
+      else await api.create<MealPlan>("meal_plans", { date, slot, options: [o], chosen: "A", ratings: {} });
+      setView("A");
+      await addMissing(o.missing ?? []);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addMissing = async (missing: string[]) => {
     if (missing.length === 0) return;
     const current = await api.list<ShoppingItem>("shopping_items");
     const have = new Set(current.filter((i) => !i.checked).map((i) => i.name));
@@ -73,9 +97,14 @@ export default function MealCard({ date, slot, label, subtitle, plan, members, o
       {!plan && !manual && (
         <div className="px-4 pb-4 pt-2">
           <p className="text-sm text-gray-400">まだ献立がありません</p>
-          <button onClick={() => setManual(true)} className="mt-2 text-sm font-bold text-blue-600">
-            ＋ 自分で入力する
-          </button>
+          <div className="mt-2 flex gap-4">
+            <button onClick={() => setPicker(true)} className="text-sm font-bold text-blue-600">
+              📖 レシピから選ぶ
+            </button>
+            <button onClick={() => setManual(true)} className="text-sm font-bold text-gray-500">
+              ＋ 自分で入力
+            </button>
+          </div>
         </div>
       )}
 
@@ -178,6 +207,9 @@ export default function MealCard({ date, slot, label, subtitle, plan, members, o
             </div>
           )}
 
+          <button onClick={() => setPicker(true)} className="mr-4 mt-3 text-xs text-blue-600">
+            別の料理にする
+          </button>
           <button
             onClick={async () => {
               if (!confirm("この献立を削除しますか？")) return;
@@ -190,6 +222,7 @@ export default function MealCard({ date, slot, label, subtitle, plan, members, o
           </button>
         </div>
       )}
+      {picker && <RecipePicker slot={slot} onPick={pickRecipe} onClose={() => setPicker(false)} />}
     </div>
   );
 }
