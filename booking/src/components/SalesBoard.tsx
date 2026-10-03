@@ -122,7 +122,7 @@ export default function SalesBoard() {
     name: string;
     loading: boolean;
     info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null; chart_note?: string | null } | null;
-    visits: { date: string; service_name: string | null; staff_id: string | null; start_min: number }[];
+    visits: { id: string; date: string; service_name: string | null; staff_id: string | null; start_min: number }[];
     firstDate: string | null;
     totalVisits: number;
     referrer: string | null; // 新患名簿の紹介者（リンク表示）
@@ -130,6 +130,13 @@ export default function SalesBoard() {
   const [patNote, setPatNote] = useState(""); // カルテメモ（編集用）
   const [patSaving, setPatSaving] = useState(false);
   const [patSaved, setPatSaved] = useState(false);
+  // 来院ごとのカルテ（自費）
+  type ChartFields = { complaint: string; findings: string; progress: string; treatment: string; note: string };
+  const [chartByAppt, setChartByAppt] = useState<Record<string, ChartFields>>({}); // 保存済み
+  const [saleInsByAppt, setSaleInsByAppt] = useState<Record<string, number>>({}); // 保険総額（0=自費）
+  const [openChart, setOpenChart] = useState<string | null>(null); // 展開中の来院
+  const [chartDraft, setChartDraft] = useState<ChartFields>({ complaint: "", findings: "", progress: "", treatment: "", note: "" });
+  const [chartSaving, setChartSaving] = useState(false);
   const [dragDy, setDragDy] = useState(0);
   const dragStartY = useRef(0);
   const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
@@ -504,7 +511,7 @@ export default function SalesBoard() {
     // 来院履歴（直近）
     const recent = supabase
       .from("appointments")
-      .select("date, service_name, staff_id, start_min")
+      .select("id, date, service_name, staff_id, start_min")
       .neq("status", "cancelled")
       .order("date", { ascending: false })
       .order("start_min", { ascending: false })
@@ -512,6 +519,22 @@ export default function SalesBoard() {
     const { data: vs } = a.patient_id
       ? await recent.eq("patient_id", a.patient_id)
       : await recent.eq("patient_name", a.patient_name || "");
+    // 来院ごとのカルテ＆自費判定（保険総額=insurance）を取得
+    const apptIds = ((vs as { id: string }[] | null) ?? []).map((v) => v.id);
+    setOpenChart(null); setChartByAppt({}); setSaleInsByAppt({});
+    if (apptIds.length) {
+      const [{ data: ce }, { data: sl }] = await Promise.all([
+        supabase.from("chart_entries").select("appointment_id, complaint, findings, progress, treatment, note").in("appointment_id", apptIds),
+        supabase.from("sales").select("appointment_id, insurance").in("appointment_id", apptIds),
+      ]);
+      const cm: Record<string, ChartFields> = {};
+      ((ce as { appointment_id: string; complaint: string | null; findings: string | null; progress: string | null; treatment: string | null; note: string | null }[] | null) ?? []).forEach((r) => {
+        cm[r.appointment_id] = { complaint: r.complaint ?? "", findings: r.findings ?? "", progress: r.progress ?? "", treatment: r.treatment ?? "", note: r.note ?? "" };
+      });
+      const sm: Record<string, number> = {};
+      ((sl as { appointment_id: string; insurance: number }[] | null) ?? []).forEach((r) => { if (r.appointment_id) sm[r.appointment_id] = r.insurance || 0; });
+      setChartByAppt(cm); setSaleInsByAppt(sm);
+    }
     // 初診日・総来院回数
     const cnt = supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled");
     const { count } = a.patient_id ? await cnt.eq("patient_id", a.patient_id) : await cnt.eq("patient_name", a.patient_name || "");
@@ -528,6 +551,31 @@ export default function SalesBoard() {
     setPatSaving(false);
     setPatSaved(true);
     setTimeout(() => setPatSaved(false), 1800);
+  }
+  // 来院ごとのカルテ：展開して編集開始
+  function openChartEditor(apptId: string) {
+    if (openChart === apptId) { setOpenChart(null); return; }
+    setChartDraft(chartByAppt[apptId] ?? { complaint: "", findings: "", progress: "", treatment: "", note: "" });
+    setOpenChart(apptId);
+  }
+  async function saveChartEntry(v: { id: string; date: string; staff_id: string | null }) {
+    setChartSaving(true);
+    const row = {
+      appointment_id: v.id,
+      patient_id: patientModal?.patientId ?? null,
+      staff_id: v.staff_id,
+      date: v.date,
+      complaint: chartDraft.complaint.trim() || null,
+      findings: chartDraft.findings.trim() || null,
+      progress: chartDraft.progress.trim() || null,
+      treatment: chartDraft.treatment.trim() || null,
+      note: chartDraft.note.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    await supabase.from("chart_entries").upsert(row, { onConflict: "appointment_id" });
+    setChartByAppt((m) => ({ ...m, [v.id]: { ...chartDraft } }));
+    setChartSaving(false);
+    setOpenChart(null);
   }
   const monthGap = (from: string, to: string) => {
     const [fy, fm] = from.slice(0, 7).split("-").map(Number);
@@ -1710,18 +1758,51 @@ export default function SalesBoard() {
                 ) : (
                   <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-400">患者未登録のためメモは保存できません（予約から登録された患者で利用できます）。</p>
                 )}
-                <div className="mb-1 mt-3 text-xs font-bold text-slate-500">来院履歴（直近）</div>
+                <div className="mb-1 mt-3 text-xs font-bold text-slate-500">来院履歴・カルテ（直近）</div>
                 <div className="rounded-lg border">
                   {patientModal.visits.length === 0 ? (
                     <p className="py-3 text-center text-xs text-slate-400">履歴なし</p>
                   ) : (
-                    patientModal.visits.map((v, i) => (
-                      <div key={i} className="flex items-center gap-2 border-b border-slate-50 px-3 py-1.5 text-[13px] last:border-b-0">
-                        <span className="whitespace-nowrap tabnum text-slate-600">{v.date.slice(5).replace("-", "/")} {minToLabel(v.start_min)}</span>
-                        <span className="flex-1 truncate text-slate-500">{v.service_name || ""}</span>
-                        <span className="whitespace-nowrap text-[11px] text-slate-400">{assignees.find((x) => x.id === v.staff_id)?.name || ""}</span>
-                      </div>
-                    ))
+                    patientModal.visits.map((v) => {
+                      const hoken = (saleInsByAppt[v.id] ?? 0) > 0; // 保険総額>0=保険併用（手書き）
+                      const has = !!chartByAppt[v.id] && Object.values(chartByAppt[v.id]).some((t) => (t || "").trim());
+                      const expanded = openChart === v.id;
+                      return (
+                        <div key={v.id} className="border-b border-slate-100 last:border-b-0">
+                          <div className="flex items-center gap-2 px-3 py-1.5 text-[13px]">
+                            <span className="whitespace-nowrap tabnum text-slate-600">{v.date.slice(5).replace("-", "/")} {minToLabel(v.start_min)}</span>
+                            <span className="flex-1 truncate text-slate-500">{v.service_name || ""}</span>
+                            <span className="whitespace-nowrap text-[11px] text-slate-400">{assignees.find((x) => x.id === v.staff_id)?.name || ""}</span>
+                            {hoken ? (
+                              <span className="whitespace-nowrap rounded bg-slate-100 px-1 text-[10px] font-bold text-slate-400">保険(手書き)</span>
+                            ) : (
+                              <button onClick={() => openChartEditor(v.id)}
+                                className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${has ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}>
+                                {has ? "カルテ✓" : "カルテ＋"}{expanded ? "▲" : "▾"}
+                              </button>
+                            )}
+                          </div>
+                          {expanded && !hoken && (
+                            <div className="space-y-1.5 bg-slate-50 px-3 py-2">
+                              {([["complaint", "主訴"], ["findings", "所見"], ["progress", "経過"], ["treatment", "施術内容"], ["note", "メモ"]] as const).map(([k, label]) => (
+                                <div key={k}>
+                                  <div className="mb-0.5 text-[11px] font-bold text-slate-500">{label}</div>
+                                  <textarea value={chartDraft[k]} onChange={(e) => setChartDraft((d) => ({ ...d, [k]: e.target.value }))} rows={2}
+                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-[13px]" />
+                                </div>
+                              ))}
+                              <div className="flex items-center gap-2 pt-0.5">
+                                <span className="text-[10px] text-slate-400">担当 {assignees.find((x) => x.id === v.staff_id)?.name || "—"}</span>
+                                <button onClick={() => saveChartEntry(v)} disabled={chartSaving}
+                                  className="ml-auto rounded-lg bg-blue-600 px-3 py-1 text-[13px] font-bold text-white disabled:bg-slate-300">
+                                  {chartSaving ? "保存中…" : "カルテ保存"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
