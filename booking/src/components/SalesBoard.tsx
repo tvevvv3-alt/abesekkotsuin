@@ -121,12 +121,12 @@ export default function SalesBoard() {
     patientId: string | null;
     name: string;
     loading: boolean;
-    info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null; referral?: string | null; chart_note?: string | null } | null;
+    info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null; chart_note?: string | null } | null;
     visits: { date: string; service_name: string | null; staff_id: string | null; start_min: number }[];
     firstDate: string | null;
     totalVisits: number;
+    referrer: string | null; // 新患名簿の紹介者（リンク表示）
   }>(null);
-  const [patRef, setPatRef] = useState(""); // 紹介元（編集用）
   const [patNote, setPatNote] = useState(""); // カルテメモ（編集用）
   const [patSaving, setPatSaving] = useState(false);
   const [patSaved, setPatSaved] = useState(false);
@@ -483,15 +483,23 @@ export default function SalesBoard() {
   const pkey = (a: { patient_id: string | null; patient_name: string | null }) => a.patient_id || "n:" + normName(a.patient_name);
   // 患者名タップ → 患者情報＋来院履歴＋紹介元/メモ（簡易カルテ）を取得して表示
   async function openPatient(a: Appt) {
-    setPatientModal({ patientId: a.patient_id, name: a.patient_name || "（未登録）", loading: true, info: null, visits: [], firstDate: null, totalVisits: 0 });
-    setPatRef(""); setPatNote(""); setPatSaved(false);
-    type PInfo = { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null; referral?: string | null; chart_note?: string | null };
+    setPatientModal({ patientId: a.patient_id, name: a.patient_name || "（未登録）", loading: true, info: null, visits: [], firstDate: null, totalVisits: 0, referrer: null });
+    setPatNote(""); setPatSaved(false);
+    type PInfo = { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null; chart_note?: string | null };
     let info: PInfo | null = null;
     if (a.patient_id) {
-      const { data } = await supabase.from("patients").select("patient_number, name_kana, birth_date, phone, referral, chart_note").eq("id", a.patient_id).maybeSingle();
+      const { data } = await supabase.from("patients").select("patient_number, name_kana, birth_date, phone, chart_note").eq("id", a.patient_id).maybeSingle();
       info = (data as PInfo | null) ?? null;
-      setPatRef(info?.referral ?? "");
       setPatNote(info?.chart_note ?? "");
+    }
+    // 紹介元は新患名簿(new_patients)の紹介者からリンク（氏名で照合。スペース差は無視）
+    let referrer: string | null = null;
+    const nm = (a.patient_name || "").trim();
+    if (nm) {
+      const { data: np } = await supabase.from("new_patients").select("name, referrer, date").order("date", { ascending: false }).limit(2000);
+      const key = normName(nm);
+      const hit = ((np as { name: string; referrer: string | null }[] | null) ?? []).find((r) => normName(r.name) === key && (r.referrer || "").trim());
+      referrer = hit?.referrer?.trim() || null;
     }
     // 来院履歴（直近）
     const recent = supabase
@@ -510,13 +518,13 @@ export default function SalesBoard() {
     const firstQ = supabase.from("appointments").select("date").neq("status", "cancelled").order("date", { ascending: true }).limit(1);
     const { data: fv } = a.patient_id ? await firstQ.eq("patient_id", a.patient_id) : await firstQ.eq("patient_name", a.patient_name || "");
     const firstDate = (fv as { date: string }[] | null)?.[0]?.date ?? null;
-    setPatientModal((p) => (p ? { ...p, loading: false, info, visits: (vs as typeof p.visits) ?? [], firstDate, totalVisits: count ?? 0 } : null));
+    setPatientModal((p) => (p ? { ...p, loading: false, info, visits: (vs as typeof p.visits) ?? [], firstDate, totalVisits: count ?? 0, referrer } : null));
   }
   async function savePatientChart() {
     const pid = patientModal?.patientId;
     if (!pid) return;
     setPatSaving(true);
-    await supabase.from("patients").update({ referral: patRef.trim() || null, chart_note: patNote.trim() || null }).eq("id", pid);
+    await supabase.from("patients").update({ chart_note: patNote.trim() || null }).eq("id", pid);
     setPatSaving(false);
     setPatSaved(true);
     setTimeout(() => setPatSaved(false), 1800);
@@ -1673,6 +1681,7 @@ export default function SalesBoard() {
                     ["患者番号", patientModal.info?.patient_number || "—"],
                     ["初診日", patientModal.firstDate ? patientModal.firstDate.replace(/-/g, "/") : "—"],
                     ["来院回数", `${patientModal.totalVisits}回`],
+                    ["紹介元", patientModal.referrer || "—"],
                   ].map(([k, v], i) => (
                     <div key={i} className="flex items-center justify-between border-b border-slate-100 px-3 py-1.5 last:border-b-0">
                       <span className="text-[12px] text-slate-400">{k}</span>
@@ -1680,15 +1689,10 @@ export default function SalesBoard() {
                     </div>
                   ))}
                 </div>
-                {/* 紹介元・カルテメモ（編集可） */}
+                <p className="mt-1 px-1 text-[10px] text-slate-400">※紹介元は新患名簿の「紹介者」からリンク表示</p>
+                {/* カルテメモ（編集可） */}
                 {patientModal.patientId ? (
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <div className="mb-0.5 text-xs font-bold text-slate-500">紹介元・きっかけ</div>
-                      <input value={patRef} onChange={(e) => { setPatRef(e.target.value); setPatSaved(false); }}
-                        placeholder="例：〇〇様のご紹介／Instagram／看板 など"
-                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
-                    </div>
+                  <div className="mt-2 space-y-2">
                     <div>
                       <div className="mb-0.5 text-xs font-bold text-slate-500">カルテメモ</div>
                       <textarea value={patNote} onChange={(e) => { setPatNote(e.target.value); setPatSaved(false); }} rows={3}
@@ -1698,13 +1702,13 @@ export default function SalesBoard() {
                     <div className="flex items-center gap-2">
                       <button onClick={savePatientChart} disabled={patSaving}
                         className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white disabled:bg-slate-300">
-                        {patSaving ? "保存中…" : "保存"}
+                        {patSaving ? "保存中…" : "メモを保存"}
                       </button>
                       {patSaved && <span className="text-xs font-bold text-emerald-600">保存しました ✓</span>}
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-400">患者未登録のため紹介元・メモは保存できません（予約から登録された患者で利用できます）。</p>
+                  <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-400">患者未登録のためメモは保存できません（予約から登録された患者で利用できます）。</p>
                 )}
                 <div className="mb-1 mt-3 text-xs font-bold text-slate-500">来院履歴（直近）</div>
                 <div className="rounded-lg border">
