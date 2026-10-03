@@ -116,13 +116,20 @@ export default function SalesBoard() {
   const [lastVisitReady, setLastVisitReady] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
-  // 患者名タップで出す患者情報
+  // 患者名タップで出す患者情報（簡易カルテ）
   const [patientModal, setPatientModal] = useState<null | {
+    patientId: string | null;
     name: string;
     loading: boolean;
-    info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null } | null;
+    info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null; referral?: string | null; chart_note?: string | null } | null;
     visits: { date: string; service_name: string | null; staff_id: string | null; start_min: number }[];
+    firstDate: string | null;
+    totalVisits: number;
   }>(null);
+  const [patRef, setPatRef] = useState(""); // 紹介元（編集用）
+  const [patNote, setPatNote] = useState(""); // カルテメモ（編集用）
+  const [patSaving, setPatSaving] = useState(false);
+  const [patSaved, setPatSaved] = useState(false);
   const [dragDy, setDragDy] = useState(0);
   const dragStartY = useRef(0);
   const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
@@ -474,15 +481,20 @@ export default function SalesBoard() {
   const hasTsuden = (a: Appt) => menuHasTsuden(a.service_name);
   // 患者キー（患者ID優先、無ければ氏名）／月差
   const pkey = (a: { patient_id: string | null; patient_name: string | null }) => a.patient_id || "n:" + normName(a.patient_name);
-  // 患者名タップ → 患者情報＋来院履歴を取得して表示
+  // 患者名タップ → 患者情報＋来院履歴＋紹介元/メモ（簡易カルテ）を取得して表示
   async function openPatient(a: Appt) {
-    setPatientModal({ name: a.patient_name || "（未登録）", loading: true, info: null, visits: [] });
-    let info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null } | null = null;
+    setPatientModal({ patientId: a.patient_id, name: a.patient_name || "（未登録）", loading: true, info: null, visits: [], firstDate: null, totalVisits: 0 });
+    setPatRef(""); setPatNote(""); setPatSaved(false);
+    type PInfo = { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null; referral?: string | null; chart_note?: string | null };
+    let info: PInfo | null = null;
     if (a.patient_id) {
-      const { data } = await supabase.from("patients").select("patient_number, name_kana, birth_date, phone").eq("id", a.patient_id).maybeSingle();
-      info = (data as typeof info) ?? null;
+      const { data } = await supabase.from("patients").select("patient_number, name_kana, birth_date, phone, referral, chart_note").eq("id", a.patient_id).maybeSingle();
+      info = (data as PInfo | null) ?? null;
+      setPatRef(info?.referral ?? "");
+      setPatNote(info?.chart_note ?? "");
     }
-    const base = supabase
+    // 来院履歴（直近）
+    const recent = supabase
       .from("appointments")
       .select("date, service_name, staff_id, start_min")
       .neq("status", "cancelled")
@@ -490,9 +502,24 @@ export default function SalesBoard() {
       .order("start_min", { ascending: false })
       .limit(10);
     const { data: vs } = a.patient_id
-      ? await base.eq("patient_id", a.patient_id)
-      : await base.eq("patient_name", a.patient_name || "");
-    setPatientModal((p) => (p ? { ...p, loading: false, info, visits: (vs as typeof p.visits) ?? [] } : null));
+      ? await recent.eq("patient_id", a.patient_id)
+      : await recent.eq("patient_name", a.patient_name || "");
+    // 初診日・総来院回数
+    const cnt = supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled");
+    const { count } = a.patient_id ? await cnt.eq("patient_id", a.patient_id) : await cnt.eq("patient_name", a.patient_name || "");
+    const firstQ = supabase.from("appointments").select("date").neq("status", "cancelled").order("date", { ascending: true }).limit(1);
+    const { data: fv } = a.patient_id ? await firstQ.eq("patient_id", a.patient_id) : await firstQ.eq("patient_name", a.patient_name || "");
+    const firstDate = (fv as { date: string }[] | null)?.[0]?.date ?? null;
+    setPatientModal((p) => (p ? { ...p, loading: false, info, visits: (vs as typeof p.visits) ?? [], firstDate, totalVisits: count ?? 0 } : null));
+  }
+  async function savePatientChart() {
+    const pid = patientModal?.patientId;
+    if (!pid) return;
+    setPatSaving(true);
+    await supabase.from("patients").update({ referral: patRef.trim() || null, chart_note: patNote.trim() || null }).eq("id", pid);
+    setPatSaving(false);
+    setPatSaved(true);
+    setTimeout(() => setPatSaved(false), 1800);
   }
   const monthGap = (from: string, to: string) => {
     const [fy, fm] = from.slice(0, 7).split("-").map(Number);
@@ -1626,13 +1653,16 @@ export default function SalesBoard() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setPatientModal(null)} />
           <div className="relative flex max-h-[85vh] w-full max-w-sm flex-col rounded-t-2xl bg-white p-4 sm:rounded-2xl">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-base font-bold text-slate-800">{patientModal.name}</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-base font-bold text-slate-800">{patientModal.name}</span>
+                {!patientModal.loading && <span className="text-[11px] text-slate-400">簡易カルテ</span>}
+              </div>
               <button onClick={() => setPatientModal(null)} className="rounded px-2 text-lg text-slate-400 active:bg-slate-100">✕</button>
             </div>
             {patientModal.loading ? (
               <p className="py-8 text-center text-sm text-slate-400">読み込み中…</p>
             ) : (
-              <>
+              <div className="flex-1 overflow-y-auto">
                 <div className="rounded-lg border text-sm">
                   {[
                     ["フリガナ", patientModal.info?.name_kana || "—"],
@@ -1641,6 +1671,8 @@ export default function SalesBoard() {
                       : "—"],
                     ["電話", patientModal.info?.phone || "—"],
                     ["患者番号", patientModal.info?.patient_number || "—"],
+                    ["初診日", patientModal.firstDate ? patientModal.firstDate.replace(/-/g, "/") : "—"],
+                    ["来院回数", `${patientModal.totalVisits}回`],
                   ].map(([k, v], i) => (
                     <div key={i} className="flex items-center justify-between border-b border-slate-100 px-3 py-1.5 last:border-b-0">
                       <span className="text-[12px] text-slate-400">{k}</span>
@@ -1648,8 +1680,34 @@ export default function SalesBoard() {
                     </div>
                   ))}
                 </div>
+                {/* 紹介元・カルテメモ（編集可） */}
+                {patientModal.patientId ? (
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <div className="mb-0.5 text-xs font-bold text-slate-500">紹介元・きっかけ</div>
+                      <input value={patRef} onChange={(e) => { setPatRef(e.target.value); setPatSaved(false); }}
+                        placeholder="例：〇〇様のご紹介／Instagram／看板 など"
+                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <div className="mb-0.5 text-xs font-bold text-slate-500">カルテメモ</div>
+                      <textarea value={patNote} onChange={(e) => { setPatNote(e.target.value); setPatSaved(false); }} rows={3}
+                        placeholder="症状・申し送り・注意点など"
+                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={savePatientChart} disabled={patSaving}
+                        className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white disabled:bg-slate-300">
+                        {patSaving ? "保存中…" : "保存"}
+                      </button>
+                      {patSaved && <span className="text-xs font-bold text-emerald-600">保存しました ✓</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-400">患者未登録のため紹介元・メモは保存できません（予約から登録された患者で利用できます）。</p>
+                )}
                 <div className="mb-1 mt-3 text-xs font-bold text-slate-500">来院履歴（直近）</div>
-                <div className="flex-1 overflow-y-auto rounded-lg border">
+                <div className="rounded-lg border">
                   {patientModal.visits.length === 0 ? (
                     <p className="py-3 text-center text-xs text-slate-400">履歴なし</p>
                   ) : (
@@ -1662,7 +1720,7 @@ export default function SalesBoard() {
                     ))
                   )}
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
