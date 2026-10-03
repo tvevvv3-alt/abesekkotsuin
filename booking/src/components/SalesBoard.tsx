@@ -116,6 +116,13 @@ export default function SalesBoard() {
   const [lastVisitReady, setLastVisitReady] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  // 患者名タップで出す患者情報
+  const [patientModal, setPatientModal] = useState<null | {
+    name: string;
+    loading: boolean;
+    info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null } | null;
+    visits: { date: string; service_name: string | null; staff_id: string | null; start_min: number }[];
+  }>(null);
   const [dragDy, setDragDy] = useState(0);
   const dragStartY = useRef(0);
   const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
@@ -467,6 +474,26 @@ export default function SalesBoard() {
   const hasTsuden = (a: Appt) => menuHasTsuden(a.service_name);
   // 患者キー（患者ID優先、無ければ氏名）／月差
   const pkey = (a: { patient_id: string | null; patient_name: string | null }) => a.patient_id || "n:" + normName(a.patient_name);
+  // 患者名タップ → 患者情報＋来院履歴を取得して表示
+  async function openPatient(a: Appt) {
+    setPatientModal({ name: a.patient_name || "（未登録）", loading: true, info: null, visits: [] });
+    let info: { patient_number?: string | null; name_kana?: string | null; birth_date?: string | null; phone?: string | null } | null = null;
+    if (a.patient_id) {
+      const { data } = await supabase.from("patients").select("patient_number, name_kana, birth_date, phone").eq("id", a.patient_id).maybeSingle();
+      info = (data as typeof info) ?? null;
+    }
+    const base = supabase
+      .from("appointments")
+      .select("date, service_name, staff_id, start_min")
+      .neq("status", "cancelled")
+      .order("date", { ascending: false })
+      .order("start_min", { ascending: false })
+      .limit(10);
+    const { data: vs } = a.patient_id
+      ? await base.eq("patient_id", a.patient_id)
+      : await base.eq("patient_name", a.patient_name || "");
+    setPatientModal((p) => (p ? { ...p, loading: false, info, visits: (vs as typeof p.visits) ?? [] } : null));
+  }
   const monthGap = (from: string, to: string) => {
     const [fy, fm] = from.slice(0, 7).split("-").map(Number);
     const [ty, tm] = to.slice(0, 7).split("-").map(Number);
@@ -1463,7 +1490,9 @@ export default function SalesBoard() {
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-medium text-slate-800">{a.patient_name || "（未登録）"}</span>
+                              <button onClick={() => openPatient(a)} className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600" title="患者情報を見る">
+                                {a.patient_name || "（未登録）"}
+                              </button>
                               <span className="text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
                               {!(kawa && a.service_id === kawa.id) && (
                                 <>
@@ -1590,6 +1619,54 @@ export default function SalesBoard() {
         入金額(=自費+負担額)・総合計(=自費+合計額) と日計・月計が自動集計されます。物販や予約外は
         「＋物販/予約外」から。担当ごとの合計(自費+保険)で当月の達成率が出ます。
       </p>
+
+      {/* 患者情報（名前タップ） */}
+      {patientModal && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setPatientModal(null)} />
+          <div className="relative flex max-h-[85vh] w-full max-w-sm flex-col rounded-t-2xl bg-white p-4 sm:rounded-2xl">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-base font-bold text-slate-800">{patientModal.name}</span>
+              <button onClick={() => setPatientModal(null)} className="rounded px-2 text-lg text-slate-400 active:bg-slate-100">✕</button>
+            </div>
+            {patientModal.loading ? (
+              <p className="py-8 text-center text-sm text-slate-400">読み込み中…</p>
+            ) : (
+              <>
+                <div className="rounded-lg border text-sm">
+                  {[
+                    ["フリガナ", patientModal.info?.name_kana || "—"],
+                    ["生年月日", patientModal.info?.birth_date
+                      ? `${patientModal.info.birth_date}（${ageAt(patientModal.info.birth_date, toDateStr(new Date())) ?? "—"}歳）`
+                      : "—"],
+                    ["電話", patientModal.info?.phone || "—"],
+                    ["患者番号", patientModal.info?.patient_number || "—"],
+                  ].map(([k, v], i) => (
+                    <div key={i} className="flex items-center justify-between border-b border-slate-100 px-3 py-1.5 last:border-b-0">
+                      <span className="text-[12px] text-slate-400">{k}</span>
+                      <span className="tabnum font-medium text-slate-700">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mb-1 mt-3 text-xs font-bold text-slate-500">来院履歴（直近）</div>
+                <div className="flex-1 overflow-y-auto rounded-lg border">
+                  {patientModal.visits.length === 0 ? (
+                    <p className="py-3 text-center text-xs text-slate-400">履歴なし</p>
+                  ) : (
+                    patientModal.visits.map((v, i) => (
+                      <div key={i} className="flex items-center gap-2 border-b border-slate-50 px-3 py-1.5 text-[13px] last:border-b-0">
+                        <span className="whitespace-nowrap tabnum text-slate-600">{v.date.slice(5).replace("-", "/")} {minToLabel(v.start_min)}</span>
+                        <span className="flex-1 truncate text-slate-500">{v.service_name || ""}</span>
+                        <span className="whitespace-nowrap text-[11px] text-slate-400">{assignees.find((x) => x.id === v.staff_id)?.name || ""}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 料金設定（自費の自動計算） */}
       {priceOpen && (
