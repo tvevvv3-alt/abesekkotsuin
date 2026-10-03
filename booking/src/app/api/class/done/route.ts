@@ -6,6 +6,7 @@ import {
   lineMessagingConfigured,
   pushText,
   renderClassDone,
+  resolveLineUserId,
 } from "@/lib/line";
 
 export const runtime = "nodejs";
@@ -37,11 +38,13 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, line_user_id, patient_name, service_id, date, start_min")
+    .select("id, line_user_id, patient_id, patient_name, service_id, date, start_min")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return NextResponse.json({ ok: false, reason: "noappt" }, { status: 404 });
-  if (!appt.line_user_id) {
+  // この予約が未連携でも、同じ患者の他予約からLINE連携を拾う（送れない／遅れる対策）
+  const lineId = await resolveLineUserId(admin, appt);
+  if (!lineId) {
     return NextResponse.json({ ok: false, reason: "noline" });
   }
   if (!lineMessagingConfigured()) {
@@ -120,7 +123,7 @@ export async function POST(req: NextRequest) {
   // プレビュー：送信せず本文だけ返す
   if (preview) return NextResponse.json({ ok: true, preview: text });
 
-  const r = await pushText(appt.line_user_id, text);
+  const r = await pushText(lineId, text);
   if (!r.ok) return NextResponse.json({ ok: false, reason: "send", error: r.error });
   return NextResponse.json({ ok: true });
 }

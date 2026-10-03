@@ -271,6 +271,47 @@ export async function buildApptInfo(
   };
 }
 
+// 送信先の line_user_id を解決する。
+// この予約が未連携(null)でも、同じ患者の他予約にLINE連携があればそれを使う。
+// （体幹教室などで、予約時の自動連携がこけた回だけ line_user_id が空になり
+//   「終了通知が送れない／遅れる」問題への対策。見つかったら書き戻して次回以降は直送。）
+export async function resolveLineUserId(
+  admin: SupabaseClient,
+  appt: {
+    id: string;
+    line_user_id: string | null;
+    patient_id?: string | null;
+    patient_name?: string | null;
+  }
+): Promise<string | null> {
+  if (appt.line_user_id) return appt.line_user_id;
+  let found: string | null = null;
+  if (appt.patient_id) {
+    const { data } = await admin
+      .from("appointments")
+      .select("line_user_id")
+      .eq("patient_id", appt.patient_id)
+      .not("line_user_id", "is", null)
+      .order("date", { ascending: false })
+      .limit(1);
+    found = (data?.[0]?.line_user_id as string | null) ?? null;
+  }
+  if (!found && appt.patient_name && appt.patient_name.trim()) {
+    const { data } = await admin
+      .from("appointments")
+      .select("line_user_id")
+      .eq("patient_name", appt.patient_name)
+      .not("line_user_id", "is", null)
+      .order("date", { ascending: false })
+      .limit(1);
+    found = (data?.[0]?.line_user_id as string | null) ?? null;
+  }
+  if (found) {
+    await admin.from("appointments").update({ line_user_id: found }).eq("id", appt.id);
+  }
+  return found;
+}
+
 // LINE へテキストを1通プッシュ送信
 export async function pushText(
   userId: string,

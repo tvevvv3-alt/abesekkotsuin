@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DEFAULT_PERSONAL_DONE_TEXT, lineMessagingConfigured, pushText, renderPersonalDone } from "@/lib/line";
+import { DEFAULT_PERSONAL_DONE_TEXT, lineMessagingConfigured, pushText, renderPersonalDone, resolveLineUserId } from "@/lib/line";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, line_user_id, patient_name, date, start_min, end_min")
+    .select("id, line_user_id, patient_id, patient_name, date, start_min, end_min")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return NextResponse.json({ ok: false, reason: "noappt" }, { status: 404 });
@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
   }
   const remaining = Math.max(0, quota - used - consumedDone);
 
-  if (!appt.line_user_id) return NextResponse.json({ ok: false, reason: "noline", remaining });
+  const lineId = await resolveLineUserId(admin, appt);
+  if (!lineId) return NextResponse.json({ ok: false, reason: "noline", remaining });
   if (!lineMessagingConfigured()) return NextResponse.json({ ok: false, reason: "notconfigured", remaining });
 
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
@@ -83,6 +84,6 @@ export async function POST(req: NextRequest) {
     : renderPersonalDone(tpl, { name: appt.patient_name, url: bookUrl, remaining: `あと${remaining}回` });
   // プレビュー：送信せず本文だけ返す
   if (preview) return NextResponse.json({ ok: true, preview: text, remaining });
-  const r = await pushText(appt.line_user_id, text);
+  const r = await pushText(lineId, text);
   return NextResponse.json({ ok: r.ok, remaining, error: r.ok ? undefined : r.error });
 }

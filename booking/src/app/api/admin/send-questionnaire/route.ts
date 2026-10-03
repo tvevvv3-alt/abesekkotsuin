@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DEFAULT_QUESTIONNAIRE_TEXT, lineMessagingConfigured, pushText, renderLinkMessage } from "@/lib/line";
+import { DEFAULT_QUESTIONNAIRE_TEXT, lineMessagingConfigured, pushText, renderLinkMessage, resolveLineUserId } from "@/lib/line";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,9 +27,10 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   if (!admin) return NextResponse.json({ ok: false, reason: "server" }, { status: 500 });
 
-  const { data: appt } = await admin.from("appointments").select("id, line_user_id, patient_name").eq("id", appointmentId).maybeSingle();
+  const { data: appt } = await admin.from("appointments").select("id, line_user_id, patient_id, patient_name").eq("id", appointmentId).maybeSingle();
   if (!appt) return NextResponse.json({ ok: false, reason: "notfound" }, { status: 404 });
-  if (!appt.line_user_id) return NextResponse.json({ ok: false, reason: "noline" });
+  const lineId = await resolveLineUserId(admin, appt);
+  if (!lineId) return NextResponse.json({ ok: false, reason: "noline" });
 
   const { data: s } = await admin.from("settings").select("questionnaire_url, questionnaire_text").eq("id", 1).maybeSingle();
   const url = (s?.questionnaire_url as string | null)?.trim();
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   const text = overrideText.trim() ? overrideText : renderLinkMessage(tpl, url);
   // プレビュー：送信せず本文だけ返す
   if (preview) return NextResponse.json({ ok: true, preview: text });
-  const r = await pushText(appt.line_user_id, text);
+  const r = await pushText(lineId, text);
   if (!r.ok) return NextResponse.json({ ok: false, reason: "send", error: r.error });
   // 送信日時を記録（モーダルの「送信済」表示・二重送信防止用）
   const sentAt = new Date().toISOString();

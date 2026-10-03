@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildApptInfo, buildCancelText, fmtDateTime, lineMessagingConfigured, pushText } from "@/lib/line";
+import { buildApptInfo, buildCancelText, fmtDateTime, lineMessagingConfigured, pushText, resolveLineUserId } from "@/lib/line";
 import { notifyStaff } from "@/lib/push";
 
 export const runtime = "nodejs";
@@ -28,10 +28,13 @@ export async function POST(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, line_user_id, status, date, start_min, service_id, staff_id, service_name, patient_name")
+    .select("id, line_user_id, patient_id, status, date, start_min, service_id, staff_id, service_name, patient_name")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return NextResponse.json({ ok: false, reason: "notfound" }, { status: 404 });
+
+  // この予約が未連携でも、同じ患者の他予約からLINE連携を拾う
+  const lineId = await resolveLineUserId(admin, appt);
 
   // キャンセル＋枠の解放
   const { error } = await admin.from("appointments").update({ status: "cancelled" }).eq("id", appointmentId);
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   // LINE連携済みの患者へキャンセル通知（失敗しても成功扱い）
   let sent = false;
-  if (appt.line_user_id && lineMessagingConfigured()) {
+  if (lineId && lineMessagingConfigured()) {
     try {
       const { data: cfg } = await admin.from("settings").select("cancel_text, clinics").eq("id", 1).maybeSingle();
       const info = await buildApptInfo(
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
         },
         (cfg?.clinics as never) ?? null
       );
-      const r = await pushText(appt.line_user_id, buildCancelText(info, (cfg as { cancel_text?: string | null } | null)?.cancel_text ?? null));
+      const r = await pushText(lineId, buildCancelText(info, (cfg as { cancel_text?: string | null } | null)?.cancel_text ?? null));
       sent = r.ok;
     } catch {
       /* noop */
@@ -69,5 +72,5 @@ export async function POST(req: NextRequest) {
     tag: "appt-" + appointmentId,
   });
 
-  return NextResponse.json({ ok: true, sent, hadLine: !!appt.line_user_id });
+  return NextResponse.json({ ok: true, sent, hadLine: !!lineId });
 }
