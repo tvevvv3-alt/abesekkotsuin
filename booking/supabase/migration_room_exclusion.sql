@@ -312,8 +312,14 @@ begin
   end if;
   v_end := (v_check->>'end_min')::int;
 
+  -- 同じ電話番号でも「氏名が同じ」患者だけを同一人物とみなす（親子・兄弟は別患者に分ける）。
+  -- 氏名はスペース差（半角/全角）を無視して比較する。
   if p_phone is not null and length(trim(p_phone)) > 0 then
-    select id into v_patient from patients where phone = p_phone order by created_at limit 1;
+    select id into v_patient from patients
+     where phone = p_phone
+       and regexp_replace(coalesce(name, ''), '[[:space:]　]', '', 'g')
+         = regexp_replace(coalesce(p_name, ''), '[[:space:]　]', '', 'g')
+     order by created_at limit 1;
   end if;
 
   if v_patient is null then
