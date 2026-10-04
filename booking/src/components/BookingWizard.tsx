@@ -1514,7 +1514,12 @@ export default function BookingWizard() {
           </div>
           <button
             disabled={!name.trim() || !phone.trim() || !birth}
-            onClick={() => setStep(4)}
+            onClick={() => {
+              // 氏名・フリガナのスペースは除去して統一（苗字と名前の間の空白なし）
+              setName(name.replace(/[\s　]/g, ""));
+              setKana(kana.replace(/[\s　]/g, ""));
+              setStep(4);
+            }}
             className="mt-5 w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:bg-slate-300"
           >
             確認へ進む
