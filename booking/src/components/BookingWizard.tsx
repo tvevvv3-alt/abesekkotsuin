@@ -1690,22 +1690,12 @@ export default function BookingWizard() {
                     style={{ backgroundColor: "#06C755" }}
                   >
                     <span className="text-lg">💬</span>
-                    LINEで登録して受け取る
+                    予約情報を確認する
                   </a>
                   <p className="mt-2 text-center text-[11px] text-slate-500">
-                    ⚠ リマインドはLINE登録された方のみお届けします
+                    予約の確認・変更・キャンセル、リマインドはLINEから行えます。
                   </p>
                 </div>
-                <a
-                  href={`/api/line/login?a=${lastAppointmentId}`}
-                  className="mt-3 flex w-full items-center justify-center rounded-xl border-2 py-3 text-sm font-bold active:opacity-90"
-                  style={{ borderColor: "#06C755", color: "#06C755" }}
-                >
-                  予約情報を確認する
-                </a>
-                <p className="mt-2 text-center text-[11px] text-slate-400">
-                  予約内容の確認・変更・キャンセルはLINEから行えます。
-                </p>
               </>
             ) : (
               <button
