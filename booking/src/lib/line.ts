@@ -328,7 +328,7 @@ export async function maybeAutoSendQuestionnaire(
   if (appt.questionnaire_sent_at) return { sent: false, reason: "already" };
   const { data: s } = await admin
     .from("settings")
-    .select("questionnaire_url, questionnaire_text, questionnaire_auto, questionnaire_gap_days")
+    .select("questionnaire_url, questionnaire_text, questionnaire_auto")
     .eq("id", 1)
     .maybeSingle();
   if (!s || !(s as { questionnaire_auto?: boolean }).questionnaire_auto) return { sent: false, reason: "off" };
@@ -351,14 +351,15 @@ export async function maybeAutoSendQuestionnaire(
     : await q.eq("patient_name", appt.patient_name || "");
   const priorDate = (prev as { date: string }[] | null)?.[0]?.date ?? null;
 
-  const gapDays = (s as { questionnaire_gap_days?: number }).questionnaire_gap_days ?? 60;
+  // 初診 or「最終来院月＋2ヶ月の末日を過ぎた再来」＝アプリの初診判定(月差3以上)と同じ基準。
+  // 例）最終5/10 → 7月末まで再診、8月以降は初診扱い＝自動送信。
   let qualify = false;
   if (!priorDate) qualify = true; // 初診（過去の来院なし）
   else {
-    const days = Math.floor(
-      (new Date(appt.date + "T00:00:00").getTime() - new Date(priorDate + "T00:00:00").getTime()) / 86400000
-    );
-    if (days >= gapDays) qualify = true; // 一定日数あいた再来
+    const [py, pm] = priorDate.slice(0, 7).split("-").map((n) => parseInt(n, 10));
+    const [ay, am] = appt.date.slice(0, 7).split("-").map((n) => parseInt(n, 10));
+    const monthGap = ay * 12 + am - (py * 12 + pm);
+    if (monthGap >= 3) qualify = true;
   }
   if (!qualify) return { sent: false, reason: "notdue" };
 

@@ -222,11 +222,7 @@ export default function SettingsAdmin() {
             <input type="checkbox" checked={!!s.questionnaire_auto} onChange={(e) => up({ questionnaire_auto: e.target.checked })} />
             問診票を自動送信する
           </label>
-          <p className="mt-1 text-[11px] text-slate-500">LINE予約の連携時に、<b>初診</b>、または前回来院から
-            <input type="number" min={1} value={s.questionnaire_gap_days ?? 60}
-              onChange={(e) => up({ questionnaire_gap_days: Math.max(1, parseInt(e.target.value || "60", 10)) })}
-              className="mx-1 w-14 rounded border px-1 py-0.5 text-right text-sm" />
-            日以上あいた再来の場合に、上記の問診票リンクを自動で送信します（親子・兄弟は本人の来院状況で判定）。</p>
+          <p className="mt-1 text-[11px] text-slate-500">LINE予約の連携時に、<b>初診</b>、または<b>最終来院の翌々月以降（初診扱い）</b>の再来に、上記の問診票リンクを自動送信します。<br />例）最終5/10 → 7月末まで再送なし、8月以降の予約で自動送信。親子・兄弟は本人の来院状況で判定します。</p>
         </div>
       </div>
 
