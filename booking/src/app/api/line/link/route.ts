@@ -5,6 +5,7 @@ import {
   DEFAULT_CONFIRM_TEXT,
   fmtDateTime,
   lineMessagingConfigured,
+  maybeAutoSendApplication,
   maybeAutoSendQuestionnaire,
   pushText,
   renderMessage,
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const { data: appt, error: apptErr } = await admin
     .from("appointments")
-    .select("id, service_id, staff_id, date, start_min, service_name, patient_id, patient_name, confirm_sent_at, questionnaire_sent_at")
+    .select("id, service_id, staff_id, date, start_min, service_name, patient_id, patient_name, confirm_sent_at, questionnaire_sent_at, application_sent_at")
     .eq("id", appointmentId)
     .maybeSingle();
   if (apptErr) return ok({ ok: false, stage: "select", error: apptErr.message });
@@ -86,6 +87,19 @@ export async function POST(req: NextRequest) {
       line_user_id: userId,
       date: appt.date,
       questionnaire_sent_at: (appt as { questionnaire_sent_at?: string | null }).questionnaire_sent_at ?? null,
+    });
+  } catch { /* 自動送信の失敗で予約連携は止めない */ }
+
+  // 体幹教室 申込書の自動送信（初めての体幹予約・設定ONのときのみ）
+  try {
+    await maybeAutoSendApplication(admin, {
+      id: appointmentId,
+      patient_id: (appt as { patient_id?: string | null }).patient_id ?? null,
+      patient_name: appt.patient_name,
+      line_user_id: userId,
+      date: appt.date,
+      service_id: appt.service_id ?? null,
+      application_sent_at: (appt as { application_sent_at?: string | null }).application_sent_at ?? null,
     });
   } catch { /* 自動送信の失敗で予約連携は止めない */ }
 

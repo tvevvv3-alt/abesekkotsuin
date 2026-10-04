@@ -59,6 +59,7 @@ export default function SettingsAdmin() {
       questionnaire_gap_days: s.questionnaire_gap_days,
       class_application_url: s.class_application_url,
       class_application_text: s.class_application_text,
+      class_application_auto: s.class_application_auto,
       remind_eve_enabled: s.remind_eve_enabled,
       remind_eve_hour: s.remind_eve_hour,
       remind_eve_text: s.remind_eve_text,
@@ -73,9 +74,9 @@ export default function SettingsAdmin() {
     };
     let { error: saveErr } = await supabase.from("settings").upsert(payload);
     // 未マイグレーションの列があっても他の設定は保存できるよう、該当列を外して再試行
-    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_gap_days/.test(saveErr.message)) {
-      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, ...rest } = payload;
-      void _o1; void _o2; void _o3;
+    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_gap_days|class_application_auto/.test(saveErr.message)) {
+      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, class_application_auto: _o4, ...rest } = payload;
+      void _o1; void _o2; void _o3; void _o4;
       ({ error: saveErr } = await supabase.from("settings").upsert(rest));
     }
     setBusy(false);
@@ -245,6 +246,14 @@ export default function SettingsAdmin() {
           className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
         />
         <p className="mt-1 text-[11px] text-slate-400"><code className="rounded bg-slate-100 px-1">{"{URL}"}</code> の位置にリンクが入ります（無ければ末尾に自動追加）。空欄なら既定文で送信。</p>
+
+        <div className="mt-3 rounded-lg bg-slate-50 p-2">
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <input type="checkbox" checked={!!s.class_application_auto} onChange={(e) => up({ class_application_auto: e.target.checked })} />
+            申込書を自動送信する
+          </label>
+          <p className="mt-1 text-[11px] text-slate-500"><b>初めて体幹教室を予約</b>した方に、LINE連携時に上記の申込書リンクを自動送信します（2回目以降は送りません）。</p>
+        </div>
       </div>
 
       <div className="space-y-4 rounded-xl border bg-white p-4">

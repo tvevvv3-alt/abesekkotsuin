@@ -381,6 +381,67 @@ export async function maybeAutoSendQuestionnaire(
   return { sent: true };
 }
 
+// 体幹教室を「初めて」予約した人に、体幹教室の申込書リンクを自動送信する。
+export async function maybeAutoSendApplication(
+  admin: SupabaseClient,
+  appt: {
+    id: string;
+    patient_id?: string | null;
+    patient_name?: string | null;
+    line_user_id: string | null;
+    date: string;
+    service_id?: string | null;
+    application_sent_at?: string | null;
+  }
+): Promise<{ sent: boolean; reason?: string }> {
+  if (appt.application_sent_at) return { sent: false, reason: "already" };
+  const { data: s } = await admin
+    .from("settings")
+    .select("class_application_url, class_application_text, class_application_auto")
+    .eq("id", 1)
+    .maybeSingle();
+  if (!s || !(s as { class_application_auto?: boolean }).class_application_auto) return { sent: false, reason: "off" };
+  const url = ((s as { class_application_url?: string | null }).class_application_url || "").trim();
+  if (!url) return { sent: false, reason: "nourl" };
+  if (!lineMessagingConfigured()) return { sent: false, reason: "notconfigured" };
+
+  // 体幹教室サービスのid一覧（category=体幹教室 or 定員制）
+  const { data: svs } = await admin.from("services").select("id, category, capacity");
+  const classIds = ((svs as { id: string; category: string | null; capacity: number | null }[] | null) ?? [])
+    .filter((v) => v.category === "体幹教室" || (v.capacity ?? 0) > 1)
+    .map((v) => v.id);
+  if (!appt.service_id || !classIds.includes(appt.service_id)) return { sent: false, reason: "notclass" };
+
+  const lineId = await resolveLineUserId(admin, appt);
+  if (!lineId) return { sent: false, reason: "noline" };
+
+  // 初めての体幹予約か（この予約より前に体幹の来院が無い）。氏名でも照合。
+  const base = () =>
+    admin
+      .from("appointments")
+      .select("id")
+      .neq("status", "cancelled")
+      .in("service_id", classIds)
+      .lt("date", appt.date)
+      .limit(1);
+  let hasPrior = false;
+  if (appt.patient_id) {
+    const { data } = await base().eq("patient_id", appt.patient_id);
+    if ((data as unknown[] | null)?.length) hasPrior = true;
+  }
+  if (!hasPrior && (appt.patient_name || "").trim()) {
+    const { data } = await base().eq("patient_name", appt.patient_name);
+    if ((data as unknown[] | null)?.length) hasPrior = true;
+  }
+  if (hasPrior) return { sent: false, reason: "notfirst" };
+
+  const tpl = ((s as { class_application_text?: string | null }).class_application_text || "").trim() || DEFAULT_APPLICATION_TEXT;
+  const r = await pushText(lineId, renderLinkMessage(tpl, url));
+  if (!r.ok) return { sent: false, reason: "send" };
+  await admin.from("appointments").update({ application_sent_at: new Date().toISOString() }).eq("id", appt.id);
+  return { sent: true };
+}
+
 // LINE へテキストを1通プッシュ送信
 export async function pushText(
   userId: string,

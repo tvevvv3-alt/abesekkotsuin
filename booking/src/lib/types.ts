@@ -207,6 +207,7 @@ export interface Settings {
   questionnaire_gap_days: number; // 自動送信とみなす来院ブランク日数（既定60）
   class_application_url: string | null; // 体幹教室 申込書（Googleフォーム等）リンク。予約変更から本人へLINE送信
   class_application_text: string | null; // 体幹教室 申込書LINE送信の本文（null=既定）。{URL}にリンク挿入
+  class_application_auto: boolean; // 体幹教室の申込書を自動送信（初めての体幹予約で自動）
   remind_eve_enabled: boolean; // 前日リマインドを送るか
   remind_eve_hour: number; // 前日リマインドの送信時刻（JST 時, 0-23）
   remind_eve_text: string | null; // 前日リマインドの本文
