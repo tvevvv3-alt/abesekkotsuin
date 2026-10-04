@@ -312,6 +312,63 @@ export async function resolveLineUserId(
   return found;
 }
 
+// 初診 or 前回来院から一定日数あいた予約なら、問診票リンクを自動送信する。
+// 親子・兄弟は患者(patient_id/氏名)ごとに判定するので、本人の来院状況だけで判断される。
+export async function maybeAutoSendQuestionnaire(
+  admin: SupabaseClient,
+  appt: {
+    id: string;
+    patient_id?: string | null;
+    patient_name?: string | null;
+    line_user_id: string | null;
+    date: string;
+    questionnaire_sent_at?: string | null;
+  }
+): Promise<{ sent: boolean; reason?: string }> {
+  if (appt.questionnaire_sent_at) return { sent: false, reason: "already" };
+  const { data: s } = await admin
+    .from("settings")
+    .select("questionnaire_url, questionnaire_text, questionnaire_auto, questionnaire_gap_days")
+    .eq("id", 1)
+    .maybeSingle();
+  if (!s || !(s as { questionnaire_auto?: boolean }).questionnaire_auto) return { sent: false, reason: "off" };
+  const url = ((s as { questionnaire_url?: string | null }).questionnaire_url || "").trim();
+  if (!url) return { sent: false, reason: "nourl" };
+  if (!lineMessagingConfigured()) return { sent: false, reason: "notconfigured" };
+  const lineId = await resolveLineUserId(admin, appt);
+  if (!lineId) return { sent: false, reason: "noline" };
+
+  // 前回来院（この予約より前・キャンセル除く）を本人分だけ探す
+  const q = admin
+    .from("appointments")
+    .select("date")
+    .neq("status", "cancelled")
+    .lt("date", appt.date)
+    .order("date", { ascending: false })
+    .limit(1);
+  const { data: prev } = appt.patient_id
+    ? await q.eq("patient_id", appt.patient_id)
+    : await q.eq("patient_name", appt.patient_name || "");
+  const priorDate = (prev as { date: string }[] | null)?.[0]?.date ?? null;
+
+  const gapDays = (s as { questionnaire_gap_days?: number }).questionnaire_gap_days ?? 60;
+  let qualify = false;
+  if (!priorDate) qualify = true; // 初診（過去の来院なし）
+  else {
+    const days = Math.floor(
+      (new Date(appt.date + "T00:00:00").getTime() - new Date(priorDate + "T00:00:00").getTime()) / 86400000
+    );
+    if (days >= gapDays) qualify = true; // 一定日数あいた再来
+  }
+  if (!qualify) return { sent: false, reason: "notdue" };
+
+  const tpl = ((s as { questionnaire_text?: string | null }).questionnaire_text || "").trim() || DEFAULT_QUESTIONNAIRE_TEXT;
+  const r = await pushText(lineId, renderLinkMessage(tpl, url));
+  if (!r.ok) return { sent: false, reason: "send" };
+  await admin.from("appointments").update({ questionnaire_sent_at: new Date().toISOString() }).eq("id", appt.id);
+  return { sent: true };
+}
+
 // LINE へテキストを1通プッシュ送信
 export async function pushText(
   userId: string,

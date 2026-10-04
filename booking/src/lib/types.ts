@@ -203,6 +203,8 @@ export interface Settings {
   questionnaire_url: string | null; // 問診票（Googleフォーム等）リンク。患者へLINE送信する回答フォーム
   questionnaire_admin_url: string | null; // 管理用の回答閲覧ページ。メニュー「問診票」から開く（無ければ questionnaire_url）
   questionnaire_text: string | null; // 問診票LINE送信の本文（null=既定）。{URL}にリンク挿入
+  questionnaire_auto: boolean; // 問診票の自動送信（初診/一定日数ブランクの予約で自動）
+  questionnaire_gap_days: number; // 自動送信とみなす来院ブランク日数（既定60）
   class_application_url: string | null; // 体幹教室 申込書（Googleフォーム等）リンク。予約変更から本人へLINE送信
   class_application_text: string | null; // 体幹教室 申込書LINE送信の本文（null=既定）。{URL}にリンク挿入
   remind_eve_enabled: boolean; // 前日リマインドを送るか

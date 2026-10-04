@@ -55,6 +55,8 @@ export default function SettingsAdmin() {
       questionnaire_url: s.questionnaire_url,
       questionnaire_admin_url: s.questionnaire_admin_url,
       questionnaire_text: s.questionnaire_text,
+      questionnaire_auto: s.questionnaire_auto,
+      questionnaire_gap_days: s.questionnaire_gap_days,
       class_application_url: s.class_application_url,
       class_application_text: s.class_application_text,
       remind_eve_enabled: s.remind_eve_enabled,
@@ -70,10 +72,10 @@ export default function SettingsAdmin() {
       updated_at: new Date().toISOString(),
     };
     let { error: saveErr } = await supabase.from("settings").upsert(payload);
-    // questionnaire_admin_url 列が未マイグレーションでも他の設定は保存できるよう再試行
-    if (saveErr && /questionnaire_admin_url/.test(saveErr.message)) {
-      const { questionnaire_admin_url: _omit, ...rest } = payload;
-      void _omit;
+    // 未マイグレーションの列があっても他の設定は保存できるよう、該当列を外して再試行
+    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_gap_days/.test(saveErr.message)) {
+      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, ...rest } = payload;
+      void _o1; void _o2; void _o3;
       ({ error: saveErr } = await supabase.from("settings").upsert(rest));
     }
     setBusy(false);
@@ -214,6 +216,18 @@ export default function SettingsAdmin() {
           className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
         />
         <p className="mt-1 text-[11px] text-slate-400"><code className="rounded bg-slate-100 px-1">{"{URL}"}</code> の位置にリンクが入ります（無ければ末尾に自動追加）。空欄なら既定文で送信。</p>
+
+        <div className="mt-3 rounded-lg bg-slate-50 p-2">
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <input type="checkbox" checked={!!s.questionnaire_auto} onChange={(e) => up({ questionnaire_auto: e.target.checked })} />
+            問診票を自動送信する
+          </label>
+          <p className="mt-1 text-[11px] text-slate-500">LINE予約の連携時に、<b>初診</b>、または前回来院から
+            <input type="number" min={1} value={s.questionnaire_gap_days ?? 60}
+              onChange={(e) => up({ questionnaire_gap_days: Math.max(1, parseInt(e.target.value || "60", 10)) })}
+              className="mx-1 w-14 rounded border px-1 py-0.5 text-right text-sm" />
+            日以上あいた再来の場合に、上記の問診票リンクを自動で送信します（親子・兄弟は本人の来院状況で判定）。</p>
+        </div>
       </div>
 
       <div className="mb-4 rounded-xl border bg-white p-4">

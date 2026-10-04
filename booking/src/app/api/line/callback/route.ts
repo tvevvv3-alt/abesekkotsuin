@@ -7,6 +7,7 @@ import {
   buildConfirmText,
   fmtDateTime,
   lineMessagingConfigured,
+  maybeAutoSendQuestionnaire,
   pushText,
 } from "@/lib/line";
 import { notifyStaff } from "@/lib/push";
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, service_id, staff_id, date, start_min, service_name, patient_name, confirm_sent_at")
+    .select("id, service_id, staff_id, date, start_min, service_name, patient_id, patient_name, confirm_sent_at, questionnaire_sent_at")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return done("?error=noappt");
@@ -82,6 +83,18 @@ export async function GET(req: NextRequest) {
     .from("appointments")
     .update({ line_user_id: userId })
     .eq("id", appointmentId);
+
+  // 問診票の自動送信（初診 or 前回来院から一定日数あいた場合。設定ONのときのみ）
+  try {
+    await maybeAutoSendQuestionnaire(admin, {
+      id: appointmentId,
+      patient_id: (appt as { patient_id?: string | null }).patient_id ?? null,
+      patient_name: appt.patient_name,
+      line_user_id: userId,
+      date: appt.date,
+      questionnaire_sent_at: (appt as { questionnaire_sent_at?: string | null }).questionnaire_sent_at ?? null,
+    });
+  } catch { /* 自動送信の失敗で連携は止めない */ }
 
   // 運営端末へプッシュ（初回連携＝新規予約のときだけ）
   if (!appt.confirm_sent_at) {
