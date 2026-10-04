@@ -338,18 +338,29 @@ export async function maybeAutoSendQuestionnaire(
   const lineId = await resolveLineUserId(admin, appt);
   if (!lineId) return { sent: false, reason: "noline" };
 
-  // 前回来院（この予約より前・キャンセル除く）を本人分だけ探す
-  const q = admin
-    .from("appointments")
-    .select("date")
-    .neq("status", "cancelled")
-    .lt("date", appt.date)
-    .order("date", { ascending: false })
-    .limit(1);
-  const { data: prev } = appt.patient_id
-    ? await q.eq("patient_id", appt.patient_id)
-    : await q.eq("patient_name", appt.patient_name || "");
-  const priorDate = (prev as { date: string }[] | null)?.[0]?.date ?? null;
+  // 前回来院（この予約より前・キャンセル除く）を探す。
+  // 電話予約などで電話番号が一致せず患者レコードが分かれても拾えるよう、
+  // patient_id だけでなく「氏名」でも照合する（＝名前が一致すれば初診扱いにしない）。
+  const priors: string[] = [];
+  const base = () =>
+    admin
+      .from("appointments")
+      .select("date")
+      .neq("status", "cancelled")
+      .lt("date", appt.date)
+      .order("date", { ascending: false })
+      .limit(1);
+  if (appt.patient_id) {
+    const { data } = await base().eq("patient_id", appt.patient_id);
+    const d = (data as { date: string }[] | null)?.[0]?.date;
+    if (d) priors.push(d);
+  }
+  if ((appt.patient_name || "").trim()) {
+    const { data } = await base().eq("patient_name", appt.patient_name);
+    const d = (data as { date: string }[] | null)?.[0]?.date;
+    if (d) priors.push(d);
+  }
+  const priorDate = priors.length ? priors.sort().slice(-1)[0] : null; // 直近の前回来院
 
   // 初診 or「最終来院月＋2ヶ月の末日を過ぎた再来」＝アプリの初診判定(月差3以上)と同じ基準。
   // 例）最終5/10 → 7月末まで再診、8月以降は初診扱い＝自動送信。
