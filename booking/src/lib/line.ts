@@ -325,7 +325,11 @@ export async function maybeAutoSendQuestionnaire(
     questionnaire_sent_at?: string | null;
   }
 ): Promise<{ sent: boolean; reason?: string }> {
-  if (appt.questionnaire_sent_at) return { sent: false, reason: "already" };
+  // 送信済み判定は列が無くても壊れないよう個別に取得（未マイグレーションでも連携を止めない）
+  try {
+    const { data: a2, error } = await admin.from("appointments").select("questionnaire_sent_at").eq("id", appt.id).maybeSingle();
+    if (!error && (a2 as { questionnaire_sent_at?: string | null } | null)?.questionnaire_sent_at) return { sent: false, reason: "already" };
+  } catch { /* 列が無ければ未送信として続行 */ }
   const { data: s } = await admin
     .from("settings")
     .select("questionnaire_url, questionnaire_text, questionnaire_auto")
@@ -394,7 +398,11 @@ export async function maybeAutoSendApplication(
     application_sent_at?: string | null;
   }
 ): Promise<{ sent: boolean; reason?: string }> {
-  if (appt.application_sent_at) return { sent: false, reason: "already" };
+  // 送信済み判定は列が無くても壊れないよう個別に取得（未マイグレーションでも連携を止めない）
+  try {
+    const { data: a2, error } = await admin.from("appointments").select("application_sent_at").eq("id", appt.id).maybeSingle();
+    if (!error && (a2 as { application_sent_at?: string | null } | null)?.application_sent_at) return { sent: false, reason: "already" };
+  } catch { /* 列が無ければ未送信として続行 */ }
   const { data: s } = await admin
     .from("settings")
     .select("class_application_url, class_application_text, class_application_auto")
