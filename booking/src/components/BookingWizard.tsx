@@ -1623,10 +1623,13 @@ export default function BookingWizard() {
             </p>
 
             {linkedViaLiff ? (
-              <>
+              <div
+                className="mt-6 rounded-2xl border-2 bg-white p-4 text-left shadow-sm"
+                style={{ borderColor: "#06C755" }}
+              >
                 {lineSent === false ? (
                   <div
-                    className="mt-6 rounded-xl px-4 py-3 text-left text-sm"
+                    className="rounded-xl px-4 py-3 text-left text-sm"
                     style={{ backgroundColor: "#fff7e6", color: "#8a6d1a" }}
                   >
                     <div className="font-bold">⚠ LINE通知の送信に失敗しました</div>
@@ -1636,7 +1639,7 @@ export default function BookingWizard() {
                   </div>
                 ) : (
                   <div
-                    className="mt-6 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
+                    className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold"
                     style={{ backgroundColor: "#e7f8ee", color: "#06860f" }}
                   >
                     <span className="text-lg">💬</span>
@@ -1645,16 +1648,18 @@ export default function BookingWizard() {
                       : "予約確認をLINEにお送りしました"}
                   </div>
                 )}
-                <p className="mt-2 text-[11px] text-slate-400">
-                  前日・当日にリマインドもLINEに届きます。
+                <p className="mt-2 text-center text-[11px] text-slate-400">
+                  前日・当日のリマインドや問診票のご案内もLINEに届きます。
                 </p>
-                <button
-                  onClick={resetWizard}
-                  className="mt-6 rounded-xl border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700"
+                <a
+                  href="/my"
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-4 text-base font-bold text-white shadow-md active:opacity-90"
+                  style={{ backgroundColor: "#06C755" }}
                 >
-                  最初に戻る
-                </button>
-              </>
+                  <span className="text-lg">💬</span>
+                  予約情報を確認する
+                </a>
+              </div>
             ) : lineEnabled && lastAppointmentId ? (
               <>
                 <div

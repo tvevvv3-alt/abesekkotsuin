@@ -22,11 +22,12 @@ export default function LineDonePage({
   const ok = searchParams.ok === "1";
   const errMsg = searchParams.error ? ERRORS[searchParams.error] || "エラーが発生しました。" : null;
 
+  const LINE_GREEN = "#06C755";
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center bg-slate-50 px-8 text-center">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center bg-slate-50 px-6 text-center">
       {ok ? (
-        <>
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-600">
+        <div className="w-full rounded-2xl border-2 bg-white p-6 text-center shadow-sm" style={{ borderColor: LINE_GREEN }}>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-600">
             ✓
           </div>
           <h1 className="text-lg font-bold text-slate-800">
@@ -37,7 +38,17 @@ export default function LineDonePage({
             <br />
             前日・当日のリマインドや問診票のご案内もLINEでお届けします。
           </p>
-        </>
+          <a
+            href="/my"
+            className="mt-6 flex w-full items-center justify-center rounded-xl py-4 text-base font-bold text-white shadow-md active:opacity-90"
+            style={{ backgroundColor: LINE_GREEN }}
+          >
+            予約の確認・変更・キャンセル
+          </a>
+          <a href="/" className="mt-3 inline-block text-sm font-bold" style={{ color: NAVY }}>
+            予約トップへ戻る
+          </a>
+        </div>
       ) : (
         <>
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-3xl text-amber-600">
@@ -54,18 +65,18 @@ export default function LineDonePage({
               お手数ですがもう一度ご予約完了画面からお試しください。
             </span>
           </p>
+          <a
+            href="/my"
+            className="mt-8 rounded-xl px-6 py-3 text-sm font-bold text-white"
+            style={{ backgroundColor: NAVY, border: `1px solid ${GOLD}` }}
+          >
+            予約の確認・変更・キャンセル
+          </a>
+          <a href="/" className="mt-3 text-sm font-bold" style={{ color: NAVY }}>
+            予約トップへ戻る
+          </a>
         </>
       )}
-      <a
-        href="/my"
-        className="mt-8 rounded-xl px-6 py-3 text-sm font-bold text-white"
-        style={{ backgroundColor: NAVY, border: `1px solid ${GOLD}` }}
-      >
-        予約の確認・変更・キャンセル
-      </a>
-      <a href="/" className="mt-3 text-sm font-bold" style={{ color: NAVY }}>
-        予約トップへ戻る
-      </a>
     </div>
   );
 }
