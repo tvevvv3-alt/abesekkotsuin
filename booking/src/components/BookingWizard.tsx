@@ -1696,12 +1696,16 @@ export default function BookingWizard() {
                     ⚠ リマインドはLINE登録された方のみお届けします
                   </p>
                 </div>
-                <button
-                  onClick={resetWizard}
-                  className="mt-4 text-xs text-slate-400 underline"
+                <a
+                  href={`/api/line/login?a=${lastAppointmentId}`}
+                  className="mt-3 flex w-full items-center justify-center rounded-xl border-2 py-3 text-sm font-bold active:opacity-90"
+                  style={{ borderColor: "#06C755", color: "#06C755" }}
                 >
-                  今はしない
-                </button>
+                  予約情報を確認する
+                </a>
+                <p className="mt-2 text-center text-[11px] text-slate-400">
+                  予約内容の確認・変更・キャンセルはLINEから行えます。
+                </p>
               </>
             ) : (
               <button
