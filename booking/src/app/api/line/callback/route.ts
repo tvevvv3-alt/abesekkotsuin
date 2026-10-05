@@ -85,7 +85,30 @@ export async function GET(req: NextRequest) {
     .update({ line_user_id: userId })
     .eq("id", appointmentId);
 
-  // 問診票の自動送信（初診 or 前回来院から一定日数あいた場合。設定ONのときのみ）
+  // 運営端末へプッシュ（初回連携＝新規予約のときだけ）
+  if (!appt.confirm_sent_at) {
+    const info = await buildApptInfo(admin, appt);
+    await notifyStaff(admin, {
+      title: "🆕 新規予約（LINE）",
+      body: `${fmtDateTime(appt.date, appt.start_min)}\n${appt.patient_name ?? ""}様\n${info.serviceName}${info.staffName ? `／担当 ${info.staffName}` : ""}`,
+      url: "/admin",
+      tag: "appt-" + appointmentId,
+    });
+  }
+
+  // ① 予約確認メッセージ（未送信のときだけ）。問診票より先に送る。
+  if (lineMessagingConfigured() && !appt.confirm_sent_at) {
+    const info = await buildApptInfo(admin, appt);
+    const r = await pushText(userId, buildConfirmText(info));
+    if (r.ok) {
+      await admin
+        .from("appointments")
+        .update({ confirm_sent_at: new Date().toISOString() })
+        .eq("id", appointmentId);
+    }
+  }
+
+  // ② 問診票の自動送信（初診 or 前回来院から一定日数あいた場合。設定ONのときのみ）
   try {
     await maybeAutoSendQuestionnaire(admin, {
       id: appointmentId,
@@ -97,7 +120,7 @@ export async function GET(req: NextRequest) {
     });
   } catch { /* 自動送信の失敗で連携は止めない */ }
 
-  // 体幹教室 申込書の自動送信（初めての体幹予約・設定ONのときのみ）
+  // ③ 体幹教室 申込書の自動送信（初めての体幹予約・設定ONのときのみ）
   try {
     await maybeAutoSendApplication(admin, {
       id: appointmentId,
@@ -110,27 +133,5 @@ export async function GET(req: NextRequest) {
     });
   } catch { /* 自動送信の失敗で連携は止めない */ }
 
-  // 運営端末へプッシュ（初回連携＝新規予約のときだけ）
-  if (!appt.confirm_sent_at) {
-    const info = await buildApptInfo(admin, appt);
-    await notifyStaff(admin, {
-      title: "🆕 新規予約（LINE）",
-      body: `${fmtDateTime(appt.date, appt.start_min)}\n${appt.patient_name ?? ""}様\n${info.serviceName}${info.staffName ? `／担当 ${info.staffName}` : ""}`,
-      url: "/admin",
-      tag: "appt-" + appointmentId,
-    });
-  }
-
-  // 確認メッセージ（未送信のときだけ）
-  if (lineMessagingConfigured() && !appt.confirm_sent_at) {
-    const info = await buildApptInfo(admin, appt);
-    const r = await pushText(userId, buildConfirmText(info));
-    if (r.ok) {
-      await admin
-        .from("appointments")
-        .update({ confirm_sent_at: new Date().toISOString() })
-        .eq("id", appointmentId);
-    }
-  }
   return done("?ok=1");
 }

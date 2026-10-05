@@ -78,7 +78,31 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 問診票の自動送信（初診 or 前回来院から一定日数あいた場合。設定ONのときのみ）
+  // ① 予約確認メッセージを先に送る（未送信のときだけ）。問診票より先。
+  let confirmSent = false;
+  let sendStage: string | undefined;
+  let sendError: string | undefined;
+  if (!lineMessagingConfigured()) {
+    sendStage = "push";
+    sendError = "アクセストークン未設定";
+  } else if (appt.confirm_sent_at) {
+    sendError = "already sent";
+  } else {
+    const tpl = s?.confirm_text?.trim() || DEFAULT_CONFIRM_TEXT;
+    const r = await pushText(userId, renderMessage(tpl, info));
+    if (r.ok) {
+      await admin
+        .from("appointments")
+        .update({ confirm_sent_at: new Date().toISOString() })
+        .eq("id", appointmentId);
+      confirmSent = true;
+    } else {
+      sendStage = "push";
+      sendError = r.error;
+    }
+  }
+
+  // ② 予約確認のあとに問診票を自動送信（初診 or 前回来院から一定日数あいた場合。設定ONのときのみ）
   try {
     await maybeAutoSendQuestionnaire(admin, {
       id: appointmentId,
@@ -90,7 +114,7 @@ export async function POST(req: NextRequest) {
     });
   } catch { /* 自動送信の失敗で予約連携は止めない */ }
 
-  // 体幹教室 申込書の自動送信（初めての体幹予約・設定ONのときのみ）
+  // ③ 体幹教室 申込書の自動送信（初めての体幹予約・設定ONのときのみ）
   try {
     await maybeAutoSendApplication(admin, {
       id: appointmentId,
@@ -103,21 +127,5 @@ export async function POST(req: NextRequest) {
     });
   } catch { /* 自動送信の失敗で予約連携は止めない */ }
 
-  // 予約確認メッセージ（未送信のときだけ）
-  if (!lineMessagingConfigured()) {
-    return ok({ ok: true, linked: true, sent: false, stage: "push", error: "アクセストークン未設定" });
-  }
-  if (appt.confirm_sent_at) {
-    return ok({ ok: true, linked: true, sent: false, error: "already sent" });
-  }
-  const tpl = s?.confirm_text?.trim() || DEFAULT_CONFIRM_TEXT;
-  const r = await pushText(userId, renderMessage(tpl, info));
-  if (r.ok) {
-    await admin
-      .from("appointments")
-      .update({ confirm_sent_at: new Date().toISOString() })
-      .eq("id", appointmentId);
-    return ok({ ok: true, linked: true, sent: true });
-  }
-  return ok({ ok: true, linked: true, sent: false, stage: "push", error: r.error });
+  return ok({ ok: true, linked: true, sent: confirmSent, stage: sendStage, error: sendError });
 }
