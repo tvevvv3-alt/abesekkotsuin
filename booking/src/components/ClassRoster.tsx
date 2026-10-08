@@ -43,6 +43,7 @@ export default function ClassRoster() {
   const [sort, setSort] = useState<"name" | "date">("name");
   const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
   const [evaled, setEvaled] = useState<Set<string>>(new Set()); // 当月に体幹テスト入力済みの会員名
+  const [testMarks, setTestMarks] = useState<Record<string, boolean>>({}); // 手動の済/未上書き（氏名→tested）
   const [dragId, setDragId] = useState<string | null>(null); // ドラッグ中の来院ID
   const [overName, setOverName] = useState<string | null>(null); // ドロップ先の会員名
   // 来院マスをタップ → 予約変更ポップアップ（カレンダー同様）
@@ -158,6 +159,18 @@ export default function ClassRoster() {
         (pmap[p.name] = { purchased: p.purchased, purchase_date: p.purchase_date, prior_count: p.prior_count ?? 0 })
     );
     setPurchases(pmap);
+    // 手動の済/未上書き（テーブル未作成でも落ちないよう別取得）
+    try {
+      const { data: marks, error: mErr } = await supabase
+        .from("class_test_marks")
+        .select("name, tested")
+        .eq("ym", ym);
+      if (!mErr) {
+        const mm: Record<string, boolean> = {};
+        (marks as { name: string; tested: boolean }[] | null)?.forEach((m) => (mm[(m.name || "").trim()] = m.tested));
+        setTestMarks(mm);
+      }
+    } catch { /* 未マイグレーションは自動判定のみで動かす */ }
     setLoading(false);
   }, [supabase, classId, from, to, ym]);
 
@@ -179,6 +192,32 @@ export default function ClassRoster() {
 
   function passOf(name: string): Member {
     return members[name] ?? { name, pass_type: "month4", quota: 4 };
+  }
+
+  // 当月に「終了」した来院がある会員名（終了＝体幹テストも済とみなす自動判定）
+  const doneNames = useMemo(
+    () => new Set(rows.filter((r) => r.status === "done").map((r) => (r.patient_name || "").trim())),
+    [rows]
+  );
+  // 体幹テスト済みか：手動の上書きがあれば優先、無ければ自動（当月の入力あり or 終了あり）
+  function isTested(name: string): boolean {
+    const key = name.trim();
+    if (key in testMarks) return testMarks[key];
+    return evaled.has(key) || doneNames.has(key);
+  }
+  // バッジのタップで 済/未 を手動切替（class_test_marks に保存）
+  async function toggleTest(name: string) {
+    const key = name.trim();
+    if (!key) return;
+    const next = !isTested(key);
+    setTestMarks((m) => ({ ...m, [key]: next })); // 楽観更新
+    const { error } = await supabase
+      .from("class_test_marks")
+      .upsert({ name: key, ym, tested: next, updated_at: new Date().toISOString() }, { onConflict: "name,ym" });
+    if (error) {
+      setTestMarks((m) => { const n = { ...m }; delete n[key]; return n; }); // 取り消し
+      setMsg("体幹テストの手動チェックを保存できませんでした（class_test_marks の作成が必要です）");
+    }
   }
 
   // フィルタ（パス種別）＋並び替え（名前順／来院日順）
@@ -526,19 +565,21 @@ export default function ClassRoster() {
                         </td>
                         <td className="border-l px-1 py-1 text-center align-middle">
                           {(() => {
-                            const tested = evaled.has(name.trim());
+                            const tested = isTested(name);
                             return (
-                              <div
-                                className={`rounded-md border px-1.5 py-1 text-[10px] font-bold leading-tight ${
+                              <button
+                                type="button"
+                                onClick={() => toggleTest(name)}
+                                className={`w-full rounded-md border px-1.5 py-1 text-[10px] font-bold leading-tight active:opacity-80 ${
                                   tested
                                     ? "border-emerald-400 bg-emerald-500 text-white"
                                     : "border-slate-200 bg-slate-50 text-slate-400"
                                 }`}
-                                title={tested ? "今月は体幹テスト入力済み" : "今月は体幹テスト未入力（日付をタップ→体幹テスト）"}
+                                title={tested ? "体幹テスト 済（タップで未に戻す）" : "体幹テスト 未（タップで済にする）"}
                               >
                                 <span className="block">体幹テスト</span>
                                 <span className="block">{tested ? "✅ 済" : "未"}</span>
-                              </div>
+                              </button>
                             );
                           })()}
                         </td>
@@ -620,7 +661,7 @@ export default function ClassRoster() {
         予約が入ると自動で表に反映されます（行＝人・列＝回数）。各回のマスを
         タップすると「予約変更」ポップアップが開き、氏名・日付・時刻の修正・
         「体幹テスト」・「終了＋LINE」（来場日・今月何回目・残り回数を通知／フリーは無制限）ができます。
-        「テスト」列は当月の未／済の表示だけ（緑＝済）で、入力は日付タップの体幹テストから。
+        「テスト」列（緑＝済）は、当月に体幹テストを入力／終了した人は自動で済になります。<b>タップで手動の済／未も切替</b>できます（LINEで送れない人や紙でテストした人の印付けに）。
         名前は横スクロールしても固定、パス種別は氏名ごとに保存されます。
         今月チケット未購入の方は<span className="font-bold text-red-500">赤い「未購入」</span>で表示。
         タップで「購入済」に切り替わり（購入日は自動で今日、変更可）、月が変わると再び未購入になります。
