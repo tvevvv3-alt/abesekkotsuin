@@ -47,6 +47,26 @@ export async function POST(req: NextRequest) {
     const hit = (appts as { line_user_id: string | null; patient_name: string | null }[] | null)
       ?.find((a) => (a.patient_name || "").replace(/[\s　]/g, "") === nameKey);
     userId = hit?.line_user_id ?? null;
+    // 氏名で連携予約が見つからない時は、氏名→patient_id→連携ID（終了通知と同じ探し方）
+    if (!userId) {
+      const { data: pid } = await admin
+        .from("appointments")
+        .select("patient_id")
+        .in("patient_name", Array.from(new Set([name, nameKey])))
+        .not("patient_id", "is", null)
+        .limit(1);
+      const patientId = (pid as { patient_id: string | null }[] | null)?.[0]?.patient_id ?? null;
+      if (patientId) {
+        const { data: la } = await admin
+          .from("appointments")
+          .select("line_user_id")
+          .eq("patient_id", patientId)
+          .not("line_user_id", "is", null)
+          .order("date", { ascending: false })
+          .limit(1);
+        userId = (la as { line_user_id: string | null }[] | null)?.[0]?.line_user_id ?? null;
+      }
+    }
   }
   if (!userId) return NextResponse.json({ ok: false, reason: "noline" });
 

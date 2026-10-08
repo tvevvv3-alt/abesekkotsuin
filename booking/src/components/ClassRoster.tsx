@@ -194,6 +194,13 @@ export default function ClassRoster() {
     return members[name] ?? { name, pass_type: "month4", quota: 4 };
   }
 
+  // その会員の“どれかの来院”に付いているLINE連携IDを拾う（終了通知と同じく、連携済みの予約があれば使える）
+  function memberLineId(name: string): string | null {
+    const key = name.trim();
+    const hit = rows.find((r) => (r.patient_name || "").trim() === key && r.line_user_id);
+    return hit?.line_user_id ?? null;
+  }
+
   // 当月に「終了」した来院がある会員名（終了＝体幹テストも済とみなす自動判定）
   const doneNames = useMemo(
     () => new Set(rows.filter((r) => r.status === "done").map((r) => (r.patient_name || "").trim())),
@@ -705,7 +712,7 @@ export default function ClassRoster() {
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <button
-                onClick={() => { setEvalTarget({ name: ev.name, lineUserId: ev.line_user_id }); setEv(null); }}
+                onClick={() => { setEvalTarget({ name: ev.name, lineUserId: ev.line_user_id || memberLineId(ev.name) }); setEv(null); }}
                 className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 active:bg-indigo-100">
                 📋 体幹テスト
               </button>
