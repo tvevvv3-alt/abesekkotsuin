@@ -26,6 +26,9 @@ interface Props {
   equipment: Equipment[];
   onClose: () => void;
   onDone: () => void;
+  // 編集中の予約の時間に対して「急な休診」「予約追加」をする（埋まった枠でも操作できるように）
+  onQuickClose?: () => void;
+  onQuickAdd?: () => void;
 }
 
 export default function AdminBookingModal({
@@ -40,6 +43,8 @@ export default function AdminBookingModal({
   equipment,
   onClose,
   onDone,
+  onQuickClose,
+  onQuickAdd,
 }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -435,6 +440,35 @@ export default function AdminBookingModal({
 
         {error && (
           <p className="mb-2 rounded-md bg-red-50 px-2 py-1.5 text-sm text-red-600">{error}</p>
+        )}
+
+        {/* 埋まった枠でも「急な休診・予約追加」ができるように（この予約の時間に対して） */}
+        {mode === "edit" && (onQuickClose || onQuickAdd) && (
+          <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-2">
+            <p className="mb-1.5 text-[11px] font-bold text-slate-500">この時間の操作</p>
+            <div className="flex gap-2">
+              {onQuickClose && (
+                <button
+                  type="button"
+                  onClick={onQuickClose}
+                  disabled={busy}
+                  className="flex-1 rounded-lg border border-rose-300 bg-rose-50 py-2 text-sm font-bold text-rose-700 active:bg-rose-100 disabled:opacity-50"
+                >
+                  この時間を休診にする
+                </button>
+              )}
+              {onQuickAdd && (
+                <button
+                  type="button"
+                  onClick={onQuickAdd}
+                  disabled={busy}
+                  className="flex-1 rounded-lg border border-blue-300 bg-blue-50 py-2 text-sm font-bold text-blue-700 active:bg-blue-100 disabled:opacity-50"
+                >
+                  この時間に予約追加
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
         <div className="flex flex-wrap items-center gap-2">

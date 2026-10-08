@@ -686,6 +686,32 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
     return null;
   }
 
+  // 編集ポップアップから：この予約の時間を休診にする（埋まった枠でも急な休診ができる）
+  async function quickCloseAppt(appt: ApptWithSteps) {
+    const closeStaff = appt.staff_id ?? null;
+    const closeSvc = appt.staff_id ? null : (appt.service_id ?? null);
+    if (!confirm(`${minToLabel(appt.start_min)}〜${minToLabel(appt.end_min)} を休診にしますか？（既存の予約はそのまま残ります）`)) return;
+    await supabase.from("closures").insert({
+      date,
+      staff_id: closeStaff,
+      service_id: closeSvc,
+      start_min: appt.start_min,
+      end_min: Math.max(appt.end_min, appt.start_min + GRID_STEP),
+      reason: null,
+    });
+    setModal(null);
+    reload();
+  }
+  // 編集ポップアップから：この予約の時間・担当で予約追加（追加モーダルを開く）
+  function quickAddAtAppt(appt: ApptWithSteps) {
+    setModal({
+      mode: "add",
+      staffId: appt.staff_id ?? undefined,
+      serviceId: appt.staff_id ? undefined : (appt.service_id ?? undefined),
+      startMin: appt.start_min,
+    });
+  }
+
   async function makeClosure() {
     if (!pop) return;
     await supabase.from("closures").insert({
@@ -1186,6 +1212,8 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
             setModal(null);
             reload();
           }}
+          onQuickClose={modal.mode === "edit" ? () => quickCloseAppt(modal.appt) : undefined}
+          onQuickAdd={modal.mode === "edit" ? () => quickAddAtAppt(modal.appt) : undefined}
         />
       )}
 
