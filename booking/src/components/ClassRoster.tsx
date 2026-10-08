@@ -680,7 +680,7 @@ export default function ClassRoster() {
       </p>
 
       {evalTarget && (
-        <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => setEvalTarget(null)} />
+        <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => { setEvalTarget(null); reload(); }} />
       )}
 
       {ev && (
