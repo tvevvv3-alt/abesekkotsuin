@@ -35,14 +35,18 @@ export async function POST(req: NextRequest) {
   // 送信先LINEユーザー。明示指定（予約から起動）を最優先。無ければ氏名で直近予約から取得。
   let userId: string | null = lineUserId || null;
   if (!userId) {
+    // 氏名の表記ゆれ（全角/半角スペース）で取りこぼさないよう、連携済み予約を集めて
+    // スペースを除いた氏名で照合する（保存済みの氏名はスペース除去済みだが、念のため両対応）。
+    const nameKey = name.replace(/[\s　]/g, "");
     const { data: appts } = await admin
       .from("appointments")
-      .select("line_user_id, date")
-      .eq("patient_name", name)
+      .select("line_user_id, patient_name, date")
       .not("line_user_id", "is", null)
       .order("date", { ascending: false })
-      .limit(1);
-    userId = (appts as { line_user_id: string | null }[] | null)?.[0]?.line_user_id ?? null;
+      .limit(500);
+    const hit = (appts as { line_user_id: string | null; patient_name: string | null }[] | null)
+      ?.find((a) => (a.patient_name || "").replace(/[\s　]/g, "") === nameKey);
+    userId = hit?.line_user_id ?? null;
   }
   if (!userId) return NextResponse.json({ ok: false, reason: "noline" });
 
