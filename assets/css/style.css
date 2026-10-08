@@ -1413,6 +1413,17 @@ p { margin: 0; }
   color: #fff;
   overflow: hidden;
 }
+/* 文字入りバナー画像をそのまま全面表示するHERO（オーバーレイなし） */
+.post-hero--banner {
+  display: block; align-items: initial; min-height: 0; overflow: visible;
+  padding: calc(52px + env(safe-area-inset-top)) 0 0;
+  background: var(--paper); color: inherit;
+}
+.post-hero__banner { display: block; width: 100%; max-width: 1200px; height: auto; margin-inline: auto; }
+.u-visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 .post-hero__bg { position: absolute; inset: 0; z-index: -1; }
 .post-hero__bg img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 32%; }
 .post-hero__bg::after {
