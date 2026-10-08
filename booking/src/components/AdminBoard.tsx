@@ -783,9 +783,8 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
     <div>
       {/* 日付（中央）＋ヒント（左）＋予約追加（右）を1段に（前後・今日は上部の共通ツールバー） */}
       <div className="mb-2 grid grid-cols-3 items-center gap-2">
-        <p className="min-w-0 truncate text-xs text-slate-400">
-          空き時間を上下ドラッグ →「予約追加」か「休診」
-        </p>
+        <span />
+
         <span className={`text-center text-sm font-bold ${holidayName(date) ? "text-rose-500" : "text-slate-700"}`}>
           {dObj.getMonth() + 1}/{dObj.getDate()}（{WEEKDAY_LABELS[dObj.getDay()]}）
           {holidayName(date) && <span className="ml-1 text-[11px] font-bold text-rose-500">{holidayName(date)}</span>}
