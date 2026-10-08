@@ -113,7 +113,7 @@ export default function AdminSchedule() {
       </div>
 
       {view === "board" ? (
-        <AdminBoard date={curDate} />
+        <AdminBoard date={curDate} onShiftDay={shift} />
       ) : (
         <CalendarView start={curDate} days={calDays} onStartChange={setCurDate} onDaysChange={setCalDays} />
       )}

@@ -140,7 +140,7 @@ interface ClosureBand {
   reason: string | null;
 }
 
-export default function AdminBoard({ date }: { date: string }) {
+export default function AdminBoard({ date, onShiftDay }: { date: string; onShiftDay?: (dir: number) => void }) {
   const supabase = useMemo(() => createClient(), []);
 
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -182,6 +182,31 @@ export default function AdminBoard({ date }: { date: string }) {
   }>(null);
   const cardActiveRef = useRef(false);
   const cardDraggedRef = useRef(false);
+  // 横スワイプで前後の日へ（列の横スクロールが端に達した状態からさらにスワイプしたとき）
+  const daySwipeRef = useRef<null | { x: number; y: number; atLeft: boolean; atRight: boolean; onCard: boolean }>(null);
+  function onBoardTouchStart(e: React.TouchEvent) {
+    const el = boardScrollRef.current;
+    if (!el || e.touches.length !== 1) { daySwipeRef.current = null; return; }
+    const t = e.touches[0];
+    const tgt = e.target as HTMLElement;
+    const onCard = !!tgt.closest?.("[data-appt-id]");
+    const atLeft = el.scrollLeft <= 2;
+    const atRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+    daySwipeRef.current = { x: t.clientX, y: t.clientY, atLeft, atRight, onCard };
+  }
+  function onBoardTouchEnd(e: React.TouchEvent) {
+    const s = daySwipeRef.current;
+    daySwipeRef.current = null;
+    if (!s || s.onCard || cardActiveRef.current || cardDraggedRef.current) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    // 横方向がはっきり優勢で、かつ十分な距離のときだけ日付変更
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx > 0 && s.atLeft) onShiftDay?.(-1);      // 右へスワイプ＝前の日
+    else if (dx < 0 && s.atRight) onShiftDay?.(1); // 左へスワイプ＝次の日
+  }
   const cardLatestRef = useRef<{ targetStart: number; targetStaffId: string | null } | null>(null);
   const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
   // 体幹教室フリーパスの会員名（LINE不要 → ♾️表示）
@@ -754,6 +779,8 @@ export default function AdminBoard({ date }: { date: string }) {
       ) : (
         <div
           ref={boardScrollRef}
+          onTouchStart={onBoardTouchStart}
+          onTouchEnd={onBoardTouchEnd}
           className="overflow-auto overscroll-contain rounded-xl border bg-white"
           // 枠を画面下端まで固定（内容が短い日でも縮まず画面いっぱいに）。
           style={{ height: boardMaxH ? `${boardMaxH}px` : "calc(100dvh - 200px)" }}
