@@ -615,63 +615,6 @@ function VisitTable({
 // 身体図：前面・背面にペンで描画（痛み/こり/しびれ/治療ポイントの色）。点も線もOK。
 function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[]) => void }) {
   const [type, setType] = useState<MarkType>("pain");
-  const addStroke = (s: Stroke) => onChange([...value, s]);
-  const undo = () => onChange(value.slice(0, -1));
-  return (
-    <div>
-      {/* ペンの色（種別）の選択 */}
-      <div className="mb-2 flex flex-wrap gap-1">
-        {MARKS.map((m) => (
-          <button
-            key={m.key}
-            type="button"
-            onClick={() => setType(m.key)}
-            className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${type === m.key ? "text-white" : "bg-white text-slate-600"}`}
-            style={type === m.key ? { backgroundColor: m.color, borderColor: m.color } : { borderColor: "#cbd5e1" }}
-          >
-            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: m.color }} />
-            {m.label}
-          </button>
-        ))}
-        <div className="ml-auto flex gap-1">
-          <button type="button" onClick={undo} disabled={value.length === 0} className="rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100 disabled:opacity-40">戻す</button>
-          <button type="button" onClick={() => onChange([])} className="rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100">リセット</button>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Figure side="front" label="前面" strokes={value} type={type} onAdd={addStroke} />
-        <Figure side="back" label="背面" strokes={value} type={type} onAdd={addStroke} />
-      </div>
-      <p className="mt-1 text-[10px] text-slate-400">指／ペンでなぞって描けます（タップで点）。色を変えて痛み・治療ポイントを描き分け。</p>
-    </div>
-  );
-}
-
-// 人体シルエット（肩幅くらいに足を開いた自然な立ち姿）
-const SILHOUETTE = (
-  <g fill="#e5e7eb" stroke="#cbd5e1" strokeWidth="1">
-    <ellipse cx="60" cy="24" rx="15" ry="18" />{/* 頭 */}
-    <rect x="53" y="40" width="14" height="10" rx="3" />{/* 首 */}
-    <ellipse cx="60" cy="56" rx="27" ry="11" />{/* 肩 */}
-    <path d="M44,52 L76,52 L71,118 L49,118 Z" />{/* 胴 */}
-    <path d="M36,54 L46,54 L42,122 L30,120 Z" />{/* 左腕（やや開き） */}
-    <path d="M74,54 L84,54 L90,120 L78,122 Z" />{/* 右腕 */}
-    <path d="M45,114 L59,114 L51,212 L37,212 Z" />{/* 左脚（外へ開く） */}
-    <path d="M61,114 L75,114 L83,212 L69,212 Z" />{/* 右脚 */}
-    <ellipse cx="43" cy="216" rx="9" ry="5" />{/* 左足 */}
-    <ellipse cx="77" cy="216" rx="9" ry="5" />{/* 右足 */}
-  </g>
-);
-
-function Figure({
-  side, label, strokes, type, onAdd,
-}: {
-  side: "front" | "back";
-  label: string;
-  strokes: Stroke[];
-  type: MarkType;
-  onAdd: (s: Stroke) => void;
-}) {
   const ref = useRef<HTMLDivElement>(null);
   const [draw, setDraw] = useState<[number, number][] | null>(null);
 
@@ -695,16 +638,38 @@ function Figure({
     setDraw((d) => (d ? [...d, p] : [p]));
   };
   const up = () => {
-    if (draw && draw.length) onAdd({ id: uid(), side, type, pts: draw });
+    if (draw && draw.length) onChange([...value, { id: uid(), side: "front", type, pts: draw }]);
     setDraw(null);
   };
-
-  const mine = strokes.filter((s) => s.side === side);
-  const toPoly = (pts: [number, number][]) => pts.map(([x, y]) => `${(x * 120).toFixed(1)},${(y * 260).toFixed(1)}`).join(" ");
+  const undo = () => onChange(value.slice(0, -1));
+  // 1点のときは同じ点を2つ並べ、丸キャップで“点”として描く
+  const poly = (pts: [number, number][]) => {
+    const s = pts.map(([x, y]) => `${(x * 100).toFixed(2)},${(y * 100).toFixed(2)}`);
+    if (s.length === 1) s.push(s[0]);
+    return s.join(" ");
+  };
 
   return (
-    <div className="flex-1">
-      <div className="mb-1 text-center text-[11px] font-bold text-slate-500">{label}</div>
+    <div>
+      {/* ペンの色（種別）の選択 */}
+      <div className="mb-2 flex flex-wrap items-center gap-1">
+        {MARKS.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => setType(m.key)}
+            className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${type === m.key ? "text-white" : "bg-white text-slate-600"}`}
+            style={type === m.key ? { backgroundColor: m.color, borderColor: m.color } : { borderColor: "#cbd5e1" }}
+          >
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: m.color }} />
+            {m.label}
+          </button>
+        ))}
+        <div className="ml-auto flex gap-1">
+          <button type="button" onClick={undo} disabled={value.length === 0} className="rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100 disabled:opacity-40">戻す</button>
+          <button type="button" onClick={() => onChange([])} className="rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100">リセット</button>
+        </div>
+      </div>
       <div
         ref={ref}
         onPointerDown={down}
@@ -712,24 +677,21 @@ function Figure({
         onPointerUp={up}
         onPointerLeave={up}
         onPointerCancel={up}
-        className="relative mx-auto select-none rounded-lg bg-white"
-        style={{ aspectRatio: "120 / 260", touchAction: "none", cursor: "crosshair" }}
+        className="relative w-full select-none overflow-hidden rounded-lg border bg-white"
+        style={{ aspectRatio: "900 / 860", touchAction: "none", cursor: "crosshair" }}
       >
-        <svg viewBox="0 0 120 260" className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-          {SILHOUETTE}
-          {side === "back" && <line x1="60" y1="52" x2="60" y2="118" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />}
-          {mine.map((s) =>
-            s.pts.length === 1 ? (
-              <circle key={s.id} cx={s.pts[0][0] * 120} cy={s.pts[0][1] * 260} r="2.6" fill={markColor(s.type)} />
-            ) : (
-              <polyline key={s.id} points={toPoly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-            )
-          )}
-          {draw && draw.length > 1 && (
-            <polyline points={toPoly(draw)} fill="none" stroke={markColor(type)} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/bodymap.png" alt="人体図（前面・背面）" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
+          {value.map((s) => (
+            <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          ))}
+          {draw && (
+            <polyline points={poly(draw)} fill="none" stroke={markColor(type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           )}
         </svg>
       </div>
+      <p className="mt-1 text-[10px] text-slate-400">左＝前面／右＝背面。指やペンでなぞって描けます（タップで点）。</p>
     </div>
   );
 }
