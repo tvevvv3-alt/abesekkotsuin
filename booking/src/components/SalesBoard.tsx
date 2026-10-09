@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import ClassChartModal from "@/components/ClassChartModal";
 import { loadAllStaff, loadServices } from "@/lib/data";
 import { addDays, minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import type { Staff } from "@/lib/types";
@@ -117,6 +118,7 @@ export default function SalesBoard() {
   const [priceOpen, setPriceOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   // 患者名タップで出す患者情報（簡易カルテ）
+  const [classChartName, setClassChartName] = useState<string | null>(null); // 体幹カルテ（8回枠）を開く会員名
   const [patientModal, setPatientModal] = useState<null | {
     patientId: string | null;
     name: string;
@@ -1573,13 +1575,23 @@ export default function SalesBoard() {
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5">
                             <div className="flex items-center gap-1.5">
-                              <Link
-                                href={a.patient_id ? `/admin/chart?p=${a.patient_id}` : `/admin/chart?n=${encodeURIComponent(a.patient_name || "")}`}
-                                className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600"
-                                title="自費カルテを開く"
-                              >
-                                {a.patient_name || "（未登録）"}
-                              </Link>
+                              {isClassAppt(a) && taikan ? (
+                                <button
+                                  onClick={() => setClassChartName(a.patient_name || "")}
+                                  className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-orange-600"
+                                  title="体幹カルテ（8回枠）を開く"
+                                >
+                                  {a.patient_name || "（未登録）"}
+                                </button>
+                              ) : (
+                                <Link
+                                  href={a.patient_id ? `/admin/chart?p=${a.patient_id}` : `/admin/chart?n=${encodeURIComponent(a.patient_name || "")}`}
+                                  className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600"
+                                  title="自費カルテを開く"
+                                >
+                                  {a.patient_name || "（未登録）"}
+                                </Link>
+                              )}
                               <span className="text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
                               {!(kawa && a.service_id === kawa.id) && (
                                 <>
@@ -1706,6 +1718,11 @@ export default function SalesBoard() {
         入金額(=自費+負担額)・総合計(=自費+合計額) と日計・月計が自動集計されます。物販や予約外は
         「＋物販/予約外」から。担当ごとの合計(自費+保険)で当月の達成率が出ます。
       </p>
+
+      {/* 体幹教室の名前タップ → 体幹カルテ（8回枠） */}
+      {classChartName && taikan && (
+        <ClassChartModal name={classChartName} classId={taikan.id} supabase={supabase} onClose={() => setClassChartName(null)} />
+      )}
 
       {/* 患者情報（名前タップ） */}
       {patientModal && (
