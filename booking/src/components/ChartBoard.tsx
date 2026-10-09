@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -44,15 +44,25 @@ type Person = {
   hasToday: boolean;
   hasFuture: boolean;
 };
+type MarkType = "pain" | "stiff" | "numb" | "treat";
+type Mark = { id: string; side: "front" | "back"; x: number; y: number; type: MarkType };
+const MARKS: { key: MarkType; label: string; color: string }[] = [
+  { key: "pain", label: "痛み", color: "#ef4444" },
+  { key: "stiff", label: "こり", color: "#3b82f6" },
+  { key: "numb", label: "しびれ", color: "#22c55e" },
+  { key: "treat", label: "治療ポイント", color: "#0d9488" },
+];
+const markColor = (t: MarkType) => MARKS.find((m) => m.key === t)?.color ?? "#64748b";
+
 type ChartFields = {
   complaint: string;
   findings: string;
   treatment: string;
   progress: string;
-  next_plan: string;
   note: string;
+  body_marks: Mark[];
 };
-const EMPTY: ChartFields = { complaint: "", findings: "", treatment: "", progress: "", next_plan: "", note: "" };
+const EMPTY: ChartFields = { complaint: "", findings: "", treatment: "", progress: "", note: "", body_marks: [] };
 
 export default function ChartBoard() {
   const supabase = useMemo(() => createClient(), []);
@@ -191,7 +201,7 @@ export default function ChartBoard() {
       let rows: Record<string, unknown>[] | null = null;
       const full = await supabase
         .from("chart_entries")
-        .select("appointment_id, complaint, findings, progress, treatment, note, next_plan, is_draft")
+        .select("appointment_id, complaint, findings, progress, treatment, note, body_marks, is_draft")
         .in("appointment_id", apptIds);
       if (full.error) {
         const base = await supabase
@@ -203,13 +213,14 @@ export default function ChartBoard() {
         rows = (full.data as Record<string, unknown>[] | null) ?? [];
       }
       rows.forEach((r) => {
+        const bm = r.body_marks;
         cm[r.appointment_id as string] = {
           complaint: (r.complaint as string) ?? "",
           findings: (r.findings as string) ?? "",
           progress: (r.progress as string) ?? "",
           treatment: (r.treatment as string) ?? "",
-          next_plan: (r.next_plan as string) ?? "",
           note: (r.note as string) ?? "",
+          body_marks: Array.isArray(bm) ? (bm as Mark[]) : (typeof bm === "string" && bm ? (JSON.parse(bm) as Mark[]) : []),
           is_draft: (r.is_draft as boolean) ?? false,
         };
       });
@@ -252,12 +263,12 @@ export default function ChartBoard() {
       note: draft.note.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const full = { ...base, next_plan: draft.next_plan.trim() || null, is_draft: isDraft };
+    const full = { ...base, body_marks: draft.body_marks, is_draft: isDraft };
     let { error } = await supabase.from("chart_entries").upsert(full, { onConflict: "appointment_id" });
     if (error) {
-      // next_plan / is_draft 未マイグレーション時は外して保存
+      // body_marks / is_draft 未マイグレーション時は外して保存
       ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
-      if (!error) setMsg("保存しました（※次回方針・下書きは列追加が必要です）");
+      if (!error) setMsg("保存しました（※身体図・下書きは列追加が必要です）");
     }
     setSaving(false);
     if (!error) {
@@ -280,7 +291,7 @@ export default function ChartBoard() {
     : p.visitCount >= 2 ? { t: "再来", c: "bg-slate-100 text-slate-500" }
     : { t: "初診", c: "bg-amber-100 text-amber-700" };
 
-  const chartField = (label: string, key: keyof ChartFields, rows = 2) => (
+  const chartField = (label: string, key: "complaint" | "findings" | "treatment" | "progress" | "note", rows = 2) => (
     <div className="flex gap-3">
       <label className="mt-1 w-20 shrink-0 text-sm font-bold text-slate-600">{label}</label>
       <textarea
@@ -397,7 +408,7 @@ export default function ChartBoard() {
                 {!selVisit ? (
                   <p className="rounded-lg border bg-slate-50 py-6 text-center text-sm text-slate-400">来院記録がありません（来院履歴から選択）</p>
                 ) : (
-                  <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+                  <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
                     {/* 記録フォーム */}
                     <div className="rounded-xl border p-3">
                       <div className="mb-3 flex items-center justify-between">
@@ -414,7 +425,6 @@ export default function ChartBoard() {
                         {chartField("評価", "findings")}
                         {chartField("施術内容", "treatment", 3)}
                         {chartField("施術後の変化", "progress")}
-                        {chartField("次回方針", "next_plan")}
                       </div>
                       <div className="mt-4 flex items-center justify-end gap-2">
                         <button onClick={() => saveChart(true)} disabled={saving} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600 active:bg-slate-100 disabled:opacity-50">下書き保存</button>
@@ -425,10 +435,8 @@ export default function ChartBoard() {
                     {/* 右：部位メモ（準備中）＋メモ */}
                     <div className="space-y-3">
                       <div className="rounded-xl border p-3">
-                        <div className="mb-2 text-sm font-bold text-slate-600">部位メモ</div>
-                        <div className="flex h-28 items-center justify-center rounded-lg bg-slate-50 text-center text-xs text-slate-400">
-                          体の図にマーク（痛み／こり／しびれ）<br />は準備中です
-                        </div>
+                        <div className="mb-2 text-sm font-bold text-slate-600">身体図（痛み・治療ポイント）</div>
+                        <BodyMap value={draft.body_marks} onChange={(bm) => setDraft((d) => ({ ...d, body_marks: bm }))} />
                       </div>
                       <div className="rounded-xl border p-3">
                         <div className="mb-2 flex items-center justify-between">
@@ -484,7 +492,7 @@ export default function ChartBoard() {
                           <span className="text-xs text-slate-400">担当：{staffName(v.staff_id) || "—"}　編集 ›</span>
                         </button>
                         <dl className="space-y-1 text-sm">
-                          {([["主訴", c.complaint], ["評価", c.findings], ["施術内容", c.treatment], ["施術後の変化", c.progress], ["次回方針", c.next_plan], ["メモ", c.note]] as const)
+                          {([["主訴", c.complaint], ["評価", c.findings], ["施術内容", c.treatment], ["施術後の変化", c.progress], ["メモ", c.note]] as const)
                             .filter(([, val]) => (val || "").trim())
                             .map(([l, val]) => (
                               <div key={l} className="flex gap-2">
@@ -565,6 +573,99 @@ function VisitTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// 身体図：前面・背面にマーク（痛み/こり/しびれ/治療ポイント）を配置して可視化
+function BodyMap({ value, onChange }: { value: Mark[]; onChange: (m: Mark[]) => void }) {
+  const [type, setType] = useState<MarkType>("pain");
+  const addAt = (side: "front" | "back", x: number, y: number) => {
+    onChange([...value, { id: (crypto.randomUUID?.() ?? String(Date.now() + Math.random())), side, x, y, type }]);
+  };
+  const remove = (id: string) => onChange(value.filter((m) => m.id !== id));
+  return (
+    <div>
+      {/* マーク種別の選択 */}
+      <div className="mb-2 flex flex-wrap gap-1">
+        {MARKS.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => setType(m.key)}
+            className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${type === m.key ? "text-white" : "bg-white text-slate-600"}`}
+            style={type === m.key ? { backgroundColor: m.color, borderColor: m.color } : { borderColor: "#cbd5e1" }}
+          >
+            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: m.color }} />
+            {m.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className="ml-auto rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100"
+        >
+          リセット
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <Figure side="front" label="前面" marks={value} onAdd={addAt} onRemove={remove} />
+        <Figure side="back" label="背面" marks={value} onAdd={addAt} onRemove={remove} />
+      </div>
+      <p className="mt-1 text-[10px] text-slate-400">図をタップで追加／点をタップで削除</p>
+    </div>
+  );
+}
+
+function Figure({
+  side, label, marks, onAdd, onRemove,
+}: {
+  side: "front" | "back";
+  label: string;
+  marks: Mark[];
+  onAdd: (side: "front" | "back", x: number, y: number) => void;
+  onRemove: (id: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const click = (e: { clientX: number; clientY: number }) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    onAdd(side, x, y);
+  };
+  const mine = marks.filter((m) => m.side === side);
+  return (
+    <div className="flex-1">
+      <div className="mb-1 text-center text-[11px] font-bold text-slate-500">{label}</div>
+      <div ref={ref} onClick={click} className="relative mx-auto cursor-crosshair select-none" style={{ aspectRatio: "120 / 260" }}>
+        <svg viewBox="0 0 120 260" className="h-full w-full" preserveAspectRatio="xMidYMid meet">
+          <g fill="#e5e7eb" stroke="#cbd5e1" strokeWidth="1">
+            <ellipse cx="60" cy="24" rx="15" ry="18" />
+            <rect x="53" y="40" width="14" height="10" rx="3" />
+            <ellipse cx="60" cy="56" rx="26" ry="11" />
+            <rect x="42" y="52" width="36" height="74" rx="14" />
+            <rect x="22" y="54" width="13" height="72" rx="6" />
+            <rect x="85" y="54" width="13" height="72" rx="6" />
+            <rect x="46" y="118" width="13" height="96" rx="6" />
+            <rect x="61" y="118" width="13" height="96" rx="6" />
+            <ellipse cx="52" cy="220" rx="8" ry="5" />
+            <ellipse cx="68" cy="220" rx="8" ry="5" />
+          </g>
+          {side === "back" && <line x1="60" y1="52" x2="60" y2="124" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />}
+        </svg>
+        {mine.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(m.id); }}
+            title="タップで削除"
+            className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+            style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, backgroundColor: markColor(m.type) }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
