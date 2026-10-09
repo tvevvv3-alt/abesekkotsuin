@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -46,7 +46,8 @@ type Person = {
   todayStart: number; // 当日来院の最早時刻（分）。当日なしは Infinity
 };
 type MarkType = "pain" | "stiff" | "numb" | "treat";
-type Mark = { id: string; side: "front" | "back"; x: number; y: number; type: MarkType };
+// 身体図の1筆（ペンの線）。pts は図内の相対座標 [x,y]（0〜1）の配列。
+type Stroke = { id: string; side: "front" | "back"; type: MarkType; pts: [number, number][] };
 const MARKS: { key: MarkType; label: string; color: string }[] = [
   { key: "pain", label: "痛み", color: "#ef4444" },
   { key: "stiff", label: "こり", color: "#3b82f6" },
@@ -54,6 +55,16 @@ const MARKS: { key: MarkType; label: string; color: string }[] = [
   { key: "treat", label: "治療ポイント", color: "#0d9488" },
 ];
 const markColor = (t: MarkType) => MARKS.find((m) => m.key === t)?.color ?? "#64748b";
+const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
+// 旧形式（点 {x,y}）も新形式（線 {pts}）も Stroke[] に正規化
+function toStrokes(arr: unknown): Stroke[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((it) => {
+    const o = it as Record<string, unknown>;
+    if (Array.isArray(o.pts)) return { id: (o.id as string) || uid(), side: (o.side as "front" | "back") || "front", type: (o.type as MarkType) || "pain", pts: o.pts as [number, number][] };
+    return { id: (o.id as string) || uid(), side: (o.side as "front" | "back") || "front", type: (o.type as MarkType) || "pain", pts: [[Number(o.x) || 0, Number(o.y) || 0]] };
+  });
+}
 
 type ChartFields = {
   complaint: string;
@@ -61,7 +72,7 @@ type ChartFields = {
   treatment: string;
   progress: string;
   note: string;
-  body_marks: Mark[];
+  body_marks: Stroke[];
 };
 const EMPTY: ChartFields = { complaint: "", findings: "", treatment: "", progress: "", note: "", body_marks: [] };
 
@@ -228,7 +239,7 @@ export default function ChartBoard() {
           progress: (r.progress as string) ?? "",
           treatment: (r.treatment as string) ?? "",
           note: (r.note as string) ?? "",
-          body_marks: Array.isArray(bm) ? (bm as Mark[]) : (typeof bm === "string" && bm ? (JSON.parse(bm) as Mark[]) : []),
+          body_marks: toStrokes(Array.isArray(bm) ? bm : (typeof bm === "string" && bm ? JSON.parse(bm) : [])),
           is_draft: (r.is_draft as boolean) ?? false,
         };
       });
@@ -601,16 +612,14 @@ function VisitTable({
   );
 }
 
-// 身体図：前面・背面にマーク（痛み/こり/しびれ/治療ポイント）を配置して可視化
-function BodyMap({ value, onChange }: { value: Mark[]; onChange: (m: Mark[]) => void }) {
+// 身体図：前面・背面にペンで描画（痛み/こり/しびれ/治療ポイントの色）。点も線もOK。
+function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[]) => void }) {
   const [type, setType] = useState<MarkType>("pain");
-  const addAt = (side: "front" | "back", x: number, y: number) => {
-    onChange([...value, { id: (crypto.randomUUID?.() ?? String(Date.now() + Math.random())), side, x, y, type }]);
-  };
-  const remove = (id: string) => onChange(value.filter((m) => m.id !== id));
+  const addStroke = (s: Stroke) => onChange([...value, s]);
+  const undo = () => onChange(value.slice(0, -1));
   return (
     <div>
-      {/* マーク種別の選択 */}
+      {/* ペンの色（種別）の選択 */}
       <div className="mb-2 flex flex-wrap gap-1">
         {MARKS.map((m) => (
           <button
@@ -624,71 +633,102 @@ function BodyMap({ value, onChange }: { value: Mark[]; onChange: (m: Mark[]) => 
             {m.label}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => onChange([])}
-          className="ml-auto rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100"
-        >
-          リセット
-        </button>
+        <div className="ml-auto flex gap-1">
+          <button type="button" onClick={undo} disabled={value.length === 0} className="rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100 disabled:opacity-40">戻す</button>
+          <button type="button" onClick={() => onChange([])} className="rounded-full border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100">リセット</button>
+        </div>
       </div>
       <div className="flex gap-2">
-        <Figure side="front" label="前面" marks={value} onAdd={addAt} onRemove={remove} />
-        <Figure side="back" label="背面" marks={value} onAdd={addAt} onRemove={remove} />
+        <Figure side="front" label="前面" strokes={value} type={type} onAdd={addStroke} />
+        <Figure side="back" label="背面" strokes={value} type={type} onAdd={addStroke} />
       </div>
-      <p className="mt-1 text-[10px] text-slate-400">図をタップで追加／点をタップで削除</p>
+      <p className="mt-1 text-[10px] text-slate-400">指／ペンでなぞって描けます（タップで点）。色を変えて痛み・治療ポイントを描き分け。</p>
     </div>
   );
 }
 
+// 人体シルエット（肩幅くらいに足を開いた自然な立ち姿）
+const SILHOUETTE = (
+  <g fill="#e5e7eb" stroke="#cbd5e1" strokeWidth="1">
+    <ellipse cx="60" cy="24" rx="15" ry="18" />{/* 頭 */}
+    <rect x="53" y="40" width="14" height="10" rx="3" />{/* 首 */}
+    <ellipse cx="60" cy="56" rx="27" ry="11" />{/* 肩 */}
+    <path d="M44,52 L76,52 L71,118 L49,118 Z" />{/* 胴 */}
+    <path d="M36,54 L46,54 L42,122 L30,120 Z" />{/* 左腕（やや開き） */}
+    <path d="M74,54 L84,54 L90,120 L78,122 Z" />{/* 右腕 */}
+    <path d="M45,114 L59,114 L51,212 L37,212 Z" />{/* 左脚（外へ開く） */}
+    <path d="M61,114 L75,114 L83,212 L69,212 Z" />{/* 右脚 */}
+    <ellipse cx="43" cy="216" rx="9" ry="5" />{/* 左足 */}
+    <ellipse cx="77" cy="216" rx="9" ry="5" />{/* 右足 */}
+  </g>
+);
+
 function Figure({
-  side, label, marks, onAdd, onRemove,
+  side, label, strokes, type, onAdd,
 }: {
   side: "front" | "back";
   label: string;
-  marks: Mark[];
-  onAdd: (side: "front" | "back", x: number, y: number) => void;
-  onRemove: (id: string) => void;
+  strokes: Stroke[];
+  type: MarkType;
+  onAdd: (s: Stroke) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const click = (e: { clientX: number; clientY: number }) => {
+  const [draw, setDraw] = useState<[number, number][] | null>(null);
+
+  const pt = (e: { clientX: number; clientY: number }): [number, number] | null => {
     const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    onAdd(side, x, y);
+    if (!r) return null;
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    return [x, y];
   };
-  const mine = marks.filter((m) => m.side === side);
+  const down = (e: RPE) => {
+    const p = pt(e);
+    if (!p) return;
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    setDraw([p]);
+  };
+  const move = (e: RPE) => {
+    if (!draw) return;
+    const p = pt(e);
+    if (!p) return;
+    setDraw((d) => (d ? [...d, p] : [p]));
+  };
+  const up = () => {
+    if (draw && draw.length) onAdd({ id: uid(), side, type, pts: draw });
+    setDraw(null);
+  };
+
+  const mine = strokes.filter((s) => s.side === side);
+  const toPoly = (pts: [number, number][]) => pts.map(([x, y]) => `${(x * 120).toFixed(1)},${(y * 260).toFixed(1)}`).join(" ");
+
   return (
     <div className="flex-1">
       <div className="mb-1 text-center text-[11px] font-bold text-slate-500">{label}</div>
-      <div ref={ref} onClick={click} className="relative mx-auto cursor-crosshair select-none" style={{ aspectRatio: "120 / 260" }}>
+      <div
+        ref={ref}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerLeave={up}
+        onPointerCancel={up}
+        className="relative mx-auto select-none rounded-lg bg-white"
+        style={{ aspectRatio: "120 / 260", touchAction: "none", cursor: "crosshair" }}
+      >
         <svg viewBox="0 0 120 260" className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-          <g fill="#e5e7eb" stroke="#cbd5e1" strokeWidth="1">
-            <ellipse cx="60" cy="24" rx="15" ry="18" />
-            <rect x="53" y="40" width="14" height="10" rx="3" />
-            <ellipse cx="60" cy="56" rx="26" ry="11" />
-            <rect x="42" y="52" width="36" height="74" rx="14" />
-            <rect x="22" y="54" width="13" height="72" rx="6" />
-            <rect x="85" y="54" width="13" height="72" rx="6" />
-            <rect x="46" y="118" width="13" height="96" rx="6" />
-            <rect x="61" y="118" width="13" height="96" rx="6" />
-            <ellipse cx="52" cy="220" rx="8" ry="5" />
-            <ellipse cx="68" cy="220" rx="8" ry="5" />
-          </g>
-          {side === "back" && <line x1="60" y1="52" x2="60" y2="124" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />}
+          {SILHOUETTE}
+          {side === "back" && <line x1="60" y1="52" x2="60" y2="118" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />}
+          {mine.map((s) =>
+            s.pts.length === 1 ? (
+              <circle key={s.id} cx={s.pts[0][0] * 120} cy={s.pts[0][1] * 260} r="2.6" fill={markColor(s.type)} />
+            ) : (
+              <polyline key={s.id} points={toPoly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            )
+          )}
+          {draw && draw.length > 1 && (
+            <polyline points={toPoly(draw)} fill="none" stroke={markColor(type)} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+          )}
         </svg>
-        {mine.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onRemove(m.id); }}
-            title="タップで削除"
-            className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
-            style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, backgroundColor: markColor(m.type) }}
-          />
-        ))}
       </div>
     </div>
   );
