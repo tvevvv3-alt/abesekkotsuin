@@ -43,6 +43,7 @@ type Person = {
   visitCount: number; // 当日以前の来院回数
   hasToday: boolean;
   hasFuture: boolean;
+  todayStart: number; // 当日来院の最早時刻（分）。当日なしは Infinity
 };
 type MarkType = "pain" | "stiff" | "numb" | "treat";
 type Mark = { id: string; side: "front" | "back"; x: number; y: number; type: MarkType };
@@ -132,7 +133,7 @@ export default function ChartBoard() {
     for (const p of pats) {
       map.set(p.id, {
         key: p.id, patient_id: p.id, name: p.name, name_kana: p.name_kana, birth_date: p.birth_date,
-        phone: p.phone, chart_note: p.chart_note, visits: [], lastVisit: null, visitCount: 0, hasToday: false, hasFuture: false,
+        phone: p.phone, chart_note: p.chart_note, visits: [], lastVisit: null, visitCount: 0, hasToday: false, hasFuture: false, todayStart: Infinity,
       });
     }
     for (const a of appts) {
@@ -141,7 +142,7 @@ export default function ChartBoard() {
       if (!person) {
         person = {
           key, patient_id: a.patient_id, name: a.patient_name || "（未登録）", name_kana: null, birth_date: null,
-          phone: null, chart_note: null, visits: [], lastVisit: null, visitCount: 0, hasToday: false, hasFuture: false,
+          phone: null, chart_note: null, visits: [], lastVisit: null, visitCount: 0, hasToday: false, hasFuture: false, todayStart: Infinity,
         };
         map.set(key, person);
       }
@@ -156,10 +157,16 @@ export default function ChartBoard() {
       p.visitCount = pastOrToday.length;
       p.hasToday = vs.some((v) => v.date === today);
       p.hasFuture = vs.some((v) => v.date > today);
+      const todayVs = vs.filter((v) => v.date === today);
+      p.todayStart = todayVs.length ? Math.min(...todayVs.map((v) => v.start_min)) : Infinity;
       arr.push(p);
     }
-    // 最終来院が新しい順（未来院は下）
-    arr.sort((a, b) => (b.lastVisit || "").localeCompare(a.lastVisit || "") || a.name.localeCompare(b.name, "ja"));
+    // 当日の来院者を最上部（来院時刻の早い順）→ その他は最終来院が新しい順
+    arr.sort((a, b) =>
+      (Number(b.hasToday) - Number(a.hasToday)) ||
+      (a.hasToday ? a.todayStart - b.todayStart : (b.lastVisit || "").localeCompare(a.lastVisit || "")) ||
+      a.name.localeCompare(b.name, "ja")
+    );
     return arr;
   }, [appts, pats, today]);
 
@@ -319,8 +326,8 @@ export default function ChartBoard() {
 
   return (
     <div className="flex h-[calc(100dvh-110px)] gap-3">
-      {/* ── 左：患者一覧 ── */}
-      <aside className="flex w-72 shrink-0 flex-col rounded-xl border bg-white">
+      {/* ── 左：患者一覧（スマホは一覧 or カルテのどちらかを全幅表示） ── */}
+      <aside className={`${selKey ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col rounded-xl border bg-white md:w-52`}>
         <div className="flex items-center justify-between gap-2 border-b p-3">
           <h2 className="text-base font-bold text-slate-800">患者一覧</h2>
           <button onClick={() => setAddOpen(true)} className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-bold text-white active:bg-teal-700">＋ 新規登録</button>
@@ -338,7 +345,7 @@ export default function ChartBoard() {
             <button
               key={k}
               onClick={() => setFilter(k)}
-              className={`flex-1 rounded-md px-1 py-1.5 ${filter === k ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500"}`}
+              className={`flex-1 whitespace-nowrap rounded-md px-0.5 py-1.5 text-[11px] ${filter === k ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500"}`}
             >
               {l}
             </button>
@@ -376,11 +383,14 @@ export default function ChartBoard() {
       </aside>
 
       {/* ── 右：カルテ本体 ── */}
-      <main className="min-w-0 flex-1 overflow-y-auto rounded-xl border bg-white">
+      <main className={`${selKey ? "block" : "hidden md:block"} min-w-0 flex-1 overflow-y-auto rounded-xl border bg-white`}>
         {!selected ? (
           <div className="flex h-full items-center justify-center text-sm text-slate-400">左の一覧から患者を選んでください</div>
         ) : (
           <div className="p-4">
+            <button onClick={() => setSelKey(null)} className="mb-2 flex items-center gap-1 text-sm font-bold text-teal-700 active:opacity-70 md:hidden">
+              ‹ 患者一覧へ
+            </button>
             {/* 患者ヘッダー */}
             <div className="mb-3 flex flex-wrap items-center gap-2 border-b pb-3">
               <h1 className="text-xl font-bold text-slate-800">{selected.name}</h1>
