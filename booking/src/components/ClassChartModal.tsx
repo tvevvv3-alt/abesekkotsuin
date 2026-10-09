@@ -20,6 +20,9 @@ export default function ClassChartModal({
   const [visits, setVisits] = useState<Visit[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [memo, setMemo] = useState("");
+  const [sport, setSport] = useState("");
+  const [grade, setGrade] = useState("");
+  const [team, setTeam] = useState("");
   const [course, setCourse] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,9 +48,18 @@ export default function ClassChartModal({
       if (!error) ((cn as { appointment_id: string; note: string | null }[] | null) ?? []).forEach((r) => { nm[r.appointment_id] = r.note ?? ""; });
     }
     setNotes(nm);
-    // 全体メモ
-    const { data: mem } = await supabase.from("class_members").select("note").eq("name", name).maybeSingle();
-    setMemo((mem as { note: string | null } | null)?.note ?? "");
+    // 全体メモ＋競技/学年/チーム（列が無くても落ちない）
+    type Mem = { note?: string | null; sport?: string | null; grade?: string | null; team?: string | null };
+    let mem: Mem | null = null;
+    const full = await supabase.from("class_members").select("note, sport, grade, team").eq("name", name).maybeSingle();
+    if (full.error) {
+      const base = await supabase.from("class_members").select("note").eq("name", name).maybeSingle();
+      mem = (base.data as Mem | null) ?? null;
+    } else mem = (full.data as Mem | null) ?? null;
+    setMemo(mem?.note ?? "");
+    setSport(mem?.sport ?? "");
+    setGrade(mem?.grade ?? "");
+    setTeam(mem?.team ?? "");
     // 既定は最新クール
     const courses = Math.max(1, Math.ceil(vs.length / PER_COURSE));
     setCourse(courses - 1);
@@ -74,9 +86,14 @@ export default function ClassChartModal({
       const { error } = await supabase.from("class_notes").upsert(rows, { onConflict: "appointment_id" });
       if (error) err = "各回メモの保存に失敗（class_notes の作成が必要です）";
     }
-    // 全体メモ（会員台帳）
-    const { error: e2 } = await supabase.from("class_members").upsert({ name, note: memo.trim() || null }, { onConflict: "name" });
-    if (e2 && !err) err = "全体メモの保存に失敗しました";
+    // 全体メモ＋競技/学年/チーム（会員台帳）
+    const full = { name, note: memo.trim() || null, sport: sport.trim() || null, grade: grade.trim() || null, team: team.trim() || null };
+    const { error: e2 } = await supabase.from("class_members").upsert(full, { onConflict: "name" });
+    if (e2) {
+      const { error: e3 } = await supabase.from("class_members").upsert({ name, note: memo.trim() || null }, { onConflict: "name" });
+      if (!e3 && !err) err = "競技/学年/チームは列追加が必要です（メモは保存）";
+      else if (e3 && !err) err = "全体メモの保存に失敗しました";
+    }
     setSaving(false);
     setMsg(err ?? "保存しました");
   }
@@ -97,6 +114,17 @@ export default function ClassChartModal({
             <p className="py-10 text-center text-sm text-slate-400">読み込み中…</p>
           ) : (
             <>
+              {/* 競技・学年・チーム */}
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                {([["競技", sport, setSport, "例：サッカー"], ["学年", grade, setGrade, "例：高3"], ["チーム", team, setTeam, "例：○○FC"]] as const).map(([label, val, setter, ph]) => (
+                  <div key={label}>
+                    <label className="mb-1 block text-xs font-bold text-slate-500">{label}</label>
+                    <input value={val} onChange={(e) => setter(e.target.value)} placeholder={ph}
+                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-500 focus:outline-none" />
+                  </div>
+                ))}
+              </div>
+
               {/* 全体メモ */}
               <div className="mb-3">
                 <label className="mb-1 block text-xs font-bold text-slate-500">メモ（目標・申し送りなど）</label>
