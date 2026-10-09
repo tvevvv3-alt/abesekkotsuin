@@ -6,6 +6,7 @@ import { loadServices } from "@/lib/data";
 import { minToLabel, toDateStr } from "@/lib/booking";
 import type { ServiceWithSteps } from "@/lib/types";
 import CoreEvalModal from "@/components/CoreEvalModal";
+import ClassChartModal from "@/components/ClassChartModal";
 import SendMessageModal from "@/components/SendMessageModal";
 
 interface Row {
@@ -42,6 +43,7 @@ export default function ClassRoster() {
   const [filter, setFilter] = useState<"all" | "month4" | "free">("all");
   const [sort, setSort] = useState<"name" | "date">("name");
   const [evalTarget, setEvalTarget] = useState<{ name: string; lineUserId: string | null } | null>(null);
+  const [chartName, setChartName] = useState<string | null>(null); // 体幹カルテ（8回枠）を開く会員名
   const [evaled, setEvaled] = useState<Set<string>>(new Set()); // 当月に体幹テスト入力済みの会員名
   const [testMarks, setTestMarks] = useState<Record<string, boolean>>({}); // 手動の済/未上書き（氏名→tested）
   const [dragId, setDragId] = useState<string | null>(null); // ドラッグ中の来院ID
@@ -504,7 +506,14 @@ export default function ClassRoster() {
                       >
                         <td className={`sticky left-0 z-10 w-[124px] min-w-[124px] max-w-[124px] border-r px-1.5 py-1 align-middle ${overName === name && dragId ? "bg-indigo-100" : pu.purchased ? "bg-white" : "bg-rose-50"}`}>
                           <div className="flex items-center gap-1">
-                            <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800">{name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setChartName(name)}
+                              className="min-w-0 flex-1 truncate text-left text-[13px] font-bold text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-orange-600"
+                              title="体幹カルテ（8回枠）を開く"
+                            >
+                              {name}
+                            </button>
                             <button
                               type="button"
                               onClick={() => togglePurchased(name, !pu.purchased)}
@@ -678,6 +687,10 @@ export default function ClassRoster() {
         （例：▶を4回 → 1〜4回目は✕、来院は5回目から）。◀で戻せます。残回数と終了通知の回数も合います。
         空マスの<b>「＋」</b>で、その会員の来院をすぐ追加できます。
       </p>
+
+      {chartName && classId && (
+        <ClassChartModal name={chartName} classId={classId} supabase={supabase} onClose={() => setChartName(null)} />
+      )}
 
       {evalTarget && (
         <CoreEvalModal name={evalTarget.name} lineUserId={evalTarget.lineUserId} onClose={() => { setEvalTarget(null); reload(); }} />
