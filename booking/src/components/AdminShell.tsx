@@ -23,7 +23,7 @@ const DEFAULT_NAV: NavItem[] = [
       { href: "/admin/new-patients", label: "新患名簿" },
       { label: "問診票", ext: "form" },
       { href: "/admin/personal", label: "回数券（パーソナル）" },
-      { label: "カルテ（将来）", soon: true },
+      { href: "/admin/chart", label: "自費カルテ" },
     ],
   },
   {
