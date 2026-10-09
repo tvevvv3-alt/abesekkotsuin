@@ -29,6 +29,7 @@ import AdminBookingModal from "./AdminBookingModal";
 
 const PX_PER_MIN = 0.9; // カレンダーに合わせて縦を詰める（30分＝27px）
 const GRID_STEP = 30; // 目盛り・スナップ（分）
+const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 
 // 列コンテキスト：担当者列 or メニュー列（体幹/川西/ハイチャージ）
 type ColCtx = { staffId?: string; serviceId?: string; canClose: boolean };
@@ -211,6 +212,8 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
   const [confirmMove, setConfirmMove] = useState<null | { title: string; detail: string; run: () => void }>(null);
   // 体幹教室フリーパスの会員名（LINE不要 → ♾️表示）
   const [freePassNames, setFreePassNames] = useState<Set<string>>(new Set());
+  // 前回来院で保険金額が入っていた患者（＝保険併用→手書きカルテ準備が必要）に丸印
+  const [prevInsured, setPrevInsured] = useState<Set<string>>(new Set());
   // 体幹教室（定員制）の同時刻グループ：多人数は畳んで「1人目＋人数」表示、タップで展開
   const [expandedClass, setExpandedClass] = useState<Set<string>>(new Set());
   const toggleClassGroup = (key: string) =>
@@ -309,6 +312,28 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
     setClosures(cl);
     setOpenings(op);
     setLoading(false);
+
+    // 前回来院（この日より前）の売上で保険金額>0だった患者に丸印（手書きカルテ準備用）
+    try {
+      const names = Array.from(new Set(merged.map((a) => (a.patient_name || "").trim()).filter(Boolean)));
+      if (names.length) {
+        const { data: sl } = await supabase
+          .from("sales")
+          .select("patient_name, date, insurance")
+          .in("patient_name", names)
+          .lt("date", date)
+          .order("date", { ascending: false });
+        const seen = new Set<string>();
+        const insured = new Set<string>();
+        ((sl as { patient_name: string | null; date: string; insurance: number | null }[] | null) ?? []).forEach((r) => {
+          const key = normName(r.patient_name);
+          if (!key || seen.has(key)) return; // 患者ごとに直近1件（＝前回来院）のみ判定
+          seen.add(key);
+          if ((r.insurance ?? 0) > 0) insured.add(key);
+        });
+        setPrevInsured(insured);
+      } else setPrevInsured(new Set());
+    } catch { setPrevInsured(new Set()); }
   }, [supabase, date]);
 
   useEffect(() => {
@@ -908,6 +933,12 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
                               className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
                               style={{ textShadow: TEXT_SHADOW }}
                             >
+                              {prevInsured.has(normName(appt.patient_name)) && (
+                                <span
+                                  className="mr-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full border-2 border-white bg-rose-500 align-middle"
+                                  title="前回保険あり：手書きカルテの準備を"
+                                />
+                              )}
                               {personalIds.has(appt.service_id ?? "") && (
                                 <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
                               )}
