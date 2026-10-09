@@ -1573,9 +1573,13 @@ export default function SalesBoard() {
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5">
                             <div className="flex items-center gap-1.5">
-                              <button onClick={() => openPatient(a)} className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600" title="患者情報を見る">
+                              <Link
+                                href={a.patient_id ? `/admin/chart?p=${a.patient_id}` : `/admin/chart?n=${encodeURIComponent(a.patient_name || "")}`}
+                                className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600"
+                                title="自費カルテを開く"
+                              >
                                 {a.patient_name || "（未登録）"}
-                              </button>
+                              </Link>
                               <span className="text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
                               {!(kawa && a.service_id === kawa.id) && (
                                 <>

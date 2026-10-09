@@ -88,6 +88,7 @@ export default function ChartBoard() {
   const [msg, setMsg] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [autoSelDone, setAutoSelDone] = useState(false);
 
   const staffName = useCallback((id: string | null) => staff.find((s) => s.id === id)?.name ?? "", [staff]);
 
@@ -236,6 +237,19 @@ export default function ChartBoard() {
       setReferrer(hit?.referrer?.trim() || null);
     } catch { setReferrer(null); }
   }, [supabase, today]);
+
+  // 個別売上などから ?p=<patient_id> / ?n=<氏名> で開かれたら、その患者を自動で選択
+  useEffect(() => {
+    if (autoSelDone || loading || persons.length === 0) return;
+    const sp = new URLSearchParams(window.location.search);
+    const p = sp.get("p");
+    const n = sp.get("n");
+    if (p || n) {
+      const target = p ? persons.find((x) => x.patient_id === p) : persons.find((x) => normName(x.name) === normName(n));
+      if (target) openPerson(target);
+    }
+    setAutoSelDone(true);
+  }, [autoSelDone, loading, persons, openPerson]);
 
   // 来院履歴の行をクリック → その来院のカルテを編集対象に
   function pickVisit(v: ApptRow) {
