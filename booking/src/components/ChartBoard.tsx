@@ -497,20 +497,17 @@ export default function ChartBoard() {
                   <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">この患者は予約から登録されていないため、初診時ページの保存はできません（閲覧のみ）。</p>
                 )}
                 <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-                  {/* 左：問診票の内容（初診時に一度だけ入力→経過からも見返せる） */}
-                  <div className="space-y-2">
-                    <div className="text-xs font-bold text-slate-400">問診票の内容</div>
-                    {([["競技名", "sport", "例：バスケットボール"], ["週何回", "weekly_freq", "例：週5回"], ["症状部位", "symptom_area", "例：右膝"], ["いつから", "onset", "例：3週間前"]] as const).map(([label, key, ph]) => (
-                      <div key={key} className="rounded-xl border p-2.5">
-                        <div className="text-[10px] font-bold text-teal-600">{label}</div>
-                        <input value={intake[key]} onChange={(e) => setIntake((it) => ({ ...it, [key]: e.target.value }))} placeholder={ph}
-                          className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-sm font-bold text-slate-800 focus:border-teal-500 focus:outline-none" />
-                      </div>
-                    ))}
-                    <div className="rounded-xl border p-2.5">
-                      <div className="text-[10px] font-bold text-teal-600">過去の既往</div>
-                      <textarea value={intake.history} onChange={(e) => setIntake((it) => ({ ...it, history: e.target.value }))} rows={2} placeholder="例：右足関節捻挫（2024年）"
-                        className="mt-0.5 w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-800 focus:border-teal-500 focus:outline-none" />
+                  {/* 左：問診票の内容（コンパクト。1行ずつ） */}
+                  <div className="rounded-xl border p-2.5">
+                    <div className="mb-1.5 text-[11px] font-bold text-slate-400">問診票の内容</div>
+                    <div className="space-y-1">
+                      {([["競技名", "sport", "バスケ等"], ["週何回", "weekly_freq", "週5回"], ["症状部位", "symptom_area", "右膝"], ["いつから", "onset", "3週間前"], ["過去の既往", "history", "右足関節捻挫(2024)"]] as const).map(([label, key, ph]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <span className="w-16 shrink-0 text-[11px] font-bold text-teal-600">{label}</span>
+                          <input value={intake[key]} onChange={(e) => setIntake((it) => ({ ...it, [key]: e.target.value }))} placeholder={ph}
+                            className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-0.5 text-sm text-slate-800 focus:border-teal-500 focus:outline-none" />
+                        </div>
+                      ))}
                     </div>
                   </div>
 
