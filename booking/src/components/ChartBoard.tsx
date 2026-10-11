@@ -76,6 +76,48 @@ type ChartFields = {
 };
 const EMPTY: ChartFields = { complaint: "", findings: "", treatment: "", progress: "", note: "", body_marks: [] };
 
+// 初診時ページ（問診票の内容＋人体図）。患者ごとに1件保存。
+type JointView = "front" | "back" | "left" | "right";
+type JointDrawing = Record<JointView, Stroke[]>;
+type Intake = {
+  sport: string;        // 競技名
+  weekly_freq: string;  // 週何回
+  symptom_area: string; // 症状部位
+  onset: string;        // いつから
+  history: string;      // 過去の既往
+  body_marks: Stroke[]; // 全身図の描き込み
+  joint_details: Record<string, JointDrawing>; // 関節ごとの前後左右
+};
+const EMPTY_INTAKE: Intake = { sport: "", weekly_freq: "", symptom_area: "", onset: "", history: "", body_marks: [], joint_details: {} };
+const emptyJoint = (): JointDrawing => ({ front: [], back: [], left: [], right: [] });
+// 選択できる関節（全身図から拡大）
+const JOINTS = ["頸部", "右肩", "左肩", "右肘", "左肘", "右手首", "左手首", "腰", "右股関節", "左股関節", "右膝", "左膝", "右足首", "左足首"];
+const VIEWS: { key: JointView; label: string }[] = [
+  { key: "front", label: "前" }, { key: "back", label: "後" }, { key: "left", label: "左" }, { key: "right", label: "右" },
+];
+function normIntake(row: Record<string, unknown> | null): Intake {
+  if (!row) return { ...EMPTY_INTAKE, joint_details: {} };
+  const jd: Record<string, JointDrawing> = {};
+  const raw = row.joint_details;
+  const obj = typeof raw === "string" ? safeParse(raw) : raw;
+  if (obj && typeof obj === "object") {
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      const vv = (v || {}) as Record<string, unknown>;
+      jd[k] = { front: toStrokes(vv.front), back: toStrokes(vv.back), left: toStrokes(vv.left), right: toStrokes(vv.right) };
+    }
+  }
+  return {
+    sport: (row.sport as string) ?? "",
+    weekly_freq: (row.weekly_freq as string) ?? "",
+    symptom_area: (row.symptom_area as string) ?? "",
+    onset: (row.onset as string) ?? "",
+    history: (row.history as string) ?? "",
+    body_marks: toStrokes(typeof row.body_marks === "string" ? safeParse(row.body_marks) : row.body_marks),
+    joint_details: jd,
+  };
+}
+function safeParse(s: unknown): unknown { try { return typeof s === "string" ? JSON.parse(s) : s; } catch { return null; } }
+
 export default function ChartBoard() {
   const supabase = useMemo(() => createClient(), []);
   const today = toDateStr(new Date());
@@ -88,16 +130,18 @@ export default function ChartBoard() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "visiting" | "booked" | "repeat">("all");
   const [selKey, setSelKey] = useState<string | null>(null);
-  const [tab, setTab] = useState<"chart" | "records" | "history">("chart");
+  const [tab, setTab] = useState<"hatsushin" | "keika">("keika");
 
   // 選択患者の明細
   const [chartMap, setChartMap] = useState<Record<string, ChartFields & { is_draft?: boolean }>>({});
   const [referrer, setReferrer] = useState<string | null>(null);
-  const [selVisitId, setSelVisitId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<ChartFields>(EMPTY);
-  const [patNote, setPatNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // 初診時ページ
+  const [intake, setIntake] = useState<Intake>(EMPTY_INTAKE);
+  const [selJoint, setSelJoint] = useState<string | null>(null);
+  const [jointPen, setJointPen] = useState<MarkType>("pain");
+  const [intakeSaving, setIntakeSaving] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
   const [autoSelDone, setAutoSelDone] = useState(false);
@@ -198,23 +242,18 @@ export default function ChartBoard() {
 
   const selected = useMemo(() => persons.find((p) => p.key === selKey) ?? null, [persons, selKey]);
 
-  // 患者を選んだら：カルテ記録・紹介元・メモを読み込み、本日（なければ直近）の来院を選択
+  // 患者を選んだら：経過記録（カルテ）＋初診時（問診票・人体図）＋紹介元を読み込み
   const openPerson = useCallback(async (p: Person) => {
     setSelKey(p.key);
-    setTab("chart");
+    setTab("keika");
+    setSelJoint(null);
     setMsg(null);
-    setPatNote(p.chart_note ?? "");
-    // 本日 or 直近（当日以前）の来院を既定選択
-    const todayVisit = p.visits.find((v) => v.date === today);
-    const lastPast = p.visits.find((v) => v.date <= today);
-    const pick = todayVisit ?? lastPast ?? p.visits[0] ?? null;
-    setSelVisitId(pick?.id ?? null);
-    setDraft(EMPTY);
     setChartMap({});
     setReferrer(null);
+    setIntake(EMPTY_INTAKE);
 
     const apptIds = p.visits.map((v) => v.id);
-    // カルテ記録（列未マイグレーションでも落ちないよう段階的に）
+    // 経過記録（列未マイグレーションでも落ちないよう段階的に）
     const cm: Record<string, ChartFields & { is_draft?: boolean }> = {};
     if (apptIds.length) {
       let rows: Record<string, unknown>[] | null = null;
@@ -245,7 +284,14 @@ export default function ChartBoard() {
       });
     }
     setChartMap(cm);
-    if (pick) setDraft(cm[pick.id] ?? EMPTY);
+
+    // 初診時（問診票の内容＋人体図）。テーブル未作成でも落ちない。
+    if (p.patient_id) {
+      try {
+        const { data: it } = await supabase.from("patient_intake").select("*").eq("patient_id", p.patient_id).maybeSingle();
+        setIntake(normIntake((it as Record<string, unknown>) ?? null));
+      } catch { setIntake(EMPTY_INTAKE); }
+    }
 
     // 紹介元（新患名簿の紹介者を氏名でリンク）
     try {
@@ -254,7 +300,7 @@ export default function ChartBoard() {
       const hit = ((np as { name: string; referrer: string | null }[] | null) ?? []).find((r) => normName(r.name) === key && (r.referrer || "").trim());
       setReferrer(hit?.referrer?.trim() || null);
     } catch { setReferrer(null); }
-  }, [supabase, today]);
+  }, [supabase]);
 
   // 個別売上などから ?p=<patient_id> / ?n=<氏名> で開かれたら、その患者を自動で選択
   useEffect(() => {
@@ -269,52 +315,65 @@ export default function ChartBoard() {
     setAutoSelDone(true);
   }, [autoSelDone, loading, persons, openPerson]);
 
-  // 来院履歴の行をクリック → その来院のカルテを編集対象に
-  function pickVisit(v: ApptRow) {
-    setSelVisitId(v.id);
-    setDraft(chartMap[v.id] ?? EMPTY);
-    setTab("chart");
-    setMsg(null);
+  // 経過記録カードの編集（その場でchartMapを更新）
+  const getEntry = (id: string): ChartFields & { is_draft?: boolean } => chartMap[id] ?? EMPTY;
+  function updateEntry(id: string, patch: Partial<ChartFields>) {
+    setChartMap((m) => ({ ...m, [id]: { ...(m[id] ?? EMPTY), ...patch } }));
   }
-
-  const selVisit = useMemo(() => selected?.visits.find((v) => v.id === selVisitId) ?? null, [selected, selVisitId]);
-
-  async function saveChart(isDraft: boolean) {
-    if (!selected || !selVisit) return;
+  // 1来院分のカルテ記録を保存
+  async function saveEntry(v: ApptRow) {
+    if (!selected) return;
     setSaving(true);
     setMsg(null);
+    const d = getEntry(v.id);
     const base = {
-      appointment_id: selVisit.id,
+      appointment_id: v.id,
       patient_id: selected.patient_id,
-      staff_id: selVisit.staff_id,
-      date: selVisit.date,
-      complaint: draft.complaint.trim() || null,
-      findings: draft.findings.trim() || null,
-      progress: draft.progress.trim() || null,
-      treatment: draft.treatment.trim() || null,
-      note: draft.note.trim() || null,
+      staff_id: v.staff_id,
+      date: v.date,
+      complaint: (d.complaint || "").trim() || null,
+      findings: (d.findings || "").trim() || null,
+      progress: (d.progress || "").trim() || null,
+      treatment: (d.treatment || "").trim() || null,
+      note: (d.note || "").trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const full = { ...base, body_marks: draft.body_marks, is_draft: isDraft };
+    const full = { ...base, body_marks: d.body_marks ?? [] };
     let { error } = await supabase.from("chart_entries").upsert(full, { onConflict: "appointment_id" });
-    if (error) {
-      // body_marks / is_draft 未マイグレーション時は外して保存
-      ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
-      if (!error) setMsg("保存しました（※身体図・下書きは列追加が必要です）");
-    }
+    if (error) ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
     setSaving(false);
-    if (!error) {
-      setChartMap((m) => ({ ...m, [selVisit.id]: { ...draft, is_draft: isDraft } }));
-      if (!msg) setMsg(isDraft ? "下書き保存しました" : "保存しました");
-    } else {
-      setMsg("保存に失敗しました");
-    }
+    setMsg(error ? "保存に失敗しました" : "保存しました");
   }
 
-  async function savePatNote() {
-    if (!selected?.patient_id) return;
-    await supabase.from("patients").update({ chart_note: patNote.trim() || null }).eq("id", selected.patient_id);
-    setMsg("メモを保存しました");
+  // 初診時ページ（問診票＋人体図）を保存
+  async function saveIntake() {
+    if (!selected?.patient_id) { setMsg("この患者は予約から登録されていないため初診時ページを保存できません"); return; }
+    setIntakeSaving(true);
+    setMsg(null);
+    const row = {
+      patient_id: selected.patient_id,
+      sport: intake.sport.trim() || null,
+      weekly_freq: intake.weekly_freq.trim() || null,
+      symptom_area: intake.symptom_area.trim() || null,
+      onset: intake.onset.trim() || null,
+      history: intake.history.trim() || null,
+      body_marks: intake.body_marks,
+      joint_details: intake.joint_details,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("patient_intake").upsert(row, { onConflict: "patient_id" });
+    setIntakeSaving(false);
+    setMsg(error ? "初診時ページの保存に失敗しました（patient_intake の作成が必要です）" : "初診時ページを保存しました");
+  }
+
+  // 関節詳細の1ビューを更新
+  function setJointView(joint: string, view: JointView, strokes: Stroke[]) {
+    setIntake((it) => {
+      const jd = { ...it.joint_details };
+      const cur = jd[joint] ?? emptyJoint();
+      jd[joint] = { ...cur, [view]: strokes };
+      return { ...it, joint_details: jd };
+    });
   }
 
   const statusBadge = (p: Person) =>
@@ -323,16 +382,10 @@ export default function ChartBoard() {
     : p.visitCount >= 2 ? { t: "再来", c: "bg-slate-100 text-slate-500" }
     : { t: "初診", c: "bg-amber-100 text-amber-700" };
 
-  const chartField = (label: string, key: "complaint" | "findings" | "treatment" | "progress" | "note", rows = 2) => (
-    <div className="flex gap-3">
-      <label className="mt-1 w-20 shrink-0 text-sm font-bold text-slate-600">{label}</label>
-      <textarea
-        value={draft[key]}
-        onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-        rows={rows}
-        className="min-h-0 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm leading-relaxed focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-      />
-    </div>
+  // 実来院（当日以前）を古い順に（1回目＝初診）
+  const pastVisits = useMemo(
+    () => (selected ? [...selected.visits].filter((v) => v.date <= today).sort((a, b) => a.date.localeCompare(b.date) || a.start_min - b.start_min) : []),
+    [selected, today]
   );
 
   return (
@@ -424,7 +477,7 @@ export default function ChartBoard() {
 
             {/* タブ */}
             <div className="mb-3 flex gap-4 border-b text-sm font-bold">
-              {([["chart", "自費カルテ"], ["records", "施術記録"], ["history", "来院履歴"]] as const).map(([k, l]) => (
+              {([["hatsushin", "初診時"], ["keika", "経過記録"]] as const).map(([k, l]) => (
                 <button
                   key={k}
                   onClick={() => setTab(k)}
@@ -437,116 +490,122 @@ export default function ChartBoard() {
 
             {msg && <p className="mb-2 rounded-md bg-teal-50 px-3 py-1.5 text-sm font-bold text-teal-700">{msg}</p>}
 
-            {/* ── 自費カルテ ── */}
-            {tab === "chart" && (
-              <>
-                {!selVisit ? (
-                  <p className="rounded-lg border bg-slate-50 py-6 text-center text-sm text-slate-400">来院記録がありません（来院履歴から選択）</p>
-                ) : (
-                  <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-                    {/* 記録フォーム */}
-                    <div className="rounded-xl border p-3">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="text-base font-bold text-slate-800">
-                          {selVisit.date === today ? "本日の記録" : "来院の記録"}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {selVisit.date.replace(/-/g, "/")}（{WEEKDAY_LABELS[new Date(selVisit.date + "T00:00:00").getDay()]}）{minToLabel(selVisit.start_min)}–{minToLabel(selVisit.end_min)}　担当：{staffName(selVisit.staff_id) || "—"}
-                          {chartMap[selVisit.id]?.is_draft && <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700">下書き</span>}
-                        </span>
+            {/* ── 初診時ページ ── */}
+            {tab === "hatsushin" && (
+              <div>
+                {!selected.patient_id && (
+                  <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">この患者は予約から登録されていないため、初診時ページの保存はできません（閲覧のみ）。</p>
+                )}
+                <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+                  {/* 左：問診票の内容（初診時に一度だけ入力→経過からも見返せる） */}
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-slate-400">問診票の内容</div>
+                    {([["競技名", "sport", "例：バスケットボール"], ["週何回", "weekly_freq", "例：週5回"], ["症状部位", "symptom_area", "例：右膝"], ["いつから", "onset", "例：3週間前"]] as const).map(([label, key, ph]) => (
+                      <div key={key} className="rounded-xl border p-2.5">
+                        <div className="text-[10px] font-bold text-teal-600">{label}</div>
+                        <input value={intake[key]} onChange={(e) => setIntake((it) => ({ ...it, [key]: e.target.value }))} placeholder={ph}
+                          className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-sm font-bold text-slate-800 focus:border-teal-500 focus:outline-none" />
                       </div>
-                      <div className="space-y-2.5">
-                        {chartField("主訴", "complaint")}
-                        {chartField("評価", "findings")}
-                        {chartField("施術内容", "treatment", 3)}
-                        {chartField("施術後の変化", "progress")}
-                      </div>
-                      <div className="mt-4 flex items-center justify-end gap-2">
-                        <button onClick={() => saveChart(true)} disabled={saving} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600 active:bg-slate-100 disabled:opacity-50">下書き保存</button>
-                        <button onClick={() => saveChart(false)} disabled={saving} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{saving ? "保存中…" : "保存"}</button>
-                      </div>
-                    </div>
-
-                    {/* 右：部位メモ（準備中）＋メモ */}
-                    <div className="space-y-3">
-                      <div className="rounded-xl border p-3">
-                        <div className="mb-2 text-sm font-bold text-slate-600">身体図（痛み・治療ポイント）</div>
-                        <BodyMap value={draft.body_marks} onChange={(bm) => setDraft((d) => ({ ...d, body_marks: bm }))} />
-                      </div>
-                      <div className="rounded-xl border p-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-sm font-bold text-slate-600">メモ（この来院）</span>
-                        </div>
-                        <textarea
-                          value={draft.note}
-                          onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))}
-                          rows={4}
-                          className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="rounded-xl border p-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-sm font-bold text-slate-600">患者メモ（共通）</span>
-                          <button onClick={savePatNote} disabled={!selected.patient_id} className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100 disabled:opacity-40">保存</button>
-                        </div>
-                        <textarea
-                          value={patNote}
-                          onChange={(e) => setPatNote(e.target.value)}
-                          rows={3}
-                          placeholder={selected.patient_id ? "紹介・申し送り・注意点など" : "予約から登録された患者のみ保存できます"}
-                          className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
-                        />
-                      </div>
+                    ))}
+                    <div className="rounded-xl border p-2.5">
+                      <div className="text-[10px] font-bold text-teal-600">過去の既往</div>
+                      <textarea value={intake.history} onChange={(e) => setIntake((it) => ({ ...it, history: e.target.value }))} rows={2} placeholder="例：右足関節捻挫（2024年）"
+                        className="mt-0.5 w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-800 focus:border-teal-500 focus:outline-none" />
                     </div>
                   </div>
-                )}
 
-                {/* 来院履歴（下） */}
-                <div className="mt-4 rounded-xl border p-3">
-                  <div className="mb-2 text-base font-bold text-slate-800">来院履歴</div>
-                  <VisitTable visits={selected.visits} chartMap={chartMap} today={today} staffName={staffName} onPick={pickVisit} selId={selVisitId} compact />
-                </div>
-              </>
-            )}
+                  {/* 右：人体図＋関節の拡大詳細 */}
+                  <div className="space-y-3">
+                    <div className="rounded-xl border p-3">
+                      <div className="mb-2 text-sm font-bold text-slate-600">人体図（痛み・損傷部位）</div>
+                      <BodyMap value={intake.body_marks} onChange={(bm) => setIntake((it) => ({ ...it, body_marks: bm }))} />
+                    </div>
 
-            {/* ── 施術記録（カルテのある来院の一覧） ── */}
-            {tab === "records" && (
-              <div className="space-y-3">
-                {selected.visits.filter((v) => chartMap[v.id]).length === 0 ? (
-                  <p className="rounded-lg border bg-slate-50 py-6 text-center text-sm text-slate-400">カルテ記録はまだありません</p>
-                ) : (
-                  selected.visits.filter((v) => chartMap[v.id]).map((v) => {
-                    const c = chartMap[v.id];
-                    return (
-                      <div key={v.id} className="rounded-xl border p-3">
-                        <button onClick={() => pickVisit(v)} className="mb-2 flex w-full items-center justify-between text-left">
-                          <span className="text-sm font-bold text-slate-700">
-                            {v.date.replace(/-/g, "/")}　{minToLabel(v.start_min)}
-                            {c.is_draft && <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700">下書き</span>}
-                          </span>
-                          <span className="text-xs text-slate-400">担当：{staffName(v.staff_id) || "—"}　編集 ›</span>
-                        </button>
-                        <dl className="space-y-1 text-sm">
-                          {([["主訴", c.complaint], ["評価", c.findings], ["施術内容", c.treatment], ["施術後の変化", c.progress], ["メモ", c.note]] as const)
-                            .filter(([, val]) => (val || "").trim())
-                            .map(([l, val]) => (
-                              <div key={l} className="flex gap-2">
-                                <dt className="w-20 shrink-0 font-bold text-slate-500">{l}</dt>
-                                <dd className="min-w-0 whitespace-pre-wrap text-slate-700">{val}</dd>
-                              </div>
-                            ))}
-                        </dl>
+                    <div className="rounded-xl border p-3">
+                      <div className="mb-2 text-sm font-bold text-slate-600">関節を選んで拡大（前後左右に記録）</div>
+                      <div className="flex flex-wrap gap-1">
+                        {JOINTS.map((j) => {
+                          const has = !!intake.joint_details[j] && VIEWS.some((v) => (intake.joint_details[j]?.[v.key]?.length ?? 0) > 0);
+                          return (
+                            <button key={j} type="button" onClick={() => setSelJoint(j === selJoint ? null : j)}
+                              className={`rounded-full border px-2 py-1 text-[11px] font-bold ${selJoint === j ? "border-teal-600 bg-teal-600 text-white" : has ? "border-rose-300 bg-rose-50 text-rose-600" : "border-slate-300 bg-white text-slate-600"}`}>
+                              {j}{has ? " ●" : ""}
+                            </button>
+                          );
+                        })}
                       </div>
-                    );
-                  })
-                )}
+                      {selJoint && (
+                        <div className="mt-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-sm font-bold text-teal-700">{selJoint} の詳細</span>
+                            <div className="flex items-center gap-1">
+                              {MARKS.map((m) => (
+                                <button key={m.key} type="button" onClick={() => setJointPen(m.key)} title={m.label}
+                                  className="h-5 w-5 rounded-full border-2" style={{ backgroundColor: m.color, borderColor: jointPen === m.key ? "#0f172a" : "#fff" }} />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {VIEWS.map((v) => (
+                              <Pad key={v.key} label={v.label} penType={jointPen}
+                                strokes={intake.joint_details[selJoint]?.[v.key] ?? []}
+                                onChange={(s) => setJointView(selJoint, v.key, s)} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button onClick={saveIntake} disabled={intakeSaving || !selected.patient_id} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{intakeSaving ? "保存中…" : "初診時ページを保存"}</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* ── 来院履歴（全件） ── */}
-            {tab === "history" && (
-              <div className="rounded-xl border p-3">
-                <VisitTable visits={selected.visits} chartMap={chartMap} today={today} staffName={staffName} onPick={pickVisit} selId={selVisitId} />
+            {/* ── 経過記録ページ ── */}
+            {tab === "keika" && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">来院ごとの記録（横スクロールで見比べ）</span>
+                  <button onClick={() => setTab("hatsushin")} className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 active:bg-teal-100">初診時を見る ›</button>
+                </div>
+                {pastVisits.length === 0 ? (
+                  <p className="rounded-lg border bg-slate-50 py-6 text-center text-sm text-slate-400">来院記録がありません</p>
+                ) : (
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {pastVisits.map((v, i) => {
+                      const d = getEntry(v.id);
+                      return (
+                        <div key={v.id} className="flex w-64 shrink-0 flex-col rounded-xl border">
+                          <div className="rounded-t-xl bg-slate-50 px-3 py-2 text-center text-sm font-bold text-slate-700">
+                            {i === 0 ? "初診（1回目）" : `${i + 1}回目`}
+                          </div>
+                          <div className="flex-1 space-y-2 p-3">
+                            <div>
+                              <div className="mb-0.5 text-[11px] font-bold text-teal-600">📅 日付</div>
+                              <div className="rounded-md bg-slate-100 px-2 py-1 text-sm font-bold text-slate-700">
+                                {v.date.replace(/-/g, "/")}（{WEEKDAY_LABELS[new Date(v.date + "T00:00:00").getDay()]}）{minToLabel(v.start_min)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="mb-0.5 text-[11px] font-bold text-teal-600">📊 症状の変化</div>
+                              <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} rows={4} className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                            </div>
+                            <div>
+                              <div className="mb-0.5 text-[11px] font-bold text-teal-600">⚙️ 施術内容</div>
+                              <textarea value={d.treatment} onChange={(e) => updateEntry(v.id, { treatment: e.target.value })} rows={4} className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                            </div>
+                          </div>
+                          <div className="border-t p-2 text-right">
+                            <button onClick={() => saveEntry(v)} disabled={saving} className="rounded-lg bg-teal-600 px-4 py-1.5 text-xs font-bold text-white active:bg-teal-700 disabled:opacity-50">保存</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -608,6 +667,49 @@ function VisitTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// 汎用の描画パッド（関節詳細の前後左右など）。背景画像は任意。
+function Pad({ label, strokes, onChange, penType, bg }: {
+  label?: string;
+  strokes: Stroke[];
+  onChange: (s: Stroke[]) => void;
+  penType: MarkType;
+  bg?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [draw, setDraw] = useState<[number, number][] | null>(null);
+  const pt = (e: { clientX: number; clientY: number }): [number, number] | null => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return null;
+    return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+  };
+  const down = (e: RPE) => { const p = pt(e); if (!p) return; try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {} setDraw([p]); };
+  const move = (e: RPE) => { if (!draw) return; const p = pt(e); if (!p) return; setDraw((d) => (d ? [...d, p] : [p])); };
+  const up = () => { if (draw && draw.length) onChange([...strokes, { id: uid(), side: "front", type: penType, pts: draw }]); setDraw(null); };
+  const poly = (pts: [number, number][]) => { const s = pts.map(([x, y]) => `${(x * 100).toFixed(2)},${(y * 100).toFixed(2)}`); if (s.length === 1) s.push(s[0]); return s.join(" "); };
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        {label ? <span className="text-[11px] font-bold text-slate-500">{label}</span> : <span />}
+        <div className="flex gap-1">
+          <button type="button" onClick={() => onChange(strokes.slice(0, -1))} disabled={!strokes.length} className="rounded border border-slate-300 px-1.5 text-[10px] font-bold text-slate-500 disabled:opacity-40">戻す</button>
+          <button type="button" onClick={() => onChange([])} className="rounded border border-slate-300 px-1.5 text-[10px] font-bold text-slate-500">消</button>
+        </div>
+      </div>
+      <div ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
+        className="relative w-full select-none overflow-hidden rounded-lg border bg-white" style={{ aspectRatio: "1 / 1", touchAction: "none", cursor: "crosshair" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {bg && <img src={bg} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
+          {strokes.map((s) => (
+            <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          ))}
+          {draw && <polyline points={poly(draw)} fill="none" stroke={markColor(penType)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+        </svg>
+      </div>
     </div>
   );
 }
