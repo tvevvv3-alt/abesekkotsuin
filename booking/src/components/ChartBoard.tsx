@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type ReactNode, type WheelEvent as RWheel } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type PointerEvent as RPE, type ReactNode, type WheelEvent as RWheel } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -726,7 +726,9 @@ function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
 function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[]) => void }) {
   const [type, setType] = useState<MarkType>("pain");
   const ref = useRef<HTMLDivElement>(null);
-  const [draw, setDraw] = useState<[number, number][] | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null); // 変換を直接当てる（ピンチを滑らかに）
+  const curStroke = useRef<[number, number][] | null>(null); // 描画中の線（refで滑らかに）
+  const [, force] = useReducer((n: number) => n + 1, 0);
   // 表示変換：content座標 c(0〜1) が p = c*s + t に表示される
   const [vw, setVw] = useState({ s: 1, tx: 0, ty: 0 });
   const vwRef = useRef(vw); vwRef.current = vw;
@@ -758,14 +760,16 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
     ptrs.current.set(e.pointerId, p);
     if (ptrs.current.size === 1) {
       drawId.current = e.pointerId;
-      setDraw([toContent(p)]);
+      curStroke.current = [toContent(p)];
+      force();
     } else if (ptrs.current.size === 2) {
       // 2本目：描画を中止してピンチへ
       drawId.current = null;
-      setDraw(null);
+      curStroke.current = null;
       const [a, b] = [...ptrs.current.values()];
       const v = vwRef.current;
       pinch.current = { d: dist(a, b) || 0.0001, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s: v.s, tx: v.tx, ty: v.ty };
+      force();
     }
   };
   const move = (e: RPE) => {
@@ -773,25 +777,33 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
     if (!p || !ptrs.current.has(e.pointerId)) return;
     ptrs.current.set(e.pointerId, p);
     if (ptrs.current.size >= 2 && pinch.current) {
+      // ピンチ中はDOMへ直接transform（Reactを介さず滑らかに）
       const [a, b] = [...ptrs.current.values()];
       const nd = dist(a, b), nmx = (a.x + b.x) / 2, nmy = (a.y + b.y) / 2;
       const pn = pinch.current;
       const ns = Math.min(MAXS, Math.max(1, pn.s * (nd / pn.d)));
-      const cx = (pn.mx - pn.tx) / pn.s, cy = (pn.my - pn.ty) / pn.s; // 開始midの content
+      const cx = (pn.mx - pn.tx) / pn.s, cy = (pn.my - pn.ty) / pn.s;
       const t = clampT(ns, nmx - cx * ns, nmy - cy * ns);
-      setVw({ s: ns, tx: t.tx, ty: t.ty });
-    } else if (drawId.current === e.pointerId && draw) {
-      setDraw((d) => (d ? [...d, toContent(p)] : d));
+      vwRef.current = { s: ns, tx: t.tx, ty: t.ty };
+      if (wrapRef.current) wrapRef.current.style.transform = `translate(${t.tx * 100}%, ${t.ty * 100}%) scale(${ns})`;
+    } else if (drawId.current === e.pointerId && curStroke.current) {
+      curStroke.current.push(toContent(p));
+      force();
     }
   };
   const up = (e: RPE) => {
     ptrs.current.delete(e.pointerId);
     if (drawId.current === e.pointerId) {
       drawId.current = null;
-      if (draw && draw.length) onChange([...value, { id: uid(), side: "front", type, pts: draw }]);
-      setDraw(null);
+      const cs = curStroke.current;
+      curStroke.current = null;
+      if (cs && cs.length) onChange([...value, { id: uid(), side: "front", type, pts: cs }]);
+      force();
     }
-    if (ptrs.current.size < 2) pinch.current = null;
+    if (ptrs.current.size < 2 && pinch.current) {
+      pinch.current = null;
+      setVw(vwRef.current); // ピンチ確定（1回だけReact更新）
+    }
   };
   const onWheel = (e: RWheel) => {
     const p = norm(e);
@@ -848,15 +860,15 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
         className="relative w-full select-none overflow-hidden rounded-lg border bg-white"
         style={{ aspectRatio: "900 / 860", touchAction: "none", cursor: "crosshair" }}
       >
-        <div className="absolute inset-0" style={{ transform: `translate(${vw.tx * 100}%, ${vw.ty * 100}%) scale(${vw.s})`, transformOrigin: "0 0" }}>
+        <div ref={wrapRef} className="absolute inset-0" style={{ transform: `translate(${vw.tx * 100}%, ${vw.ty * 100}%) scale(${vw.s})`, transformOrigin: "0 0" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/bodymap.png" alt="人体図（前面・背面）" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
             {value.map((s) => (
               <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             ))}
-            {draw && (
-              <polyline points={poly(draw)} fill="none" stroke={markColor(type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            {curStroke.current && (
+              <polyline points={poly(curStroke.current)} fill="none" stroke={markColor(type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             )}
           </svg>
         </div>
