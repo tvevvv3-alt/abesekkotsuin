@@ -14,9 +14,14 @@ export default function IntakePage() {
   const [done, setDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const [preview, setPreview] = useState(false);
+
   useEffect(() => {
-    const a = new URLSearchParams(window.location.search).get("a");
+    const sp = new URLSearchParams(window.location.search);
+    const a = sp.get("a");
     setApptId(a);
+    // プレビュー（確認用）：予約なしでフォームだけ表示（送信はしない）
+    if (sp.get("preview") === "1") { setPreview(true); setLoading(false); return; }
     if (!a) { setLoading(false); setErr("予約が指定されていません。LINEのリンクから開いてください。"); return; }
     (async () => {
       try {
@@ -78,9 +83,10 @@ export default function IntakePage() {
         <h1 className="text-xl font-bold text-slate-800">問診票</h1>
         <p className="text-xs text-slate-500">ご来院前に、下記のご記入をお願いいたします。</p>
       </div>
+      {preview && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">プレビュー表示です（送信はされません）。実際は患者さんが予約ごとのリンクから入力します。</p>}
       {err && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold text-rose-600">{err}</p>}
-      {apptId && <QuestionnaireForm value={answers} onChange={setAnswers} accent={TEAL} />}
-      {apptId && (
+      {(apptId || preview) && <QuestionnaireForm value={answers} onChange={setAnswers} accent={TEAL} />}
+      {apptId && !preview && (
         <div className="sticky bottom-0 -mx-4 mt-4 border-t bg-white/95 px-4 py-3 backdrop-blur">
           <button
             onClick={submit}

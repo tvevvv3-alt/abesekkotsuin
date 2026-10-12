@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type PointerEvent as RPE, type ReactNode, type WheelEvent as RWheel } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type ReactNode, type WheelEvent as RWheel } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -752,23 +752,22 @@ function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
 // 身体図：ピンチ/ホイールでズーム＆移動できる人体図にペン描画（点も線もOK）。
 function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[]) => void }) {
   const [type, setType] = useState<MarkType>("pain");
+  const [mode, setMode] = useState<"draw" | "pan">("draw");
+  const typeRef = useRef(type); typeRef.current = type;
+  const modeRef = useRef(mode); modeRef.current = mode;
   const ref = useRef<HTMLDivElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null); // 変換を直接当てる（ピンチを滑らかに）
-  const curStroke = useRef<[number, number][] | null>(null); // 描画中の線（refで滑らかに）
-  const [, force] = useReducer((n: number) => n + 1, 0);
-  // 表示変換：content座標 c(0〜1) が p = c*s + t に表示される
+  const wrapRef = useRef<HTMLDivElement>(null);     // transform を直接当てる
+  const liveRef = useRef<SVGPolylineElement>(null); // 描画中の線を直接更新（再描画なし）
+  const curStroke = useRef<[number, number][] | null>(null);
+  const drawId = useRef<number | null>(null);
+  const panRef = useRef<null | { x: number; y: number; tx: number; ty: number }>(null);
   const [vw, setVw] = useState({ s: 1, tx: 0, ty: 0 });
   const vwRef = useRef(vw); vwRef.current = vw;
   const ptrs = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinch = useRef<null | { d: number; mx: number; my: number; s: number; tx: number; ty: number }>(null);
-  const drawId = useRef<number | null>(null);
 
   const MAXS = 6;
-  const clampT = (s: number, tx: number, ty: number) => ({
-    tx: Math.min(0, Math.max(1 - s, tx)),
-    ty: Math.min(0, Math.max(1 - s, ty)),
-  });
-  // コンテナ内の正規化座標(0〜1)
+  const clampT = (s: number, tx: number, ty: number) => ({ tx: Math.min(0, Math.max(1 - s, tx)), ty: Math.min(0, Math.max(1 - s, ty)) });
   const norm = (e: { clientX: number; clientY: number }) => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return null;
@@ -779,32 +778,58 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
     return [Math.min(1, Math.max(0, (p.x - v.tx) / v.s)), Math.min(1, Math.max(0, (p.y - v.ty) / v.s))];
   };
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+  const poly = (pts: [number, number][]) => {
+    const s = pts.map(([x, y]) => `${(x * 100).toFixed(2)},${(y * 100).toFixed(2)}`);
+    if (s.length === 1) s.push(s[0]);
+    return s.join(" ");
+  };
+  // 描画中の線をDOMへ直接反映（Reactを介さない＝途切れない・軽い）
+  const paintLive = () => {
+    const el = liveRef.current;
+    if (!el) return;
+    if (curStroke.current && curStroke.current.length) {
+      el.setAttribute("points", poly(curStroke.current));
+      el.setAttribute("stroke", markColor(typeRef.current));
+      el.style.display = "";
+    } else {
+      el.setAttribute("points", "");
+      el.style.display = "none";
+    }
+  };
+  const applyTransform = (v: { s: number; tx: number; ty: number }) => {
+    if (wrapRef.current) wrapRef.current.style.transform = `translate(${v.tx * 100}%, ${v.ty * 100}%) scale(${v.s})`;
+  };
 
   const down = (e: RPE) => {
     const p = norm(e);
     if (!p) return;
-    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     ptrs.current.set(e.pointerId, p);
-    if (ptrs.current.size === 1) {
-      drawId.current = e.pointerId;
-      curStroke.current = [toContent(p)];
-      force();
-    } else if (ptrs.current.size === 2) {
-      // 2本目：描画を中止してピンチへ
-      drawId.current = null;
-      curStroke.current = null;
+    if (ptrs.current.size === 2) {
+      // 2本指＝ピンチ（描画・パンは中止）
+      drawId.current = null; curStroke.current = null; paintLive(); panRef.current = null;
       const [a, b] = [...ptrs.current.values()];
       const v = vwRef.current;
       pinch.current = { d: dist(a, b) || 0.0001, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s: v.s, tx: v.tx, ty: v.ty };
-      force();
+      return;
+    }
+    if (ptrs.current.size === 1) {
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+      if (modeRef.current === "pan") {
+        const v = vwRef.current;
+        panRef.current = { x: p.x, y: p.y, tx: v.tx, ty: v.ty };
+      } else {
+        drawId.current = e.pointerId;
+        curStroke.current = [toContent(p)];
+        paintLive();
+      }
     }
   };
   const move = (e: RPE) => {
+    if (!ptrs.current.has(e.pointerId)) return;
     const p = norm(e);
-    if (!p || !ptrs.current.has(e.pointerId)) return;
+    if (!p) return;
     ptrs.current.set(e.pointerId, p);
     if (ptrs.current.size >= 2 && pinch.current) {
-      // ピンチ中はDOMへ直接transform（Reactを介さず滑らかに）
       const [a, b] = [...ptrs.current.values()];
       const nd = dist(a, b), nmx = (a.x + b.x) / 2, nmy = (a.y + b.y) / 2;
       const pn = pinch.current;
@@ -812,10 +837,19 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
       const cx = (pn.mx - pn.tx) / pn.s, cy = (pn.my - pn.ty) / pn.s;
       const t = clampT(ns, nmx - cx * ns, nmy - cy * ns);
       vwRef.current = { s: ns, tx: t.tx, ty: t.ty };
-      if (wrapRef.current) wrapRef.current.style.transform = `translate(${t.tx * 100}%, ${t.ty * 100}%) scale(${ns})`;
+      applyTransform(vwRef.current);
     } else if (drawId.current === e.pointerId && curStroke.current) {
-      curStroke.current.push(toContent(p));
-      force();
+      // 取りこぼし防止：サブフレームの点もまとめて拾う
+      const ne = e.nativeEvent as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
+      const evs = ne.getCoalescedEvents ? ne.getCoalescedEvents() : [ne];
+      for (const ev of evs) { const q = norm(ev); if (q) curStroke.current.push(toContent(q)); }
+      paintLive();
+    } else if (panRef.current) {
+      const pr = panRef.current;
+      const v = vwRef.current;
+      const t = clampT(v.s, pr.tx + (p.x - pr.x), pr.ty + (p.y - pr.y));
+      vwRef.current = { s: v.s, tx: t.tx, ty: t.ty };
+      applyTransform(vwRef.current);
     }
   };
   const up = (e: RPE) => {
@@ -824,20 +858,18 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
       drawId.current = null;
       const cs = curStroke.current;
       curStroke.current = null;
-      if (cs && cs.length) onChange([...value, { id: uid(), side: "front", type, pts: cs }]);
-      force();
+      paintLive();
+      if (cs && cs.length) onChange([...value, { id: uid(), side: "front", type: typeRef.current, pts: cs }]);
     }
-    if (ptrs.current.size < 2 && pinch.current) {
-      pinch.current = null;
-      setVw(vwRef.current); // ピンチ確定（1回だけReact更新）
-    }
+    if (panRef.current && ptrs.current.size === 0) { panRef.current = null; setVw(vwRef.current); }
+    if (pinch.current && ptrs.current.size < 2) { pinch.current = null; setVw(vwRef.current); }
   };
   const onWheel = (e: RWheel) => {
     const p = norm(e);
     if (!p) return;
     const v = vwRef.current;
     const ns = Math.min(MAXS, Math.max(1, v.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
-    const cx = (p.x - v.tx) / v.s, cy = (p.y - v.ty) / v.s; // カーソル下の content を固定
+    const cx = (p.x - v.tx) / v.s, cy = (p.y - v.ty) / v.s;
     const t = clampT(ns, p.x - cx * ns, p.y - cy * ns);
     setVw({ s: ns, tx: t.tx, ty: t.ty });
   };
@@ -845,16 +877,11 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
   const zoomBy = (f: number) => {
     const v = vwRef.current;
     const ns = Math.min(MAXS, Math.max(1, v.s * f));
-    const cx = (0.5 - v.tx) / v.s, cy = (0.5 - v.ty) / v.s; // 中央基準
+    const cx = (0.5 - v.tx) / v.s, cy = (0.5 - v.ty) / v.s;
     const t = clampT(ns, 0.5 - cx * ns, 0.5 - cy * ns);
     setVw({ s: ns, tx: t.tx, ty: t.ty });
   };
   const undo = () => onChange(value.slice(0, -1));
-  const poly = (pts: [number, number][]) => {
-    const s = pts.map(([x, y]) => `${(x * 100).toFixed(2)},${(y * 100).toFixed(2)}`);
-    if (s.length === 1) s.push(s[0]);
-    return s.join(" ");
-  };
 
   return (
     <div>
@@ -863,9 +890,9 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
           <button
             key={m.key}
             type="button"
-            onClick={() => setType(m.key)}
-            className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${type === m.key ? "text-white" : "bg-white text-slate-600"}`}
-            style={type === m.key ? { backgroundColor: m.color, borderColor: m.color } : { borderColor: "#cbd5e1" }}
+            onClick={() => { setType(m.key); if (mode !== "draw") setMode("draw"); }}
+            className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${type === m.key && mode === "draw" ? "text-white" : "bg-white text-slate-600"}`}
+            style={type === m.key && mode === "draw" ? { backgroundColor: m.color, borderColor: m.color } : { borderColor: "#cbd5e1" }}
           >
             <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: m.color }} />
             {m.label}
@@ -885,29 +912,30 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
         onPointerCancel={up}
         onWheel={onWheel}
         className="relative w-full select-none overflow-hidden rounded-lg border bg-white"
-        style={{ aspectRatio: "900 / 860", touchAction: "none", cursor: "crosshair" }}
+        style={{ aspectRatio: "900 / 860", touchAction: "none", cursor: mode === "pan" ? "grab" : "crosshair" }}
       >
         <div ref={wrapRef} className="absolute inset-0" style={{ transform: `translate(${vw.tx * 100}%, ${vw.ty * 100}%) scale(${vw.s})`, transformOrigin: "0 0" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/bodymap.png" alt="人体図（前面・背面）" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
             {value.map((s) => (
-              <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             ))}
-            {curStroke.current && (
-              <polyline points={poly(curStroke.current)} fill="none" stroke={markColor(type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-            )}
+            <polyline ref={liveRef} points="" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ display: "none" }} />
           </svg>
         </div>
-        {/* ズーム操作 */}
-        <div className="absolute bottom-1 right-1 flex items-center gap-1 rounded-full bg-white/90 px-1 py-0.5 shadow">
+        {/* 操作バー：モード＋ズーム */}
+        <div className="absolute bottom-1 right-1 flex items-center gap-1 rounded-full bg-white/95 px-1 py-0.5 shadow">
+          <button type="button" onClick={() => setMode("draw")} className={`h-6 rounded-full px-2 text-[11px] font-bold ${mode === "draw" ? "bg-teal-600 text-white" : "text-slate-500"}`}>✏️描く</button>
+          <button type="button" onClick={() => setMode("pan")} className={`h-6 rounded-full px-2 text-[11px] font-bold ${mode === "pan" ? "bg-teal-600 text-white" : "text-slate-500"}`}>✋移動</button>
+          <span className="mx-0.5 h-4 w-px bg-slate-200" />
           <button type="button" onClick={() => zoomBy(1 / 1.4)} disabled={vw.s <= 1} className="h-6 w-6 rounded-full text-base font-bold text-slate-600 disabled:opacity-30">－</button>
-          <span className="w-8 text-center text-[10px] font-bold text-slate-500">×{vw.s.toFixed(1)}</span>
+          <span className="w-7 text-center text-[10px] font-bold text-slate-500">×{vw.s.toFixed(1)}</span>
           <button type="button" onClick={() => zoomBy(1.4)} disabled={vw.s >= MAXS} className="h-6 w-6 rounded-full text-base font-bold text-slate-600 disabled:opacity-30">＋</button>
-          {vw.s > 1 && <button type="button" onClick={resetView} className="ml-0.5 rounded-full px-1.5 text-[10px] font-bold text-teal-600">全体</button>}
+          {vw.s > 1 && <button type="button" onClick={resetView} className="rounded-full px-1 text-[10px] font-bold text-teal-600">全体</button>}
         </div>
       </div>
-      <p className="mt-1 text-[10px] text-slate-400">左＝前面／右＝背面。2本指で拡大・移動（＋/－でも可）、1本指/ペンで描く。</p>
+      <p className="mt-1 text-[10px] text-slate-400">左＝前面／右＝背面。<b>✏️描く</b>＝1本指で線、<b>✋移動</b>＝1本指で移動。＋/－で拡大（2本指ピンチも可）。</p>
     </div>
   );
 }
