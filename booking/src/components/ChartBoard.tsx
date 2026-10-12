@@ -6,6 +6,8 @@ import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import { ageAt } from "@/lib/pricing";
 import type { Staff } from "@/lib/types";
+import QuestionnaireForm from "@/components/QuestionnaireForm";
+import { toIntakeLinked, type QValue } from "@/lib/questionnaire";
 
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 const TEAL = "#0d9488";
@@ -87,8 +89,10 @@ type Intake = {
   history: string;      // 過去の既往
   body_marks: Stroke[]; // 全身図の描き込み
   joint_details: Record<string, JointDrawing>; // 関節ごとの前後左右
+  questionnaire: QValue; // 問診票の全回答
+  submitted_at: string | null; // 患者がLINEから送信した日時
 };
-const EMPTY_INTAKE: Intake = { sport: "", weekly_freq: "", symptom_area: "", onset: "", history: "", body_marks: [], joint_details: {} };
+const EMPTY_INTAKE: Intake = { sport: "", weekly_freq: "", symptom_area: "", onset: "", history: "", body_marks: [], joint_details: {}, questionnaire: {}, submitted_at: null };
 const emptyJoint = (): JointDrawing => ({ front: [], back: [], left: [], right: [] });
 // 選択できる関節（全身図から拡大）
 const JOINTS = ["頸部", "右肩", "左肩", "右肘", "左肘", "右手首", "左手首", "腰", "右股関節", "左股関節", "右膝", "左膝", "右足首", "左足首"];
@@ -106,6 +110,7 @@ function normIntake(row: Record<string, unknown> | null): Intake {
       jd[k] = { front: toStrokes(vv.front), back: toStrokes(vv.back), left: toStrokes(vv.left), right: toStrokes(vv.right) };
     }
   }
+  const q = typeof row.questionnaire === "string" ? safeParse(row.questionnaire) : row.questionnaire;
   return {
     sport: (row.sport as string) ?? "",
     weekly_freq: (row.weekly_freq as string) ?? "",
@@ -114,6 +119,8 @@ function normIntake(row: Record<string, unknown> | null): Intake {
     history: (row.history as string) ?? "",
     body_marks: toStrokes(typeof row.body_marks === "string" ? safeParse(row.body_marks) : row.body_marks),
     joint_details: jd,
+    questionnaire: (q && typeof q === "object" ? (q as QValue) : {}),
+    submitted_at: (row.submitted_at as string) ?? null,
   };
 }
 function safeParse(s: unknown): unknown { try { return typeof s === "string" ? JSON.parse(s) : s; } catch { return null; } }
@@ -350,18 +357,27 @@ export default function ChartBoard() {
     if (!selected?.patient_id) { setMsg("この患者は予約から登録されていないため初診時ページを保存できません"); return; }
     setIntakeSaving(true);
     setMsg(null);
+    const linked = toIntakeLinked(intake.questionnaire);
     const row = {
       patient_id: selected.patient_id,
-      sport: intake.sport.trim() || null,
-      weekly_freq: intake.weekly_freq.trim() || null,
-      symptom_area: intake.symptom_area.trim() || null,
-      onset: intake.onset.trim() || null,
-      history: intake.history.trim() || null,
+      sport: linked.sport || null,
+      weekly_freq: linked.weekly_freq || null,
+      symptom_area: linked.symptom_area || null,
+      onset: linked.onset || null,
+      history: linked.history || null,
       body_marks: intake.body_marks,
       joint_details: intake.joint_details,
+      questionnaire: intake.questionnaire,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from("patient_intake").upsert(row, { onConflict: "patient_id" });
+    let { error } = await supabase.from("patient_intake").upsert(row, { onConflict: "patient_id" });
+    if (error) {
+      // questionnaire 列が未マイグレーションでも保存できるようにフォールバック
+      const { questionnaire: _q, ...base } = row;
+      void _q;
+      ({ error } = await supabase.from("patient_intake").upsert(base, { onConflict: "patient_id" }));
+      if (!error) { setIntakeSaving(false); setMsg("保存しました（※問診票は列追加が必要です）"); return; }
+    }
     setIntakeSaving(false);
     setMsg(error ? "初診時ページの保存に失敗しました（patient_intake の作成が必要です）" : "初診時ページを保存しました");
   }
@@ -496,32 +512,43 @@ export default function ChartBoard() {
                 {!selected.patient_id && (
                   <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">この患者は予約から登録されていないため、初診時ページの保存はできません（閲覧のみ）。</p>
                 )}
-                <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-                  {/* 左：問診票の内容（コンパクト。1行ずつ） */}
-                  <div className="rounded-xl border p-2.5">
-                    <div className="mb-1.5 text-[11px] font-bold text-slate-400">問診票の内容</div>
-                    <div className="space-y-1">
-                      {([["競技名", "sport", "バスケ等"], ["週何回", "weekly_freq", "週5回"], ["症状部位", "symptom_area", "右膝"], ["いつから", "onset", "3週間前"], ["過去の既往", "history", "右足関節捻挫(2024)"]] as const).map(([label, key, ph]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <span className="w-16 shrink-0 text-[11px] font-bold text-teal-600">{label}</span>
-                          <input value={intake[key]} onChange={(e) => setIntake((it) => ({ ...it, [key]: e.target.value }))} placeholder={ph}
-                            className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-0.5 text-sm text-slate-800 focus:border-teal-500 focus:outline-none" />
-                        </div>
-                      ))}
+                {/* 概要（問診票から自動反映） */}
+                {(() => {
+                  const lk = toIntakeLinked(intake.questionnaire);
+                  const chips: [string, string][] = [["競技", lk.sport], ["週何回", lk.weekly_freq], ["症状部位", lk.symptom_area], ["いつから", lk.onset], ["既往", lk.history]];
+                  return (
+                    <div className="mb-3 rounded-xl border bg-slate-50 p-2.5">
+                      <div className="mb-1 flex items-center gap-2 text-[11px] font-bold text-slate-400">
+                        問診票サマリ
+                        {intake.submitted_at && <span className="rounded bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700">患者送信 {new Date(intake.submitted_at).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {chips.map(([l, v]) => (
+                          <span key={l} className="text-sm"><span className="mr-1 text-[11px] font-bold text-teal-600">{l}</span><span className="font-bold text-slate-700">{v || "—"}</span></span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  );
+                })()}
 
-                  {/* 右：人体図＋関節の拡大詳細 */}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {/* 左：人体図 */}
                   <div className="space-y-3">
                     <div className="rounded-xl border p-3">
                       <div className="mb-2 text-sm font-bold text-slate-600">人体図（痛み・損傷部位）</div>
                       <BodyMap value={intake.body_marks} onChange={(bm) => setIntake((it) => ({ ...it, body_marks: bm }))} />
                     </div>
-
-                    <div className="flex justify-end">
-                      <button onClick={saveIntake} disabled={intakeSaving || !selected.patient_id} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{intakeSaving ? "保存中…" : "初診時ページを保存"}</button>
-                    </div>
                   </div>
+
+                  {/* 右：問診票（全項目・編集可） */}
+                  <div>
+                    <div className="mb-2 text-sm font-bold text-slate-600">問診票</div>
+                    <QuestionnaireForm value={intake.questionnaire} onChange={(q) => setIntake((it) => ({ ...it, questionnaire: q }))} />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <button onClick={saveIntake} disabled={intakeSaving || !selected.patient_id} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{intakeSaving ? "保存中…" : "初診時ページを保存"}</button>
                 </div>
               </div>
             )}

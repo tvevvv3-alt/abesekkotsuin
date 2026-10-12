@@ -332,11 +332,14 @@ export async function maybeAutoSendQuestionnaire(
   } catch { /* 列が無ければ未送信として続行 */ }
   const { data: s } = await admin
     .from("settings")
-    .select("questionnaire_url, questionnaire_text, questionnaire_auto")
+    .select("questionnaire_url, questionnaire_text, questionnaire_auto, questionnaire_inapp")
     .eq("id", 1)
     .maybeSingle();
   if (!s || !(s as { questionnaire_auto?: boolean }).questionnaire_auto) return { sent: false, reason: "off" };
-  const url = ((s as { questionnaire_url?: string | null }).questionnaire_url || "").trim();
+  // アプリ内問診票がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
+  const inapp = !!(s as { questionnaire_inapp?: boolean }).questionnaire_inapp;
+  const siteBase = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
+  const url = inapp ? `${siteBase}/intake?a=${appt.id}` : ((s as { questionnaire_url?: string | null }).questionnaire_url || "").trim();
   if (!url) return { sent: false, reason: "nourl" };
   if (!lineMessagingConfigured()) return { sent: false, reason: "notconfigured" };
   const lineId = await resolveLineUserId(admin, appt);

@@ -56,6 +56,7 @@ export default function SettingsAdmin() {
       questionnaire_admin_url: s.questionnaire_admin_url,
       questionnaire_text: s.questionnaire_text,
       questionnaire_auto: s.questionnaire_auto,
+      questionnaire_inapp: s.questionnaire_inapp,
       questionnaire_gap_days: s.questionnaire_gap_days,
       class_application_url: s.class_application_url,
       class_application_text: s.class_application_text,
@@ -74,9 +75,9 @@ export default function SettingsAdmin() {
     };
     let { error: saveErr } = await supabase.from("settings").upsert(payload);
     // 未マイグレーションの列があっても他の設定は保存できるよう、該当列を外して再試行
-    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_gap_days|class_application_auto/.test(saveErr.message)) {
-      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, class_application_auto: _o4, ...rest } = payload;
-      void _o1; void _o2; void _o3; void _o4;
+    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_inapp|questionnaire_gap_days|class_application_auto/.test(saveErr.message)) {
+      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, class_application_auto: _o4, questionnaire_inapp: _o5, ...rest } = payload;
+      void _o1; void _o2; void _o3; void _o4; void _o5;
       ({ error: saveErr } = await supabase.from("settings").upsert(rest));
     }
     setBusy(false);
@@ -192,7 +193,16 @@ export default function SettingsAdmin() {
       <div className="mb-4 rounded-xl border bg-white p-4">
         <label className="block text-sm font-bold text-slate-700">問診票</label>
         <p className="mt-1 text-[11px] text-slate-500">患者用フォームは「問診票を送る」で本人へLINE送信、左メニュー「患者管理 → 問診票」からは<b>管理用（回答閲覧）ページ</b>を開きます。</p>
-        <span className="mt-2 block text-xs font-bold text-slate-500">患者用フォームのリンク（LINE送信）</span>
+
+        <div className="mt-2 rounded-lg bg-teal-50 p-2">
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <input type="checkbox" checked={!!s.questionnaire_inapp} onChange={(e) => up({ questionnaire_inapp: e.target.checked })} />
+            アプリ内問診票を使う（Googleフォームの代わり）
+          </label>
+          <p className="mt-1 text-[11px] text-slate-500">ONにすると、LINEで送る問診票リンクが<b>この予約専用のアプリ内問診票</b>になります。回答は<b>カルテ初診時に自動反映</b>（二重入力なし）。OFFのときは下のGoogleフォームのリンクを送ります。</p>
+        </div>
+
+        <span className="mt-3 block text-xs font-bold text-slate-500">患者用フォームのリンク（Googleフォーム。アプリ内問診票OFF時に使用）</span>
         <input
           value={s.questionnaire_url ?? ""}
           onChange={(e) => up({ questionnaire_url: e.target.value })}

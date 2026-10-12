@@ -32,8 +32,10 @@ export async function POST(req: NextRequest) {
   const lineId = await resolveLineUserId(admin, appt);
   if (!lineId) return NextResponse.json({ ok: false, reason: "noline" });
 
-  const { data: s } = await admin.from("settings").select("questionnaire_url, questionnaire_text").eq("id", 1).maybeSingle();
-  const url = (s?.questionnaire_url as string | null)?.trim();
+  const { data: s } = await admin.from("settings").select("questionnaire_url, questionnaire_text, questionnaire_inapp").eq("id", 1).maybeSingle();
+  const inapp = !!(s?.questionnaire_inapp as boolean | undefined);
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
+  const url = inapp ? `${base}/intake?a=${appointmentId}` : (s?.questionnaire_url as string | null)?.trim();
   if (!url) return NextResponse.json({ ok: false, reason: "nourl" });
   if (!lineMessagingConfigured()) return NextResponse.json({ ok: false, reason: "notconfigured" });
 
