@@ -749,21 +749,23 @@ function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
   );
 }
 
-// 身体図：ピンチ/ホイールでズーム＆移動できる人体図にペン描画（点も線もOK）。
+// 身体図：ズーム＆移動できる人体図にペン描画。指はtouchイベント、ペン/マウスはpointer。
 function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[]) => void }) {
   const [type, setType] = useState<MarkType>("pain");
   const [mode, setMode] = useState<"draw" | "pan">("draw");
   const typeRef = useRef(type); typeRef.current = type;
   const modeRef = useRef(mode); modeRef.current = mode;
+  const valueRef = useRef(value); valueRef.current = value;
+  const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   const ref = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);     // transform を直接当てる
   const liveRef = useRef<SVGPolylineElement>(null); // 描画中の線を直接更新（再描画なし）
   const curStroke = useRef<[number, number][] | null>(null);
-  const drawId = useRef<number | null>(null);
+  const drawPtr = useRef<number | null>(null);      // pointer(ペン/マウス)での描画ID
+  const touchDraw = useRef(false);                  // touch(指)での描画中
   const panRef = useRef<null | { x: number; y: number; tx: number; ty: number }>(null);
   const [vw, setVw] = useState({ s: 1, tx: 0, ty: 0 });
   const vwRef = useRef(vw); vwRef.current = vw;
-  const ptrs = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinch = useRef<null | { d: number; mx: number; my: number; s: number; tx: number; ty: number }>(null);
 
   const MAXS = 6;
@@ -783,7 +785,6 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
     if (s.length === 1) s.push(s[0]);
     return s.join(" ");
   };
-  // 描画中の線をDOMへ直接反映（Reactを介さない＝途切れない・軽い）
   const paintLive = () => {
     const el = liveRef.current;
     if (!el) return;
@@ -799,70 +800,94 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
   const applyTransform = (v: { s: number; tx: number; ty: number }) => {
     if (wrapRef.current) wrapRef.current.style.transform = `translate(${v.tx * 100}%, ${v.ty * 100}%) scale(${v.s})`;
   };
+  const commitStroke = () => {
+    const cs = curStroke.current;
+    curStroke.current = null;
+    paintLive();
+    if (cs && cs.length) onChangeRef.current([...valueRef.current, { id: uid(), side: "front", type: typeRef.current, pts: cs }]);
+  };
 
-  const down = (e: RPE) => {
-    const p = norm(e);
-    if (!p) return;
-    ptrs.current.set(e.pointerId, p);
-    if (ptrs.current.size === 2) {
-      // 2本指＝ピンチ（描画・パンは中止）
-      drawId.current = null; curStroke.current = null; paintLive(); panRef.current = null;
-      const [a, b] = [...ptrs.current.values()];
-      const v = vwRef.current;
-      pinch.current = { d: dist(a, b) || 0.0001, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s: v.s, tx: v.tx, ty: v.ty };
-      return;
-    }
-    if (ptrs.current.size === 1) {
-      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-      if (modeRef.current === "pan") {
+  // ── 指（タッチ）：1本=描く/移動、2本=ピンチ。スクロール奪取を防ぐため passive:false ──
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const nt = (t: Touch) => norm({ clientX: t.clientX, clientY: t.clientY });
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        touchDraw.current = false; curStroke.current = null; paintLive(); panRef.current = null;
+        const a = nt(e.touches[0]), b = nt(e.touches[1]);
+        if (!a || !b) return;
         const v = vwRef.current;
-        panRef.current = { x: p.x, y: p.y, tx: v.tx, ty: v.ty };
-      } else {
-        drawId.current = e.pointerId;
-        curStroke.current = [toContent(p)];
-        paintLive();
+        pinch.current = { d: dist(a, b) || 0.0001, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s: v.s, tx: v.tx, ty: v.ty };
+      } else if (e.touches.length === 1 && !pinch.current) {
+        const p = nt(e.touches[0]); if (!p) return;
+        if (modeRef.current === "pan") { const v = vwRef.current; panRef.current = { x: p.x, y: p.y, tx: v.tx, ty: v.ty }; }
+        else { touchDraw.current = true; curStroke.current = [toContent(p)]; paintLive(); }
       }
-    }
+    };
+    const onMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length >= 2 && pinch.current) {
+        const a = nt(e.touches[0]), b = nt(e.touches[1]); if (!a || !b) return;
+        const nd = dist(a, b), nmx = (a.x + b.x) / 2, nmy = (a.y + b.y) / 2, pn = pinch.current;
+        const ns = Math.min(MAXS, Math.max(1, pn.s * (nd / pn.d)));
+        const cx = (pn.mx - pn.tx) / pn.s, cy = (pn.my - pn.ty) / pn.s;
+        const t = clampT(ns, nmx - cx * ns, nmy - cy * ns);
+        vwRef.current = { s: ns, tx: t.tx, ty: t.ty }; applyTransform(vwRef.current);
+      } else if (e.touches.length === 1 && touchDraw.current && curStroke.current) {
+        const p = nt(e.touches[0]); if (p) { curStroke.current.push(toContent(p)); paintLive(); }
+      } else if (e.touches.length === 1 && panRef.current) {
+        const p = nt(e.touches[0]); if (p) { const pr = panRef.current, v = vwRef.current; const t = clampT(v.s, pr.tx + (p.x - pr.x), pr.ty + (p.y - pr.y)); vwRef.current = { s: v.s, tx: t.tx, ty: t.ty }; applyTransform(vwRef.current); }
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (pinch.current && e.touches.length < 2) { pinch.current = null; setVw(vwRef.current); }
+      if (e.touches.length === 0) {
+        if (touchDraw.current) { touchDraw.current = false; commitStroke(); }
+        if (panRef.current) { panRef.current = null; setVw(vwRef.current); }
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: false });
+    el.addEventListener("touchcancel", onEnd, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+    // 中身は全てrefで最新参照するため、一度だけ登録する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── ペン/マウス（pointer）：指(touch)はtouchイベントに任せて無視 ──
+  const down = (e: RPE) => {
+    if (e.pointerType === "touch") return;
+    const p = norm(e); if (!p) return;
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    if (modeRef.current === "pan") { const v = vwRef.current; panRef.current = { x: p.x, y: p.y, tx: v.tx, ty: v.ty }; }
+    else { drawPtr.current = e.pointerId; curStroke.current = [toContent(p)]; paintLive(); }
   };
   const move = (e: RPE) => {
-    if (!ptrs.current.has(e.pointerId)) return;
-    const p = norm(e);
-    if (!p) return;
-    ptrs.current.set(e.pointerId, p);
-    if (ptrs.current.size >= 2 && pinch.current) {
-      const [a, b] = [...ptrs.current.values()];
-      const nd = dist(a, b), nmx = (a.x + b.x) / 2, nmy = (a.y + b.y) / 2;
-      const pn = pinch.current;
-      const ns = Math.min(MAXS, Math.max(1, pn.s * (nd / pn.d)));
-      const cx = (pn.mx - pn.tx) / pn.s, cy = (pn.my - pn.ty) / pn.s;
-      const t = clampT(ns, nmx - cx * ns, nmy - cy * ns);
-      vwRef.current = { s: ns, tx: t.tx, ty: t.ty };
-      applyTransform(vwRef.current);
-    } else if (drawId.current === e.pointerId && curStroke.current) {
-      // 取りこぼし防止：サブフレームの点もまとめて拾う
+    if (e.pointerType === "touch") return;
+    const p = norm(e); if (!p) return;
+    if (drawPtr.current === e.pointerId && curStroke.current) {
       const ne = e.nativeEvent as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
       const evs = ne.getCoalescedEvents ? ne.getCoalescedEvents() : [ne];
       for (const ev of evs) { const q = norm(ev); if (q) curStroke.current.push(toContent(q)); }
       paintLive();
     } else if (panRef.current) {
-      const pr = panRef.current;
-      const v = vwRef.current;
+      const pr = panRef.current, v = vwRef.current;
       const t = clampT(v.s, pr.tx + (p.x - pr.x), pr.ty + (p.y - pr.y));
-      vwRef.current = { s: v.s, tx: t.tx, ty: t.ty };
-      applyTransform(vwRef.current);
+      vwRef.current = { s: v.s, tx: t.tx, ty: t.ty }; applyTransform(vwRef.current);
     }
   };
   const up = (e: RPE) => {
-    ptrs.current.delete(e.pointerId);
-    if (drawId.current === e.pointerId) {
-      drawId.current = null;
-      const cs = curStroke.current;
-      curStroke.current = null;
-      paintLive();
-      if (cs && cs.length) onChange([...value, { id: uid(), side: "front", type: typeRef.current, pts: cs }]);
-    }
-    if (panRef.current && ptrs.current.size === 0) { panRef.current = null; setVw(vwRef.current); }
-    if (pinch.current && ptrs.current.size < 2) { pinch.current = null; setVw(vwRef.current); }
+    if (e.pointerType === "touch") return;
+    if (drawPtr.current === e.pointerId) { drawPtr.current = null; commitStroke(); }
+    if (panRef.current) { panRef.current = null; setVw(vwRef.current); }
   };
   const onWheel = (e: RWheel) => {
     const p = norm(e);
@@ -908,7 +933,6 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
-        onPointerLeave={up}
         onPointerCancel={up}
         onWheel={onWheel}
         className="relative w-full select-none overflow-hidden rounded-lg border bg-white"
@@ -919,9 +943,9 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
           <img src="/bodymap.png" alt="人体図（前面・背面）" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
             {value.map((s) => (
-              <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             ))}
-            <polyline ref={liveRef} points="" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ display: "none" }} />
+            <polyline ref={liveRef} points="" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ display: "none" }} />
           </svg>
         </div>
         {/* 操作バー：モード＋ズーム */}
