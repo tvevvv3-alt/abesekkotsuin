@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -93,7 +93,7 @@ const emptyJoint = (): JointDrawing => ({ front: [], back: [], left: [], right: 
 // 選択できる関節（全身図から拡大）
 const JOINTS = ["頸部", "右肩", "左肩", "右肘", "左肘", "右手首", "左手首", "腰", "右股関節", "左股関節", "右膝", "左膝", "右足首", "左足首"];
 const VIEWS: { key: JointView; label: string }[] = [
-  { key: "front", label: "前" }, { key: "back", label: "後" }, { key: "left", label: "左" }, { key: "right", label: "右" },
+  { key: "front", label: "前面" }, { key: "back", label: "後面" }, { key: "left", label: "左側面" }, { key: "right", label: "右側面" },
 ];
 function normIntake(row: Record<string, unknown> | null): Intake {
   if (!row) return { ...EMPTY_INTAKE, joint_details: {} };
@@ -546,7 +546,9 @@ export default function ChartBoard() {
                             {VIEWS.map((v) => (
                               <Pad key={v.key} label={v.label} penType={jointPen}
                                 strokes={intake.joint_details[selJoint]?.[v.key] ?? []}
-                                onChange={(s) => setJointView(selJoint, v.key, s)} />
+                                onChange={(s) => setJointView(selJoint, v.key, s)}
+                                bgImg={`/joints/${encodeURIComponent(selJoint)}/${v.key}.png`}
+                                bgNode={<JointSketch view={v.key} />} />
                             ))}
                           </div>
                         </div>
@@ -668,16 +670,57 @@ function VisitTable({
   );
 }
 
-// 汎用の描画パッド（関節詳細の前後左右など）。背景画像は任意。
-function Pad({ label, strokes, onChange, penType, bg }: {
+// 簡易な関節線画（下地のプレースホルダ）。public/joints/ に画像を置けば差し替わる。
+function JointSketch({ view }: { view: JointView }) {
+  const g = { fill: "none", stroke: "#cbd5e1", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (view === "front" || view === "back") {
+    return (
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+        <g {...g}>
+          <path d="M40,6 C37,24 37,36 44,45 L56,45 C63,36 63,24 60,6" />
+          <path d="M44,57 C40,74 40,86 43,96 M56,57 C60,74 60,86 57,96" />
+          {view === "front" ? (
+            <>
+              <ellipse cx="50" cy="51" rx="15" ry="8" />
+              <circle cx="50" cy="50" r="6" />
+            </>
+          ) : (
+            <>
+              <circle cx="44" cy="51" r="5" />
+              <circle cx="56" cy="51" r="5" />
+              <line x1="50" y1="45" x2="50" y2="58" />
+            </>
+          )}
+        </g>
+      </svg>
+    );
+  }
+  const flip = view === "left" ? "translate(100,0) scale(-1,1)" : undefined;
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+      <g {...g} transform={flip}>
+        <path d="M44,6 C41,26 41,38 45,47" />
+        <path d="M60,6 C64,26 61,38 56,45" />
+        <ellipse cx="53" cy="51" rx="11" ry="12" />
+        <path d="M46,58 C42,76 42,86 45,96" />
+        <path d="M58,56 C61,76 59,86 56,96" />
+      </g>
+    </svg>
+  );
+}
+
+// 汎用の描画パッド（関節詳細の前後左右など）。背景は画像（あれば）→無ければ線画。
+function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
   label?: string;
   strokes: Stroke[];
   onChange: (s: Stroke[]) => void;
   penType: MarkType;
-  bg?: string;
+  bgImg?: string;   // /joints/<関節>/<ビュー>.png（あれば優先）
+  bgNode?: ReactNode; // 画像が無い時の簡易線画
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [draw, setDraw] = useState<[number, number][] | null>(null);
+  const [imgOk, setImgOk] = useState(true);
   const pt = (e: { clientX: number; clientY: number }): [number, number] | null => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return null;
@@ -698,8 +741,13 @@ function Pad({ label, strokes, onChange, penType, bg }: {
       </div>
       <div ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
         className="relative w-full select-none overflow-hidden rounded-lg border bg-white" style={{ aspectRatio: "1 / 1", touchAction: "none", cursor: "crosshair" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {bg && <img src={bg} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
+        {/* 背景：画像があれば優先、無ければ簡易線画 */}
+        {bgImg && imgOk ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={bgImg} alt="" draggable={false} onError={() => setImgOk(false)} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
+        ) : (
+          bgNode && <div className="pointer-events-none absolute inset-0">{bgNode}</div>
+        )}
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
           {strokes.map((s) => (
             <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
