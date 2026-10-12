@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type ReactNode, type WheelEvent as RWheel } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -518,43 +518,6 @@ export default function ChartBoard() {
                       <BodyMap value={intake.body_marks} onChange={(bm) => setIntake((it) => ({ ...it, body_marks: bm }))} />
                     </div>
 
-                    <div className="rounded-xl border p-3">
-                      <div className="mb-2 text-sm font-bold text-slate-600">関節を選んで拡大（前後左右に記録）</div>
-                      <div className="flex flex-wrap gap-1">
-                        {JOINTS.map((j) => {
-                          const has = !!intake.joint_details[j] && VIEWS.some((v) => (intake.joint_details[j]?.[v.key]?.length ?? 0) > 0);
-                          return (
-                            <button key={j} type="button" onClick={() => setSelJoint(j === selJoint ? null : j)}
-                              className={`rounded-full border px-2 py-1 text-[11px] font-bold ${selJoint === j ? "border-teal-600 bg-teal-600 text-white" : has ? "border-rose-300 bg-rose-50 text-rose-600" : "border-slate-300 bg-white text-slate-600"}`}>
-                              {j}{has ? " ●" : ""}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {selJoint && (
-                        <div className="mt-3">
-                          <div className="mb-2 flex items-center justify-between">
-                            <span className="text-sm font-bold text-teal-700">{selJoint} の詳細</span>
-                            <div className="flex items-center gap-1">
-                              {MARKS.map((m) => (
-                                <button key={m.key} type="button" onClick={() => setJointPen(m.key)} title={m.label}
-                                  className="h-5 w-5 rounded-full border-2" style={{ backgroundColor: m.color, borderColor: jointPen === m.key ? "#0f172a" : "#fff" }} />
-                              ))}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            {VIEWS.map((v) => (
-                              <Pad key={v.key} label={v.label} penType={jointPen}
-                                strokes={intake.joint_details[selJoint]?.[v.key] ?? []}
-                                onChange={(s) => setJointView(selJoint, v.key, s)}
-                                bgImg={`/joints/${encodeURIComponent(selJoint)}/${v.key}.png`}
-                                bgNode={<JointSketch view={v.key} />} />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
                     <div className="flex justify-end">
                       <button onClick={saveIntake} disabled={intakeSaving || !selected.patient_id} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{intakeSaving ? "保存中…" : "初診時ページを保存"}</button>
                     </div>
@@ -759,37 +722,95 @@ function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
   );
 }
 
-// 身体図：前面・背面にペンで描画（痛み/こり/しびれ/治療ポイントの色）。点も線もOK。
+// 身体図：ピンチ/ホイールでズーム＆移動できる人体図にペン描画（点も線もOK）。
 function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[]) => void }) {
   const [type, setType] = useState<MarkType>("pain");
   const ref = useRef<HTMLDivElement>(null);
   const [draw, setDraw] = useState<[number, number][] | null>(null);
+  // 表示変換：content座標 c(0〜1) が p = c*s + t に表示される
+  const [vw, setVw] = useState({ s: 1, tx: 0, ty: 0 });
+  const vwRef = useRef(vw); vwRef.current = vw;
+  const ptrs = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinch = useRef<null | { d: number; mx: number; my: number; s: number; tx: number; ty: number }>(null);
+  const drawId = useRef<number | null>(null);
 
-  const pt = (e: { clientX: number; clientY: number }): [number, number] | null => {
+  const MAXS = 6;
+  const clampT = (s: number, tx: number, ty: number) => ({
+    tx: Math.min(0, Math.max(1 - s, tx)),
+    ty: Math.min(0, Math.max(1 - s, ty)),
+  });
+  // コンテナ内の正規化座標(0〜1)
+  const norm = (e: { clientX: number; clientY: number }) => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return null;
-    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-    return [x, y];
+    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
   };
+  const toContent = (p: { x: number; y: number }): [number, number] => {
+    const v = vwRef.current;
+    return [Math.min(1, Math.max(0, (p.x - v.tx) / v.s)), Math.min(1, Math.max(0, (p.y - v.ty) / v.s))];
+  };
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
   const down = (e: RPE) => {
-    const p = pt(e);
+    const p = norm(e);
     if (!p) return;
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-    setDraw([p]);
+    ptrs.current.set(e.pointerId, p);
+    if (ptrs.current.size === 1) {
+      drawId.current = e.pointerId;
+      setDraw([toContent(p)]);
+    } else if (ptrs.current.size === 2) {
+      // 2本目：描画を中止してピンチへ
+      drawId.current = null;
+      setDraw(null);
+      const [a, b] = [...ptrs.current.values()];
+      const v = vwRef.current;
+      pinch.current = { d: dist(a, b) || 0.0001, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s: v.s, tx: v.tx, ty: v.ty };
+    }
   };
   const move = (e: RPE) => {
-    if (!draw) return;
-    const p = pt(e);
-    if (!p) return;
-    setDraw((d) => (d ? [...d, p] : [p]));
+    const p = norm(e);
+    if (!p || !ptrs.current.has(e.pointerId)) return;
+    ptrs.current.set(e.pointerId, p);
+    if (ptrs.current.size >= 2 && pinch.current) {
+      const [a, b] = [...ptrs.current.values()];
+      const nd = dist(a, b), nmx = (a.x + b.x) / 2, nmy = (a.y + b.y) / 2;
+      const pn = pinch.current;
+      const ns = Math.min(MAXS, Math.max(1, pn.s * (nd / pn.d)));
+      const cx = (pn.mx - pn.tx) / pn.s, cy = (pn.my - pn.ty) / pn.s; // 開始midの content
+      const t = clampT(ns, nmx - cx * ns, nmy - cy * ns);
+      setVw({ s: ns, tx: t.tx, ty: t.ty });
+    } else if (drawId.current === e.pointerId && draw) {
+      setDraw((d) => (d ? [...d, toContent(p)] : d));
+    }
   };
-  const up = () => {
-    if (draw && draw.length) onChange([...value, { id: uid(), side: "front", type, pts: draw }]);
-    setDraw(null);
+  const up = (e: RPE) => {
+    ptrs.current.delete(e.pointerId);
+    if (drawId.current === e.pointerId) {
+      drawId.current = null;
+      if (draw && draw.length) onChange([...value, { id: uid(), side: "front", type, pts: draw }]);
+      setDraw(null);
+    }
+    if (ptrs.current.size < 2) pinch.current = null;
+  };
+  const onWheel = (e: RWheel) => {
+    const p = norm(e);
+    if (!p) return;
+    const v = vwRef.current;
+    const ns = Math.min(MAXS, Math.max(1, v.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+    const cx = (p.x - v.tx) / v.s, cy = (p.y - v.ty) / v.s; // カーソル下の content を固定
+    const t = clampT(ns, p.x - cx * ns, p.y - cy * ns);
+    setVw({ s: ns, tx: t.tx, ty: t.ty });
+  };
+  const resetView = () => setVw({ s: 1, tx: 0, ty: 0 });
+  const zoomBy = (f: number) => {
+    const v = vwRef.current;
+    const ns = Math.min(MAXS, Math.max(1, v.s * f));
+    const cx = (0.5 - v.tx) / v.s, cy = (0.5 - v.ty) / v.s; // 中央基準
+    const t = clampT(ns, 0.5 - cx * ns, 0.5 - cy * ns);
+    setVw({ s: ns, tx: t.tx, ty: t.ty });
   };
   const undo = () => onChange(value.slice(0, -1));
-  // 1点のときは同じ点を2つ並べ、丸キャップで“点”として描く
   const poly = (pts: [number, number][]) => {
     const s = pts.map(([x, y]) => `${(x * 100).toFixed(2)},${(y * 100).toFixed(2)}`);
     if (s.length === 1) s.push(s[0]);
@@ -798,7 +819,6 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
 
   return (
     <div>
-      {/* ペンの色（種別）の選択 */}
       <div className="mb-2 flex flex-wrap items-center gap-1">
         {MARKS.map((m) => (
           <button
@@ -824,21 +844,31 @@ function BodyMap({ value, onChange }: { value: Stroke[]; onChange: (s: Stroke[])
         onPointerUp={up}
         onPointerLeave={up}
         onPointerCancel={up}
+        onWheel={onWheel}
         className="relative w-full select-none overflow-hidden rounded-lg border bg-white"
         style={{ aspectRatio: "900 / 860", touchAction: "none", cursor: "crosshair" }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/bodymap.png" alt="人体図（前面・背面）" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
-          {value.map((s) => (
-            <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          ))}
-          {draw && (
-            <polyline points={poly(draw)} fill="none" stroke={markColor(type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          )}
-        </svg>
+        <div className="absolute inset-0" style={{ transform: `translate(${vw.tx * 100}%, ${vw.ty * 100}%) scale(${vw.s})`, transformOrigin: "0 0" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/bodymap.png" alt="人体図（前面・背面）" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
+            {value.map((s) => (
+              <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            ))}
+            {draw && (
+              <polyline points={poly(draw)} fill="none" stroke={markColor(type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            )}
+          </svg>
+        </div>
+        {/* ズーム操作 */}
+        <div className="absolute bottom-1 right-1 flex items-center gap-1 rounded-full bg-white/90 px-1 py-0.5 shadow">
+          <button type="button" onClick={() => zoomBy(1 / 1.4)} disabled={vw.s <= 1} className="h-6 w-6 rounded-full text-base font-bold text-slate-600 disabled:opacity-30">－</button>
+          <span className="w-8 text-center text-[10px] font-bold text-slate-500">×{vw.s.toFixed(1)}</span>
+          <button type="button" onClick={() => zoomBy(1.4)} disabled={vw.s >= MAXS} className="h-6 w-6 rounded-full text-base font-bold text-slate-600 disabled:opacity-30">＋</button>
+          {vw.s > 1 && <button type="button" onClick={resetView} className="ml-0.5 rounded-full px-1.5 text-[10px] font-bold text-teal-600">全体</button>}
+        </div>
       </div>
-      <p className="mt-1 text-[10px] text-slate-400">左＝前面／右＝背面。指やペンでなぞって描けます（タップで点）。</p>
+      <p className="mt-1 text-[10px] text-slate-400">左＝前面／右＝背面。2本指で拡大・移動（＋/－でも可）、1本指/ペンで描く。</p>
     </div>
   );
 }
