@@ -61,6 +61,7 @@ export default function AdminBookingModal({
 
   const [name, setName] = useState(appt?.patient_name || "");
   const [qSentAt, setQSentAt] = useState<string | null>(appt?.questionnaire_sent_at ?? null);
+  const [qCopied, setQCopied] = useState(false);
   // 送信前プレビュー＆編集モーダル
   const [sendMsg, setSendMsg] = useState<
     | {
@@ -484,13 +485,28 @@ export default function AdminBookingModal({
           {/* 治療の予約：問診票 */}
           {mode === "edit" && !isClass && (
             <div className="inline-flex flex-col items-center gap-0.5">
-              <button
-                onClick={sendQuestionnaire}
-                disabled={busy}
-                className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-600 active:bg-emerald-50 disabled:opacity-50"
-              >
-                問診票を送る
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={sendQuestionnaire}
+                  disabled={busy}
+                  className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-600 active:bg-emerald-50 disabled:opacity-50"
+                >
+                  問診票を送る
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!appt) return;
+                    const url = `${window.location.origin}/intake?a=${appt.id}`;
+                    try { await navigator.clipboard.writeText(url); setQCopied(true); setTimeout(() => setQCopied(false), 1500); }
+                    catch { window.prompt("このリンクをコピーしてください", url); }
+                  }}
+                  title="問診票リンクをコピー（LINEが届かない時の予備）"
+                  className="rounded-lg border border-slate-300 px-2 py-2 text-xs font-bold text-slate-500 active:bg-slate-100"
+                >
+                  {qCopied ? "コピー済✓" : "🔗リンク"}
+                </button>
+              </div>
               {qSentAt && (
                 <span className="text-[10px] font-bold text-emerald-600">
                   {new Date(qSentAt).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}送信済
