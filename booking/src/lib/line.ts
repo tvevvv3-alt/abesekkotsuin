@@ -323,7 +323,8 @@ export async function maybeAutoSendQuestionnaire(
     line_user_id: string | null;
     date: string;
     questionnaire_sent_at?: string | null;
-  }
+  },
+  baseUrl?: string // アプリ内問診票のベースURL（呼び出し側のリクエストから）
 ): Promise<{ sent: boolean; reason?: string }> {
   // 送信済み判定は列が無くても壊れないよう個別に取得（未マイグレーションでも連携を止めない）
   try {
@@ -338,7 +339,7 @@ export async function maybeAutoSendQuestionnaire(
   if (!s || !(s as { questionnaire_auto?: boolean }).questionnaire_auto) return { sent: false, reason: "off" };
   // アプリ内問診票がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
   const inapp = !!(s as { questionnaire_inapp?: boolean }).questionnaire_inapp;
-  const siteBase = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
+  const siteBase = (baseUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
   const url = inapp ? `${siteBase}/intake?a=${appt.id}` : ((s as { questionnaire_url?: string | null }).questionnaire_url || "").trim();
   if (!url) return { sent: false, reason: "nourl" };
   if (!lineMessagingConfigured()) return { sent: false, reason: "notconfigured" };

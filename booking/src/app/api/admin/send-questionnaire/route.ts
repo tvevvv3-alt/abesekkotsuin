@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_QUESTIONNAIRE_TEXT, lineMessagingConfigured, pushText, renderLinkMessage, resolveLineUserId } from "@/lib/line";
+import { getBaseUrl } from "@/lib/url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const { data: s } = await admin.from("settings").select("questionnaire_url, questionnaire_text, questionnaire_inapp").eq("id", 1).maybeSingle();
   const inapp = !!(s?.questionnaire_inapp as boolean | undefined);
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
+  const base = getBaseUrl(req).replace(/\/$/, "");
   const url = inapp ? `${base}/intake?a=${appointmentId}` : (s?.questionnaire_url as string | null)?.trim();
   if (!url) return NextResponse.json({ ok: false, reason: "nourl" });
   if (!lineMessagingConfigured()) return NextResponse.json({ ok: false, reason: "notconfigured" });

@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
       line_user_id: userId,
       date: appt.date,
       questionnaire_sent_at: null,
-    });
+    }, base);
   } catch { /* 自動送信の失敗で連携は止めない */ }
 
   // ③ 体幹教室 申込書の自動送信（初めての体幹予約・設定ONのときのみ）

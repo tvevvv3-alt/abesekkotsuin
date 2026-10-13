@@ -11,6 +11,7 @@ import {
   renderMessage,
 } from "@/lib/line";
 import { notifyStaff } from "@/lib/push";
+import { getBaseUrl } from "@/lib/url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
       line_user_id: userId,
       date: appt.date,
       questionnaire_sent_at: null,
-    });
+    }, getBaseUrl(req));
   } catch { /* 自動送信の失敗で予約連携は止めない */ }
 
   // ③ 体幹教室 申込書の自動送信（初めての体幹予約・設定ONのときのみ）
