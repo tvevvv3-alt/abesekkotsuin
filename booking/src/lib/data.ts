@@ -137,6 +137,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     remind_morning_text: null,
     class_done_text: null,
     personal_done_text: null,
+    line_oa_url: null,
     notice_ibaraki: null,
     notice_kawanishi: null,
   };
@@ -168,6 +169,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     remind_morning_text: data.remind_morning_text ?? null,
     class_done_text: data.class_done_text ?? null,
     personal_done_text: data.personal_done_text ?? null,
+    line_oa_url: data.line_oa_url ?? null,
     notice_ibaraki: data.notice_ibaraki ?? null,
     notice_kawanishi: data.notice_kawanishi ?? null,
   };

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loadSettings } from "@/lib/data";
 import PushToggle from "./PushToggle";
+import LineFab from "./LineFab";
 
 // 院内システムの左メニュー（親＋子のグループ構造）。
 // 営業時間・予約公開設定は「基本設定」内から開くのでサイドバーには出さない。
@@ -234,6 +235,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         <main className="min-w-0 flex-1 px-2 py-4 md:px-3">{children}</main>
       </div>
+      <LineFab />
     </div>
   );
 }

@@ -217,6 +217,7 @@ export interface Settings {
   remind_morning_text: string | null; // 当日リマインドの本文
   class_done_text: string | null; // 体幹教室「終了」時のお礼メッセージ本文
   personal_done_text: string | null; // パーソナル「終了」時のお礼メッセージ本文
+  line_oa_url: string | null; // 管理画面の公式LINEボタンのリンク先（空欄なら非表示）
   notice_ibaraki: string | null; // 予約トップのお知らせ（茨木本院）。空欄なら非表示
   notice_kawanishi: string | null; // 予約トップのお知らせ（川西整体院）。空欄なら非表示
 }

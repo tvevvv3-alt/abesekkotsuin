@@ -69,15 +69,16 @@ export default function SettingsAdmin() {
       remind_morning_text: s.remind_morning_text,
       class_done_text: s.class_done_text,
       personal_done_text: s.personal_done_text,
+      line_oa_url: s.line_oa_url,
       notice_ibaraki: s.notice_ibaraki,
       notice_kawanishi: s.notice_kawanishi,
       updated_at: new Date().toISOString(),
     };
     let { error: saveErr } = await supabase.from("settings").upsert(payload);
     // 未マイグレーションの列があっても他の設定は保存できるよう、該当列を外して再試行
-    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_inapp|questionnaire_gap_days|class_application_auto/.test(saveErr.message)) {
-      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, class_application_auto: _o4, questionnaire_inapp: _o5, ...rest } = payload;
-      void _o1; void _o2; void _o3; void _o4; void _o5;
+    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_inapp|questionnaire_gap_days|class_application_auto|line_oa_url/.test(saveErr.message)) {
+      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, class_application_auto: _o4, questionnaire_inapp: _o5, line_oa_url: _o6, ...rest } = payload;
+      void _o1; void _o2; void _o3; void _o4; void _o5; void _o6;
       ({ error: saveErr } = await supabase.from("settings").upsert(rest));
     }
     setBusy(false);
@@ -191,7 +192,16 @@ export default function SettingsAdmin() {
       </div>
 
       <div className="mb-4 rounded-xl border bg-white p-4">
-        <label className="block text-sm font-bold text-slate-700">問診票</label>
+        <label className="block text-sm font-bold text-slate-700">公式LINE（管理画面のボタン）</label>
+        <p className="mt-1 text-[11px] text-slate-500">管理画面の<b>右下に出る緑のLINEボタン</b>のリンク先。URLを入れるとボタンが表示され、タップで公式LINEへ移動できます。空欄なら非表示。</p>
+        <input
+          value={s.line_oa_url ?? ""}
+          onChange={(e) => up({ line_oa_url: e.target.value })}
+          placeholder="例）https://line.me/R/ti/p/@xxxxxxx または https://lin.ee/xxxxxxx"
+          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+        />
+
+        <label className="mt-5 block text-sm font-bold text-slate-700">問診票</label>
         <p className="mt-1 text-[11px] text-slate-500">患者用フォームは「問診票を送る」で本人へLINE送信、左メニュー「患者管理 → 問診票」からは<b>管理用（回答閲覧）ページ</b>を開きます。</p>
 
         <div className="mt-2 rounded-lg bg-teal-50 p-2">
