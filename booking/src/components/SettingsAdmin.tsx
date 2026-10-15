@@ -192,14 +192,15 @@ export default function SettingsAdmin() {
       </div>
 
       <div className="mb-4 rounded-xl border bg-white p-4">
-        <label className="block text-sm font-bold text-slate-700">公式LINE（管理画面のボタン）</label>
-        <p className="mt-1 text-[11px] text-slate-500">管理画面の<b>右下に出る緑のLINEボタン</b>のリンク先。URLを入れるとボタンが表示され、タップで公式LINEへ移動できます。空欄なら非表示。</p>
+        <label className="block text-sm font-bold text-slate-700">LINE応対（公式アカウント管理）ボタン</label>
+        <p className="mt-1 text-[11px] text-slate-500">管理画面の<b>右下に出る緑のLINEボタン</b>のリンク先。公式アカウントの<b>応対（チャット）画面のURL</b>を入れると、タップで患者対応のLINE管理画面へ移動できます。空欄なら非表示。</p>
         <input
           value={s.line_oa_url ?? ""}
           onChange={(e) => up({ line_oa_url: e.target.value })}
-          placeholder="例）https://line.me/R/ti/p/@xxxxxxx または https://lin.ee/xxxxxxx"
+          placeholder="例）https://chat.line.biz/  または  https://manager.line.biz/account/＜ID＞/chat"
           className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
         />
+        <p className="mt-1 text-[11px] text-slate-400">※ブラウザでLINE応対画面を開いた時のアドレスをそのまま貼るのが確実です。</p>
 
         <label className="mt-5 block text-sm font-bold text-slate-700">問診票</label>
         <p className="mt-1 text-[11px] text-slate-500">患者用フォームは「問診票を送る」で本人へLINE送信、左メニュー「患者管理 → 問診票」からは<b>管理用（回答閲覧）ページ</b>を開きます。</p>

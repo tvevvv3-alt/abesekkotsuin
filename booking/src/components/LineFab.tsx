@@ -24,8 +24,8 @@ export default function LineFab() {
       href={url}
       target="_blank"
       rel="noreferrer"
-      title="公式LINEを開く"
-      aria-label="公式LINEを開く"
+      title="LINE応対（公式アカウント管理）を開く"
+      aria-label="LINE応対（公式アカウント管理）を開く"
       className="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition active:scale-95"
       style={{ backgroundColor: "#06C755" }}
     >
