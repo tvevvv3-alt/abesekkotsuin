@@ -26,18 +26,19 @@ export default function LineFab() {
       rel="noreferrer"
       title="LINE応対（公式アカウント管理）を開く"
       aria-label="LINE応対（公式アカウント管理）を開く"
-      className="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition active:scale-95"
-      style={{ backgroundColor: "#06C755" }}
+      className="fixed bottom-5 right-5 z-40 flex items-center justify-center rounded-full ring-1 ring-black/5 transition hover:brightness-105 active:scale-95"
+      style={{ height: 52, width: 52, backgroundColor: "#06C755", boxShadow: "0 8px 22px rgba(6,199,85,.45)" }}
     >
-      <svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true">
+      {/* クリーンなチャットバブル */}
+      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
         <path
           fill="#fff"
-          d="M24 8C13.5 8 5 15 5 23.6c0 7.7 6.7 14.1 15.8 15.3.6.1 1.4.4 1.6.9.2.5.1 1.2.1 1.7l-.2 1.6c-.1.5-.4 1.9 1.7 1 2.1-.9 11.2-6.6 15.3-11.3C42.9 31 45 27.5 45 23.6 45 15 36.5 8 24 8Z"
+          d="M12 3.2C6.9 3.2 3 6.5 3 10.6c0 2.3 1.3 4.4 3.4 5.8.2.1.3.3.2.6l-.5 1.9c-.1.4.3.7.6.5l2.3-1.4c.2-.1.4-.1.6-.1.7.1 1.3.2 2 .2 5.1 0 9-3.3 9-7.4S17.1 3.2 12 3.2Z"
         />
         <g fill="#06C755">
-          <rect x="15.5" y="20" width="1.9" height="8" rx=".9" />
-          <path d="M20 20.9c0-.5.4-.9.9-.9s.9.4.9.9v4.7l3.1-5.1c.2-.3.5-.5.8-.5.5 0 .9.4.9.9v6.2c0 .5-.4.9-.9.9s-.9-.4-.9-.9v-4.6l-3.1 5c-.2.3-.5.5-.8.5-.5 0-.9-.4-.9-.9v-6.2Z" />
-          <path d="M28.5 20.9c0-.5.4-.9.9-.9h3.3c.5 0 .9.4.9.9s-.4.9-.9.9h-2.4v1.3h2.4c.5 0 .9.4.9.9s-.4.9-.9.9h-2.4v1.3h2.4c.5 0 .9.4.9.9s-.4.9-.9.9h-3.3c-.5 0-.9-.4-.9-.9v-6.2Z" />
+          <circle cx="8.6" cy="10.6" r="1.05" />
+          <circle cx="12" cy="10.6" r="1.05" />
+          <circle cx="15.4" cy="10.6" r="1.05" />
         </g>
       </svg>
     </a>
