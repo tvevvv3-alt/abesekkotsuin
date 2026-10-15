@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import QuestionnaireForm from "@/components/QuestionnaireForm";
-import { missingRequired, type QValue } from "@/lib/questionnaire";
+import { DEFAULT_SECTIONS, missingRequired, parseSections, type QSection, type QValue } from "@/lib/questionnaire";
 
 const TEAL = "#0d9488";
 
 export default function IntakePage() {
   const [apptId, setApptId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<QValue>({});
+  const [sections, setSections] = useState<QSection[]>(DEFAULT_SECTIONS);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -20,14 +21,15 @@ export default function IntakePage() {
     const sp = new URLSearchParams(window.location.search);
     const a = sp.get("a");
     setApptId(a);
-    // プレビュー（確認用）：予約なしでフォームだけ表示（送信はしない）
-    if (sp.get("preview") === "1") { setPreview(true); setLoading(false); return; }
-    if (!a) { setLoading(false); setErr("予約が指定されていません。LINEのリンクから開いてください。"); return; }
+    const isPreview = sp.get("preview") === "1";
+    if (isPreview) setPreview(true);
+    if (!a && !isPreview) { setLoading(false); setErr("予約が指定されていません。LINEのリンクから開いてください。"); return; }
     (async () => {
       try {
-        const res = await fetch(`/api/intake?a=${encodeURIComponent(a)}`);
+        const res = await fetch(`/api/intake${a ? `?a=${encodeURIComponent(a)}` : ""}`);
         const j = await res.json();
         if (!j.ok) { setErr("予約が見つかりませんでした。"); setLoading(false); return; }
+        if (j.schema) setSections(parseSections(j.schema));
         // 既存回答があれば復元、無ければ予約・患者情報で基本項目をプリフィル
         const base: QValue = { ...(j.answers || {}) };
         if (!base.name && j.patient?.name) base.name = j.patient.name;
@@ -43,7 +45,7 @@ export default function IntakePage() {
   }, []);
 
   async function submit() {
-    const miss = missingRequired(answers);
+    const miss = missingRequired(answers, sections);
     if (miss.length) { setErr(`未入力の必須項目があります：${miss.slice(0, 5).join("、")}${miss.length > 5 ? " ほか" : ""}`); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     setBusy(true);
     setErr(null);
@@ -85,7 +87,7 @@ export default function IntakePage() {
       </div>
       {preview && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">プレビュー表示です（送信はされません）。実際は患者さんが予約ごとのリンクから入力します。</p>}
       {err && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold text-rose-600">{err}</p>}
-      {(apptId || preview) && <QuestionnaireForm value={answers} onChange={setAnswers} accent={TEAL} />}
+      {(apptId || preview) && <QuestionnaireForm value={answers} onChange={setAnswers} accent={TEAL} sections={sections} />}
       {apptId && !preview && (
         <div className="sticky bottom-0 -mx-4 mt-4 border-t bg-white/95 px-4 py-3 backdrop-blur">
           <button

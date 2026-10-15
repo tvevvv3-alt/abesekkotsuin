@@ -7,7 +7,7 @@ import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
 import { ageAt } from "@/lib/pricing";
 import type { Staff } from "@/lib/types";
 import QuestionnaireForm from "@/components/QuestionnaireForm";
-import { toIntakeLinked, type QValue } from "@/lib/questionnaire";
+import { DEFAULT_SECTIONS, parseSections, toIntakeLinked, type QSection, type QValue } from "@/lib/questionnaire";
 
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 const TEAL = "#0d9488";
@@ -146,6 +146,7 @@ export default function ChartBoard() {
   const [msg, setMsg] = useState<string | null>(null);
   // 初診時ページ
   const [intake, setIntake] = useState<Intake>(EMPTY_INTAKE);
+  const [qSections, setQSections] = useState<QSection[]>(DEFAULT_SECTIONS);
   const [selJoint, setSelJoint] = useState<string | null>(null);
   const [jointPen, setJointPen] = useState<MarkType>("pain");
   const [intakeSaving, setIntakeSaving] = useState(false);
@@ -187,6 +188,16 @@ export default function ChartBoard() {
   }, [supabase, fetchAllAppts]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 問診票の質問定義（管理画面で編集した内容）を読み込み
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("settings").select("questionnaire_schema").eq("id", 1).maybeSingle();
+        setQSections(parseSections((data as { questionnaire_schema?: unknown } | null)?.questionnaire_schema));
+      } catch { /* 未マイグレーションなら既定 */ }
+    })();
+  }, [supabase]);
 
   // 患者（予約の氏名＋患者台帳）を1人にまとめる
   const persons = useMemo<Person[]>(() => {
@@ -357,7 +368,7 @@ export default function ChartBoard() {
     if (!selected?.patient_id) { setMsg("この患者は予約から登録されていないため初診時ページを保存できません"); return; }
     setIntakeSaving(true);
     setMsg(null);
-    const linked = toIntakeLinked(intake.questionnaire);
+    const linked = toIntakeLinked(intake.questionnaire, qSections);
     const row = {
       patient_id: selected.patient_id,
       sport: linked.sport || null,
@@ -514,7 +525,7 @@ export default function ChartBoard() {
                 )}
                 {/* 概要（問診票から自動反映） */}
                 {(() => {
-                  const lk = toIntakeLinked(intake.questionnaire);
+                  const lk = toIntakeLinked(intake.questionnaire, qSections);
                   const chips: [string, string][] = [["競技", lk.sport], ["週何回", lk.weekly_freq], ["症状部位", lk.symptom_area], ["いつから", lk.onset], ["既往", lk.history]];
                   return (
                     <div className="mb-3 rounded-xl border bg-slate-50 p-2.5">
@@ -543,7 +554,7 @@ export default function ChartBoard() {
                   {/* 右：問診票（全項目・編集可） */}
                   <div>
                     <div className="mb-2 text-sm font-bold text-slate-600">問診票</div>
-                    <QuestionnaireForm value={intake.questionnaire} onChange={(q) => setIntake((it) => ({ ...it, questionnaire: q }))} />
+                    <QuestionnaireForm value={intake.questionnaire} onChange={(q) => setIntake((it) => ({ ...it, questionnaire: q }))} sections={qSections} />
                   </div>
                 </div>
 

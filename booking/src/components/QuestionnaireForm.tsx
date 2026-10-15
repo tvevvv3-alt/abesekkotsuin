@@ -1,14 +1,16 @@
 "use client";
 
-import { Q_SECTIONS, type QField, type QValue } from "@/lib/questionnaire";
+import { Q_SECTIONS, type QField, type QSection, type QValue } from "@/lib/questionnaire";
 
 // スキーマ駆動の問診票フォーム。公開ページ・カルテ初診時で共用。
+// sections を渡すと、その質問定義で描画（管理画面で編集した内容を反映）。
 export default function QuestionnaireForm({
-  value, onChange, accent = "#0d9488",
+  value, onChange, accent = "#0d9488", sections = Q_SECTIONS,
 }: {
   value: QValue;
   onChange: (next: QValue) => void;
   accent?: string;
+  sections?: QSection[];
 }) {
   const set = (k: string, v: string | string[]) => onChange({ ...value, [k]: v });
   const str = (k: string) => (typeof value[k] === "string" ? (value[k] as string) : "");
@@ -48,7 +50,7 @@ export default function QuestionnaireForm({
         )}
         {f.type === "radio" && (
           <div className="space-y-1">
-            {f.options.map((o) => (
+            {(f.options ?? []).map((o) => (
               <label key={o} className="flex items-center gap-2 text-sm text-slate-700">
                 <input type="radio" name={f.key} checked={str(f.key) === o} onChange={() => set(f.key, o)} style={{ accentColor: accent }} />
                 {o}
@@ -65,7 +67,7 @@ export default function QuestionnaireForm({
         )}
         {f.type === "checkbox" && (
           <div className="space-y-1">
-            {f.options.map((o) => (
+            {(f.options ?? []).map((o) => (
               <label key={o} className="flex items-center gap-2 text-sm text-slate-700">
                 <input type="checkbox" checked={arr(f.key).includes(o)} onChange={() => toggle(f.key, o)} style={{ accentColor: accent }} />
                 {o}
@@ -86,8 +88,8 @@ export default function QuestionnaireForm({
 
   return (
     <div className="space-y-4">
-      {Q_SECTIONS.map((sec) => (
-        <section key={sec.title} className="rounded-xl border bg-white p-3">
+      {sections.map((sec, si) => (
+        <section key={si} className="rounded-xl border bg-white p-3">
           <h3 className="mb-2 border-b pb-1.5 text-sm font-bold" style={{ color: accent }}>{sec.title}</h3>
           {sec.note && (
             <pre className="mb-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-600">{sec.note}</pre>

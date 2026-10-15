@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { toIntakeLinked, type QValue } from "@/lib/questionnaire";
+import { parseSections, toIntakeLinked, type QSection, type QValue } from "@/lib/questionnaire";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/intake?a=<予約ID> … 問診票の初期表示（患者基本情報＋既存回答）を返す
+// 管理画面で保存した質問定義を取得（未設定/未マイグレーションなら既定）
+async function loadSchema(admin: NonNullable<ReturnType<typeof createAdminClient>>): Promise<QSection[]> {
+  try {
+    const { data } = await admin.from("settings").select("questionnaire_schema").eq("id", 1).maybeSingle();
+    return parseSections((data as { questionnaire_schema?: unknown } | null)?.questionnaire_schema);
+  } catch {
+    return parseSections(null);
+  }
+}
+
+// GET /api/intake?a=<予約ID> … 問診票の初期表示（質問定義＋患者基本情報＋既存回答）を返す
+// a 省略時は質問定義のみ（プレビュー用）
 export async function GET(req: NextRequest) {
   const a = req.nextUrl.searchParams.get("a") || "";
-  if (!a) return NextResponse.json({ ok: false, reason: "bad" }, { status: 400 });
   const admin = createAdminClient();
   if (!admin) return NextResponse.json({ ok: false, reason: "server" }, { status: 500 });
+
+  const schema = await loadSchema(admin);
+  if (!a) return NextResponse.json({ ok: true, schema, patient: { name: "", kana: "", birth: "", phone: "" }, answers: {}, date: null });
 
   const { data: appt } = await admin
     .from("appointments")
@@ -28,7 +41,7 @@ export async function GET(req: NextRequest) {
     const q = (it as { questionnaire?: unknown } | null)?.questionnaire;
     if (q && typeof q === "object") answers = q as QValue;
   }
-  return NextResponse.json({ ok: true, patient, answers, date: appt.date });
+  return NextResponse.json({ ok: true, schema, patient, answers, date: appt.date });
 }
 
 // POST /api/intake … 問診票の回答を保存（患者が送信）
@@ -51,7 +64,8 @@ export async function POST(req: NextRequest) {
   if (!appt) return NextResponse.json({ ok: false, reason: "notfound" }, { status: 404 });
   if (!appt.patient_id) return NextResponse.json({ ok: false, reason: "nopatient" });
 
-  const linked = toIntakeLinked(answers);
+  const schema = await loadSchema(admin);
+  const linked = toIntakeLinked(answers, schema);
   const row = {
     patient_id: appt.patient_id,
     questionnaire: answers,

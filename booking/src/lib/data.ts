@@ -140,6 +140,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     line_oa_url: null,
     notice_ibaraki: null,
     notice_kawanishi: null,
+    questionnaire_schema: null,
   };
   if (!data) return defaults;
   // 移行前で列が無い場合も既定で補完
@@ -172,6 +173,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     line_oa_url: data.line_oa_url ?? null,
     notice_ibaraki: data.notice_ibaraki ?? null,
     notice_kawanishi: data.notice_kawanishi ?? null,
+    questionnaire_schema: data.questionnaire_schema ?? null,
   };
 }
 

@@ -220,6 +220,7 @@ export interface Settings {
   line_oa_url: string | null; // 管理画面の公式LINEボタンのリンク先（空欄なら非表示）
   notice_ibaraki: string | null; // 予約トップのお知らせ（茨木本院）。空欄なら非表示
   notice_kawanishi: string | null; // 予約トップのお知らせ（川西整体院）。空欄なら非表示
+  questionnaire_schema: unknown | null; // アプリ内問診票の質問定義（QSection[]のJSON）。null=既定を使用
 }
 
 // 月別の予約公開設定

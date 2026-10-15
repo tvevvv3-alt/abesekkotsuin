@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Q_SECTIONS, type QValue } from "@/lib/questionnaire";
+import { DEFAULT_SECTIONS, parseSections, type QSection, type QValue } from "@/lib/questionnaire";
 import { ageAt } from "@/lib/pricing";
 
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
@@ -34,6 +34,16 @@ export default function IntakeAdmin() {
   const [sel, setSel] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "new">("all");
   const [q, setQ] = useState("");
+  const [sections, setSections] = useState<QSection[]>(DEFAULT_SECTIONS);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("settings").select("questionnaire_schema").eq("id", 1).maybeSingle();
+        setSections(parseSections((data as { questionnaire_schema?: unknown } | null)?.questionnaire_schema));
+      } catch { /* 未マイグレーションなら既定 */ }
+    })();
+  }, [supabase]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,6 +103,7 @@ export default function IntakeAdmin() {
         <Link href="/admin" className="rounded-md bg-slate-600 px-2 py-1 text-[11px] font-bold text-white active:bg-slate-700">← 戻る</Link>
         <h1 className="text-lg font-bold text-slate-800">問診票（提出一覧）</h1>
         <span className="text-xs text-slate-400">{rows.length}件</span>
+        <Link href="/admin/intake/edit" className="ml-auto rounded-md border border-teal-300 bg-teal-50 px-3 py-1 text-[11px] font-bold text-teal-700 active:bg-teal-100">✏️ 質問を編集</Link>
       </div>
 
       <div className="flex gap-3">
@@ -148,8 +159,8 @@ export default function IntakeAdmin() {
               </div>
 
               <div className="space-y-3">
-                {Q_SECTIONS.map((sec) => (
-                  <section key={sec.title}>
+                {sections.map((sec, si) => (
+                  <section key={si}>
                     <h3 className="mb-1 border-b pb-0.5 text-sm font-bold text-teal-700">{sec.title}</h3>
                     <dl className="space-y-1">
                       {sec.fields.map((f) => (
