@@ -101,6 +101,8 @@ export default function HistoryBoard() {
                 staffName = st.name;
                 detailText = detailText.slice(0, detailText.length - ` / ${st.name}`.length);
               }
+              // detail に担当が含まれていなくても（キャンセル等）、予約の担当を表示
+              if (!staffName && st) staffName = st.name;
               return (
                 <li key={l.id} className="flex items-center gap-2 px-3 py-2">
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${m.cls}`}>{m.label}</span>
