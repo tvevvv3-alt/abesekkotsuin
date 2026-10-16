@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_SECTIONS, parseSections, type QSection, type QValue } from "@/lib/questionnaire";
@@ -26,6 +26,10 @@ function fmtAnswer(v: QValue, key: string): string {
   if (typeof other === "string" && other.trim()) s = s ? `${s}（${other}）` : `その他（${other}）`;
   return s || "—";
 }
+
+// 印刷ヘッダのテーブルセル（A4）
+const phThCell: CSSProperties = { border: "0.5pt solid #999", background: "#f1f5f9", padding: "3px 6px", fontSize: "9pt", fontWeight: 700, textAlign: "left", whiteSpace: "nowrap", width: "1%", color: "#334155" };
+const phTdCell: CSSProperties = { border: "0.5pt solid #999", padding: "3px 8px" };
 
 export default function IntakeAdmin() {
   const supabase = useMemo(() => createClient(), []);
@@ -98,7 +102,22 @@ export default function IntakeAdmin() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <style>{`@media print { .noprint { display:none !important; } .print-area { position:absolute; left:0; top:0; width:100%; padding:16px; } body { background:#fff; } }`}</style>
+      <style>{`
+        .print-head { display: none; }
+        @media print {
+          @page { size: A4 portrait; margin: 12mm 13mm; }
+          html, body { background: #fff !important; }
+          .noprint { display: none !important; }
+          /* 印刷対象だけを通常フローで全幅表示（枠線・余白・影をリセット） */
+          .print-area { position: static !important; width: 100% !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; font-size: 10.5pt; color: #111; }
+          .print-area, .print-area * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print-head { display: block !important; }
+          .screen-head { display: none !important; }
+          .q-sec { break-inside: avoid; margin-bottom: 7px; }
+          .q-sec + .q-sec { margin-top: 2px; }
+          .q-item { break-inside: avoid; }
+        }
+      `}</style>
 
       <div className="noprint mb-3 flex flex-wrap items-center gap-2">
         <Link href="/admin" className="rounded-md bg-slate-600 px-2 py-1 text-[11px] font-bold text-white active:bg-slate-700">← 戻る</Link>
@@ -157,11 +176,43 @@ export default function IntakeAdmin() {
           ) : (
             <div className="rounded-xl border bg-white p-4 print-area">
               <button onClick={() => setSel(null)} className="noprint mb-2 text-sm font-bold text-teal-700 md:hidden">‹ 一覧へ</button>
-              <div className="mb-3 flex flex-wrap items-center gap-2 border-b pb-2">
+
+              {/* 画面用ヘッダ */}
+              <div className="screen-head mb-3 flex flex-wrap items-center gap-2 border-b pb-2">
                 <h2 className="text-lg font-bold text-slate-800">{current.name}</h2>
                 {ageAt(current.birth, today) != null && <span className="text-sm text-slate-500">{ageAt(current.birth, today)}歳</span>}
                 {current.kana && <span className="text-xs text-slate-400">{current.kana}</span>}
                 <span className="ml-auto text-xs text-slate-400">{current.submitted_at ? new Date(current.submitted_at).toLocaleString("ja-JP") + " 送信" : "スタッフ入力"}</span>
+              </div>
+
+              {/* 印刷用ヘッダ（A4タテ） */}
+              <div className="print-head">
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", borderBottom: "2px solid #111", paddingBottom: "4px", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "15pt", fontWeight: 700 }}>問 診 票</div>
+                  <div style={{ fontSize: "9pt", color: "#333", textAlign: "right" }}>阿部接骨院 / Total Recoverytation Abe</div>
+                </div>
+                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "10px", fontSize: "10pt" }}>
+                  <tbody>
+                    <tr>
+                      <th style={phThCell}>フリガナ</th>
+                      <td style={phTdCell} colSpan={3}>{current.kana || "　"}</td>
+                    </tr>
+                    <tr>
+                      <th style={phThCell}>お名前</th>
+                      <td style={{ ...phTdCell, fontSize: "13pt", fontWeight: 700 }} colSpan={3}>{current.name}</td>
+                    </tr>
+                    <tr>
+                      <th style={phThCell}>生年月日</th>
+                      <td style={phTdCell}>{current.birth || "—"}{ageAt(current.birth, today) != null ? `（${ageAt(current.birth, today)}歳）` : ""}</td>
+                      <th style={phThCell}>電話番号</th>
+                      <td style={phTdCell}>{fmtAnswer(current.questionnaire, "phone")}</td>
+                    </tr>
+                    <tr>
+                      <th style={phThCell}>提出日</th>
+                      <td style={phTdCell} colSpan={3}>{current.submitted_at ? new Date(current.submitted_at).toLocaleString("ja-JP") + " 送信" : "スタッフ入力"}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               <div className="noprint mb-3 flex flex-wrap gap-2">
@@ -172,13 +223,13 @@ export default function IntakeAdmin() {
 
               <div className="space-y-3">
                 {sections.map((sec, si) => (
-                  <section key={si}>
-                    <h3 className="mb-1 border-b pb-0.5 text-sm font-bold text-teal-700">{sec.title}</h3>
-                    <dl className="space-y-1">
+                  <section key={si} className="q-sec">
+                    <h3 className="mb-1 border-b border-slate-300 pb-0.5 text-sm font-bold text-teal-700 print:text-black">{sec.title}</h3>
+                    <dl>
                       {sec.fields.map((f) => (
-                        <div key={f.key} className="flex gap-2 text-sm">
-                          <dt className="w-40 shrink-0 font-bold text-slate-500">{f.label.length > 18 ? f.label.slice(0, 18) + "…" : f.label}</dt>
-                          <dd className="min-w-0 whitespace-pre-wrap text-slate-800">{fmtAnswer(current.questionnaire, f.key)}</dd>
+                        <div key={f.key} className="q-item grid grid-cols-[8.5rem_1fr] gap-x-3 border-b border-slate-100 py-1 text-sm sm:grid-cols-[11rem_1fr]">
+                          <dt className="font-bold text-slate-500 print:text-slate-700">{f.label}</dt>
+                          <dd className="min-w-0 whitespace-pre-wrap break-words text-slate-800 print:text-black">{fmtAnswer(current.questionnaire, f.key)}</dd>
                         </div>
                       ))}
                     </dl>
