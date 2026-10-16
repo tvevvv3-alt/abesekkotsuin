@@ -34,6 +34,7 @@ export default function IntakeAdmin() {
   const [sel, setSel] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "new">("all");
   const [q, setQ] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
   const [sections, setSections] = useState<QSection[]>(DEFAULT_SECTIONS);
 
   useEffect(() => {
@@ -103,7 +104,18 @@ export default function IntakeAdmin() {
         <Link href="/admin" className="rounded-md bg-slate-600 px-2 py-1 text-[11px] font-bold text-white active:bg-slate-700">← 戻る</Link>
         <h1 className="text-lg font-bold text-slate-800">問診票（提出一覧）</h1>
         <span className="text-xs text-slate-400">{rows.length}件</span>
-        <Link href="/admin/intake/edit" className="ml-auto rounded-md border border-teal-300 bg-teal-50 px-3 py-1 text-[11px] font-bold text-teal-700 active:bg-teal-100">✏️ 質問を編集</Link>
+        <button
+          onClick={async () => {
+            const url = `${window.location.origin}/intake?new=1`;
+            try { await navigator.clipboard.writeText(url); } catch { /* noop */ }
+            setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1800);
+          }}
+          title="白紙の問診票リンク（電話予約など、自動送信できない方に手動で送る用）"
+          className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-bold text-slate-600 active:bg-slate-100"
+        >
+          {linkCopied ? "✓ コピーしました" : "🔗 白紙リンクをコピー"}
+        </button>
+        <Link href="/admin/intake/edit" className="rounded-md border border-teal-300 bg-teal-50 px-3 py-1 text-[11px] font-bold text-teal-700 active:bg-teal-100">✏️ 質問を編集</Link>
       </div>
 
       <div className="flex gap-3">

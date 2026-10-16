@@ -16,14 +16,17 @@ export default function IntakePage() {
   const [err, setErr] = useState<string | null>(null);
 
   const [preview, setPreview] = useState(false);
+  const [blank, setBlank] = useState(false); // 白紙モード（予約に紐づかない直接入力・電話予約用）
 
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const a = sp.get("a");
     setApptId(a);
     const isPreview = sp.get("preview") === "1";
+    const isBlank = sp.get("new") === "1" || sp.get("blank") === "1";
     if (isPreview) setPreview(true);
-    if (!a && !isPreview) { setLoading(false); setErr("予約が指定されていません。LINEのリンクから開いてください。"); return; }
+    if (isBlank) setBlank(true);
+    if (!a && !isPreview && !isBlank) { setLoading(false); setErr("予約が指定されていません。LINEのリンクから開いてください。"); return; }
     (async () => {
       try {
         const res = await fetch(`/api/intake${a ? `?a=${encodeURIComponent(a)}` : ""}`);
@@ -53,10 +56,11 @@ export default function IntakePage() {
       const res = await fetch("/api/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: apptId, answers }),
+        body: JSON.stringify(apptId ? { appointmentId: apptId, answers } : { answers, blank: true }),
       });
       const j = await res.json();
       if (j.ok) setDone(true);
+      else if (j.reason === "noname") setErr("お名前の入力が必要です。");
       else setErr("送信に失敗しました。時間をおいて再度お試しください。");
     } catch {
       setErr("送信に失敗しました。通信環境をご確認ください。");
@@ -87,8 +91,8 @@ export default function IntakePage() {
       </div>
       {preview && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">プレビュー表示です（送信はされません）。実際は患者さんが予約ごとのリンクから入力します。</p>}
       {err && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold text-rose-600">{err}</p>}
-      {(apptId || preview) && <QuestionnaireForm value={answers} onChange={setAnswers} accent={TEAL} sections={sections} />}
-      {apptId && !preview && (
+      {(apptId || preview || blank) && <QuestionnaireForm value={answers} onChange={setAnswers} accent={TEAL} sections={sections} />}
+      {(apptId || blank) && !preview && (
         <div className="sticky bottom-0 -mx-4 mt-4 border-t bg-white/95 px-4 py-3 backdrop-blur">
           <button
             onClick={submit}
