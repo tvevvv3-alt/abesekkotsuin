@@ -235,9 +235,9 @@ export default function IntakeAdmin() {
                     <h3 className="mb-1 border-b border-slate-300 pb-0.5 text-sm font-bold text-teal-700 print:text-black">{sec.title}</h3>
                     <dl>
                       {sec.fields.map((f) => (
-                        <div key={f.key} className="q-item grid grid-cols-[8.5rem_1fr] gap-x-3 border-b border-slate-100 py-1 text-sm sm:grid-cols-[11rem_1fr]">
-                          <dt className="font-bold text-slate-500 print:text-slate-700">{f.label}</dt>
-                          <dd className="min-w-0 whitespace-pre-wrap break-words text-slate-800 print:text-black">{fmtAnswer(current.questionnaire, f.key)}</dd>
+                        <div key={f.key} className="q-item border-b border-slate-100 py-1.5 text-sm sm:grid sm:grid-cols-[11rem_1fr] sm:gap-x-3 sm:py-1">
+                          <dt className="text-[13px] font-bold text-slate-500 sm:text-sm print:text-slate-700">{f.label}</dt>
+                          <dd className="mt-0.5 min-w-0 whitespace-pre-wrap break-words pl-2 font-medium text-slate-800 sm:mt-0 sm:pl-0 sm:font-normal print:text-black">{fmtAnswer(current.questionnaire, f.key)}</dd>
                         </div>
                       ))}
                     </dl>
