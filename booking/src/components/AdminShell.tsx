@@ -31,6 +31,8 @@ const DEFAULT_NAV: NavItem[] = [
   {
     href: "/admin/staff", label: "スタッフ管理", icon: "🧑‍⚕️", children: [
       { href: "/admin/shifts", label: "シフト" },
+      { href: "/admin/timecard", label: "タイムカード（打刻）" },
+      { href: "/admin/timecard/report", label: "勤怠集計" },
       { href: "/admin/sales", label: "売上（個別）" },
     ],
   },
