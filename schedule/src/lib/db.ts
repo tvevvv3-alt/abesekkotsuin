@@ -15,8 +15,12 @@ type Filter = { from?: string; to?: string };
 let supabase: SupabaseClient | null | undefined;
 function sb(): SupabaseClient | null {
   if (supabase !== undefined) return supabase;
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Supabase の画面からコピーすると末尾に /rest/v1/ が付くことがあるので取り除く
+  const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)
+    ?.trim()
+    .replace(/\/rest\/v1\/?$/, "")
+    .replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   supabase = url && key ? createClient(url, key, { auth: { persistSession: false } }) : null;
   return supabase;
 }

@@ -84,15 +84,21 @@ export default function CalendarApp() {
       return { y: d.getFullYear(), m: d.getMonth() };
     });
 
-  // 左右スワイプで月移動
-  const touchX = useRef<number | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => (touchX.current = e.touches[0].clientX);
+  // 左右スワイプで月移動（縦スクロール中に誤って月が変わらないよう、横方向がはっきりしたときだけ）
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) =>
+    (touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY });
   const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchX.current == null) return;
-    const dx = e.changedTouches[0].clientX - touchX.current;
-    if (Math.abs(dx) > 60) shiftMonth(dx < 0 ? 1 : -1);
-    touchX.current = null;
+    if (!touchStart.current) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current.x;
+    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 2) shiftMonth(dx < 0 ? 1 : -1);
+    touchStart.current = null;
   };
+
+  // 日付はスマホの時計で決める。サーバーで作ったHTMLの日付（公開した日）が残らないよう、表示は端末で行う
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, FamilyEvent[]> = {};
@@ -105,6 +111,8 @@ export default function CalendarApp() {
     for (const p of plans) (map[p.date] ??= []).push(p);
     return map;
   }, [plans]);
+
+  if (!mounted) return null;
 
   return (
     <div className="pb-28" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
