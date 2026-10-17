@@ -26,22 +26,27 @@ export default function AttendanceBoard() {
   const supabase = useMemo(() => createClient(), []);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [staffId, setStaffId] = useState<string>("");
-  const [month, setMonth] = useState(() => toDateStr(new Date()).slice(0, 7)); // YYYY-MM
+  // month(YYYY-MM)は「締め月」を表す。給与は20日締め＝前月21日〜締め月20日が1期間。
+  const [month, setMonth] = useState(() => {
+    const t = new Date(); let y = t.getFullYear(), m = t.getMonth() + 1;
+    if (t.getDate() >= 21) { m++; if (m > 12) { m = 1; y++; } } // 21日以降は翌月度
+    return `${y}-${String(m).padStart(2, "0")}`;
+  });
   const [cards, setCards] = useState<Record<string, TimeCard>>({}); // key=date
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<{ date: string; cin: string; cout: string; brk: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const monthStart = month + "-01";
-  const monthEnd = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
-  }, [month]);
+  // 締め期間：前月21日〜締め月20日
+  const [cy, cm] = month.split("-").map(Number);
+  const periodStart = useMemo(() => toDateStr(new Date(cy, cm - 2, 21)), [cy, cm]); // 前月21日
+  const periodEndExcl = useMemo(() => toDateStr(new Date(cy, cm - 1, 21)), [cy, cm]); // 当月21日（<で使う）
   const days = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const last = new Date(y, m, 0).getDate();
-    return Array.from({ length: last }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
-  }, [month]);
+    const out: string[] = [];
+    const d = new Date(cy, cm - 2, 21), end = new Date(cy, cm - 1, 20);
+    while (d <= end) { out.push(toDateStr(new Date(d))); d.setDate(d.getDate() + 1); }
+    return out;
+  }, [cy, cm]);
 
   useEffect(() => {
     (async () => {
@@ -57,12 +62,12 @@ export default function AttendanceBoard() {
     setLoading(true);
     const { data } = await supabase.from("time_cards")
       .select("staff_id, date, clock_in, clock_out, break_min, break_started_at")
-      .eq("staff_id", staffId).gte("date", monthStart).lt("date", monthEnd);
+      .eq("staff_id", staffId).gte("date", periodStart).lt("date", periodEndExcl);
     const map: Record<string, TimeCard> = {};
     (data as TimeCard[] ?? []).forEach((c) => { map[c.date] = c; });
     setCards(map);
     setLoading(false);
-  }, [supabase, staffId, monthStart, monthEnd]);
+  }, [supabase, staffId, periodStart, periodEndExcl]);
   useEffect(() => { load(); }, [load]);
 
   const gotoMonth = (dir: number) => {
@@ -101,7 +106,8 @@ export default function AttendanceBoard() {
 
   const totalMin = days.reduce((n, d) => n + workedMin(cards[d]), 0);
   const workDays = days.filter((d) => cards[d]?.clock_in).length;
-  const monthLabel = `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`;
+  const periodLabel = `${cm}月度`;
+  const rangeLabel = `${new Date(cy, cm - 2, 21).getMonth() + 1}/21〜${cm}/20`;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -110,7 +116,10 @@ export default function AttendanceBoard() {
         <h1 className="text-lg font-bold text-slate-800">勤怠集計</h1>
         <div className="ml-auto flex items-center gap-1.5">
           <button onClick={() => gotoMonth(-1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100">‹</button>
-          <span className="min-w-[88px] text-center text-sm font-bold text-slate-700">{monthLabel}</span>
+          <div className="min-w-[108px] text-center leading-tight">
+            <div className="text-sm font-bold text-slate-700">{periodLabel}</div>
+            <div className="text-[10px] text-slate-400">{rangeLabel}</div>
+          </div>
           <button onClick={() => gotoMonth(1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100">›</button>
         </div>
       </div>
@@ -164,7 +173,7 @@ export default function AttendanceBoard() {
         </div>
       )}
 
-      <p className="mt-3 text-xs text-slate-400">実働＝退勤−出勤−休憩。打刻忘れ・修正は各行の「修正」から手入力できます。</p>
+      <p className="mt-3 text-xs text-slate-400">20日締め（前月21日〜当月20日）で集計。実働＝退勤−出勤−休憩。打刻忘れ・修正は各行の「修正」から手入力できます。</p>
 
       {/* 修正モーダル */}
       {edit && (
