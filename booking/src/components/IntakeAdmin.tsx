@@ -112,10 +112,18 @@ export default function IntakeAdmin() {
           .print-area { position: static !important; width: 100% !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; font-size: 10.5pt; color: #111; }
           .print-area, .print-area * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .print-head { display: block !important; }
+          .print-head table { font-size: 8.8pt; margin-bottom: 6px !important; }
+          .print-head table td, .print-head table th { padding: 2px 6px !important; }
           .screen-head { display: none !important; }
-          .q-sec { break-inside: avoid; margin-bottom: 7px; }
-          .q-sec + .q-sec { margin-top: 2px; }
-          .q-item { break-inside: avoid; }
+          /* 1ページに収めるため2段組み＋コンパクト表示 */
+          .print-area { font-size: 8.8pt; line-height: 1.25; }
+          .q-list { column-count: 2; column-gap: 8mm; }
+          .q-sec { break-inside: avoid; margin: 0 0 4px; }
+          .q-sec h3 { font-size: 9.2pt; margin-bottom: 1px; padding-bottom: 1px; }
+          .q-item { display: block !important; break-inside: avoid; border: 0 !important; padding: 0.5px 0 !important; }
+          .q-item dt { display: inline; font-weight: 700; color: #111 !important; }
+          .q-item dt::after { content: "："; }
+          .q-item dd { display: inline; }
         }
       `}</style>
 
@@ -221,7 +229,7 @@ export default function IntakeAdmin() {
                 <Link href={`/admin/chart?p=${current.patient_id}`} className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700">カルテを開く ›</Link>
               </div>
 
-              <div className="space-y-3">
+              <div className="q-list space-y-3">
                 {sections.map((sec, si) => (
                   <section key={si} className="q-sec">
                     <h3 className="mb-1 border-b border-slate-300 pb-0.5 text-sm font-bold text-teal-700 print:text-black">{sec.title}</h3>
