@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseSections, toIntakeLinked, type QSection, type QValue } from "@/lib/questionnaire";
+import { notifyStaff } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,21 @@ async function resolvePatientForBlank(admin: NonNullable<ReturnType<typeof creat
   return { id: data.id as string };
 }
 
+// 問診票が届いたらスタッフ端末へプッシュ通知
+async function notifyIntake(admin: NonNullable<ReturnType<typeof createAdminClient>>, patientId: string, answers: QValue) {
+  let name = getStr(answers, "name");
+  if (!name) {
+    const { data } = await admin.from("patients").select("name").eq("id", patientId).maybeSingle();
+    name = (data as { name?: string } | null)?.name || "患者";
+  }
+  await notifyStaff(admin, {
+    title: "📝 問診票が届きました",
+    body: `${name}さんが問診票を送信しました`,
+    url: "/admin/intake",
+    tag: "intake-" + patientId,
+  });
+}
+
 // POST /api/intake … 問診票の回答を保存（患者が送信）
 export async function POST(req: NextRequest) {
   let appointmentId = "";
@@ -132,7 +148,9 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     }, { onConflict: "patient_id" });
     if (e2) return NextResponse.json({ ok: false, reason: "save", error: e2.message });
+    await notifyIntake(admin, patientId, answers);
     return NextResponse.json({ ok: true, partial: true });
   }
+  await notifyIntake(admin, patientId, answers);
   return NextResponse.json({ ok: true });
 }
