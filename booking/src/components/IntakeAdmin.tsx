@@ -115,15 +115,15 @@ export default function IntakeAdmin() {
           .print-head table { font-size: 8.8pt; margin-bottom: 6px !important; }
           .print-head table td, .print-head table th { padding: 2px 6px !important; }
           .screen-head { display: none !important; }
-          /* 1ページに収めるため2段組み＋コンパクト表示 */
-          .print-area { font-size: 8.8pt; line-height: 1.25; }
-          .q-list { column-count: 2; column-gap: 8mm; }
-          .q-sec { break-inside: avoid; margin: 0 0 4px; }
-          .q-sec h3 { font-size: 9.2pt; margin-bottom: 1px; padding-bottom: 1px; }
-          .q-item { display: block !important; break-inside: avoid; border: 0 !important; padding: 0.5px 0 !important; }
-          .q-item dt { display: inline; font-weight: 700; color: #111 !important; }
-          .q-item dt::after { content: "："; }
-          .q-item dd { display: inline; }
+          /* 1ページに収めつつ読みやすく：2段組み＋「質問を上・回答を下」 */
+          .print-area { font-size: 9.3pt; line-height: 1.3; }
+          .q-list { column-count: 2; column-gap: 9mm; }
+          .q-sec { break-inside: avoid; margin: 0 0 7px; }
+          .q-sec h3 { font-size: 9.8pt; margin-bottom: 3px; padding-bottom: 2px; border-bottom: 0.5pt solid #cbd5e1; }
+          .q-item { display: block !important; break-inside: avoid; border: 0 !important; padding: 0 !important; margin-bottom: 5px; }
+          .q-item dt { display: block; font-weight: 700; color: #475569 !important; font-size: 8.5pt; margin-bottom: 0; }
+          .q-item dt::after { content: ""; }
+          .q-item dd { display: block; color: #111 !important; padding-left: 9px; }
         }
       `}</style>
 
