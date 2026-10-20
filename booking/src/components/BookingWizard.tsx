@@ -241,6 +241,8 @@ export default function BookingWizard() {
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
   const isPersonal = !!service?.personal; // パーソナル（1回／10回分の料金体系）
   const afterHours = !!service?.after_hours; // 時間外予約（固定の夜枠のみ）
+  // 初診専用メニュー（「初めて方」など）は再診料金を表示しない
+  const initialOnly = /初めて|初診専用/.test(`${service?.name ?? ""}${service?.patient_name ?? ""}`);
 
   // クラスの開始時刻固定（体幹=17:00/18:00/19:30）
   const classStarts = useMemo(() => {
@@ -375,7 +377,9 @@ export default function BookingWizard() {
   // メニューカードの料金表示（スタッフ差があれば最小額＋「〜」）
   function menuPriceLabel(serviceId: string): string | null {
     const ps = prices.filter((p) => p.service_id === serviceId);
-    const personal = !!services.find((s) => s.id === serviceId)?.personal;
+    const sv = services.find((s) => s.id === serviceId);
+    const personal = !!sv?.personal;
+    const initOnly = /初めて|初診専用/.test(`${sv?.name ?? ""}${sv?.patient_name ?? ""}`);
     const fmt = (n: number) => `¥${n.toLocaleString()}`;
     const part = (arr: number[], label: string) => {
       if (!arr.length) return null;
@@ -391,7 +395,9 @@ export default function BookingWizard() {
       .filter((n): n is number => n != null);
     const parts = personal
       ? [part(inis, "1回"), part(reps, "10回分")].filter(Boolean)
-      : [part(inis, "初診"), part(reps, "再診")].filter(Boolean);
+      : initOnly
+        ? [part(inis, "初診")].filter(Boolean)
+        : [part(inis, "初診"), part(reps, "再診")].filter(Boolean);
     return parts.length ? parts.join(" ・ ") : null;
   }
 
@@ -1198,8 +1204,11 @@ export default function BookingWizard() {
               <div className="mb-2 text-xs font-bold text-slate-700">
                 料金 <span className="font-normal text-slate-400">（{service?.patient_name || service?.name}）</span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const).map(([label, ippan, gakusei]) => (
+              <div className={`grid gap-2 ${initialOnly ? "grid-cols-1" : "grid-cols-2"}`}>
+                {(initialOnly
+                  ? ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei]] as const)
+                  : ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const)
+                ).map(([label, ippan, gakusei]) => (
                   <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-2 text-center">
                     <div className="text-[10px] text-slate-400">{label}</div>
                     <div className="text-base font-bold text-slate-800">¥{ippan.toLocaleString()}</div>
@@ -1210,7 +1219,7 @@ export default function BookingWizard() {
                 ))}
               </div>
               <p className="mt-1.5 text-[10px] leading-snug text-slate-400">
-                2ヶ月以内（例：最終8/9→10月末日）は再診料金です。
+                {!initialOnly && "2ヶ月以内（例：最終8/9→10月末日）は再診料金です。"}
                 {service?.category !== "川西整体院" && "怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。"}
               </p>
             </div>
@@ -1548,7 +1557,9 @@ export default function BookingWizard() {
                   value={
                     isPersonal
                       ? `1回 ¥${(selectedPrice.initial_price ?? 0).toLocaleString()} / 10回分 ¥${(selectedPrice.repeat_price ?? 0).toLocaleString()}`
-                      : `初診 ¥${(selectedPrice.initial_price ?? 0).toLocaleString()} / 再診 ¥${(selectedPrice.repeat_price ?? 0).toLocaleString()}`
+                      : initialOnly
+                        ? `初診 ¥${(selectedPrice.initial_price ?? 0).toLocaleString()}`
+                        : `初診 ¥${(selectedPrice.initial_price ?? 0).toLocaleString()} / 再診 ¥${(selectedPrice.repeat_price ?? 0).toLocaleString()}`
                   }
                 />
               )}
