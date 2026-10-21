@@ -444,6 +444,13 @@ export default function BookingWizard() {
         studentDiffers: false,
       };
     }
+    // メニュー料金(service_prices)がスタッフ別に設定されていればそれを最優先。
+    // （初診専用50分など、30/60・通電の自動計算に当てはまらないメニュー向け）
+    if (selectedPrice && (selectedPrice.initial_price != null || selectedPrice.repeat_price != null)) {
+      const ini = selectedPrice.initial_price ?? selectedPrice.repeat_price ?? 0;
+      const rep = selectedPrice.repeat_price ?? selectedPrice.initial_price ?? 0;
+      return { initialIppan: ini, initialGakusei: ini, repeatIppan: rep, repeatGakusei: rep, studentDiffers: false };
+    }
     const sp = (selectedStaff as unknown as { self_prices?: Partial<SelfPrices> }).self_prices;
     const p: SelfPrices = { ...defaultPrices(selectedStaff.name), ...(sp || {}) };
     const opt: SelfOptions = { ...DEFAULT_OPTIONS, ...((settings as unknown as { self_options?: Partial<SelfOptions> })?.self_options || {}) };
