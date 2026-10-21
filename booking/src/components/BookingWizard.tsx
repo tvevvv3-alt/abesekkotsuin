@@ -241,8 +241,8 @@ export default function BookingWizard() {
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
   const isPersonal = !!service?.personal; // パーソナル（1回／10回分の料金体系）
   const afterHours = !!service?.after_hours; // 時間外予約（固定の夜枠のみ）
-  // 初診専用メニュー（「初めて方」など）は再診料金を表示しない
-  const initialOnly = /初めて|初診専用/.test(`${service?.name ?? ""}${service?.patient_name ?? ""}`);
+  // 初診専用メニュー（「はじめて方／初めて方／初診専用」など）は再診料金を表示しない
+  const initialOnly = /はじめて|初めて|初診専用/.test(`${service?.name ?? ""}${service?.patient_name ?? ""}`);
 
   // クラスの開始時刻固定（体幹=17:00/18:00/19:30）
   const classStarts = useMemo(() => {
@@ -379,7 +379,7 @@ export default function BookingWizard() {
     const ps = prices.filter((p) => p.service_id === serviceId);
     const sv = services.find((s) => s.id === serviceId);
     const personal = !!sv?.personal;
-    const initOnly = /初めて|初診専用/.test(`${sv?.name ?? ""}${sv?.patient_name ?? ""}`);
+    const initOnly = /はじめて|初めて|初診専用/.test(`${sv?.name ?? ""}${sv?.patient_name ?? ""}`);
     const fmt = (n: number) => `¥${n.toLocaleString()}`;
     const part = (arr: number[], label: string) => {
       if (!arr.length) return null;
