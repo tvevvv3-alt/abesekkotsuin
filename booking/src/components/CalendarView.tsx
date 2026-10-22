@@ -1344,10 +1344,10 @@ function NoteModal({
   const [text, setText] = useState(editing?.text ?? "");
   const [color, setColor] = useState(editing?.color ?? flat[0] ?? NOTE_COLORS[0]);
   const allDay = editing ? editing.start_min == null : data.mode === "add" && data.allDay;
-  const round15 = (m: number) => Math.round(m / 15) * 15;
+  const round30 = (m: number) => Math.round(m / 30) * 30; // 30分単位を基本に
   const initStart = editing?.start_min ?? (data.mode === "add" ? data.startMin : 600);
-  const [startMin, setStartMin] = useState<number>(round15(initStart ?? 600));
-  const [endMin, setEndMin] = useState<number>(round15(editing?.end_min ?? (initStart ?? 600) + 60));
+  const [startMin, setStartMin] = useState<number>(editing?.start_min ?? round30(initStart ?? 600));
+  const [endMin, setEndMin] = useState<number>(editing?.end_min ?? round30((initStart ?? 600) + 30));
   const [busy, setBusy] = useState(false);
   // 繰り返し（追加時のみ）：なし/毎日/毎週/毎月 × 回数ぶん行を作成
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly">("none");
@@ -1364,7 +1364,7 @@ function NoteModal({
       text: text.trim(),
       color,
       start_min: allDay ? null : startMin,
-      end_min: allDay ? null : Math.max(endMin, startMin + 15),
+      end_min: allDay ? null : Math.max(endMin, startMin + 30),
     };
     if (editing) {
       await supabase.from("calendar_notes").update(row).eq("id", editing.id);
@@ -1400,16 +1400,18 @@ function NoteModal({
   const timeInput = (val: number, set: (n: number) => void) => {
     const h = Math.floor(val / 60);
     const mnRaw = val % 60;
-    const mn = [0, 15, 30, 45].reduce((a, b) => (Math.abs(b - mnRaw) < Math.abs(a - mnRaw) ? b : a), 0);
+    // 基本は30分単位（00/30）。既存メモが15/45分の場合はその値も選べるよう追加。
+    const base = [0, 30];
+    const opts = base.includes(mnRaw) ? base : [...base, mnRaw].sort((a, b) => a - b);
     return (
       <span className="inline-flex items-center gap-1 tabnum">
-        <select value={h} onChange={(e) => set(parseInt(e.target.value, 10) * 60 + mn)} className="rounded-md border px-2 py-1 text-sm">
+        <select value={h} onChange={(e) => set(parseInt(e.target.value, 10) * 60 + mnRaw)} className="rounded-md border px-2 py-1 text-sm">
           {Array.from({ length: 24 }, (_, i) => i).map((i) => (
             <option key={i} value={i}>{i}時</option>
           ))}
         </select>
-        <select value={mn} onChange={(e) => set(h * 60 + parseInt(e.target.value, 10))} className="rounded-md border px-2 py-1 text-sm">
-          {[0, 15, 30, 45].map((m) => (
+        <select value={mnRaw} onChange={(e) => set(h * 60 + parseInt(e.target.value, 10))} className="rounded-md border px-2 py-1 text-sm">
+          {opts.map((m) => (
             <option key={m} value={m}>{String(m).padStart(2, "0")}分</option>
           ))}
         </select>
