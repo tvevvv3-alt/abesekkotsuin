@@ -111,6 +111,22 @@ function segColor(hex: string, tone: "light" | "dark"): string {
   return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
+// 通電（薄）相当の色を hex で返す（segColor の light と同じ配合）。メモのパレット用。
+function lightHex(hex: string): string {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  let r = parseInt(n.slice(0, 2), 16);
+  let g = parseInt(n.slice(2, 4), 16);
+  let b = parseInt(n.slice(4, 6), 16);
+  if ([r, g, b].some(isNaN)) return hex;
+  const a = 0.42;
+  r = Math.round(r + (255 - r) * a);
+  g = Math.round(g + (255 - g) * a);
+  b = Math.round(b + (255 - b) * a);
+  const hx = (v: number) => v.toString(16).padStart(2, "0");
+  return `#${hx(r)}${hx(g)}${hx(b)}`;
+}
+
 // 工程の色分け：通電＝薄い / 施術＝濃い
 function stepTone(st: AppointmentStep): "light" | "dark" {
   if (/通電/.test(st.name)) return "light";
@@ -320,11 +336,12 @@ export default function CalendarView({
       ? CLASS_COLOR
       : staffColor(a.staff_id);
 
-  // メモの色パレット：各担当カラー＋体幹＋汎用5色（重複は除外）
+  // メモの色パレット：各担当カラー＋体幹＋汎用5色＋「通電の薄い色」版（重複は除外）
   const notePalette = useMemo(() => {
     const staffCols = staff.map((s) => s.color).filter((c): c is string => !!c);
     const extras = [CLASS_COLOR, "#ef4444", "#ec4899", "#14b8a6", "#0ea5e9", "#64748b"];
-    return Array.from(new Set([...staffCols, ...extras]));
+    const lights = [...staffCols, CLASS_COLOR].map(lightHex); // 通電の薄い色
+    return Array.from(new Set([...staffCols, ...extras, ...lights]));
   }, [staff]);
 
   // 既定の基準表示は 9:00〜21:00（ズーム1でこの範囲が画面に収まる）。
