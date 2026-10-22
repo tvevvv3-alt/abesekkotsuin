@@ -336,12 +336,12 @@ export default function CalendarView({
       ? CLASS_COLOR
       : staffColor(a.staff_id);
 
-  // メモの色パレット：各担当カラー＋体幹＋汎用5色＋「通電の薄い色」版（重複は除外）
+  // メモの色パレット：濃（担当順＋体幹）／薄（その通電色）／メモ用の汎用色
   const notePalette = useMemo(() => {
-    const staffCols = staff.map((s) => s.color).filter((c): c is string => !!c);
-    const extras = [CLASS_COLOR, "#ef4444", "#ec4899", "#14b8a6", "#0ea5e9", "#64748b"];
-    const lights = [...staffCols, CLASS_COLOR].map(lightHex); // 通電の薄い色
-    return Array.from(new Set([...staffCols, ...extras, ...lights]));
+    const dark = Array.from(new Set([...staff.map((s) => s.color).filter((c): c is string => !!c), CLASS_COLOR]));
+    const light = dark.map(lightHex); // 通電の薄い色
+    const memo = ["#ef4444", "#ec4899", "#14b8a6", "#64748b"]; // 赤・ピンク・ティール・グレー
+    return { dark, light, memo };
   }, [staff]);
 
   // 既定の基準表示は 9:00〜21:00（ズーム1でこの範囲が画面に収まる）。
@@ -1330,14 +1330,19 @@ function NoteModal({
   data:
     | { mode: "add"; date: string; allDay: boolean; startMin: number }
     | { mode: "edit"; note: CalendarNote };
-  palette: string[];
+  palette: { dark: string[]; light: string[]; memo: string[] };
   onClose: () => void;
   onDone: () => void;
 }) {
-  const colors = palette.length ? palette : NOTE_COLORS;
+  const pal = {
+    dark: palette.dark ?? [],
+    light: palette.light ?? [],
+    memo: palette.memo?.length ? palette.memo : (palette.dark?.length ? [] : NOTE_COLORS),
+  };
+  const flat = [...pal.dark, ...pal.light, ...pal.memo];
   const editing = data.mode === "edit" ? data.note : null;
   const [text, setText] = useState(editing?.text ?? "");
-  const [color, setColor] = useState(editing?.color ?? colors[0]);
+  const [color, setColor] = useState(editing?.color ?? flat[0] ?? NOTE_COLORS[0]);
   const allDay = editing ? editing.start_min == null : data.mode === "add" && data.allDay;
   const round15 = (m: number) => Math.round(m / 15) * 15;
   const initStart = editing?.start_min ?? (data.mode === "add" ? data.startMin : 600);
@@ -1442,15 +1447,30 @@ function NoteModal({
             <span className="text-[11px] text-slate-400">（複数日は終了日を指定）</span>
           </div>
         )}
-        <div className="mb-3 flex flex-wrap gap-2">
-          {colors.map((c) => (
-            <button
-              key={c}
-              onClick={() => setColor(c)}
-              className={`h-7 w-7 rounded-full ${color === c ? "ring-2 ring-offset-2 ring-slate-500" : ""}`}
-              style={{ backgroundColor: c }}
-            />
-          ))}
+        <div className="mb-3 space-y-1.5">
+          {/* 担当色：濃（担当順）→ 薄 の2段 */}
+          {pal.dark.length > 0 && (
+            <>
+              <div className="flex gap-1.5">
+                {pal.dark.map((c) => (
+                  <button key={c} onClick={() => setColor(c)} className={`h-8 w-8 shrink-0 rounded-full ${color === c ? "ring-2 ring-offset-2 ring-slate-500" : ""}`} style={{ backgroundColor: c }} />
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                {pal.light.map((c) => (
+                  <button key={c} onClick={() => setColor(c)} className={`h-8 w-8 shrink-0 rounded-full ${color === c ? "ring-2 ring-offset-2 ring-slate-500" : ""}`} style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            </>
+          )}
+          {/* メモ用の色 */}
+          {pal.memo.length > 0 && (
+            <div className={`flex gap-1.5 ${pal.dark.length ? "mt-1 border-t border-slate-100 pt-2" : ""}`}>
+              {pal.memo.map((c) => (
+                <button key={c} onClick={() => setColor(c)} className={`h-8 w-8 shrink-0 rounded-full ${color === c ? "ring-2 ring-offset-2 ring-slate-500" : ""}`} style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          )}
         </div>
         {!editing && (
           <div className="mb-4 flex items-center gap-2 text-sm text-slate-600">
