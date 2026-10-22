@@ -7,7 +7,7 @@
 //   checkbox                → string[]（選択ラベルの配列）
 //   「その他」自由入力       → `${key}__other` に string
 
-export type FieldType = "text" | "textarea" | "date" | "tel" | "radio" | "checkbox";
+export type FieldType = "text" | "textarea" | "date" | "wareki" | "tel" | "radio" | "checkbox";
 // カルテ初診時へ連携する項目（これを付けた回答がカルテのサマリに反映される）
 export type LinkKey = "sport" | "weekly_freq" | "symptom_area" | "onset" | "history";
 
@@ -28,7 +28,8 @@ export type QValue = Record<string, string | string[]>;
 export const FIELD_TYPE_LABELS: { value: FieldType; label: string }[] = [
   { value: "text", label: "記述（短文）" },
   { value: "textarea", label: "記述（長文）" },
-  { value: "date", label: "日付" },
+  { value: "date", label: "日付（西暦）" },
+  { value: "wareki", label: "日付（和暦）" },
   { value: "tel", label: "電話番号" },
   { value: "radio", label: "選択（1つ）" },
   { value: "checkbox", label: "選択（複数）" },
@@ -74,7 +75,7 @@ export const DEFAULT_SECTIONS: QSection[] = [
     fields: [
       { key: "name", label: "受診者名", type: "text", required: true, placeholder: "例）阿部 太郎" },
       { key: "kana", label: "ふりがな", type: "text", required: true, placeholder: "例）あべ たろう" },
-      { key: "birth", label: "生年月日", type: "date", required: true },
+      { key: "birth", label: "生年月日", type: "wareki", required: true },
       { key: "sex", label: "性別", type: "radio", options: ["男性", "女性", "回答しない"], required: true },
       { key: "postal", label: "郵便番号", type: "text", placeholder: "例）567-0851" },
       { key: "address", label: "住所", type: "text", required: true },
@@ -130,7 +131,7 @@ export const DEFAULT_SECTIONS: QSection[] = [
 // 互換のためのエイリアス（既存import用）
 export const Q_SECTIONS = DEFAULT_SECTIONS;
 
-const TYPES = new Set<FieldType>(["text", "textarea", "date", "tel", "radio", "checkbox"]);
+const TYPES = new Set<FieldType>(["text", "textarea", "date", "wareki", "tel", "radio", "checkbox"]);
 const LINKS = new Set<LinkKey>(["sport", "weekly_freq", "symptom_area", "onset", "history"]);
 let keySeq = 0;
 export const newFieldKey = () => `q_${Date.now().toString(36)}_${(keySeq++).toString(36)}`;
