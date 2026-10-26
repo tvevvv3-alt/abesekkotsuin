@@ -1178,6 +1178,11 @@ p { margin: 0; }
 .price-card__meta { margin-block-start: 1em; color: var(--field); font-size: 0.92rem; letter-spacing: 0.05em; line-height: 1.7; }
 .price-card__small { color: var(--ink-mute); font-size: 0.82rem; letter-spacing: 0.02em; }
 .price-card--sub { background: var(--paper); }
+.price-card--first {
+  background: linear-gradient(140deg, rgba(231,203,131,0.24), rgba(255,255,255,0.14));
+  outline: 1.5px solid rgba(200,163,78,0.5); outline-offset: -1.5px;
+  box-shadow: 0 18px 44px -26px rgba(176,138,60,0.55);
+}
 .menu__note { margin-block-start: clamp(22px, 5vw, 34px); font-size: 0.85rem; color: var(--ink-mute); text-align: center; letter-spacing: 0.03em; }
 
 /* メニュー横スクロールの上アキ */
