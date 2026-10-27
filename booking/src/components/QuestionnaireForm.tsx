@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Q_SECTIONS, type QField, type QSection, type QValue } from "@/lib/questionnaire";
 
 // 和暦（元号＋年月日）入力。内部値は西暦 YYYY-MM-DD で保持し既存処理と互換。
@@ -24,36 +25,56 @@ function waToISO(era: string, y: string, mo: string, d: string) {
   return `${Y}-${String(parseInt(mo, 10)).padStart(2, "0")}-${String(parseInt(d, 10)).padStart(2, "0")}`;
 }
 function WarekiInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const cur = waFromISO(value);
-  const upd = (patch: Partial<{ era: string; y: string; mo: string; d: string }>) => {
-    const next = { ...cur, ...patch };
-    onChange(waToISO(next.era, next.y, next.mo, next.d));
+  // 内部で元号/年/月/日を保持（未完成でも選択が消えないように）。確定時に西暦へ変換して親へ通知。
+  const init = waFromISO(value);
+  const [era, setEra] = useState(init.era);
+  const [y, setY] = useState(init.y);
+  const [mo, setMo] = useState(init.mo);
+  const [d, setD] = useState(init.d);
+  const lastEmit = useRef(value);
+  // 親が外部から value を変えた（患者切替・プリフィル等）ときだけ内部を同期
+  useEffect(() => {
+    if (value !== lastEmit.current) {
+      const p = waFromISO(value);
+      setEra(p.era); setY(p.y); setMo(p.mo); setD(p.d);
+      lastEmit.current = value;
+    }
+  }, [value]);
+  const commit = (e: string, yy: string, m: string, dd: string) => {
+    const iso = waToISO(e, yy, m, dd);
+    lastEmit.current = iso;
+    onChange(iso);
   };
-  const eraObj = ERAS.find((e) => e.key === cur.era);
+  const setEraV = (v: string) => { setEra(v); setY(""); commit(v, "", mo, d); };
+  const setYV = (v: string) => { setY(v); commit(era, v, mo, d); };
+  const setMoV = (v: string) => { setMo(v); commit(era, y, v, d); };
+  const setDV = (v: string) => { setD(v); commit(era, y, mo, v); };
+  const eraObj = ERAS.find((e) => e.key === era);
   const years = eraObj ? Array.from({ length: Math.max(eraObj.max, 1) }, (_, i) => i + 1) : [];
+  const iso = waToISO(era, y, mo, d);
   const sel = "rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <select value={cur.era} onChange={(e) => upd({ era: e.target.value, y: "" })} className={sel}>
+      <select value={era} onChange={(e) => setEraV(e.target.value)} className={sel}>
         <option value="">元号</option>
         {ERAS.map((e) => <option key={e.key} value={e.key}>{e.key}</option>)}
       </select>
-      <select value={cur.y} onChange={(e) => upd({ y: e.target.value })} disabled={!cur.era} className={sel}>
+      <select value={y} onChange={(e) => setYV(e.target.value)} disabled={!era} className={sel}>
         <option value="">—</option>
         {years.map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
       <span className="text-sm text-slate-500">年</span>
-      <select value={cur.mo} onChange={(e) => upd({ mo: e.target.value })} className={sel}>
+      <select value={mo} onChange={(e) => setMoV(e.target.value)} className={sel}>
         <option value="">—</option>
         {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
       <span className="text-sm text-slate-500">月</span>
-      <select value={cur.d} onChange={(e) => upd({ d: e.target.value })} className={sel}>
+      <select value={d} onChange={(e) => setDV(e.target.value)} className={sel}>
         <option value="">—</option>
         {Array.from({ length: 31 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
       <span className="text-sm text-slate-500">日</span>
-      {value && <span className="ml-1 text-[11px] text-slate-400">（西暦 {value.slice(0, 4)}年）</span>}
+      {iso && <span className="ml-1 text-[11px] text-slate-400">（西暦 {iso.slice(0, 4)}年）</span>}
     </div>
   );
 }
