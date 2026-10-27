@@ -27,6 +27,21 @@ function fmtAnswer(v: QValue, key: string): string {
   return s || "—";
 }
 
+// 西暦 YYYY-MM-DD → 和暦（例：昭和50年2月24日）
+const WA_ERAS = [
+  { key: "令和", base: 2018 },
+  { key: "平成", base: 1988 },
+  { key: "昭和", base: 1925 },
+  { key: "大正", base: 1911 },
+];
+function toWareki(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  if (!m) return iso || "—";
+  const Y = +m[1], mo = +m[2], d = +m[3];
+  for (const e of WA_ERAS) if (Y > e.base) return `${e.key}${Y - e.base}年${mo}月${d}日`;
+  return `${Y}年${mo}月${d}日`;
+}
+
 // 印刷ヘッダのテーブルセル（A4）
 const phThCell: CSSProperties = { border: "0.5pt solid #999", background: "#f1f5f9", padding: "3px 6px", fontSize: "9pt", fontWeight: 700, textAlign: "left", whiteSpace: "nowrap", width: "1%", color: "#334155" };
 const phTdCell: CSSProperties = { border: "0.5pt solid #999", padding: "3px 8px" };
@@ -194,7 +209,7 @@ export default function IntakeAdmin() {
                     </tr>
                     <tr>
                       <th style={phThCell}>生年月日</th>
-                      <td style={phTdCell}>{current.birth || "—"}{ageAt(current.birth, today) != null ? `（${ageAt(current.birth, today)}歳）` : ""}</td>
+                      <td style={phTdCell}>{current.birth ? toWareki(current.birth) : "—"}{ageAt(current.birth, today) != null ? `（${ageAt(current.birth, today)}歳）` : ""}</td>
                       <th style={phThCell}>電話番号</th>
                       <td style={phTdCell}>{fmtAnswer(current.questionnaire, "phone")}</td>
                     </tr>
@@ -219,7 +234,7 @@ export default function IntakeAdmin() {
                       {sec.fields.map((f) => (
                         <div key={f.key} className="q-item border-b border-slate-100 py-1.5 text-sm sm:grid sm:grid-cols-[11rem_1fr] sm:gap-x-3 sm:py-1">
                           <dt className="text-[13px] font-bold text-slate-500 sm:text-sm print:text-slate-700">{f.label}</dt>
-                          <dd className="mt-0.5 min-w-0 whitespace-pre-wrap break-words pl-2 font-medium text-slate-800 sm:mt-0 sm:pl-0 sm:font-normal print:text-black">{fmtAnswer(current.questionnaire, f.key)}</dd>
+                          <dd className="mt-0.5 min-w-0 whitespace-pre-wrap break-words pl-2 font-medium text-slate-800 sm:mt-0 sm:pl-0 sm:font-normal print:text-black">{f.type === "wareki" ? (typeof current.questionnaire[f.key] === "string" && current.questionnaire[f.key] ? toWareki(current.questionnaire[f.key] as string) : "—") : fmtAnswer(current.questionnaire, f.key)}</dd>
                         </div>
                       ))}
                     </dl>
