@@ -1199,8 +1199,8 @@ export default function SalesBoard() {
     const jihiTotal = perMonth((m) => rows.reduce((x, r) => x + r.jihi[m], 0));
     // 物販利益 総計＝各担当の物販利益＋担当なし物販利益＋その他売上
     const busTotal = perMonth((m) => rows.reduce((x, r) => x + r.bus[m], 0) + busM[m]);
-    // 総合計＝施術(保険+自費)＋物販利益＋川西＋体幹（＝当月サマリーの総売上と一致）
-    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + busTotal[m] + taikanM[m] + kawaM[m]);
+    // 総合計＝施術(保険+自費)＋川西＋体幹。物販は含めない（別管理。スプレッドシートの正データに合わせる）
+    const sougou = perMonth((m) => hokenTotal[m] + jihiTotal[m] + taikanM[m] + kawaM[m]);
     return { rows, kawaM, taikanM, busTotal, busSales, hokenTotal, jihiTotal, sougou };
   }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, retailCostOf, year]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
@@ -1474,7 +1474,7 @@ export default function SalesBoard() {
               </tbody>
             </table>
             <p className="mt-2 px-1 text-[11px] text-slate-400">
-              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費＋物販利益。川西院は自費＋保険。総合計＝当月サマリーの総売上と一致（物販は利益で計上）。物販売上＝物販の販売総額（確定申告用・総合計には含めない）。‹ › で年を移動できます。
+              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費＋物販利益。川西院は自費＋保険。総合計＝保険総計＋自費総計＋川西＋体幹（物販は含めない）。物販利益・物販売上は別管理（物販込みで見たい時は総合計＋物販利益）。‹ › で年を移動できます。
             </p>
             <p className="px-1 text-[11px] text-slate-400">数字をドラッグ（PC）／タップ（スマホ）で選ぶと、下に合計・平均が出ます。Shift＋クリックで追加選択。</p>
             {/* 選択範囲の合計・平均（スプレッドシート風） */}
