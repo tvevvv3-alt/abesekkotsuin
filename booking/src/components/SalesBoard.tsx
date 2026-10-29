@@ -870,7 +870,7 @@ export default function SalesBoard() {
     const mix = (c: number) => Math.round(255 * (1 - a) + (isNaN(c) ? 255 : c) * a);
     return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
   };
-  const NAME_W = 46, LABEL_W = 34; // 左固定列の幅
+  const NAME_W = 60, LABEL_W = 34; // 左固定列の幅（名前が2段に折り返さない幅）
   const d = new Date(date + "T00:00:00");
   const monthLabel = `${d.getFullYear()}年${d.getMonth() + 1}月`;
   // ‹ › の移動幅：日=1日 / 月=1ヶ月 / 年=1年
@@ -1422,7 +1422,7 @@ export default function SalesBoard() {
                   return (
                     <Fragment key={r.id}>
                       <tr className="border-t" style={{ backgroundColor: r.color + "10" }}>
-                        <td rowSpan={4} className="sticky left-0 z-10 px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: overWhite(r.color, 0.2), width: NAME_W, minWidth: NAME_W }}>
+                        <td rowSpan={4} className="sticky left-0 z-10 whitespace-nowrap px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: overWhite(r.color, 0.2), width: NAME_W, minWidth: NAME_W }}>
                           <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: r.color }} />{r.name}
                         </td>
                         {labelTd("保険")}
