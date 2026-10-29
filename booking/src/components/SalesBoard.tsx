@@ -1412,38 +1412,38 @@ export default function SalesBoard() {
               </thead>
               <tbody>
                 {yearData.rows.map((r) => {
-                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m]); // 総計＝保険+自費（物販は物販行で別管理）
+                  const isAbe = r.name.includes("阿部"); // 川西は阿部に含める
+                  const kawa = isAbe ? yearData.kawaM : null;
+                  // 総計＝保険＋自費＋物販（＋川西：阿部のみ）
+                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m] + r.bus[m] + (kawa ? kawa[m] : 0));
                   const cell = (v: number, key: string, bold = false) => (
                     <td {...selProps(key, v)} className={`cursor-cell select-none px-1 py-0.5 text-right tabnum ${v ? "text-slate-700" : "text-slate-300"} ${bold ? "font-bold" : ""}${selClass(key)}`}>{v.toLocaleString()}</td>
                   );
                   const labelTd = (t: string, bold = false) => (
                     <td className={`sticky z-10 whitespace-nowrap border-r px-1 py-0.5 ${bold ? "font-bold text-slate-600" : "text-slate-400"}`} style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>{t}</td>
                   );
+                  const subRows: { label: string; k: string; arr: number[]; bold?: boolean }[] = [
+                    { label: "保険", k: "hoken", arr: r.hoken },
+                    { label: "自費", k: "jihi", arr: r.jihi },
+                    { label: "物販", k: "bus", arr: r.bus },
+                    ...(kawa ? [{ label: "川西", k: "kawa", arr: kawa }] : []),
+                    { label: "総計", k: "sokei", arr: sokei, bold: true },
+                  ];
+                  const span = subRows.length;
                   return (
                     <Fragment key={r.id}>
-                      <tr className="border-t" style={{ backgroundColor: r.color + "10" }}>
-                        <td rowSpan={4} className="sticky left-0 z-10 whitespace-nowrap px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: overWhite(r.color, 0.2), width: NAME_W, minWidth: NAME_W }}>
-                          <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: r.color }} />{r.name}
-                        </td>
-                        {labelTd("保険")}
-                        {r.hoken.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-hoken-${m}`)}</Fragment>)}
-                        {cell(sum12(r.hoken), `${r.id}-hoken-y`, true)}
-                      </tr>
-                      <tr style={{ backgroundColor: r.color + "10" }}>
-                        {labelTd("自費")}
-                        {r.jihi.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-jihi-${m}`)}</Fragment>)}
-                        {cell(sum12(r.jihi), `${r.id}-jihi-y`, true)}
-                      </tr>
-                      <tr style={{ backgroundColor: r.color + "10" }}>
-                        {labelTd("物販")}
-                        {r.bus.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-bus-${m}`)}</Fragment>)}
-                        {cell(sum12(r.bus), `${r.id}-bus-y`, true)}
-                      </tr>
-                      <tr className="border-b" style={{ backgroundColor: r.color + "10" }}>
-                        {labelTd("総計", true)}
-                        {sokei.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-sokei-${m}`, true)}</Fragment>)}
-                        {cell(sum12(sokei), `${r.id}-sokei-y`, true)}
-                      </tr>
+                      {subRows.map((sr, i) => (
+                        <tr key={sr.k} className={`${i === 0 ? "border-t" : ""} ${i === span - 1 ? "border-b" : ""}`} style={{ backgroundColor: r.color + "10" }}>
+                          {i === 0 && (
+                            <td rowSpan={span} className="sticky left-0 z-10 whitespace-nowrap px-1.5 align-middle text-[12px] font-bold text-slate-800" style={{ backgroundColor: overWhite(r.color, 0.2), width: NAME_W, minWidth: NAME_W }}>
+                              <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: r.color }} />{r.name}
+                            </td>
+                          )}
+                          {labelTd(sr.label, sr.bold)}
+                          {sr.arr.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-${sr.k}-${m}`, sr.bold)}</Fragment>)}
+                          {cell(sum12(sr.arr), `${r.id}-${sr.k}-y`, true)}
+                        </tr>
+                      ))}
                     </Fragment>
                   );
                 })}
@@ -1463,19 +1463,18 @@ export default function SalesBoard() {
                     <>
                       {aggRow("保険総計", yearData.hokenTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("自費総計", yearData.jihiTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
-                      {aggRow("物販利益", yearData.busTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
-                      {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700", "#eef2ff")}
                       {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700", "#fff7ed")}
-                      {aggRow("総合計", yearData.sougou, "bg-amber-100 text-amber-900", "#fef3c7")}
-                      {aggRow("物販込み総合計", yearData.sougou.map((v, m) => v + yearData.busTotal[m]), "bg-emerald-100 text-emerald-900", "#d1fae5")}
+                      {aggRow("物販利益", yearData.busTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("物販売上", yearData.busSales, "bg-slate-100 text-slate-500", "#f1f5f9")}
+                      {aggRow("院全体の売上", yearData.sougou.map((v, m) => v + yearData.busSales[m]), "bg-amber-100 text-amber-900", "#fef3c7")}
+                      {aggRow("院全体の利益", yearData.sougou.map((v, m) => v + yearData.busTotal[m]), "bg-emerald-100 text-emerald-900", "#d1fae5")}
                     </>
                   );
                 })()}
               </tbody>
             </table>
             <p className="mt-2 px-1 text-[11px] text-slate-400">
-              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費（物販は含めない）。川西院は自費＋保険。総合計＝保険総計＋自費総計＋川西＋体幹（物販は含めない）。物販込み総合計＝総合計＋物販利益。物販売上＝物販の販売総額（確定申告用）。‹ › で年を移動できます。
+              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）。総計＝保険＋自費＋物販（阿部は川西も含む）。院全体の売上＝施術（保険＋自費）＋体幹＋川西＋物販売上（物販は販売総額）。院全体の利益＝施術＋体幹＋川西＋物販利益（物販は利益）。‹ › で年を移動できます。
             </p>
             <p className="px-1 text-[11px] text-slate-400">数字をドラッグ（PC）／タップ（スマホ）で選ぶと、下に合計・平均が出ます。Shift＋クリックで追加選択。</p>
             {/* 選択範囲の合計・平均（スプレッドシート風） */}
