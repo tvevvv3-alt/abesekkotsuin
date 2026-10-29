@@ -1464,6 +1464,7 @@ export default function SalesBoard() {
                       {aggRow("保険総計", yearData.hokenTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("自費総計", yearData.jihiTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("体幹教室", yearData.taikanM, "bg-orange-50 text-orange-700", "#fff7ed")}
+                      {aggRow("川西院", yearData.kawaM, "bg-indigo-50 text-indigo-700", "#eef2ff")}
                       {aggRow("物販利益", yearData.busTotal, "bg-slate-50 text-slate-600", "#f8fafc")}
                       {aggRow("物販売上", yearData.busSales, "bg-slate-100 text-slate-500", "#f1f5f9")}
                       {aggRow("院全体の売上", yearData.sougou.map((v, m) => v + yearData.busSales[m]), "bg-amber-100 text-amber-900", "#fef3c7")}
