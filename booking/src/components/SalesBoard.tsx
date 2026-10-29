@@ -1412,7 +1412,7 @@ export default function SalesBoard() {
               </thead>
               <tbody>
                 {yearData.rows.map((r) => {
-                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m] + r.bus[m]);
+                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m]); // 総計＝保険+自費（物販は物販行で別管理）
                   const cell = (v: number, key: string, bold = false) => (
                     <td {...selProps(key, v)} className={`cursor-cell select-none px-1 py-0.5 text-right tabnum ${v ? "text-slate-700" : "text-slate-300"} ${bold ? "font-bold" : ""}${selClass(key)}`}>{v.toLocaleString()}</td>
                   );
@@ -1474,7 +1474,7 @@ export default function SalesBoard() {
               </tbody>
             </table>
             <p className="mt-2 px-1 text-[11px] text-slate-400">
-              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費＋物販利益。川西院は自費＋保険。総合計＝保険総計＋自費総計＋川西＋体幹（物販は含めない）。物販利益・物販売上は別管理（物販込みで見たい時は総合計＋物販利益）。‹ › で年を移動できます。
+              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費（物販は含めない）。川西院は自費＋保険。総合計＝保険総計＋自費総計＋川西＋体幹（物販は含めない）。物販は物販・物販利益・物販売上の行で別管理（物販込みで見たい時は総合計＋物販利益）。‹ › で年を移動できます。
             </p>
             <p className="px-1 text-[11px] text-slate-400">数字をドラッグ（PC）／タップ（スマホ）で選ぶと、下に合計・平均が出ます。Shift＋クリックで追加選択。</p>
             {/* 選択範囲の合計・平均（スプレッドシート風） */}
