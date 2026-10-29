@@ -1414,8 +1414,8 @@ export default function SalesBoard() {
                 {yearData.rows.map((r) => {
                   const isAbe = r.name.includes("阿部"); // 川西は阿部に含める
                   const kawa = isAbe ? yearData.kawaM : null;
-                  // 総計＝保険＋自費（＋川西：阿部のみ）。物販は総計に含めず、物販行で薄色表示
-                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m] + (kawa ? kawa[m] : 0));
+                  // 総計＝保険＋自費＋物販（＋川西：阿部のみ）。物販行は薄色で参考表示
+                  const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m] + r.bus[m] + (kawa ? kawa[m] : 0));
                   const cell = (v: number, key: string, bold = false, muted = false) => (
                     <td {...selProps(key, v)} className={`cursor-cell select-none px-1 py-0.5 text-right tabnum ${muted ? "italic text-slate-400" : v ? "text-slate-700" : "text-slate-300"} ${bold ? "font-bold" : ""}${selClass(key)}`}>{v.toLocaleString()}</td>
                   );
@@ -1475,7 +1475,7 @@ export default function SalesBoard() {
               </tbody>
             </table>
             <p className="mt-2 px-1 text-[11px] text-slate-400">
-              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入・薄色は参考＝総計に含めない）。総計＝保険＋自費（阿部は川西も含む）。院全体の売上＝施術（保険＋自費）＋体幹＋川西＋物販売上（物販は販売総額）。院全体の利益＝施術＋体幹＋川西＋物販利益（物販は利益）。‹ › で年を移動できます。
+              保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入・薄色で参考表示）。総計＝保険＋自費＋物販（阿部は川西も含む）。院全体の売上＝施術（保険＋自費）＋体幹＋川西＋物販売上（物販は販売総額）。院全体の利益＝施術＋体幹＋川西＋物販利益（物販は利益）。‹ › で年を移動できます。
             </p>
             <p className="px-1 text-[11px] text-slate-400">数字をドラッグ（PC）／タップ（スマホ）で選ぶと、下に合計・平均が出ます。Shift＋クリックで追加選択。</p>
             {/* 選択範囲の合計・平均（スプレッドシート風） */}
