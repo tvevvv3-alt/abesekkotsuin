@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import ClassChartModal from "@/components/ClassChartModal";
@@ -1205,6 +1205,41 @@ export default function SalesBoard() {
   }, [yearSales, staff, kawa, taikan, yearCancelledIds, yearApptKeys, retailCostOf, year]);
   const sum12 = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
+  // 年間表のセル選択（スプレッドシート風：合計・平均）
+  const [sel, setSel] = useState<Map<string, number>>(new Map());
+  const dragRef = useRef<null | "add" | "del">(null);
+  const downRef = useRef<{ x: number; y: number; touch: boolean } | null>(null);
+  const movedRef = useRef(false);
+  useEffect(() => {
+    const mv = (e: PointerEvent) => { const d = downRef.current; if (d && d.touch && (Math.abs(e.clientX - d.x) > 8 || Math.abs(e.clientY - d.y) > 8)) movedRef.current = true; };
+    const up = () => { dragRef.current = null; downRef.current = null; };
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", up);
+    return () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); };
+  }, []);
+  useEffect(() => { setSel(new Map()); }, [view, year]); // ビュー/年の切替で選択解除
+  const selApply = (key: string, val: number, mode: "add" | "del") => setSel((prev) => { const n = new Map(prev); if (mode === "add") n.set(key, val); else n.delete(key); return n; });
+  const selDown = (e: RPE, key: string, val: number) => {
+    const touch = e.pointerType === "touch";
+    downRef.current = { x: e.clientX, y: e.clientY, touch };
+    movedRef.current = false;
+    if (touch) { dragRef.current = null; return; } // タップはpointerupで判定（横スクロール優先）
+    e.preventDefault();
+    if (e.shiftKey || e.metaKey || e.ctrlKey) { const mode: "add" | "del" = sel.has(key) ? "del" : "add"; dragRef.current = mode; selApply(key, val, mode); }
+    else { dragRef.current = "add"; setSel(new Map([[key, val]])); } // 新規選択（ドラッグで拡張、Shiftで追加）
+  };
+  const selEnter = (key: string, val: number) => { if (dragRef.current) selApply(key, val, dragRef.current); };
+  const selUp = (e: RPE, key: string, val: number) => { if (e.pointerType === "touch" && downRef.current && !movedRef.current) selApply(key, val, sel.has(key) ? "del" : "add"); };
+  const selProps = (key: string, val: number) => ({
+    onPointerDown: (e: RPE) => selDown(e, key, val),
+    onPointerEnter: () => selEnter(key, val),
+    onPointerUp: (e: RPE) => selUp(e, key, val),
+  });
+  const selClass = (key: string) => (sel.has(key) ? " bg-blue-200 outline outline-2 -outline-offset-2 outline-blue-500" : "");
+  const selVals = Array.from(sel.values());
+  const selSum = selVals.reduce((a, b) => a + b, 0);
+  const selAvg = selVals.length ? Math.round(selSum / selVals.length) : 0;
+
   const btn = "flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-500 active:bg-slate-100";
   const amt = "w-[60px] rounded border border-slate-300 px-1 py-0 text-right text-[13px] leading-tight tabnum focus:border-blue-400 focus:outline-none";
   // 支払方法を「現金」「レス」の2ボタンで選択。金額(窓口徴収)があるのに未選択なら赤で警告。
@@ -1378,8 +1413,8 @@ export default function SalesBoard() {
               <tbody>
                 {yearData.rows.map((r) => {
                   const sokei = Array.from({ length: 12 }, (_, m) => r.hoken[m] + r.jihi[m] + r.bus[m]);
-                  const cell = (v: number, bold = false) => (
-                    <td className={`px-1 py-0.5 text-right tabnum ${v ? "text-slate-700" : "text-slate-300"} ${bold ? "font-bold" : ""}`}>{v.toLocaleString()}</td>
+                  const cell = (v: number, key: string, bold = false) => (
+                    <td {...selProps(key, v)} className={`cursor-cell select-none px-1 py-0.5 text-right tabnum ${v ? "text-slate-700" : "text-slate-300"} ${bold ? "font-bold" : ""}${selClass(key)}`}>{v.toLocaleString()}</td>
                   );
                   const labelTd = (t: string, bold = false) => (
                     <td className={`sticky z-10 whitespace-nowrap border-r px-1 py-0.5 ${bold ? "font-bold text-slate-600" : "text-slate-400"}`} style={{ left: NAME_W, backgroundColor: overWhite(r.color, 0.07), width: LABEL_W, minWidth: LABEL_W }}>{t}</td>
@@ -1391,23 +1426,23 @@ export default function SalesBoard() {
                           <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: r.color }} />{r.name}
                         </td>
                         {labelTd("保険")}
-                        {r.hoken.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
-                        {cell(sum12(r.hoken), true)}
+                        {r.hoken.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-hoken-${m}`)}</Fragment>)}
+                        {cell(sum12(r.hoken), `${r.id}-hoken-y`, true)}
                       </tr>
                       <tr style={{ backgroundColor: r.color + "10" }}>
                         {labelTd("自費")}
-                        {r.jihi.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
-                        {cell(sum12(r.jihi), true)}
+                        {r.jihi.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-jihi-${m}`)}</Fragment>)}
+                        {cell(sum12(r.jihi), `${r.id}-jihi-y`, true)}
                       </tr>
                       <tr style={{ backgroundColor: r.color + "10" }}>
                         {labelTd("物販")}
-                        {r.bus.map((v, m) => <Fragment key={m}>{cell(v)}</Fragment>)}
-                        {cell(sum12(r.bus), true)}
+                        {r.bus.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-bus-${m}`)}</Fragment>)}
+                        {cell(sum12(r.bus), `${r.id}-bus-y`, true)}
                       </tr>
                       <tr className="border-b" style={{ backgroundColor: r.color + "10" }}>
                         {labelTd("総計", true)}
-                        {sokei.map((v, m) => <Fragment key={m}>{cell(v, true)}</Fragment>)}
-                        {cell(sum12(sokei), true)}
+                        {sokei.map((v, m) => <Fragment key={m}>{cell(v, `${r.id}-sokei-${m}`, true)}</Fragment>)}
+                        {cell(sum12(sokei), `${r.id}-sokei-y`, true)}
                       </tr>
                     </Fragment>
                   );
@@ -1417,10 +1452,11 @@ export default function SalesBoard() {
                   const aggRow = (label: string, arr: number[], cls: string, bg: string) => (
                     <tr className={`border-t ${cls}`}>
                       <td colSpan={2} className="sticky left-0 z-10 whitespace-nowrap border-r px-1.5 py-1 font-bold" style={{ backgroundColor: bg, minWidth: NAME_W + LABEL_W }}>{label}</td>
-                      {arr.map((v, m) => (
-                        <td key={m} className={`px-1 py-1 text-right tabnum font-bold ${v ? "" : "opacity-40"}`}>{v.toLocaleString()}</td>
-                      ))}
-                      <td className="px-1.5 py-1 text-right tabnum font-bold">{sum12(arr).toLocaleString()}</td>
+                      {arr.map((v, m) => {
+                        const key = `agg-${label}-${m}`;
+                        return <td key={m} {...selProps(key, v)} className={`cursor-cell select-none px-1 py-1 text-right tabnum font-bold ${v ? "" : "opacity-40"}${selClass(key)}`}>{v.toLocaleString()}</td>;
+                      })}
+                      {(() => { const key = `agg-${label}-y`; const v = sum12(arr); return <td {...selProps(key, v)} className={`cursor-cell select-none px-1.5 py-1 text-right tabnum font-bold${selClass(key)}`}>{v.toLocaleString()}</td>; })()}
                     </tr>
                   );
                   return (
@@ -1440,6 +1476,16 @@ export default function SalesBoard() {
             <p className="mt-2 px-1 text-[11px] text-slate-400">
               保険＝合計額（保険総額）／自費＝保険外／物販＝物販利益（販売−仕入）／総計＝保険＋自費＋物販利益。川西院は自費＋保険。総合計＝当月サマリーの総売上と一致（物販は利益で計上）。物販売上＝物販の販売総額（確定申告用・総合計には含めない）。‹ › で年を移動できます。
             </p>
+            <p className="px-1 text-[11px] text-slate-400">数字をドラッグ（PC）／タップ（スマホ）で選ぶと、下に合計・平均が出ます。Shift＋クリックで追加選択。</p>
+            {/* 選択範囲の合計・平均（スプレッドシート風） */}
+            {sel.size > 0 && (
+              <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full bg-slate-800 px-5 py-2.5 text-sm text-white shadow-xl">
+                <span className="text-slate-300">選択 <b className="text-white">{sel.size}</b></span>
+                <span className="text-slate-300">合計 <b className="text-white">¥{selSum.toLocaleString()}</b></span>
+                <span className="text-slate-300">平均 <b className="text-white">¥{selAvg.toLocaleString()}</b></span>
+                <button onClick={() => setSel(new Map())} className="ml-1 rounded-full bg-white/20 px-3 py-1 text-xs font-bold active:bg-white/30">クリア</button>
+              </div>
+            )}
           </div>
         )
       ) : loading ? (
