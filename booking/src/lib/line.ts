@@ -337,17 +337,21 @@ export async function maybeAutoSendQuestionnaire(
     .eq("id", 1)
     .maybeSingle();
   if (!s || !(s as { questionnaire_auto?: boolean }).questionnaire_auto) return { sent: false, reason: "off" };
-  // 体幹教室（定員制クラス）の予約には施術の問診票を送らない（申込書は別途送付）
+  // 体幹教室（定員制クラス）の予約には施術の問診票を送らない（申込書は別途送付）。
+  // service_id だけでなくメニュー名でも判定（service_id が空でも確実に除外）。
   try {
-    const { data: a3 } = await admin.from("appointments").select("service_id").eq("id", appt.id).maybeSingle();
+    const { data: a3 } = await admin.from("appointments").select("service_id, service_name").eq("id", appt.id).maybeSingle();
     const svcId = (a3 as { service_id?: string | null } | null)?.service_id ?? null;
-    if (svcId) {
+    const svcName = (a3 as { service_name?: string | null } | null)?.service_name ?? "";
+    let isClass = /体幹/.test(svcName);
+    if (!isClass && svcId) {
       const { data: svs } = await admin.from("services").select("id, category, capacity");
       const classIds = ((svs as { id: string; category: string | null; capacity: number | null }[] | null) ?? [])
         .filter((v) => v.category === "体幹教室" || (v.capacity ?? 0) > 1)
         .map((v) => v.id);
-      if (classIds.includes(svcId)) return { sent: false, reason: "class" };
+      if (classIds.includes(svcId)) isClass = true;
     }
+    if (isClass) return { sent: false, reason: "class" };
   } catch { /* 取得できない場合は従来どおり続行 */ }
   // アプリ内問診票がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
   const inapp = !!(s as { questionnaire_inapp?: boolean }).questionnaire_inapp;
@@ -434,7 +438,13 @@ export async function maybeAutoSendApplication(
   const classIds = ((svs as { id: string; category: string | null; capacity: number | null }[] | null) ?? [])
     .filter((v) => v.category === "体幹教室" || (v.capacity ?? 0) > 1)
     .map((v) => v.id);
-  if (!appt.service_id || !classIds.includes(appt.service_id)) return { sent: false, reason: "notclass" };
+  // 体幹教室か（service_id or メニュー名で判定。service_id が空でも拾う）
+  let isClass = !!(appt.service_id && classIds.includes(appt.service_id));
+  if (!isClass) {
+    const { data: a4 } = await admin.from("appointments").select("service_name").eq("id", appt.id).maybeSingle();
+    if (/体幹/.test((a4 as { service_name?: string | null } | null)?.service_name ?? "")) isClass = true;
+  }
+  if (!isClass) return { sent: false, reason: "notclass" };
 
   const lineId = await resolveLineUserId(admin, appt);
   if (!lineId) return { sent: false, reason: "noline" };
