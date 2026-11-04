@@ -337,6 +337,18 @@ export async function maybeAutoSendQuestionnaire(
     .eq("id", 1)
     .maybeSingle();
   if (!s || !(s as { questionnaire_auto?: boolean }).questionnaire_auto) return { sent: false, reason: "off" };
+  // 体幹教室（定員制クラス）の予約には施術の問診票を送らない（申込書は別途送付）
+  try {
+    const { data: a3 } = await admin.from("appointments").select("service_id").eq("id", appt.id).maybeSingle();
+    const svcId = (a3 as { service_id?: string | null } | null)?.service_id ?? null;
+    if (svcId) {
+      const { data: svs } = await admin.from("services").select("id, category, capacity");
+      const classIds = ((svs as { id: string; category: string | null; capacity: number | null }[] | null) ?? [])
+        .filter((v) => v.category === "体幹教室" || (v.capacity ?? 0) > 1)
+        .map((v) => v.id);
+      if (classIds.includes(svcId)) return { sent: false, reason: "class" };
+    }
+  } catch { /* 取得できない場合は従来どおり続行 */ }
   // アプリ内問診票がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
   const inapp = !!(s as { questionnaire_inapp?: boolean }).questionnaire_inapp;
   const siteBase = (baseUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
