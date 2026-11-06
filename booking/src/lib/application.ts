@@ -38,6 +38,26 @@ export const DEFAULT_APPLICATION_SECTIONS: QSection[] = [
       { key: "birth", label: "生年月日", type: "wareki", required: true },
       { key: "phone", label: "電話番号", type: "tel", required: true },
       { key: "referral", label: "体幹教室はどのようにして知りましたか", type: "text", required: true, placeholder: "例：同じチームの阿部さん／HP／評判 など" },
+      { key: "sport_team", label: "競技名・チーム名", type: "text", required: true, placeholder: "例：野球　チーム名" },
+      { key: "school", label: "学校名", type: "text", required: true },
+      { key: "goal", label: "目的・目標を教えてください（具体的にあれば詳しく教えてください）", type: "textarea", required: true },
+      { key: "exercise_freq", label: "運動頻度はどの程度ですか", type: "radio", options: ["毎日", "週5〜6", "週3〜4", "週1〜2", "月に数日", "していない"], required: true },
+    ],
+  },
+  {
+    title: "健康状態・既往",
+    fields: [
+      { key: "pain", label: "現在、身体に痛みはありますか（痛みの場所もしくは病名）", type: "textarea" },
+      { key: "injury_history", label: "過去にケガをしましたか", type: "textarea", placeholder: "例：小6でオスグットになった、右足がひどい捻挫をしたことがある" },
+      { key: "other_clinic", label: "現在、ほかの病院や整骨院に通院されてますか", type: "text", placeholder: "例：病院名／治療している場所" },
+    ],
+  },
+  {
+    title: "ご要望・料金",
+    note: "【料金（税込）】\n月4回：4,400円（翌月振替1回可能）\nフリーパス：8,150円（8回以上でお得）",
+    fields: [
+      { key: "request", label: "ご要望・伝えたい事、ご自由にお書きください", type: "textarea" },
+      { key: "fee_agree", label: "上記の料金について理解しました", type: "checkbox", options: ["理解しました"], required: true },
     ],
   },
 ];
