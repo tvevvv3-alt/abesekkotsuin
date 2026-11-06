@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       date: appt.date,
       service_id: appt.service_id ?? null,
       application_sent_at: null,
-    });
+    }, getBaseUrl(req));
   } catch { /* 自動送信の失敗で予約連携は止めない */ }
 
   return ok({ ok: true, linked: true, sent: confirmSent, stage: sendStage, error: sendError });

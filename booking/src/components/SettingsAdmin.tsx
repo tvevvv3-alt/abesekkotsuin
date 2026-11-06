@@ -61,6 +61,7 @@ export default function SettingsAdmin() {
       class_application_url: s.class_application_url,
       class_application_text: s.class_application_text,
       class_application_auto: s.class_application_auto,
+      class_application_inapp: s.class_application_inapp,
       remind_eve_enabled: s.remind_eve_enabled,
       remind_eve_hour: s.remind_eve_hour,
       remind_eve_text: s.remind_eve_text,
@@ -76,9 +77,9 @@ export default function SettingsAdmin() {
     };
     let { error: saveErr } = await supabase.from("settings").upsert(payload);
     // 未マイグレーションの列があっても他の設定は保存できるよう、該当列を外して再試行
-    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_inapp|questionnaire_gap_days|class_application_auto|line_oa_url/.test(saveErr.message)) {
-      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, class_application_auto: _o4, questionnaire_inapp: _o5, line_oa_url: _o6, ...rest } = payload;
-      void _o1; void _o2; void _o3; void _o4; void _o5; void _o6;
+    if (saveErr && /questionnaire_admin_url|questionnaire_auto|questionnaire_inapp|questionnaire_gap_days|class_application_auto|class_application_inapp|line_oa_url/.test(saveErr.message)) {
+      const { questionnaire_admin_url: _o1, questionnaire_auto: _o2, questionnaire_gap_days: _o3, class_application_auto: _o4, questionnaire_inapp: _o5, line_oa_url: _o6, class_application_inapp: _o7, ...rest } = payload;
+      void _o1; void _o2; void _o3; void _o4; void _o5; void _o6; void _o7;
       ({ error: saveErr } = await supabase.from("settings").upsert(rest));
     }
     setBusy(false);
@@ -251,7 +252,16 @@ export default function SettingsAdmin() {
       <div className="mb-4 rounded-xl border bg-white p-4">
         <label className="block text-sm font-bold text-slate-700">体幹教室 申込書</label>
         <p className="mt-1 text-[11px] text-slate-500">体幹教室の予約変更画面「体幹教室申込書を送る」で本人へLINE送信します。問診票とは別です。</p>
-        <span className="mt-2 block text-xs font-bold text-slate-500">リンク（Googleフォーム等）</span>
+
+        <div className="mt-2 rounded-lg bg-indigo-50 p-2">
+          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+            <input type="checkbox" checked={!!s.class_application_inapp} onChange={(e) => up({ class_application_inapp: e.target.checked })} />
+            アプリ内申込書を使う（Googleフォームの代わり）
+          </label>
+          <p className="mt-1 text-[11px] text-slate-500">ONにすると、LINEで送る申込書リンクが<b>この予約専用のアプリ内申込書</b>になります。提出内容は「患者管理 → 体幹教室 申込書」で確認・印刷できます。OFFのときは下のGoogleフォームのリンクを送ります。</p>
+        </div>
+
+        <span className="mt-3 block text-xs font-bold text-slate-500">リンク（Googleフォーム。アプリ内申込書OFF時に使用）</span>
         <input
           value={s.class_application_url ?? ""}
           onChange={(e) => up({ class_application_url: e.target.value })}

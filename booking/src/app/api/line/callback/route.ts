@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
       date: appt.date,
       service_id: appt.service_id ?? null,
       application_sent_at: null,
-    });
+    }, base);
   } catch { /* 自動送信の失敗で連携は止めない */ }
 
   return done("?ok=1");

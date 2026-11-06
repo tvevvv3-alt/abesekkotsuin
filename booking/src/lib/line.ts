@@ -416,7 +416,8 @@ export async function maybeAutoSendApplication(
     date: string;
     service_id?: string | null;
     application_sent_at?: string | null;
-  }
+  },
+  baseUrl?: string // アプリ内申込書のベースURL（呼び出し側のリクエストから）
 ): Promise<{ sent: boolean; reason?: string }> {
   // 送信済み判定は列が無くても壊れないよう個別に取得（未マイグレーションでも連携を止めない）
   try {
@@ -425,11 +426,14 @@ export async function maybeAutoSendApplication(
   } catch { /* 列が無ければ未送信として続行 */ }
   const { data: s } = await admin
     .from("settings")
-    .select("class_application_url, class_application_text, class_application_auto")
+    .select("class_application_url, class_application_text, class_application_auto, class_application_inapp")
     .eq("id", 1)
     .maybeSingle();
   if (!s || !(s as { class_application_auto?: boolean }).class_application_auto) return { sent: false, reason: "off" };
-  const url = ((s as { class_application_url?: string | null }).class_application_url || "").trim();
+  // アプリ内申込書がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
+  const inapp = !!(s as { class_application_inapp?: boolean }).class_application_inapp;
+  const siteBase = (baseUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
+  const url = inapp ? `${siteBase}/application?a=${appt.id}` : ((s as { class_application_url?: string | null }).class_application_url || "").trim();
   if (!url) return { sent: false, reason: "nourl" };
   if (!lineMessagingConfigured()) return { sent: false, reason: "notconfigured" };
 

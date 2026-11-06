@@ -209,6 +209,7 @@ export interface Settings {
   class_application_url: string | null; // 体幹教室 申込書（Googleフォーム等）リンク。予約変更から本人へLINE送信
   class_application_text: string | null; // 体幹教室 申込書LINE送信の本文（null=既定）。{URL}にリンク挿入
   class_application_auto: boolean; // 体幹教室の申込書を自動送信（初めての体幹予約で自動）
+  class_application_inapp: boolean; // 申込書リンクをアプリ内フォームにする（OFF=Googleフォーム）
   remind_eve_enabled: boolean; // 前日リマインドを送るか
   remind_eve_hour: number; // 前日リマインドの送信時刻（JST 時, 0-23）
   remind_eve_text: string | null; // 前日リマインドの本文
@@ -221,6 +222,7 @@ export interface Settings {
   notice_ibaraki: string | null; // 予約トップのお知らせ（茨木本院）。空欄なら非表示
   notice_kawanishi: string | null; // 予約トップのお知らせ（川西整体院）。空欄なら非表示
   questionnaire_schema: unknown | null; // アプリ内問診票の質問定義（QSection[]のJSON）。null=既定を使用
+  application_schema: unknown | null; // 体幹教室 申込書の質問定義（QSection[]のJSON）。null=既定を使用
 }
 
 // 月別の予約公開設定

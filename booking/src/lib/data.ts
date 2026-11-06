@@ -129,6 +129,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     class_application_url: null,
     class_application_text: null,
     class_application_auto: false,
+    class_application_inapp: false,
     remind_eve_enabled: true,
     remind_eve_hour: 18,
     remind_eve_text: null,
@@ -141,6 +142,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     notice_ibaraki: null,
     notice_kawanishi: null,
     questionnaire_schema: null,
+    application_schema: null,
   };
   if (!data) return defaults;
   // 移行前で列が無い場合も既定で補完
@@ -162,6 +164,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     class_application_url: data.class_application_url ?? null,
     class_application_text: data.class_application_text ?? null,
     class_application_auto: data.class_application_auto ?? false,
+    class_application_inapp: data.class_application_inapp ?? false,
     remind_eve_enabled: data.remind_eve_enabled ?? true,
     remind_eve_hour: data.remind_eve_hour ?? 18,
     remind_eve_text: data.remind_eve_text ?? null,
@@ -174,6 +177,7 @@ export async function loadSettings(sb: SupabaseClient): Promise<Settings> {
     notice_ibaraki: data.notice_ibaraki ?? null,
     notice_kawanishi: data.notice_kawanishi ?? null,
     questionnaire_schema: data.questionnaire_schema ?? null,
+    application_schema: data.application_schema ?? null,
   };
 }
 

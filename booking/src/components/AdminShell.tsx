@@ -17,6 +17,7 @@ const DEFAULT_NAV: NavItem[] = [
   {
     href: "/admin/class", label: "体幹教室", icon: "🤸", children: [
       { href: "/admin/core-eval", label: "体幹評価" },
+      { href: "/admin/application", label: "申込書（アプリ内）" },
     ],
   },
   {
