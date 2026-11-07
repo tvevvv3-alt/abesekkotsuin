@@ -424,14 +424,20 @@ export async function maybeAutoSendApplication(
     const { data: a2, error } = await admin.from("appointments").select("application_sent_at").eq("id", appt.id).maybeSingle();
     if (!error && (a2 as { application_sent_at?: string | null } | null)?.application_sent_at) return { sent: false, reason: "already" };
   } catch { /* 列が無ければ未送信として続行 */ }
+  // 保証済みの列だけで取得（未マイグレーションの環境でも設定取得が失敗しない）。
   const { data: s } = await admin
     .from("settings")
-    .select("class_application_url, class_application_text, class_application_auto, class_application_inapp")
+    .select("class_application_url, class_application_text, class_application_auto")
     .eq("id", 1)
     .maybeSingle();
   if (!s || !(s as { class_application_auto?: boolean }).class_application_auto) return { sent: false, reason: "off" };
+  // アプリ内申込書フラグは別取得（列が無い環境では Googleフォームにフォールバック）。
+  let inapp = false;
+  try {
+    const { data: si, error } = await admin.from("settings").select("class_application_inapp").eq("id", 1).maybeSingle();
+    if (!error) inapp = !!(si as { class_application_inapp?: boolean } | null)?.class_application_inapp;
+  } catch { /* 列が無ければアプリ内OFF扱い */ }
   // アプリ内申込書がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
-  const inapp = !!(s as { class_application_inapp?: boolean }).class_application_inapp;
   const siteBase = (baseUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
   const url = inapp ? `${siteBase}/application?a=${appt.id}` : ((s as { class_application_url?: string | null }).class_application_url || "").trim();
   if (!url) return { sent: false, reason: "nourl" };
