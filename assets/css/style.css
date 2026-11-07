@@ -1364,15 +1364,24 @@ p { margin: 0; }
 }
 .article-card { display: flex; }
 .article-card__link {
-  display: flex; flex-direction: column; width: 100%;
+  --cardpad: clamp(24px, 5.5vw, 32px);
+  display: flex; flex-direction: column; width: 100%; overflow: hidden;
   background: linear-gradient(140deg, rgba(255,255,255,0.42), rgba(255,255,255,0.14));
   -webkit-backdrop-filter: blur(26px) saturate(150%);
   backdrop-filter: blur(26px) saturate(150%);
   border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 18px;
-  padding: clamp(24px, 5.5vw, 32px);
+  padding: var(--cardpad);
   box-shadow: 0 18px 44px -26px rgba(20, 32, 44, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
 }
+.article-card__thumb {
+  display: block;
+  width: calc(100% + var(--cardpad) * 2);
+  margin: calc(var(--cardpad) * -1) calc(var(--cardpad) * -1) clamp(18px, 4vw, 22px);
+  aspect-ratio: 16 / 9; object-fit: cover; object-position: 50% 40%;
+  background: rgba(47, 116, 214, 0.06);
+}
+.article-card__link:hover .article-card__thumb { opacity: 0.94; }
 .article-card__link:hover {
   transform: translateY(-3px);
   box-shadow: 0 28px 56px -28px rgba(20, 32, 44, 0.5);
