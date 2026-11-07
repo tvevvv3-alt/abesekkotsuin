@@ -417,7 +417,8 @@ export async function maybeAutoSendApplication(
     service_id?: string | null;
     application_sent_at?: string | null;
   },
-  baseUrl?: string // アプリ内申込書のベースURL（呼び出し側のリクエストから）
+  baseUrl?: string, // アプリ内申込書のベースURL（呼び出し側のリクエストから）
+  opts?: { dryRun?: boolean } // dryRun=true のとき実際には送らず、判定理由だけ返す（診断用）
 ): Promise<{ sent: boolean; reason?: string }> {
   // 送信済み判定は列が無くても壊れないよう個別に取得（未マイグレーションでも連携を止めない）
   try {
@@ -478,6 +479,9 @@ export async function maybeAutoSendApplication(
     if ((data as unknown[] | null)?.length) hasPrior = true;
   }
   if (hasPrior) return { sent: false, reason: "notfirst" };
+
+  // 診断モード：ここまで来れば本来は送信される。実際には送らず理由を返す。
+  if (opts?.dryRun) return { sent: false, reason: "would-send" };
 
   const tpl = ((s as { class_application_text?: string | null }).class_application_text || "").trim() || DEFAULT_APPLICATION_TEXT;
   const r = await pushText(lineId, renderLinkMessage(tpl, url));
