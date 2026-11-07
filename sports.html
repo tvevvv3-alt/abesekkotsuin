@@ -46,7 +46,7 @@
   }
   </script>
 </head>
-<body>
+<body class="has-dockbar">
 
   <!-- ========================= HEADER ========================= -->
   <header class="site-header" id="siteHeader">
@@ -61,128 +61,143 @@
   </header>
 
   <!-- ========================= HERO ========================= -->
-  <header class="post-hero">
-    <div class="post-hero__bg">
-      <img src="assets/images/blog-skateboard-movement.png" alt="" aria-hidden="true" />
+  <section class="hero" id="hero">
+    <div class="hero__media">
+      <img src="assets/images/blog-skateboard-movement.png" alt="競技中のアスリート" />
+      <div class="hero__scrim"></div>
     </div>
-    <div class="post-hero__inner container container--narrow">
-      <nav class="post-hero__crumb" aria-label="パンくず">
-        <a href="index.html#hero">ホーム</a><span aria-hidden="true">／</span><span>スポーツのケガ</span>
-      </nav>
-      <span class="post-hero__cat">スポーツ外傷・障害</span>
-      <p class="post-hero__kicker">部活・競技を、あきらめる前に。</p>
-      <h1 class="post-hero__title">その痛み、<br />がまんして続けてない？</h1>
-      <p class="post-hero__sub">オスグッド・野球肘・シンスプリント・肉離れ・捻挫…部活や競技中のケガを、原因から見極めて“競技復帰”までサポートします。</p>
-      <p class="post-hero__meta">茨木市のスポーツ特化 ｜ 阿部接骨院</p>
+    <div class="hero__inner">
+      <p class="hero__lead reveal">部活・競技を、<br />あきらめる前に。</p>
+      <h1 class="hero__title reveal" data-delay="1"><span class="hero__title-inner">その痛み、<br />がまんして<br />続けてない？</span></h1>
+      <div class="hero__message reveal" data-delay="2">
+        <p>オスグッド・野球肘・シンスプリント・<br />肉離れ・捻挫…</p>
+        <p>競技中のケガを原因から見極め、<br />“競技復帰”までサポートします。</p>
+      </div>
+      <div class="hero__cta reveal" data-delay="3">
+        <a class="btn btn--line btn--lg" href="#" data-line>
+          <span class="btn__icon" aria-hidden="true"></span>
+          LINEで予約・相談
+        </a>
+      </div>
     </div>
-  </header>
+    <a href="#s-symptoms" class="hero__scroll" aria-label="下へスクロール">
+      <span class="hero__scroll-line"></span>
+    </a>
+  </section>
 
-  <!-- ========================= BODY ========================= -->
-  <article class="post">
-    <div class="container container--narrow">
-
-      <p class="post__lead reveal">
-        「少し休めば治る」と思って続けた痛みが、<strong>大会前に悪化</strong>。<br />
-        部活や競技のケガは、<strong>早く・正しく対処できるか</strong>で復帰のスピードが大きく変わります。
-      </p>
-    </div>
-
-    <!-- 症状グリッド（既存の記事カードを流用） -->
+  <!-- ========================= 症状（横スクロール） ========================= -->
+  <section class="section section--alt section--worry" id="s-symptoms">
     <div class="container">
-      <header class="section__head reveal" style="margin-bottom:0;">
-        <span class="section__index">01</span>
-        <h2 class="section__title">こんな痛み・ケガ、ありませんか？</h2>
-        <p class="section__sub">部活生・学生アスリートに多い症状です。当てはまったら早めにご相談ください。</p>
+      <header class="section__head reveal">
+        <h2 class="section__title">こんな痛み・ケガ、<br />ありませんか？</h2>
+        <p class="section__sub">部活生・学生アスリートに多い症状です。当てはまったら、早めにご相談ください。</p>
       </header>
-      <ul class="articles">
-        <li class="article-card reveal">
-          <div class="article-card__link">
-            <span class="article-card__cat">ひざ</span>
-            <h3 class="article-card__title">オスグッド／ジャンパー膝</h3>
-            <p class="article-card__desc">成長期に多い膝のお皿の下の痛み。走る・跳ぶ・ダッシュでズキッとくる。</p>
-          </div>
+    </div>
+
+    <div class="hscroll reveal" data-hscroll>
+      <ul class="hscroll__track">
+        <li class="hcard">
+          <span class="hcard__no">01</span>
+          <span class="hcard__icon">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="32" cy="32" r="20"/><polyline points="14 32 25 32 29 22 35 42 39 32 50 32"/></svg>
+          </span>
+          <p class="hcard__text">オスグッド／<br />ジャンパー膝</p>
         </li>
-        <li class="article-card reveal" data-delay="1">
-          <div class="article-card__link">
-            <span class="article-card__cat">ひじ・肩</span>
-            <h3 class="article-card__title">野球肘／野球肩</h3>
-            <p class="article-card__desc">投げると痛い・球速が落ちた。放置すると長期離脱につながることも。</p>
-          </div>
+        <li class="hcard">
+          <span class="hcard__no">02</span>
+          <span class="hcard__icon">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="32" cy="32" r="20"/><polyline points="14 32 25 32 29 22 35 42 39 32 50 32"/></svg>
+          </span>
+          <p class="hcard__text">野球肘／<br />野球肩</p>
         </li>
-        <li class="article-card reveal" data-delay="2">
-          <div class="article-card__link">
-            <span class="article-card__cat">すね・足</span>
-            <h3 class="article-card__title">シンスプリント／疲労骨折の疑い</h3>
-            <p class="article-card__desc">走るとすねの内側が痛い。練習量が増えた時期に出やすい使い過ぎのサイン。</p>
-          </div>
+        <li class="hcard">
+          <span class="hcard__no">03</span>
+          <span class="hcard__icon">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="32" cy="32" r="20"/><polyline points="14 32 25 32 29 22 35 42 39 32 50 32"/></svg>
+          </span>
+          <p class="hcard__text">シンスプリント／<br />疲労骨折の疑い</p>
         </li>
-        <li class="article-card reveal" data-delay="1">
-          <div class="article-card__link">
-            <span class="article-card__cat">肉離れ</span>
-            <h3 class="article-card__title">太もも・ふくらはぎの肉離れ</h3>
-            <p class="article-card__desc">ダッシュやジャンプでブチッ。初期対応と復帰の見極めが再発を防ぐカギ。</p>
-          </div>
+        <li class="hcard">
+          <span class="hcard__no">04</span>
+          <span class="hcard__icon">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="32" cy="32" r="20"/><polyline points="14 32 25 32 29 22 35 42 39 32 50 32"/></svg>
+          </span>
+          <p class="hcard__text">太もも・ふくらはぎ<br />の肉離れ</p>
         </li>
-        <li class="article-card reveal" data-delay="2">
-          <div class="article-card__link">
-            <span class="article-card__cat">足首・腰</span>
-            <h3 class="article-card__title">捻挫／腰椎分離症・スポーツ腰痛</h3>
-            <p class="article-card__desc">繰り返す足首の捻挫、反ると痛い腰。かばう動きが新たな不調を生みます。</p>
-          </div>
+        <li class="hcard">
+          <span class="hcard__no">05</span>
+          <span class="hcard__icon">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="32" cy="32" r="20"/><polyline points="14 32 25 32 29 22 35 42 39 32 50 32"/></svg>
+          </span>
+          <p class="hcard__text">捻挫／<br />腰椎分離症</p>
         </li>
-        <li class="article-card reveal" data-delay="3">
-          <div class="article-card__link">
-            <span class="article-card__cat">くり返す・長引く</span>
-            <h3 class="article-card__title">オーバーユース／ぶり返す痛み</h3>
-            <p class="article-card__desc">「同じ所ばかり痛める」のは、身体の使い方にヒントがあります。</p>
-          </div>
+        <li class="hcard">
+          <span class="hcard__no">06</span>
+          <span class="hcard__icon">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="61 11 61 27 45 27"/><polyline points="3 53 3 37 19 37"/><path d="M9.36 24 a24 24 0 0 1 39.6 -8.96 L61 27 M3 37 l12.4 11.6 a24 24 0 0 0 39.6 -8.96"/></svg>
+          </span>
+          <p class="hcard__text">オーバーユース／<br />ぶり返す痛み</p>
         </li>
       </ul>
     </div>
+    <p class="hscroll__hint reveal" aria-hidden="true">← よこにスクロール →</p>
+  </section>
+
+  <!-- ========================= 宣言 ========================= -->
+  <section class="section section--statement">
+    <div class="container container--narrow">
+      <p class="statement__kicker reveal">がまんは、正解じゃない。</p>
+      <div class="statement__lines">
+        <p class="statement__line reveal">なぜ、痛いのか。</p>
+        <p class="statement__line reveal">なぜ、繰り返すのか。</p>
+        <p class="statement__line reveal">その原因から、<br />見つけ出す。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 競技復帰まで ========================= -->
+  <section class="section section--step section--evaluate" id="s-flow">
+    <div class="container">
+      <header class="section__head reveal">
+        <span class="section__index">01</span>
+        <h2 class="section__title section__title--xl">競技復帰まで。</h2>
+        <p class="section__sub">痛みを取るだけで、終わらせない。動ける身体に戻します。</p>
+      </header>
+    </div>
 
     <div class="container container--narrow">
-      <section class="post__sec reveal">
-        <h2 class="post__h2">なぜ、痛みが長引く・繰り返すのか</h2>
-        <p>痛い場所＝原因、とは限りません。身体は<strong>使いやすい場所</strong>を優先して動くため、同じ部位にばかり負担が集中し、痛みやケガにつながります。</p>
-        <p>だから阿部接骨院では、痛みのある場所だけでなく、</p>
-        <ul class="post__list">
-          <li>なぜ、そこに負担がかかっているのか</li>
-          <li>どの動き・どの使い方が引き金になっているのか</li>
-        </ul>
-        <p>を見極めてから施術します。これが「早く治す」と「再発させない」の両立につながります。</p>
-      </section>
-
-      <section class="post__sec reveal">
-        <h2 class="post__h2">競技復帰までの流れ</h2>
-        <ul class="post__list">
-          <li><strong>見極める</strong>…必要に応じてエコーで組織（筋・靭帯・骨・軟骨）の状態を確認し、原因を特定。</li>
-          <li><strong>施術する</strong>…微弱電流治療器などで痛みと組織の回復にアプローチ。</li>
-          <li><strong>動ける身体をつくる</strong>…体幹・動作を整え、パフォーマンスと再発予防へ。</li>
-          <li><strong>競技復帰</strong>…大会・試合に向けて、戻すタイミングまで一緒に判断します。</li>
-        </ul>
-      </section>
-
-      <section class="post__sec reveal">
-        <h2 class="post__h2">部活生・学生アスリート、歓迎です</h2>
-        <p>「大会前に間に合わせたい」「テスト期間だけ通いたい」——そんな相談も大歓迎。完全予約制なので待ち時間が少なく、学校・部活の後でも通いやすい環境です。</p>
-        <p>競技中の<strong>動画</strong>があれば、ぜひ見せてください。普段の身体の使い方から、痛みの原因を一緒に探せます。</p>
-      </section>
-
-      <!-- CTA -->
-      <aside class="post-cta reveal">
-        <p class="post-cta__lead">スポーツのケガ・痛みのご相談は、<br />LINEからお気軽にどうぞ。</p>
-        <div class="post-cta__btns">
-          <a class="btn btn--line btn--lg" href="#" data-line>
-            <span class="btn__icon" aria-hidden="true"></span>
-            LINEで予約・相談
-          </a>
-        </div>
-      </aside>
-
-      <p class="post__back reveal"><a href="index.html#hero">← ホームへ戻る</a></p>
-
+      <ul class="assess reveal">
+        <li class="assess__item">
+          <h3 class="assess__label">見極める</h3>
+          <p class="assess__desc">必要に応じエコーで組織を確認し、痛みの原因を特定</p>
+        </li>
+        <li class="assess__item">
+          <h3 class="assess__label">施術する</h3>
+          <p class="assess__desc">微弱電流治療器などで、痛みと組織の回復にアプローチ</p>
+        </li>
+        <li class="assess__item">
+          <h3 class="assess__label">動ける身体へ</h3>
+          <p class="assess__desc">体幹・動作を整え、再発予防とパフォーマンス向上へ</p>
+        </li>
+        <li class="assess__item">
+          <h3 class="assess__label">競技復帰</h3>
+          <p class="assess__desc">大会・試合に向け、戻すタイミングまで一緒に判断</p>
+        </li>
+      </ul>
     </div>
-  </article>
+  </section>
+
+  <!-- ========================= 宣言（ダーク） ========================= -->
+  <section class="section section--statement section--dark">
+    <div class="container container--narrow">
+      <p class="statement__kicker reveal">部活生・学生アスリート、歓迎。</p>
+      <div class="statement__lines">
+        <p class="statement__line reveal">「大会前に、<br />間に合わせたい」</p>
+        <p class="statement__line reveal">その相談こそ、<br />得意です。</p>
+      </div>
+      <p class="section__sub reveal" style="text-align:center;margin-top:1.6em;">完全予約制で待ち時間が少なく、学校・部活の後でも通いやすい。競技中の動画があれば、ぜひ見せてください。</p>
+    </div>
+  </section>
 
   <!-- ========================= FOOTER ========================= -->
   <footer class="footer" id="footer">
