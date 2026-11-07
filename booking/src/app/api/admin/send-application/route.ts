@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getBaseUrl } from "@/lib/url";
 import { DEFAULT_APPLICATION_TEXT, lineMessagingConfigured, pushText, renderLinkMessage, resolveLineUserId } from "@/lib/line";
 
 export const runtime = "nodejs";
@@ -33,7 +34,17 @@ export async function POST(req: NextRequest) {
   if (!lineId) return NextResponse.json({ ok: false, reason: "noline" });
 
   const { data: s } = await admin.from("settings").select("class_application_url, class_application_text").eq("id", 1).maybeSingle();
-  const url = (s?.class_application_url as string | null)?.trim();
+  // アプリ内申込書フラグは別取得（列が無い環境では Googleフォームにフォールバック）。
+  let inapp = false;
+  try {
+    const { data: si, error } = await admin.from("settings").select("class_application_inapp").eq("id", 1).maybeSingle();
+    if (!error) inapp = !!(si as { class_application_inapp?: boolean } | null)?.class_application_inapp;
+  } catch { /* 列が無ければアプリ内OFF扱い */ }
+  // アプリ内ONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
+  const siteBase = getBaseUrl(req).replace(/\/$/, "");
+  const url = inapp
+    ? `${siteBase}/application?a=${appointmentId}`
+    : (s?.class_application_url as string | null)?.trim();
   if (!url) return NextResponse.json({ ok: false, reason: "nourl" });
   if (!lineMessagingConfigured()) return NextResponse.json({ ok: false, reason: "notconfigured" });
 
