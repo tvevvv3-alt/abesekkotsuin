@@ -204,32 +204,8 @@ export default function SettingsAdmin() {
         <p className="mt-1 text-[11px] text-slate-400">※ブラウザでLINE応対画面を開いた時のアドレスをそのまま貼るのが確実です。</p>
 
         <label className="mt-5 block text-sm font-bold text-slate-700">問診票</label>
-        <p className="mt-1 text-[11px] text-slate-500">患者用フォームは「問診票を送る」で本人へLINE送信、左メニュー「患者管理 → 問診票」からは<b>管理用（回答閲覧）ページ</b>を開きます。</p>
+        <p className="mt-1 text-[11px] text-slate-500">「問診票を送る」で本人へLINE送信します。回答は<b>カルテ初診時に自動反映</b>（二重入力なし）。回答の確認・印刷は左メニュー「患者管理 → 問診票」から行えます。</p>
 
-        <div className="mt-2 rounded-lg bg-teal-50 p-2">
-          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-            <input type="checkbox" checked={!!s.questionnaire_inapp} onChange={(e) => up({ questionnaire_inapp: e.target.checked })} />
-            アプリ内問診票を使う（Googleフォームの代わり）
-          </label>
-          <p className="mt-1 text-[11px] text-slate-500">ONにすると、LINEで送る問診票リンクが<b>この予約専用のアプリ内問診票</b>になります。回答は<b>カルテ初診時に自動反映</b>（二重入力なし）。OFFのときは下のGoogleフォームのリンクを送ります。</p>
-        </div>
-
-        <span className="mt-3 block text-xs font-bold text-slate-500">患者用フォームのリンク（Googleフォーム。アプリ内問診票OFF時に使用）</span>
-        <input
-          value={s.questionnaire_url ?? ""}
-          onChange={(e) => up({ questionnaire_url: e.target.value })}
-          placeholder="https://docs.google.com/forms/d/…/viewform"
-          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-        />
-        <p className="mt-1 text-[11px] text-slate-400">患者に送るのはこちら（末尾 <code className="rounded bg-slate-100 px-1">/viewform</code>）。</p>
-        <span className="mt-3 block text-xs font-bold text-slate-500">管理用の回答閲覧ページ（メニュー「問診票」から開く）</span>
-        <input
-          value={s.questionnaire_admin_url ?? ""}
-          onChange={(e) => up({ questionnaire_admin_url: e.target.value })}
-          placeholder="回答一覧ページのURL（例：…/edit#responses）"
-          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-        />
-        <p className="mt-1 text-[11px] text-slate-400">回答を確認するページのURL。未入力なら患者用フォームを開きます。</p>
         <span className="mt-3 block text-xs font-bold text-slate-500">LINEメッセージ本文</span>
         <textarea
           value={s.questionnaire_text ?? ""}
@@ -245,29 +221,14 @@ export default function SettingsAdmin() {
             <input type="checkbox" checked={!!s.questionnaire_auto} onChange={(e) => up({ questionnaire_auto: e.target.checked })} />
             問診票を自動送信する
           </label>
-          <p className="mt-1 text-[11px] text-slate-500">LINE予約の連携時に、<b>初診</b>、または<b>最終来院の翌々月以降（初診扱い）</b>の再来に、上記の問診票リンクを自動送信します。<br />例）最終5/10 → 7月末まで再送なし、8月以降の予約で自動送信。親子・兄弟は本人の来院状況で判定します。</p>
+          <p className="mt-1 text-[11px] text-slate-500">LINE予約の連携時に、<b>初診</b>、または<b>最終来院の翌々月以降（初診扱い）</b>の再来に、問診票リンクを自動送信します。<br />例）最終5/10 → 7月末まで再送なし、8月以降の予約で自動送信。親子・兄弟は本人の来院状況で判定します。</p>
         </div>
       </div>
 
       <div className="mb-4 rounded-xl border bg-white p-4">
         <label className="block text-sm font-bold text-slate-700">体幹教室 申込書</label>
-        <p className="mt-1 text-[11px] text-slate-500">体幹教室の予約変更画面「体幹教室申込書を送る」で本人へLINE送信します。問診票とは別です。</p>
+        <p className="mt-1 text-[11px] text-slate-500">体幹教室の予約変更画面「体幹教室申込書を送る」で本人へLINE送信します。提出内容は左メニュー「体幹教室 → 申込書」で確認・印刷できます。問診票とは別です。</p>
 
-        <div className="mt-2 rounded-lg bg-indigo-50 p-2">
-          <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-            <input type="checkbox" checked={!!s.class_application_inapp} onChange={(e) => up({ class_application_inapp: e.target.checked })} />
-            アプリ内申込書を使う（Googleフォームの代わり）
-          </label>
-          <p className="mt-1 text-[11px] text-slate-500">ONにすると、LINEで送る申込書リンクが<b>この予約専用のアプリ内申込書</b>になります。提出内容は「患者管理 → 体幹教室 申込書」で確認・印刷できます。OFFのときは下のGoogleフォームのリンクを送ります。</p>
-        </div>
-
-        <span className="mt-3 block text-xs font-bold text-slate-500">リンク（Googleフォーム。アプリ内申込書OFF時に使用）</span>
-        <input
-          value={s.class_application_url ?? ""}
-          onChange={(e) => up({ class_application_url: e.target.value })}
-          placeholder="https://docs.google.com/forms/d/…/viewform"
-          className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-        />
         <span className="mt-3 block text-xs font-bold text-slate-500">LINEメッセージ本文</span>
         <textarea
           value={s.class_application_text ?? ""}
@@ -283,7 +244,7 @@ export default function SettingsAdmin() {
             <input type="checkbox" checked={!!s.class_application_auto} onChange={(e) => up({ class_application_auto: e.target.checked })} />
             申込書を自動送信する
           </label>
-          <p className="mt-1 text-[11px] text-slate-500"><b>初めて体幹教室を予約</b>した方に、LINE連携時に上記の申込書リンクを自動送信します（2回目以降は送りません）。</p>
+          <p className="mt-1 text-[11px] text-slate-500"><b>初めて体幹教室を予約</b>した方に、LINE連携時に申込書リンクを自動送信します（2回目以降は送りません）。</p>
         </div>
       </div>
 

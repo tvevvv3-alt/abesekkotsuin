@@ -353,11 +353,9 @@ export async function maybeAutoSendQuestionnaire(
     }
     if (isClass) return { sent: false, reason: "class" };
   } catch { /* 取得できない場合は従来どおり続行 */ }
-  // アプリ内問診票がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
-  const inapp = !!(s as { questionnaire_inapp?: boolean }).questionnaire_inapp;
+  // 問診票はアプリ内フォームのみ（この予約専用の入力ページURLを送る）
   const siteBase = (baseUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
-  const url = inapp ? `${siteBase}/intake?a=${appt.id}` : ((s as { questionnaire_url?: string | null }).questionnaire_url || "").trim();
-  if (!url) return { sent: false, reason: "nourl" };
+  const url = `${siteBase}/intake?a=${appt.id}`;
   if (!lineMessagingConfigured()) return { sent: false, reason: "notconfigured" };
   const lineId = await resolveLineUserId(admin, appt);
   if (!lineId) return { sent: false, reason: "noline" };
@@ -432,16 +430,9 @@ export async function maybeAutoSendApplication(
     .eq("id", 1)
     .maybeSingle();
   if (!s || !(s as { class_application_auto?: boolean }).class_application_auto) return { sent: false, reason: "off" };
-  // アプリ内申込書フラグは別取得（列が無い環境では Googleフォームにフォールバック）。
-  let inapp = false;
-  try {
-    const { data: si, error } = await admin.from("settings").select("class_application_inapp").eq("id", 1).maybeSingle();
-    if (!error) inapp = !!(si as { class_application_inapp?: boolean } | null)?.class_application_inapp;
-  } catch { /* 列が無ければアプリ内OFF扱い */ }
-  // アプリ内申込書がONなら、この予約専用の入力ページURLを送る（Googleフォームの代わり）
+  // 申込書はアプリ内フォームのみ（この予約専用の入力ページURLを送る）
   const siteBase = (baseUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://abesekkotsuin.vercel.app").replace(/\/$/, "");
-  const url = inapp ? `${siteBase}/application?a=${appt.id}` : ((s as { class_application_url?: string | null }).class_application_url || "").trim();
-  if (!url) return { sent: false, reason: "nourl" };
+  const url = `${siteBase}/application?a=${appt.id}`;
   if (!lineMessagingConfigured()) return { sent: false, reason: "notconfigured" };
 
   // 体幹教室サービスのid一覧（category=体幹教室 or 定員制）
