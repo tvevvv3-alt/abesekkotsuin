@@ -2159,3 +2159,6 @@ body.is-modal-open { overflow: hidden; }
   border: 1px solid rgba(255,255,255,0.3); background: rgba(205,168,84,0.95);
   box-shadow: 0 6px 16px -9px rgba(150,110,30,0.7);
 }
+
+/* LP HERO：施設バッジとLINEボタンの間に余白 */
+.hero--lp .hero__cta { margin-block-start: clamp(16px, 4.5vw, 24px); }
