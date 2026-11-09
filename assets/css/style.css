@@ -256,6 +256,15 @@ p { margin: 0; }
   opacity: 0.95;
 }
 .hero__cta { }
+.hero__badges { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 1.5em 0 0; padding: 0; }
+.hero__badge {
+  display: inline-flex; align-items: center;
+  padding: 0.42em 0.95em; border-radius: 999px;
+  font-size: 0.8rem; font-weight: 600; letter-spacing: 0.03em; color: #fff;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.3);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
 .hero__scroll {
   position: absolute;
   inset-block-end: max(22px, env(safe-area-inset-bottom));
