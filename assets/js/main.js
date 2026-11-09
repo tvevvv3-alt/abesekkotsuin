@@ -325,7 +325,7 @@
     var img = document.querySelector(".hero__media img");
     var inner = document.querySelector(".hero__inner");
     if (reduceMotion || !hero || !img) return;
-    var zoomAmt = hero.classList.contains("hero--lp") ? 0.36 : 0.16;
+    var zoomAmt = hero.classList.contains("hero--lp") ? 0.6 : 0.16;
     var baseMargin = inner ? getComputedStyle(inner).marginTop : "0px";
     var hTicking = false;
     function heroUpdate() {
