@@ -2137,3 +2137,17 @@ body.is-modal-open { overflow: hidden; }
   background: linear-gradient(135deg, var(--field-2), var(--field));
   box-shadow: 0 9px 20px -9px rgba(20,32,44,0.55);
 }
+
+/* ===== LP HERO：ひと目で入る タグ＆タグライン ===== */
+.hero__tagline {
+  font-family: var(--sans); font-weight: 600;
+  font-size: clamp(1.05rem, 4.6vw, 1.32rem); line-height: 1.5;
+  margin: 0.85em 0 0; letter-spacing: 0.02em;
+  text-shadow: 0 2px 14px rgba(0,0,0,0.6);
+}
+.hero__tags { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0.9em 0 0; padding: 0; }
+.hero__tag {
+  font-size: 0.79rem; font-weight: 600; color: #fff; letter-spacing: 0.02em;
+  padding: 0.3em 0.8em; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.06);
+}
