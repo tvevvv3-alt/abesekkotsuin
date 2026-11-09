@@ -2091,7 +2091,7 @@ body.is-modal-open { overflow: hidden; }
   object-fit: cover; object-position: 52% 28%; transform: none; animation: none;
 }
 .hero--lp .hero__scrim {
-  background: linear-gradient(to top, rgba(6,12,22,0.96) 5%, rgba(6,12,22,0.80) 24%, rgba(6,12,22,0.42) 48%, rgba(6,12,22,0.12) 70%, rgba(6,12,22,0.34) 100%);
+  background: linear-gradient(to top, rgba(6,12,22,0.97) 4%, rgba(6,12,22,0.9) 30%, rgba(6,12,22,0.66) 52%, rgba(6,12,22,0.28) 72%, rgba(6,12,22,0.1) 100%);
 }
 .hero--lp .hero__inner { margin-block-start: 0; padding-block: 0 clamp(92px, 21vw, 124px); }
 .hero--lp .hero__lead { margin-block-end: 0.7em; }
