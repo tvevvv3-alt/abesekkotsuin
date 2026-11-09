@@ -178,7 +178,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen bg-slate-100">
       {/* モバイル用ヘッダ（ハンバーガー） */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b bg-white px-4 py-3 md:hidden">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b bg-white px-4 py-3 md:hidden print:hidden">
         <button
           onClick={() => setOpen(true)}
           className="rounded-md p-1.5 text-slate-700 hover:bg-slate-100"
@@ -203,7 +203,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
       {/* モバイル：ドロワー */}
       {open && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 md:hidden print:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-0 flex h-full w-64 flex-col bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-4 py-3">
@@ -220,7 +220,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
       <div className="flex w-full">
         {/* デスクトップ：サイドメニュー */}
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-white md:flex">
+        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-white md:flex print:hidden">
           <div className="border-b px-4 py-4">
             <div className="font-bold text-slate-800">阿部接骨院</div>
             <div className="text-xs text-slate-400">予約管理</div>
@@ -235,9 +235,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </button>
         </aside>
 
-        <main className="min-w-0 flex-1 px-2 py-4 md:px-3">{children}</main>
+        <main className="min-w-0 flex-1 px-2 py-4 md:px-3 print:px-0 print:py-0">{children}</main>
       </div>
-      <LineFab />
+      <div className="print:hidden"><LineFab /></div>
     </div>
   );
 }
