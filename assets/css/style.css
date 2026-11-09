@@ -2183,3 +2183,6 @@ body.is-modal-open { overflow: hidden; }
   margin: 0; font-weight: 600; color: var(--field);
   font-size: clamp(0.6rem, 2.6vw, 0.74rem); line-height: 1.4; letter-spacing: 0;
 }
+
+/* 症状グリッド：末尾が1枚余る場合は中央寄せ */
+.symptom-card:last-child:nth-child(3n+1) { grid-column: 2; }
