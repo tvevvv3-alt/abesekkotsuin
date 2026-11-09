@@ -2186,3 +2186,19 @@ body.is-modal-open { overflow: hidden; }
 
 /* 症状グリッド：末尾が1枚余る場合は中央寄せ */
 .symptom-card:last-child:nth-child(3n+1) { grid-column: 2; }
+
+/* ===== LP：メディア掲載（軽量2枚） ===== */
+.media-lite { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 3.5vw, 18px); margin: clamp(22px, 5vw, 32px) 0 0; padding: 0; }
+.media-lite__item { background: #fff; border-radius: 14px; padding: clamp(10px,3vw,14px); border: 1px solid rgba(28,58,94,0.08); box-shadow: 0 14px 30px -24px rgba(20,32,44,0.5); text-align: center; }
+.media-lite__img { display: block; border-radius: 10px; overflow: hidden; background: #f2f6fb; aspect-ratio: 4 / 3; }
+.media-lite__img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.media-lite__text { margin: 0.7em 0 0; font-size: clamp(0.72rem, 3vw, 0.84rem); font-weight: 600; color: var(--field); line-height: 1.5; }
+
+/* ===== LP：はじめての方へ（情報＆二次導線） ===== */
+.lp-info { margin: clamp(18px,4.5vw,26px) 0 0; border: 1px solid rgba(28,58,94,0.1); border-radius: 14px; overflow: hidden; background: #fff; }
+.lp-info > div { display: grid; grid-template-columns: 4.5em 1fr; gap: 0.3em 1em; padding: clamp(12px,3.4vw,16px) clamp(14px,4vw,20px); }
+.lp-info > div + div { border-top: 1px solid rgba(28,58,94,0.08); }
+.lp-info dt { font-weight: 700; color: var(--field); font-size: 0.85rem; letter-spacing: 0.04em; }
+.lp-info dd { margin: 0; color: var(--ink-soft); font-size: 0.9rem; line-height: 1.6; }
+.lp-links { display: flex; flex-direction: column; gap: 10px; margin-block-start: clamp(16px,4vw,22px); }
+.lp-links .btn { width: 100%; }
