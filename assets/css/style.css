@@ -261,8 +261,8 @@ p { margin: 0; }
   display: inline-flex; align-items: center;
   padding: 0.42em 0.95em; border-radius: 999px;
   font-size: 0.8rem; font-weight: 600; letter-spacing: 0.03em; color: #fff;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(39,104,196,0.42);
+  border: 1px solid rgba(135,190,255,0.55);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 .hero__scroll {
@@ -2147,7 +2147,8 @@ body.is-modal-open { overflow: hidden; }
 }
 .hero__tags { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0.9em 0 0; padding: 0; }
 .hero__tag {
-  font-size: 0.79rem; font-weight: 600; color: #fff; letter-spacing: 0.02em;
-  padding: 0.3em 0.8em; border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.06);
+  font-size: 0.79rem; font-weight: 700; color: #1a2436; letter-spacing: 0.02em;
+  padding: 0.32em 0.82em; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.3); background: rgba(205,168,84,0.95);
+  box-shadow: 0 6px 16px -9px rgba(150,110,30,0.7);
 }
