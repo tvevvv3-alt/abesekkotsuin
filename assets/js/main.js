@@ -325,12 +325,13 @@
     var img = document.querySelector(".hero__media img");
     var inner = document.querySelector(".hero__inner");
     if (reduceMotion || !hero || !img) return;
+    var zoomAmt = hero.classList.contains("hero--lp") ? 0.36 : 0.16;
     var baseMargin = inner ? getComputedStyle(inner).marginTop : "0px";
     var hTicking = false;
     function heroUpdate() {
       var h = hero.offsetHeight || window.innerHeight;
       var p = Math.min(Math.max(window.scrollY / h, 0), 1);
-      img.style.transform = "scale(" + (1 + p * 0.16).toFixed(3) + ")";
+      img.style.transform = "scale(" + (1 + p * zoomAmt).toFixed(3) + ")";
       if (inner) {
         inner.style.transform = "translateY(" + (p * -18).toFixed(1) + "px)";
         inner.style.opacity = (1 - p * 0.38).toFixed(2);
