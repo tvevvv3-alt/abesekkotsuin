@@ -2097,7 +2097,7 @@ body.is-modal-open { overflow: hidden; }
 .hero--lp .hero__lead { margin-block-end: 0.7em; }
 .hero--lp .hero__title {
   font-family: var(--sans); font-weight: 800;
-  font-size: clamp(2.5rem, 11.5vw, 3.7rem); line-height: 1.16;
+  font-size: clamp(1.95rem, 8.6vw, 2.9rem); line-height: 1.24;
   letter-spacing: 0.005em; margin-block-start: 0.2em;
   text-shadow: 0 3px 24px rgba(0,0,0,0.62);
 }
