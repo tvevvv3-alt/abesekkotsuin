@@ -2108,3 +2108,30 @@ body.is-modal-open { overflow: hidden; }
 @media (min-width: 768px) {
   .hero--lp .hero__inner { padding-block: 0 clamp(64px, 10vh, 110px); }
 }
+
+/* ===== LP：アイコン/番号つき assess（パッと分かる視覚化） ===== */
+.assess--ico .assess__item,
+.assess--num .assess__item {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+  column-gap: clamp(13px, 3.6vw, 18px); align-items: center;
+}
+.assess--ico .assess__ico, .assess--num .assess__num { grid-column: 1; grid-row: 1 / 3; align-self: center; }
+.assess--ico .assess__label, .assess--num .assess__label { grid-column: 2; grid-row: 1; padding-inline-start: 0; }
+.assess--ico .assess__desc, .assess--num .assess__desc { grid-column: 2; grid-row: 2; padding-inline-start: 0; }
+.assess--ico .assess__label::before, .assess--num .assess__label::before { content: none; }
+.assess__ico {
+  width: clamp(46px, 13vw, 58px); aspect-ratio: 1; border-radius: 27%;
+  display: grid; place-items: center; color: var(--field);
+  background: linear-gradient(160deg, #ffffff, #e8eff9);
+  border: 1px solid rgba(28,58,94,0.12);
+  box-shadow: 0 10px 22px -12px rgba(20,32,44,0.45), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.assess__ico svg { width: 52%; height: 52%; display: block; }
+.assess__num {
+  width: clamp(42px, 12vw, 52px); aspect-ratio: 1; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--serif); font-weight: 600; font-size: clamp(1.05rem, 4.2vw, 1.3rem);
+  color: #fff; letter-spacing: 0.02em;
+  background: linear-gradient(135deg, var(--field-2), var(--field));
+  box-shadow: 0 9px 20px -9px rgba(20,32,44,0.55);
+}
