@@ -2082,3 +2082,29 @@ body.is-modal-open { overflow: hidden; }
 .dcard__icon img { width: 100%; height: auto; display: block; }
 .dcard__name { padding: 0; }
 .dcard__desc { padding: 0.5em 0 0; }
+
+/* ===== スポーツLP：インパクト重視のフルブリードHERO ===== */
+.hero--lp { min-height: 100svh; justify-content: flex-end; }
+.hero--lp .hero__media { position: absolute; inset: 0; width: 100%; z-index: -1; }
+.hero--lp .hero__media img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: 52% 28%; transform: none; animation: none;
+}
+.hero--lp .hero__scrim {
+  background: linear-gradient(to top, rgba(6,12,22,0.96) 5%, rgba(6,12,22,0.80) 24%, rgba(6,12,22,0.42) 48%, rgba(6,12,22,0.12) 70%, rgba(6,12,22,0.34) 100%);
+}
+.hero--lp .hero__inner { margin-block-start: 0; padding-block: 0 clamp(92px, 21vw, 124px); }
+.hero--lp .hero__lead { margin-block-end: 0.7em; }
+.hero--lp .hero__title {
+  font-family: var(--sans); font-weight: 800;
+  font-size: clamp(2.5rem, 11.5vw, 3.7rem); line-height: 1.16;
+  letter-spacing: 0.005em; margin-block-start: 0.2em;
+  text-shadow: 0 3px 24px rgba(0,0,0,0.62);
+}
+.hero--lp .hero__message {
+  margin-block: 0.95em 0; font-family: var(--sans); font-weight: 400;
+  font-size: clamp(0.95rem, 3.9vw, 1.12rem); line-height: 1.7; letter-spacing: 0.03em; gap: 0.5em;
+}
+@media (min-width: 768px) {
+  .hero--lp .hero__inner { padding-block: 0 clamp(64px, 10vh, 110px); }
+}
