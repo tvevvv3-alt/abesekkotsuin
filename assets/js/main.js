@@ -65,8 +65,25 @@
   var lastY = window.scrollY;
   var ticking = false;
 
+  /* ---- Scroll progress bar（今ページのどの辺にいるか） ---- */
+  var progress = document.createElement("div");
+  progress.className = "scroll-progress";
+  progress.setAttribute("aria-hidden", "true");
+  var progressBar = document.createElement("span");
+  progressBar.className = "scroll-progress__bar";
+  progress.appendChild(progressBar);
+  document.body.appendChild(progress);
+
+  function updateProgress(y) {
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    var p = max > 0 ? y / max : 0;
+    if (p < 0) p = 0; else if (p > 1) p = 1;
+    progressBar.style.transform = "scaleX(" + p + ")";
+  }
+
   function onScroll() {
     var y = window.scrollY;
+    updateProgress(y);
     // Solid background once past hero-ish threshold
     if (y > 60) header.classList.add("is-solid");
     else header.classList.remove("is-solid");
@@ -89,6 +106,7 @@
   window.addEventListener("scroll", function () {
     if (!ticking) { window.requestAnimationFrame(onScroll); ticking = true; }
   }, { passive: true });
+  window.addEventListener("resize", function () { updateProgress(window.scrollY); }, { passive: true });
   onScroll();
 
   /* ---- サイト内メニュー（ハンバーガー） ---- */

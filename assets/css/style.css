@@ -104,6 +104,19 @@ p { margin: 0; }
 }
 
 /* ---------- Header ---------- */
+/* ===== スクロール進捗バー（今ページのどの辺にいるか） ===== */
+.scroll-progress {
+  position: fixed; inset-block-start: 0; inset-inline: 0;
+  height: 3px; z-index: 101; pointer-events: none; background: transparent;
+}
+.scroll-progress__bar {
+  display: block; height: 100%; width: 100%;
+  transform: scaleX(0); transform-origin: left center;
+  background: linear-gradient(90deg, #15325c 0%, #2f74d6 46%, #74aef0 72%, #c8a34e 100%);
+  box-shadow: 0 0 6px rgba(47,116,214,0.5);
+  will-change: transform;
+}
+
 .site-header {
   position: fixed;
   inset-block-start: 0; inset-inline: 0;
@@ -1094,11 +1107,6 @@ p { margin: 0; }
   backdrop-filter: blur(24px) saturate(150%);
   border: 0;
   box-shadow: 0 -12px 34px -18px rgba(0,0,0,0.55);
-}
-.dockbar::before {
-  content: ""; position: absolute; inset-inline: 0; inset-block-end: 100%;
-  height: clamp(12px, 4vw, 20px);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0,40 L0,22 C150,4 300,34 450,20 C600,6 760,32 900,17 C1040,4 1150,24 1200,18 L1200,40 Z' fill='%230e1a30' fill-opacity='0.62'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
 }
 .dockbar__item {
   flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
