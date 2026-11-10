@@ -75,10 +75,17 @@
   document.body.appendChild(progress);
 
   function updateProgress(y) {
-    var max = document.documentElement.scrollHeight - window.innerHeight;
-    var p = max > 0 ? y / max : 0;
-    if (p < 0) p = 0; else if (p > 1) p = 1;
-    progressBar.style.transform = "scaleX(" + p + ")";
+    var sh = document.documentElement.scrollHeight;
+    var vh = window.innerHeight;
+    var max = sh - vh;
+    if (max <= 8) { progress.style.opacity = "0"; return; }
+    progress.style.opacity = "1";
+    var p = y / max; if (p < 0) p = 0; else if (p > 1) p = 1;
+    var trackH = progress.clientHeight;
+    var thumbH = Math.max(40, Math.round(vh / sh * trackH));
+    var top = Math.round(p * (trackH - thumbH));
+    progressBar.style.height = thumbH + "px";
+    progressBar.style.transform = "translateY(" + top + "px)";
   }
 
   function onScroll() {
@@ -362,12 +369,8 @@
     heroUpdate();
   })();
 
-  /* ---- Premium: scroll progress bar + subtle parallax ---- */
+  /* ---- Premium: subtle parallax ---- */
   (function () {
-    var bar = document.createElement("div");
-    bar.className = "scroll-progress";
-    document.body.appendChild(bar);
-
     var items = [];
     function register(selector, strength, base) {
       document.querySelectorAll(selector).forEach(function (el) {
@@ -386,10 +389,6 @@
     var pTicking = false;
 
     function update() {
-      var de = document.documentElement;
-      var max = de.scrollHeight - vh;
-      bar.style.transform = "scaleX(" + (max > 0 ? Math.min(window.scrollY / max, 1) : 0) + ")";
-
       for (var i = 0; i < items.length; i++) {
         var p = items[i];
         var r = p.el.getBoundingClientRect();

@@ -104,17 +104,22 @@ p { margin: 0; }
 }
 
 /* ---------- Header ---------- */
-/* ===== スクロール進捗バー（今ページのどの辺にいるか） ===== */
+/* ===== スクロール位置バー（右側の縦バー：今ページのどの辺にいるか） ===== */
 .scroll-progress {
-  position: fixed; inset-block-start: 0; inset-inline: 0;
-  height: 3px; z-index: 101; pointer-events: none; background: transparent;
+  position: fixed; inset-block: 10px; inset-inline-end: 4px;
+  width: 4px; z-index: 101; pointer-events: none;
+  border-radius: 99px; background: rgba(28,58,94,0.1);
+  opacity: 1; transition: opacity 0.3s ease;
 }
 .scroll-progress__bar {
-  display: block; height: 100%; width: 100%;
-  transform: scaleX(0); transform-origin: left center;
-  background: linear-gradient(90deg, #15325c 0%, #2f74d6 46%, #74aef0 72%, #c8a34e 100%);
-  box-shadow: 0 0 6px rgba(47,116,214,0.5);
-  will-change: transform;
+  position: absolute; inset-inline: 0; inset-block-start: 0;
+  height: 40px; border-radius: 99px;
+  background: linear-gradient(180deg, #15325c 0%, #2f74d6 46%, #74aef0 72%, #c8a34e 100%);
+  box-shadow: 0 1px 6px rgba(47,116,214,0.4);
+  will-change: transform; transition: transform 0.08s linear;
+}
+@media (max-width: 860px) {
+  .has-dockbar .scroll-progress { inset-block-end: calc(84px + env(safe-area-inset-bottom)); }
 }
 
 .site-header {
@@ -873,16 +878,6 @@ p { margin: 0; }
 :root {
   --grad-brand:  linear-gradient(120deg, #1a4f9c 0%, #2f74d6 52%, #46c2ff 100%);
   --grad-deep:   linear-gradient(158deg, #091a30 0%, #07142a 50%, #0e2b52 100%);
-}
-
-/* --- スクロール進捗バー（最上部・グラデ） --- */
-.scroll-progress {
-  position: fixed; inset-block-start: 0; inset-inline-start: 0;
-  height: 3px; width: 100%;
-  transform: scaleX(0); transform-origin: 0 50%;
-  background: var(--grad-brand);
-  box-shadow: 0 0 14px rgba(63, 155, 230, 0.7);
-  z-index: 200; pointer-events: none;
 }
 
 /* --- リビールを上質に（ぼかし＋わずかな拡大から立ち上がる） --- */
