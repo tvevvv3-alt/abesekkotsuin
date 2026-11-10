@@ -119,17 +119,21 @@ export default function PersonalRoster() {
     setPersonalSvcList(personalSvc.map((s) => ({ id: s.id, name: s.name })));
 
     // 回数券は archived 列ありで取得。未マイグレーションの環境では列なしで再取得（壊さない）。
-    let tkRes = await supabase
+    const tkFull = await supabase
       .from("personal_tickets")
       .select("id, name, staff_id, expiry, quota, used_offset, archived, sort_order")
       .order("sort_order")
       .order("created_at");
-    if (tkRes.error) {
-      tkRes = await supabase
+    let tkData: Ticket[];
+    if (tkFull.error) {
+      const tkBase = await supabase
         .from("personal_tickets")
         .select("id, name, staff_id, expiry, quota, used_offset, sort_order")
         .order("sort_order")
         .order("created_at");
+      tkData = (tkBase.data as Ticket[]) ?? [];
+    } else {
+      tkData = (tkFull.data as Ticket[]) ?? [];
     }
     const appts = personalIds.length
       ? await supabase
@@ -140,7 +144,7 @@ export default function PersonalRoster() {
           .order("date")
           .order("start_min")
       : { data: [] as Visit[] };
-    let tickets = ((tkRes.data as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 }));
+    let tickets = tkData.map((r) => ({ ...r, used_offset: r.used_offset ?? 0 }));
     const visitData = (appts.data as Visit[]) ?? [];
 
     // 予約を患者名でまとめる（スペースの有無は無視。既にorder byで日付順）
