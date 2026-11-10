@@ -66,6 +66,7 @@ export default function PersonalRoster() {
   >(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [staffFilter, setStaffFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"default" | "name" | "expiry">("default");
   // 来院（予約）の編集ポップアップ：氏名・日付・時刻を直せる（同姓同名/兄弟の付け替え）
   const [ev, setEv] = useState<
     | { id: string; name: string; date: string; time: string; start_min: number; end_min: number; done: boolean; line_user_id: string | null }
@@ -221,8 +222,30 @@ export default function PersonalRoster() {
       if (!ticketsByName.has(k)) { ticketsByName.set(k, []); nameOrder.push(k); }
       ticketsByName.get(k)!.push(t);
     });
+    // 並び替え：登録順（既定）／名前順／有効期限順（今月起点で近い順）
+    const monthOf = (exp: string | null) => {
+      const m = (exp || "").match(/(\d+)\s*月/);
+      return m ? parseInt(m[1], 10) : null;
+    };
+    const curMonth = new Date().getMonth() + 1;
+    const order = [...nameOrder];
+    if (sortBy === "name") {
+      order.sort((a, b) => (ticketsByName.get(a)![0].name.trim()).localeCompare(ticketsByName.get(b)![0].name.trim(), "ja"));
+    } else if (sortBy === "expiry") {
+      const rank = (k: string) => {
+        let best: number | null = null;
+        ticketsByName.get(k)!.forEach((t) => {
+          const mo = monthOf(t.expiry);
+          if (mo == null) return;
+          const r = (mo - curMonth + 12) % 12; // 今月を0として、近い月ほど小さい
+          best = best == null ? r : Math.min(best, r);
+        });
+        return best == null ? 999 : best; // 期限なしは末尾
+      };
+      order.sort((a, b) => rank(a) - rank(b));
+    }
     const out: { ticket: Ticket; visits: Visit[]; idx: number; total: number }[] = [];
-    nameOrder.forEach((k) => {
+    order.forEach((k) => {
       const tks = [...ticketsByName.get(k)!].sort((a, b) => a.sort_order - b.sort_order);
       const visits = [...(visitsByName.get(k) ?? [])].sort((a, b) => a.date.localeCompare(b.date) || a.start_min - b.start_min);
       let vi = 0;
@@ -244,7 +267,7 @@ export default function PersonalRoster() {
     });
     emptyTickets.forEach((t) => out.push({ ticket: t, visits: [], idx: 0, total: 1 }));
     return staffFilter === "all" ? out : out.filter((r) => r.ticket.staff_id === staffFilter);
-  }, [rows, visitsByName, staffFilter]);
+  }, [rows, visitsByName, staffFilter, sortBy]);
 
   // 列は回数券の枠数（既定10）まで。11列目は作らない。
   const maxCols = useMemo(() => Math.max(10, ...rows.map((r) => r.quota ?? 10)), [rows]);
@@ -336,14 +359,24 @@ export default function PersonalRoster() {
         <button onClick={addRow} className="rounded-md bg-blue-600 px-2.5 py-1 text-[12px] font-bold text-white active:bg-blue-700">
           ＋ 会員を追加
         </button>
-        <div className="ml-auto flex items-center gap-1">
-          <span className="text-[11px] text-slate-400">担当</span>
-          <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs">
-            <option value="all">すべて</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>{s.display_name || s.name}</option>
-            ))}
-          </select>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-slate-400">並び</span>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "default" | "name" | "expiry")} className="rounded-lg border border-slate-300 px-2 py-1 text-xs">
+              <option value="default">登録順</option>
+              <option value="name">名前順</option>
+              <option value="expiry">有効期限順</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-slate-400">担当</span>
+            <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs">
+              <option value="all">すべて</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>{s.display_name || s.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
