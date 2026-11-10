@@ -19,6 +19,7 @@ interface Ticket {
   quota: number;
   used_offset: number;
   sort_order: number;
+  archived?: boolean; // 完了（アーカイブ）：一覧から隠すが削除はしない
 }
 
 interface Visit {
@@ -67,6 +68,7 @@ export default function PersonalRoster() {
   const [msg, setMsg] = useState<string | null>(null);
   const [staffFilter, setStaffFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"default" | "name" | "expiry">("default");
+  const [showArchived, setShowArchived] = useState(false);
   // 来院（予約）の編集ポップアップ：氏名・日付・時刻を直せる（同姓同名/兄弟の付け替え）
   const [ev, setEv] = useState<
     | { id: string; name: string; date: string; time: string; start_min: number; end_min: number; done: boolean; line_user_id: string | null }
@@ -116,23 +118,29 @@ export default function PersonalRoster() {
     setHasPersonalMenu(personalIds.length > 0);
     setPersonalSvcList(personalSvc.map((s) => ({ id: s.id, name: s.name })));
 
-    const [{ data: tk }, appts] = await Promise.all([
-      supabase
+    // 回数券は archived 列ありで取得。未マイグレーションの環境では列なしで再取得（壊さない）。
+    let tkRes = await supabase
+      .from("personal_tickets")
+      .select("id, name, staff_id, expiry, quota, used_offset, archived, sort_order")
+      .order("sort_order")
+      .order("created_at");
+    if (tkRes.error) {
+      tkRes = await supabase
         .from("personal_tickets")
         .select("id, name, staff_id, expiry, quota, used_offset, sort_order")
         .order("sort_order")
-        .order("created_at"),
-      personalIds.length
-        ? supabase
-            .from("appointments")
-            .select("id, patient_name, date, start_min, end_min, status, staff_id, service_id, line_user_id")
-            .in("service_id", personalIds)
-            .neq("status", "cancelled")
-            .order("date")
-            .order("start_min")
-        : Promise.resolve({ data: [] as Visit[] }),
-    ]);
-    let tickets = ((tk as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 }));
+        .order("created_at");
+    }
+    const appts = personalIds.length
+      ? await supabase
+          .from("appointments")
+          .select("id, patient_name, date, start_min, end_min, status, staff_id, service_id, line_user_id")
+          .in("service_id", personalIds)
+          .neq("status", "cancelled")
+          .order("date")
+          .order("start_min")
+      : { data: [] as Visit[] };
+    let tickets = ((tkRes.data as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 }));
     const visitData = (appts.data as Visit[]) ?? [];
 
     // 予約を患者名でまとめる（スペースの有無は無視。既にorder byで日付順）
@@ -246,10 +254,14 @@ export default function PersonalRoster() {
     }
     const out: { ticket: Ticket; visits: Visit[]; idx: number; total: number }[] = [];
     order.forEach((k) => {
-      const tks = [...ticketsByName.get(k)!].sort((a, b) => a.sort_order - b.sort_order);
+      const allTks = [...ticketsByName.get(k)!].sort((a, b) => a.sort_order - b.sort_order);
       const visits = [...(visitsByName.get(k) ?? [])].sort((a, b) => a.date.localeCompare(b.date) || a.start_min - b.start_min);
+      // 表示対象の券数（完了を隠す場合は未完了のみ）＝「全N枚」表記に使う
+      const total = (showArchived ? allTks : allTks.filter((t) => !t.archived)).length;
+      const startLen = out.length;
       let vi = 0;
-      tks.forEach((tk, i) => {
+      let dispIdx = 0;
+      allTks.forEach((tk) => {
         const capacity = Math.max(0, (tk.quota ?? 10) - (tk.used_offset ?? 0)); // 使えるスタンプ数
         const assigned: Visit[] = [];
         let used = 0;
@@ -260,14 +272,17 @@ export default function PersonalRoster() {
           used += c;
           vi++;
         }
-        out.push({ ticket: tk, visits: assigned, idx: i, total: tks.length });
+        // 完了（アーカイブ）券：来院だけ消費して表示しない（残りは次の券へ流れない）
+        if (tk.archived && !showArchived) return;
+        out.push({ ticket: tk, visits: assigned, idx: dispIdx, total });
+        dispIdx++;
       });
-      // 端数（券が足りない保険。通常はreloadで新券が作られる）→ 最後の券に載せる
-      if (vi < visits.length && out.length) out[out.length - 1].visits.push(...visits.slice(vi));
+      // 端数（券が足りない保険。通常はreloadで新券が作られる）→ この会員の最後の表示券に載せる
+      if (vi < visits.length && out.length > startLen) out[out.length - 1].visits.push(...visits.slice(vi));
     });
     emptyTickets.forEach((t) => out.push({ ticket: t, visits: [], idx: 0, total: 1 }));
     return staffFilter === "all" ? out : out.filter((r) => r.ticket.staff_id === staffFilter);
-  }, [rows, visitsByName, staffFilter, sortBy]);
+  }, [rows, visitsByName, staffFilter, sortBy, showArchived]);
 
   // 列は回数券の枠数（既定10）まで。11列目は作らない。
   const maxCols = useMemo(() => Math.max(10, ...rows.map((r) => r.quota ?? 10)), [rows]);
@@ -367,6 +382,10 @@ export default function PersonalRoster() {
           ＋ 会員を追加
         </button>
         <div className="ml-auto flex items-center gap-2">
+          <label className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            完了分も表示
+          </label>
           <div className="flex items-center gap-1">
             <span className="text-[11px] text-slate-400">並び</span>
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "default" | "name" | "expiry")} className="rounded-lg border border-slate-300 px-2 py-1 text-xs">
@@ -425,7 +444,7 @@ export default function PersonalRoster() {
                 const consumedDone = vs.filter((v) => v.status === "done").reduce((n, v) => n + consumeOf(v), 0);
                 const remain = quota - off - consumedDone;
                 return (
-                  <tr key={r.id} className="border-t">
+                  <tr key={r.id} className={`border-t ${r.archived ? "bg-emerald-50/50" : ""}`}>
                     <td className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-r bg-white px-1.5 py-1 align-middle">
                       {cr.idx === 0 ? (
                         <input value={r.name} placeholder="お名前" onChange={(e) => setLocal(r.id, { name: e.target.value })} onBlur={() => persist(r.id)} className={`${amt} font-bold text-slate-800`} />
@@ -437,6 +456,9 @@ export default function PersonalRoster() {
                       )}
                       {cr.idx === 0 && cr.total > 1 && (
                         <span className="mt-0.5 inline-block rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-500">1枚目 / 全{cr.total}枚</span>
+                      )}
+                      {r.archived && (
+                        <span className="mt-0.5 ml-1 inline-block rounded bg-emerald-100 px-1 text-[9px] font-bold text-emerald-600">完了</span>
                       )}
                     </td>
                     <td className="border-l px-1 py-1 align-middle">
@@ -543,6 +565,11 @@ export default function PersonalRoster() {
                       return cells;
                     })()}
                     <td className="border-l px-1 py-1 text-center align-middle">
+                      {r.archived ? (
+                        <button onClick={() => savePatch(r.id, { archived: false })} className="mb-1 block w-full whitespace-nowrap text-[11px] font-bold text-amber-600" title="一覧に戻す">↩ 戻す</button>
+                      ) : remain <= 0 ? (
+                        <button onClick={() => savePatch(r.id, { archived: true })} className="mb-1 block w-full whitespace-nowrap rounded bg-emerald-50 px-1 py-0.5 text-[11px] font-bold text-emerald-600" title="この回数券を完了にして一覧から隠す（データは残ります）">完了</button>
+                      ) : null}
                       <button onClick={() => deleteRow(r.id)} className="text-[11px] font-bold text-red-400">削除</button>
                     </td>
                   </tr>
@@ -563,6 +590,8 @@ export default function PersonalRoster() {
         空マスの<b>「＋」</b>で、その会員の予約をすぐ追加できます。
         回数券は<b>10スタンプ</b>（60分=2スタンプ）。使い切って<b>11回目</b>になると、
         その会員の<b>2枚目の回数券が自動で下の段に追加</b>されます（11列目は作りません）。
+        使い切った券は右端の<b className="text-emerald-600">「完了」</b>で一覧から隠せます（<b>削除ではないので売上・来院・履歴は残ります</b>）。
+        上部の<b>「完了分も表示」</b>で、いつでも見返し・<b>「戻す」</b>ができます。
       </p>
 
       {add && (
