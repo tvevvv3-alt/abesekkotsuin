@@ -2088,7 +2088,7 @@ body.is-modal-open { overflow: hidden; }
 .dcard__desc { padding: 0.5em 0 0; }
 
 /* ===== スポーツLP：インパクト重視のフルブリードHERO ===== */
-.hero--lp { min-height: 100svh; justify-content: flex-end; }
+.hero--lp { min-height: 100svh; justify-content: flex-start; padding-block-start: 0; }
 .hero--lp .hero__media { position: absolute; inset: 0; width: 100%; z-index: -1; }
 .hero--lp .hero__media img {
   position: absolute; inset: 0; width: 100%; height: 100%;
@@ -2100,8 +2100,8 @@ body.is-modal-open { overflow: hidden; }
     linear-gradient(to top, rgba(6,12,22,0.5) 0%, rgba(6,12,22,0.26) 26%, rgba(6,12,22,0.34) 48%, rgba(6,12,22,0.16) 70%, rgba(6,12,22,0.03) 100%),
     linear-gradient(to right, rgba(6,12,22,0.74) 0%, rgba(6,12,22,0.4) 40%, rgba(6,12,22,0.08) 72%, rgba(6,12,22,0) 100%);
 }
-/* 見出しは上部のネイビー帯に収め、施術機器に重ねない（画面高さ基準で位置を固定） */
-.hero--lp .hero__inner { margin-block-start: 0; padding-block: 0 42svh; }
+/* 見出しは上部のネイビー余白に配置し、選手・施術機器に重ねない（画面高さ基準で固定） */
+.hero--lp .hero__inner { margin-block-start: 0; padding-block: clamp(96px, 13svh, 128px) 0; }
 .hero--lp .hero__lead {
   display: inline-flex; align-items: center; gap: 0.6em;
   font-family: var(--sans); font-weight: 600;
@@ -2139,7 +2139,7 @@ body.is-modal-open { overflow: hidden; }
   font-size: clamp(0.95rem, 3.9vw, 1.12rem); line-height: 1.7; letter-spacing: 0.03em; gap: 0.5em;
 }
 @media (min-width: 768px) {
-  .hero--lp .hero__inner { padding-block: 0 clamp(64px, 10vh, 110px); }
+  .hero--lp .hero__inner { padding-block: clamp(120px, 16vh, 180px) 0; }
 }
 
 /* ===== LP：アイコン/番号つき assess（パッと分かる視覚化） ===== */
