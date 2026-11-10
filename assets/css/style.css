@@ -957,9 +957,9 @@ p { margin: 0; }
 .band__img { will-change: transform; }
 
 /* --- LINEボタン/FABをわずかに立体的なグラデ緑へ --- */
-.btn--line { background: linear-gradient(135deg, #08cf5b, #04ad49); }
-.btn--line:hover { background: linear-gradient(135deg, #06c755, #03963f); }
-.fab-line { background: linear-gradient(135deg, #08cf5b, #04ad49); }
+.btn--line { background: linear-gradient(135deg, #2ee07c, #06c755); }
+.btn--line:hover { background: linear-gradient(135deg, #3ae787, #05b84f); }
+.fab-line { background: linear-gradient(135deg, #2ee07c, #06c755); }
 
 /* --- ダーク背景の白文字を読みやすく（影で浮かせる） --- */
 .section--dark .statement__kicker,
@@ -1129,7 +1129,7 @@ p { margin: 0; }
   position: relative; overflow: hidden;
   flex: 1 1 auto; flex-direction: row; align-self: stretch; gap: 0.5em;
   min-height: clamp(44px, 12vw, 52px); padding: 0 1em; border-radius: 14px;
-  background: linear-gradient(135deg, #08cf5b, #04ad49);
+  background: linear-gradient(135deg, #2ee07c, #06c755);
   box-shadow: 0 8px 20px -6px rgba(6,199,85,0.65), inset 0 1px 0 rgba(255,255,255,0.35);
   animation: dockLineGlow 2s ease-in-out infinite;
 }
@@ -2261,6 +2261,22 @@ body.is-modal-open { overflow: hidden; }
   color: var(--field); background: rgba(28,58,94,0.06);
   border: 1px solid rgba(28,58,94,0.12); border-radius: 999px;
   padding: 0.3em 0.72em;
+}
+
+/* ===== LP：予約セクションの補足（LINEメニュー予約／メッセージ相談） ===== */
+.howto-notes {
+  list-style: none; margin: clamp(16px, 4.5vw, 24px) auto 0; padding: 0;
+  max-width: 30em; display: flex; flex-direction: column; gap: 9px;
+}
+.howto-notes li {
+  position: relative; padding-inline-start: 1.8em;
+  font-size: clamp(0.88rem, 3.6vw, 0.98rem); font-weight: 600; line-height: 1.5;
+  color: var(--field);
+}
+.howto-notes li::before {
+  content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.08em;
+  width: 1.35em; height: 1.35em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='12' fill='%2306c755'/%3E%3Cpath d='M6 12.5l4 4L18 8' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* ===== LP：症状グリッド（一覧表示＋部位アイコン） ===== */
