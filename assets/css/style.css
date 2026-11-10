@@ -2210,3 +2210,16 @@ body.is-modal-open { overflow: hidden; }
 .lp .section__title { font-size: clamp(1.7rem, 7.6vw, 2.4rem); line-height: 1.3; }
 .lp .assess__item { padding-block: clamp(11px, 3vw, 15px); }
 .lp .assess { padding-block: clamp(4px, 1.2vw, 10px); }
+
+/* ===== サイト内の青ライン（上＝ヘッダー下／下＝画面下）：ページ内にいる安心感 ===== */
+.site-header { border-block-end: none; }
+.site-header::after {
+  content: ""; position: absolute; inset-inline: 0; inset-block-end: 0; height: 2px;
+  background: linear-gradient(90deg, #15325c 0%, #2f74d6 46%, #74aef0 72%, #c8a34e 100%);
+  opacity: 0.92; pointer-events: none;
+}
+body::after {
+  content: ""; position: fixed; inset-inline: 0; inset-block-end: 0; height: 3px;
+  background: linear-gradient(90deg, #15325c 0%, #2f74d6 46%, #74aef0 72%, #c8a34e 100%);
+  z-index: 97; pointer-events: none;
+}
