@@ -1087,9 +1087,9 @@ p { margin: 0; }
 .dockbar {
   position: fixed; z-index: 96;
   inset-block-end: 0; inset-inline: 0;
-  display: none; align-items: center; justify-content: center; gap: 9px;
-  padding: clamp(15px,4.2vw,21px) clamp(14px,4.5vw,22px) calc(11px + env(safe-area-inset-bottom));
-  background: rgba(14,26,48,0.6);
+  display: none; align-items: center; justify-content: center; gap: 10px;
+  padding: clamp(8px,2.4vw,11px) clamp(12px,4vw,18px) calc(8px + env(safe-area-inset-bottom));
+  background: rgba(14,26,48,0.62);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
   backdrop-filter: blur(24px) saturate(150%);
   border: 0;
@@ -1097,46 +1097,46 @@ p { margin: 0; }
 }
 .dockbar::before {
   content: ""; position: absolute; inset-inline: 0; inset-block-end: 100%;
-  height: clamp(16px, 5.2vw, 26px);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0,40 L0,22 C150,4 300,34 450,20 C600,6 760,32 900,17 C1040,4 1150,24 1200,18 L1200,40 Z' fill='%230e1a30' fill-opacity='0.6'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
+  height: clamp(12px, 4vw, 20px);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0,40 L0,22 C150,4 300,34 450,20 C600,6 760,32 900,17 C1040,4 1150,24 1200,18 L1200,40 Z' fill='%230e1a30' fill-opacity='0.62'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat;
 }
 .dockbar__item {
-  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   transition: transform 0.18s var(--ease);
 }
 .dockbar__item:active { transform: scale(0.9); }
-/* アプリ風ボタン（角丸四角タイル＋ネイビー線アイコン） */
+/* 補助ボタン（電話・アクセス）はコンパクトなアイコンのみ */
 .dockbar__app {
-  width: clamp(38px, 11vw, 44px); aspect-ratio: 1; border-radius: 27%;
-  background-color: rgba(255,255,255,0.55);
-  background-repeat: no-repeat; background-position: center; background-size: 54%;
-  border: 1px solid rgba(255,255,255,0.8);
-  box-shadow: 0 6px 14px -5px rgba(20,32,44,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
+  width: clamp(30px, 8vw, 36px); aspect-ratio: 1; border-radius: 28%;
+  background-color: rgba(255,255,255,0.5);
+  background-repeat: no-repeat; background-position: center; background-size: 52%;
+  border: 1px solid rgba(255,255,255,0.75);
+  box-shadow: 0 5px 12px -5px rgba(20,32,44,0.4), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 .dockbar__app--tel { background-image: var(--tel-line); }
 .dockbar__app--map { background-image: var(--map-line); }
 .dockbar__app--ig  { background-image: var(--ig-line); }
-.dockbar__label { display: block; font-size: 0.64rem; font-weight: 600; letter-spacing: 0.02em; color: rgba(255,255,255,0.92); }
+.dockbar__label { display: block; font-size: 0.58rem; font-weight: 600; letter-spacing: 0.02em; color: rgba(255,255,255,0.88); }
 
-/* LINE：緑で横長に強調 */
+/* LINE：緑で横長に強調（主役） */
 .dockbar__item--line {
-  flex: 1.7 1 0; flex-direction: row; align-self: stretch; gap: 0.45em;
-  padding: 0 0.7em; border-radius: 16px;
+  flex: 1 1 auto; flex-direction: row; align-self: stretch; gap: 0.5em;
+  min-height: clamp(42px, 11.5vw, 50px); padding: 0 1em; border-radius: 14px;
   background: linear-gradient(135deg, #08cf5b, #04ad49);
   box-shadow: 0 8px 18px -6px rgba(6,199,85,0.6), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 .dockbar__item--line .dockbar__app {
-  width: 20px; height: 20px; border: 0; border-radius: 0; box-shadow: none;
+  width: 22px; height: 22px; border: 0; border-radius: 0; box-shadow: none;
   background: #fff;
   -webkit-mask: var(--line-icon) center/contain no-repeat;
   mask: var(--line-icon) center/contain no-repeat;
 }
-.dockbar__item--line .dockbar__label { display: inline; font-size: 0.86rem; font-weight: 600; color: #fff; }
+.dockbar__item--line .dockbar__label { display: inline; font-size: 0.95rem; font-weight: 700; color: #fff; letter-spacing: 0.04em; }
 
 @media (max-width: 860px) {
   .dockbar { display: flex; }
   .has-dockbar .fab-group { display: none; }
-  .has-dockbar .footer { padding-block-end: calc(120px + env(safe-area-inset-bottom)); }
+  .has-dockbar .footer { padding-block-end: calc(92px + env(safe-area-inset-bottom)); }
 }
 
 /* =================================================================
@@ -2092,15 +2092,16 @@ body.is-modal-open { overflow: hidden; }
 .hero--lp .hero__media { position: absolute; inset: 0; width: 100%; z-index: -1; }
 .hero--lp .hero__media img {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: 52% 28%; transform: none; animation: none;
-  transform-origin: 74% 80%;
+  object-fit: cover; object-position: 50% 50%; transform: none; animation: none;
+  transform-origin: 60% 70%;
 }
 .hero--lp .hero__scrim {
   background:
     linear-gradient(to top, rgba(6,12,22,0.5) 0%, rgba(6,12,22,0.26) 26%, rgba(6,12,22,0.34) 48%, rgba(6,12,22,0.16) 70%, rgba(6,12,22,0.03) 100%),
     linear-gradient(to right, rgba(6,12,22,0.74) 0%, rgba(6,12,22,0.4) 40%, rgba(6,12,22,0.08) 72%, rgba(6,12,22,0) 100%);
 }
-.hero--lp .hero__inner { margin-block-start: 0; padding-block: 0 clamp(150px, 33vw, 210px); }
+/* 見出しは上部のネイビー帯に収め、施術機器に重ねない（画面高さ基準で位置を固定） */
+.hero--lp .hero__inner { margin-block-start: 0; padding-block: 0 42svh; }
 .hero--lp .hero__lead {
   display: inline-flex; align-items: center; gap: 0.6em;
   font-family: var(--sans); font-weight: 600;
@@ -2118,12 +2119,13 @@ body.is-modal-open { overflow: hidden; }
   letter-spacing: 0.005em; margin-block-start: 0;
   text-shadow: 0 3px 24px rgba(0,0,0,0.66);
 }
-/* LP HERO：バッジは見出しより控えめに */
-.hero--lp .hero__badges { gap: 6px; margin-block-start: 1.1em; opacity: 0.9; }
+/* LP HERO：バッジは見出しより控えめ・でも読みやすく */
+.hero--lp .hero__badges { gap: 7px; margin-block-start: 1.05em; }
 .hero--lp .hero__badge {
-  padding: 0.3em 0.78em; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.02em;
-  color: rgba(255,255,255,0.9);
-  background: rgba(16,30,54,0.4); border-color: rgba(165,195,235,0.4);
+  padding: 0.36em 0.82em; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(16,30,54,0.5); border-color: rgba(165,195,235,0.5);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
 }
 /* LP HERO：CTA補足（初回も押しやすく） */
 .hero__cta-note {
@@ -2271,16 +2273,3 @@ body.is-modal-open { overflow: hidden; }
 .lp .section__title { font-size: clamp(1.7rem, 7.6vw, 2.4rem); line-height: 1.3; }
 .lp .assess__item { padding-block: clamp(11px, 3vw, 15px); }
 .lp .assess { padding-block: clamp(4px, 1.2vw, 10px); }
-
-/* ===== サイト内の青ライン（上＝ヘッダー下／下＝画面下）：ページ内にいる安心感 ===== */
-.site-header { border-block-end: none; }
-.site-header::after {
-  content: ""; position: absolute; inset-inline: 0; inset-block-end: 0; height: 2px;
-  background: linear-gradient(90deg, #15325c 0%, #2f74d6 46%, #74aef0 72%, #c8a34e 100%);
-  opacity: 0.92; pointer-events: none;
-}
-body::after {
-  content: ""; position: fixed; inset-inline: 0; inset-block-end: 0; height: 3px;
-  background: linear-gradient(90deg, #15325c 0%, #2f74d6 46%, #74aef0 72%, #c8a34e 100%);
-  z-index: 94; pointer-events: none;
-}

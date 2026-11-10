@@ -71,8 +71,9 @@
     if (y > 60) header.classList.add("is-solid");
     else header.classList.remove("is-solid");
 
-    // Header stays fixed and always visible (no hide-on-scroll)
-    header.classList.remove("is-hidden");
+    // Hide on scroll down, show on scroll up (after some distance)
+    if (y > 320 && y > lastY + 4) header.classList.add("is-hidden");
+    else if (y < lastY - 4) header.classList.remove("is-hidden");
 
     // Floating LINE button: show after hero
     if (fab) {
