@@ -283,6 +283,13 @@ export default function PersonalRoster() {
       .update({ name: r.name, staff_id: r.staff_id, expiry: r.expiry, quota: r.quota, used_offset: r.used_offset })
       .eq("id", id);
   }
+  // 指定した列だけをその場で保存（state更新も同時に行う）。
+  // setTimeout+persist はクロージャの古い rows を参照して旧値を保存してしまうため、
+  // ◀▶（used_offset）や担当（staff_id）のような即時変更はこちらで明示値を保存する。
+  async function savePatch(id: string, patch: Partial<Ticket>) {
+    setRows((p) => p.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    await supabase.from("personal_tickets").update(patch).eq("id", id);
+  }
 
   async function addRow() {
     const { data, error } = await supabase
@@ -435,7 +442,7 @@ export default function PersonalRoster() {
                     <td className="border-l px-1 py-1 align-middle">
                       <select
                         value={r.staff_id ?? ""}
-                        onChange={(e) => { setLocal(r.id, { staff_id: e.target.value || null }); setTimeout(() => persist(r.id), 0); }}
+                        onChange={(e) => savePatch(r.id, { staff_id: e.target.value || null })}
                         className="w-[52px] rounded border px-0.5 py-0.5 text-[11px] font-bold"
                         style={{ backgroundColor: st?.color || "#94a3b8", borderColor: st?.color || "#94a3b8", color: "#fff" }}
                       >
@@ -456,7 +463,7 @@ export default function PersonalRoster() {
                         title="▶で予約を右へずらす（1〜N回目を✕＝消費済みに）。◀で戻す。前システム・前月からの繰越に。"
                       >
                         <button
-                          onClick={() => { setLocal(r.id, { used_offset: Math.max(0, off - 1) }); setTimeout(() => persist(r.id), 0); }}
+                          onClick={() => savePatch(r.id, { used_offset: Math.max(0, off - 1) })}
                           disabled={off <= 0}
                           className="px-1 text-[10px] font-bold text-amber-700 active:bg-amber-100 disabled:opacity-30"
                           aria-label="左へ戻す"
@@ -465,7 +472,7 @@ export default function PersonalRoster() {
                         </button>
                         <span className="min-w-[13px] border-x border-amber-200 text-center text-[10px] font-bold text-amber-700">{off}</span>
                         <button
-                          onClick={() => { setLocal(r.id, { used_offset: off + 1 }); setTimeout(() => persist(r.id), 0); }}
+                          onClick={() => savePatch(r.id, { used_offset: off + 1 })}
                           className="px-1 text-[10px] font-bold text-amber-700 active:bg-amber-100"
                           aria-label="右へずらす"
                         >
