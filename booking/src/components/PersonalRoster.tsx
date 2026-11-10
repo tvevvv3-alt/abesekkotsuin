@@ -36,6 +36,11 @@ interface Visit {
 function consumeOf(v: Visit): number {
   return Math.max(1, Math.round((v.end_min - v.start_min) / 30));
 }
+// 氏名の表記ゆらぎ（全角/半角スペースの有無）を無視した突き合わせキー。
+// 「上田 龍太郎」「上田　龍太郎」「上田龍太郎」を同一人物として扱い、回数券の二重発行を防ぐ。
+function nameKey(s: string | null | undefined): string {
+  return (s || "").replace(/[\s　]+/g, "");
+}
 function mdLabel(date: string): string {
   const m = date.match(/^\d{4}-(\d{2})-(\d{2})/);
   return m ? `${Number(m[1])}/${Number(m[2])}` : date;
@@ -129,19 +134,19 @@ export default function PersonalRoster() {
     let tickets = ((tk as Ticket[]) ?? []).map((r) => ({ ...r, used_offset: r.used_offset ?? 0 }));
     const visitData = (appts.data as Visit[]) ?? [];
 
-    // 予約を患者名でまとめる（既にorder byで日付順）
+    // 予約を患者名でまとめる（スペースの有無は無視。既にorder byで日付順）
     const groups = new Map<string, Visit[]>();
     visitData.forEach((v) => {
-      const key = (v.patient_name || "").trim();
+      const key = nameKey(v.patient_name);
       if (!key) return;
       const a = groups.get(key) ?? [];
       a.push(v);
       groups.set(key, a);
     });
-    // 既存の回数券を名前ごとにまとめ、容量（スタンプ）を集計
+    // 既存の回数券を名前ごとにまとめ、容量（スタンプ）を集計（スペース無視）
     const tksByName = new Map<string, Ticket[]>();
     tickets.forEach((t) => {
-      const k = t.name.trim();
+      const k = nameKey(t.name);
       if (!k) return;
       const a = tksByName.get(k) ?? [];
       a.push(t);
@@ -151,21 +156,22 @@ export default function PersonalRoster() {
     // 新しい回数券（2枚目…）を自動追加する（＝11回目は新しい段へ）。
     const toCreate: Record<string, unknown>[] = [];
     let sortSeq = 900;
-    groups.forEach((list, nm) => {
+    groups.forEach((list, key) => {
       const totalStamps = list.reduce((n, v) => n + consumeOf(v), 0);
-      const tks = tksByName.get(nm) ?? [];
+      const tks = tksByName.get(key) ?? [];
       let cap = tks.reduce((n, t) => n + Math.max(0, (t.quota ?? 10) - (t.used_offset ?? 0)), 0);
       const first = list[0];
+      const displayName = (first.patient_name || "").trim(); // 表示名は実際の氏名（スペースは残す）
       const vm = vmById.get(first.service_id ?? "") ?? 5;
       const staffId = [...list].reverse().find((a) => a.staff_id)?.staff_id ?? null;
       // 券が1枚も無ければ1枚目を作る（担当・有効期限つき）
       if (tks.length === 0) {
-        toCreate.push({ name: nm, staff_id: staffId, expiry: expiryLabel(first.date, vm), kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: sortSeq++ });
+        toCreate.push({ name: displayName, staff_id: staffId, expiry: expiryLabel(first.date, vm), kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: sortSeq++ });
         cap += 10;
       }
       // スタンプが容量を超えるぶん、10スタンプ券を追加
       while (cap < totalStamps) {
-        toCreate.push({ name: nm, staff_id: staffId, expiry: null, kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: sortSeq++ });
+        toCreate.push({ name: displayName, staff_id: staffId, expiry: null, kind: "パーソナル", quota: 10, used_offset: 0, visits: [], sort_order: sortSeq++ });
         cap += 10;
       }
     });
@@ -194,7 +200,7 @@ export default function PersonalRoster() {
   const visitsByName = useMemo(() => {
     const m = new Map<string, Visit[]>();
     visits.forEach((v) => {
-      const key = (v.patient_name || "").trim();
+      const key = nameKey(v.patient_name);
       if (!key) return;
       const a = m.get(key) ?? [];
       a.push(v);
@@ -210,7 +216,7 @@ export default function PersonalRoster() {
     const nameOrder: string[] = [];
     const emptyTickets: Ticket[] = [];
     rows.forEach((t) => {
-      const k = t.name.trim();
+      const k = nameKey(t.name);
       if (!k) { emptyTickets.push(t); return; }
       if (!ticketsByName.has(k)) { ticketsByName.set(k, []); nameOrder.push(k); }
       ticketsByName.get(k)!.push(t);
