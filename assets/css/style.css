@@ -2215,12 +2215,12 @@ body.is-modal-open { overflow: hidden; }
   box-shadow: 0 16px 34px -26px rgba(20,32,44,0.5);
 }
 .achieve__mark {
-  width: clamp(34px, 9vw, 40px); aspect-ratio: 1; border-radius: 50%;
-  display: grid; place-items: center; color: #fff;
-  background: linear-gradient(135deg, #c8a34e, #e7cb83);
-  box-shadow: 0 8px 18px -10px rgba(150,110,30,0.75);
+  width: clamp(40px, 10.5vw, 46px); aspect-ratio: 1; border-radius: 50%;
+  display: grid; place-items: center; line-height: 1;
+  font-size: clamp(1.15rem, 5vw, 1.4rem);
+  background: #eef3fb; border: 1px solid rgba(28,58,94,0.1);
+  box-shadow: 0 6px 14px -9px rgba(20,32,44,0.45);
 }
-.achieve__mark svg { width: 56%; height: 56%; display: block; }
 .achieve__ttl {
   margin: 0; font-family: var(--sans); font-weight: 700;
   font-size: clamp(0.95rem, 3.9vw, 1.05rem); line-height: 1.42; color: var(--field);
