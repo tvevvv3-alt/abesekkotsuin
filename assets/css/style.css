@@ -1143,15 +1143,15 @@ p { margin: 0; }
     rgba(255,255,255,0.22) 53%,
     transparent 56%);
   transform: translateX(-140%);
-  animation: dockLineShine 2s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation: dockLineShine 2s cubic-bezier(0.38, 0, 0.3, 1) infinite;
 }
 @keyframes dockLineGlow {
-  0%, 2%, 22%, 100% { box-shadow: 0 8px 20px -6px rgba(6,199,85,0.6), 0 0 0 0 rgba(130,255,190,0), inset 0 1px 0 rgba(255,255,255,0.35); }
-  9% { box-shadow: 0 10px 28px -6px rgba(6,199,85,0.95), 0 0 16px 2px rgba(130,255,190,0.6), inset 0 1px 0 rgba(255,255,255,0.45); }
+  0%, 4%, 40%, 100% { box-shadow: 0 8px 20px -6px rgba(6,199,85,0.6), 0 0 0 0 rgba(130,255,190,0), inset 0 1px 0 rgba(255,255,255,0.35); }
+  18% { box-shadow: 0 10px 28px -6px rgba(6,199,85,0.95), 0 0 16px 2px rgba(130,255,190,0.6), inset 0 1px 0 rgba(255,255,255,0.45); }
 }
 @keyframes dockLineShine {
   0% { transform: translateX(-140%); }
-  18%, 100% { transform: translateX(140%); }
+  35%, 100% { transform: translateX(140%); }
 }
 @media (prefers-reduced-motion: reduce) {
   .dockbar__item--line { animation: none; }
