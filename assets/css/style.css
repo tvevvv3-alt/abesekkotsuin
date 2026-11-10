@@ -1109,9 +1109,9 @@ p { margin: 0; }
   transition: transform 0.18s var(--ease);
 }
 .dockbar__item:active { transform: scale(0.9); }
-/* 補助ボタン（電話・アクセス）はコンパクトなアイコンのみ */
+/* 補助ボタン（ホーム・電話・アクセス）はアイコンのみ（文字なし） */
 .dockbar__app {
-  width: clamp(30px, 8vw, 36px); aspect-ratio: 1; border-radius: 28%;
+  width: clamp(36px, 9.5vw, 42px); aspect-ratio: 1; border-radius: 28%;
   background-color: rgba(255,255,255,0.5);
   background-repeat: no-repeat; background-position: center; background-size: 52%;
   border: 1px solid rgba(255,255,255,0.75);
@@ -1122,13 +1122,34 @@ p { margin: 0; }
 .dockbar__app--home { background-image: var(--home-line); }
 .dockbar__app--ig  { background-image: var(--ig-line); }
 .dockbar__label { display: block; font-size: 0.58rem; font-weight: 600; letter-spacing: 0.02em; color: rgba(255,255,255,0.88); }
+.dockbar__item:not(.dockbar__item--line) .dockbar__label { display: none; }
 
-/* LINE：緑で横長に強調（主役） */
+/* LINE：緑で横長に強調（主役）＋光のスイープで目をひく */
 .dockbar__item--line {
+  position: relative; overflow: hidden;
   flex: 1 1 auto; flex-direction: row; align-self: stretch; gap: 0.5em;
-  min-height: clamp(42px, 11.5vw, 50px); padding: 0 1em; border-radius: 14px;
+  min-height: clamp(44px, 12vw, 52px); padding: 0 1em; border-radius: 14px;
   background: linear-gradient(135deg, #08cf5b, #04ad49);
-  box-shadow: 0 8px 18px -6px rgba(6,199,85,0.6), inset 0 1px 0 rgba(255,255,255,0.35);
+  box-shadow: 0 8px 20px -6px rgba(6,199,85,0.65), inset 0 1px 0 rgba(255,255,255,0.35);
+  animation: dockLineGlow 2.6s ease-in-out infinite;
+}
+.dockbar__item--line::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.55) 50%, transparent 60%);
+  transform: translateX(-130%);
+  animation: dockLineShine 4.2s ease-in-out infinite;
+}
+@keyframes dockLineGlow {
+  0%, 100% { box-shadow: 0 8px 20px -6px rgba(6,199,85,0.6), 0 0 0 0 rgba(6,199,85,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
+  50% { box-shadow: 0 10px 26px -6px rgba(6,199,85,0.9), 0 0 0 5px rgba(6,199,85,0), inset 0 1px 0 rgba(255,255,255,0.35); }
+}
+@keyframes dockLineShine {
+  0% { transform: translateX(-130%); }
+  22%, 100% { transform: translateX(130%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dockbar__item--line { animation: none; }
+  .dockbar__item--line::after { display: none; }
 }
 .dockbar__item--line .dockbar__app {
   width: 22px; height: 22px; border: 0; border-radius: 0; box-shadow: none;
