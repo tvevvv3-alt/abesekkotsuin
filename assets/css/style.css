@@ -2283,13 +2283,18 @@ body.is-modal-open { overflow: hidden; }
   animation: fuseFlow 2.8s linear infinite;
 }
 @keyframes fuseFlow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+/* 中央：施術台にうつ伏せで寝ている人（3施術が集まる対象） */
 .fusion__core {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: clamp(17px, 5.2vw, 23px); aspect-ratio: 1; border-radius: 50%; z-index: 2;
-  background: radial-gradient(circle at 50% 38%, #ffffff, #d9e4f3);
-  border: 1px solid rgba(200,163,78,0.6);
-  box-shadow: 0 0 0 5px rgba(26,79,156,0.05), 0 0 14px 2px rgba(26,79,156,0.12), 0 4px 10px -6px rgba(20,32,44,0.4);
+  width: clamp(64px, 19vw, 80px); height: auto; z-index: 2; color: var(--field);
+  filter: drop-shadow(0 0 5px rgba(247,245,240,0.95)) drop-shadow(0 0 5px rgba(247,245,240,0.9));
 }
+.fusion__core { display: block; overflow: visible; }
+.fusion__figure { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+.fusion__figure circle { fill: currentColor; stroke: none; }
+.fusion__table { stroke: rgba(26,79,156,0.4); stroke-width: 1.5; stroke-linecap: round; }
+/* 運動療法：DNSの赤ちゃんマーク（ブランド色に着色） */
+.baby-mark { width: 62%; height: 62%; object-fit: contain; display: block; }
 .fusion .assess__ico {
   background: linear-gradient(160deg, #ffffff, #f1f5fb);
   border-color: rgba(28,58,94,0.07);
