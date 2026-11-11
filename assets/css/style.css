@@ -178,6 +178,18 @@ p { margin: 0; }
 }
 .site-nav__link:hover { color: var(--field); }
 .site-nav__link:hover::after { transform: scaleX(1); }
+/* 別ページ（スポーツ特化サイト）へ飛ぶ導線は、青い塗りピルで区別 */
+.site-nav__link--lp {
+  color: #fff; background: var(--field);
+  border-radius: 999px; padding: 0.46em 1.05em;
+  font-weight: 700; letter-spacing: 0.04em;
+  box-shadow: 0 8px 18px -10px rgba(26,79,156,0.75);
+  transition: background-color 0.25s var(--ease), transform 0.25s var(--ease);
+}
+.site-nav__link--lp:hover { color: #fff; background: #15407e; transform: translateY(-1px); }
+.site-nav__link--lp::after { display: none; }
+.site-nav__link--lp span { display: inline-block; transition: transform 0.25s var(--ease); }
+.site-nav__link--lp:hover span { transform: translateX(3px); }
 .site-nav__cta { display: none; }
 .nav-close { display: none; }
 
@@ -238,6 +250,11 @@ p { margin: 0; }
     padding: 0.95em 0.1em; border-block-end: 1px solid rgba(20,32,44,0.08);
   }
   .site-nav__link::after { display: none; }
+  .site-nav__link--lp {
+    color: #fff !important; align-self: flex-start;
+    border-block-end: 0; padding: 0.7em 1.3em;
+    margin-block: 2px 12px; font-size: 1.02rem;
+  }
   .site-nav__cta { display: inline-flex; align-self: flex-start; margin-block-start: 1.2em; }
 }
 
