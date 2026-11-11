@@ -513,6 +513,8 @@ p { margin: 0; }
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 .assess__desc { margin: 0; padding-inline-start: 1.6em; color: var(--ink-soft); font-weight: 300; font-size: 0.95rem; line-height: 1.75; letter-spacing: 0.02em; }
+.assess__explain { margin-block-start: clamp(18px, 4.5vw, 26px); display: flex; flex-direction: column; gap: 0.85em; }
+.assess__explain p { margin: 0; font-size: clamp(0.92rem, 3.7vw, 1rem); line-height: 1.85; color: var(--ink-soft); }
 .assess__more { text-align: center; margin-block-start: clamp(18px, 4vw, 26px); }
 .assess__more a { color: var(--field); font-weight: 500; font-size: 0.92rem; letter-spacing: 0.04em; }
 
@@ -1258,6 +1260,21 @@ p { margin: 0; }
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.55);
 }
 .hero__message p { margin: 0; }
+.hero__scope {
+  list-style: none; margin: 0 0 clamp(1.8em, 6vw, 2.6em); padding: 0;
+  display: flex; flex-direction: column; gap: 0.5em;
+}
+.hero__scope li {
+  position: relative; padding-inline-start: 1.5em;
+  font-family: var(--sans); font-weight: 600; letter-spacing: 0.02em;
+  font-size: clamp(0.92rem, 3.8vw, 1.05rem); line-height: 1.5;
+  color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.hero__scope li::before {
+  content: ""; position: absolute; inset-inline-start: 0; inset-block-start: 0.55em;
+  width: 0.85em; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, #2f74d6, #74aef0);
+}
 
 /* 横スクロール案内をカード上に置く版 */
 .hscroll__hint--top { margin-block: 0 16px; }
