@@ -2274,19 +2274,22 @@ body.is-modal-open { overflow: hidden; }
   margin: clamp(26px, 5.5vw, 42px) auto 0; aspect-ratio: 1 / 1.14;
 }
 .fusion__web { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.fusion__tri { fill: none; stroke: rgba(26,79,156,0.15); stroke-width: 0.4; }
-.fusion__spoke { stroke: rgba(26,79,156,0.32); stroke-width: 0.55; stroke-linecap: round; stroke-dasharray: 2.2 3.8; animation: fuseFlow 2.6s linear infinite; }
-@keyframes fuseFlow { to { stroke-dashoffset: -12; } }
-.fusion__core {
-  position: absolute; left: 50%; top: 51%; transform: translate(-50%, -50%);
-  width: clamp(74px, 22vw, 94px); aspect-ratio: 1; border-radius: 50%; z-index: 2;
-  display: grid; place-items: center; text-align: center;
-  background: radial-gradient(circle at 50% 34%, #ffffff, #f3f7fc);
-  border: 1px solid rgba(200,163,78,0.4);
-  box-shadow: 0 8px 20px -14px rgba(20,32,44,0.28), inset 0 1px 0 rgba(255,255,255,0.9);
+/* 3施術を中央へ曲線でスタイリッシュに接続（点線なし） */
+.fusion__link { fill: none; stroke: rgba(26,79,156,0.2); stroke-width: 0.7; stroke-linecap: round; }
+.fusion__flow {
+  fill: none; stroke: var(--field); stroke-width: 1.15; stroke-linecap: round;
+  stroke-dasharray: 16 84; opacity: 0.85;
+  filter: drop-shadow(0 0 1.2px rgba(26,79,156,0.55));
+  animation: fuseFlow 2.8s linear infinite;
 }
-.fusion__core b { font-family: var(--serif); font-weight: 600; color: var(--field); font-size: clamp(1.02rem, 4.4vw, 1.26rem); letter-spacing: 0.1em; line-height: 1; }
-.fusion__core span { display: block; margin-block-start: 0.3em; font-size: clamp(0.56rem, 2.4vw, 0.66rem); color: var(--ink-mute); letter-spacing: 0.06em; }
+@keyframes fuseFlow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+.fusion__core {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: clamp(17px, 5.2vw, 23px); aspect-ratio: 1; border-radius: 50%; z-index: 2;
+  background: radial-gradient(circle at 50% 38%, #ffffff, #d9e4f3);
+  border: 1px solid rgba(200,163,78,0.6);
+  box-shadow: 0 0 0 5px rgba(26,79,156,0.05), 0 0 14px 2px rgba(26,79,156,0.12), 0 4px 10px -6px rgba(20,32,44,0.4);
+}
 .fusion .assess__ico {
   background: linear-gradient(160deg, #ffffff, #f1f5fb);
   border-color: rgba(28,58,94,0.07);
@@ -2299,7 +2302,7 @@ body.is-modal-open { overflow: hidden; }
 .fusion__node .assess__ico { margin: 0 auto 0.42em; width: clamp(46px, 13.5vw, 56px); }
 .fusion__label { margin: 0; font-family: var(--serif); font-weight: 600; color: var(--field); font-size: clamp(1rem, 4.1vw, 1.14rem); letter-spacing: 0.04em; line-height: 1.3; }
 .fusion__desc { margin: 0.18em 0 0; color: var(--ink-soft); font-weight: 300; font-size: clamp(0.72rem, 2.9vw, 0.8rem); line-height: 1.5; }
-@media (prefers-reduced-motion: reduce) { .fusion__spoke { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .fusion__flow { animation: none; opacity: 0; } }
 
 /* ===== LP HERO：ひと目で入る タグ＆タグライン ===== */
 .hero__tagline {
