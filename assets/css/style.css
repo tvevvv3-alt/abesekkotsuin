@@ -1151,36 +1151,28 @@ p { margin: 0; }
 
 /* LINE：緑で横長に強調（主役）＋光のスイープで目をひく */
 .dockbar__item--line {
-  position: relative; overflow: hidden;
+  position: relative;
   flex: 1 1 auto; flex-direction: row; align-self: stretch; gap: 0.5em;
   min-height: clamp(44px, 12vw, 52px); padding: 0 1em; border-radius: 14px;
   background: linear-gradient(135deg, #2ee07c, #06c755);
   box-shadow: 0 8px 20px -6px rgba(6,199,85,0.65), inset 0 1px 0 rgba(255,255,255,0.35);
-  animation: dockLineGlow 2s ease-out infinite;
+  transform-origin: center bottom;
+  animation: dockLineFloat 2.6s ease-in-out infinite;
 }
-/* シーケンシャルウィンカー風：ラインでシュパーンと流れる光 */
-.dockbar__item--line::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(100deg,
-    transparent 44%,
-    rgba(255,255,255,0.22) 47%,
-    rgba(255,255,255,0.98) 50%,
-    rgba(255,255,255,0.22) 53%,
-    transparent 56%);
-  transform: translateX(-140%);
-  animation: dockLineShine 2s cubic-bezier(0.38, 0, 0.3, 1) infinite;
-}
-@keyframes dockLineGlow {
-  0%, 4%, 40%, 100% { box-shadow: 0 8px 20px -6px rgba(6,199,85,0.6), 0 0 0 0 rgba(130,255,190,0), inset 0 1px 0 rgba(255,255,255,0.35); }
-  18% { box-shadow: 0 10px 28px -6px rgba(6,199,85,0.95), 0 0 16px 2px rgba(130,255,190,0.6), inset 0 1px 0 rgba(255,255,255,0.45); }
-}
-@keyframes dockLineShine {
-  0% { transform: translateX(-140%); }
-  35%, 100% { transform: translateX(140%); }
+.dockbar__item--line:active { animation: none; transform: scale(0.96); }
+/* ふわふわ：拡大縮小しながら軽く浮き上がる */
+@keyframes dockLineFloat {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 8px 20px -6px rgba(6,199,85,0.6), inset 0 1px 0 rgba(255,255,255,0.35);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.04);
+    box-shadow: 0 16px 32px -8px rgba(6,199,85,0.85), inset 0 1px 0 rgba(255,255,255,0.45);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .dockbar__item--line { animation: none; }
-  .dockbar__item--line::after { display: none; }
 }
 .dockbar__item--line .dockbar__app {
   width: 22px; height: 22px; border: 0; border-radius: 0; box-shadow: none;
