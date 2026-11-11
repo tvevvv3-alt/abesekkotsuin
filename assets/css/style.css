@@ -1173,25 +1173,49 @@ p { margin: 0; }
 }
 /* LINE予約ボタンの上を、白い小さなボールが転がって跳ねる */
 .dock-ball {
-  position: absolute; top: -9px; left: 10px;
-  width: 8px; height: 8px; border-radius: 50%;
+  position: absolute; top: -10px; left: 8px;
+  width: 9px; height: 9px; border-radius: 50%;
   background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   pointer-events: none; z-index: 3;
   animation:
-    dockBallRun 3s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate,
-    dockBallHop 0.62s infinite,
-    dockBallSpin 0.62s linear infinite;
+    dockBallX 3.6s ease-out infinite,
+    dockBallY 3.6s linear infinite,
+    dockBallR 3.6s ease-out infinite;
 }
-@keyframes dockBallRun {
-  from { left: 10px; }
-  to   { left: calc(100% - 18px); }
+/* 横：ポーンと飛び出して右へ進み、だんだん減速してコロコロ止まる */
+@keyframes dockBallX {
+  0%   { left: 8px; opacity: 0; }
+  3%   { left: 8px; opacity: 1; }
+  14%  { left: 24%; }
+  28%  { left: 44%; }
+  44%  { left: 64%; }
+  58%  { left: 80%; }
+  72%  { left: calc(100% - 20px); }
+  82%  { left: calc(100% - 16px); }
+  93%  { left: calc(100% - 16px); opacity: 1; }
+  99%  { left: calc(100% - 16px); opacity: 0; }
+  100% { left: 8px; opacity: 0; }
 }
-@keyframes dockBallHop {
-  0%   { transform: translateY(0);    animation-timing-function: cubic-bezier(0.3, 0, 0.25, 1); }
-  50%  { transform: translateY(-15px); animation-timing-function: cubic-bezier(0.8, 0, 0.7, 1); }
+/* 上下：大きく跳ねて、だんだん小さくバウンドし接地 */
+@keyframes dockBallY {
+  0%   { transform: translateY(0);     animation-timing-function: cubic-bezier(0.2,0.6,0.35,1); }
+  13%  { transform: translateY(-27px); animation-timing-function: cubic-bezier(0.7,0,0.85,0.5); }
+  26%  { transform: translateY(0);     animation-timing-function: cubic-bezier(0.2,0.6,0.35,1); }
+  37%  { transform: translateY(-15px); animation-timing-function: cubic-bezier(0.7,0,0.85,0.5); }
+  46%  { transform: translateY(0);     animation-timing-function: cubic-bezier(0.2,0.6,0.35,1); }
+  54%  { transform: translateY(-7px);  animation-timing-function: cubic-bezier(0.7,0,0.85,0.5); }
+  60%  { transform: translateY(0);     animation-timing-function: cubic-bezier(0.2,0.6,0.35,1); }
+  65%  { transform: translateY(-3px);  animation-timing-function: cubic-bezier(0.7,0,0.85,0.5); }
+  69%  { transform: translateY(0); }
   100% { transform: translateY(0); }
 }
-@keyframes dockBallSpin { from { rotate: 0deg; } to { rotate: 360deg; } }
+/* 回転：飛行・転がり中はよく回り、止まるとともに停止 */
+@keyframes dockBallR {
+  0%   { rotate: 0deg; }
+  72%  { rotate: 900deg; }
+  82%  { rotate: 1010deg; }
+  100% { rotate: 1010deg; }
+}
 @media (prefers-reduced-motion: reduce) {
   .dockbar__item--line { animation: none; }
   .dock-ball { display: none; }
