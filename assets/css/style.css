@@ -100,7 +100,7 @@ p { margin: 0; }
   mask: var(--line-icon) center/contain no-repeat;
 }
 :root {
-  --line-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 5.69 2 10.23c0 4.07 3.56 7.48 8.37 8.13.33.07.78.22.89.5.1.26.07.66.03.92l-.14.86c-.04.26-.2 1.01.89.55s5.86-3.45 8-5.91c1.48-1.62 2.19-3.27 2.19-5.1C22.25 5.69 17.52 2 12 2z'/%3E%3C/svg%3E");
+  --line-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 5.69 2 10.23c0 4.07 3.56 7.48 8.37 8.13.33.07.78.22.89.5.1.26.07.66.03.92l-.14.86c-.04.26-.2 1.01.89.55s5.86-3.45 8-5.91c1.48-1.62 2.19-3.27 2.19-5.1C22.25 5.69 17.52 2 12 2z'/%3E%3C/svg%3E");
 }
 
 /* ---------- Header ---------- */
@@ -1130,10 +1130,10 @@ p { margin: 0; }
 
 /* ===================== ガラス製ボトムバー（ドック） ===================== */
 :root {
-  --tel-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.8 3.5h2.7l1.4 3.8-1.9 1.2a11.5 11.5 0 0 0 5.3 5.3l1.2-1.9 3.8 1.4v2.7a2 2 0 0 1-2.2 2A16.3 16.3 0 0 1 4.8 5.7 2 2 0 0 1 6.8 3.5z'/%3E%3C/svg%3E");
-  --map-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z'/%3E%3Ccircle cx='12' cy='11' r='2.3'/%3E%3C/svg%3E");
-  --ig-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='3.5' width='17' height='17' rx='5'/%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Ccircle cx='16.9' cy='7.1' r='1.1' fill='%231c3a5e' stroke='none'/%3E%3C/svg%3E");
-  --home-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 11.5 12 4l8.5 7.5'/%3E%3Cpath d='M5.5 10.2V20h13V10.2'/%3E%3C/svg%3E");
+  --tel-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.8 3.5h2.7l1.4 3.8-1.9 1.2a11.5 11.5 0 0 0 5.3 5.3l1.2-1.9 3.8 1.4v2.7a2 2 0 0 1-2.2 2A16.3 16.3 0 0 1 4.8 5.7 2 2 0 0 1 6.8 3.5z'/%3E%3C/svg%3E");
+  --map-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z'/%3E%3Ccircle cx='12' cy='11' r='2.3'/%3E%3C/svg%3E");
+  --ig-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='3.5' width='17' height='17' rx='5'/%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Ccircle cx='16.9' cy='7.1' r='1.1' fill='%231c3a5e' stroke='none'/%3E%3C/svg%3E");
+  --home-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231c3a5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 11.5 12 4l8.5 7.5'/%3E%3Cpath d='M5.5 10.2V20h13V10.2'/%3E%3C/svg%3E");
 }
 .dockbar {
   position: fixed; z-index: 96;
