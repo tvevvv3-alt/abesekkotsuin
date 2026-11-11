@@ -1197,13 +1197,21 @@ p { margin: 0; }
   animation: dnsSquat 1.7s ease-in-out infinite;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.22));
 }
-/* スクワット：立ち上がり→ゆっくり沈み込み→ボトムで一息→押し上げ */
+.dock-baby--right { left: auto; right: 9px; animation-name: dnsSquatR; }
+/* スクワット：立ち上がり→深く沈み込み→ボトムで一息→押し上げ */
 @keyframes dnsSquat {
-  0%,100% { transform: translateY(-3px) scaleY(1.03) scaleX(0.98); }
-  46%     { transform: translateY(0)    scaleY(0.8)  scaleX(1.06); }
-  58%     { transform: translateY(0)    scaleY(0.8)  scaleX(1.06); }
+  0%,100% { transform: translateY(-4px) scaleY(1.05) scaleX(0.96); }
+  46%     { transform: translateY(0)    scaleY(0.68) scaleX(1.1); }
+  58%     { transform: translateY(0)    scaleY(0.68) scaleX(1.1); }
 }
-.dockbar__item--line:active .dock-baby { transform: translateY(0) scaleY(0.8) scaleX(1.06); }
+/* 右側はミラー（内向き） */
+@keyframes dnsSquatR {
+  0%,100% { transform: translateY(-4px) scaleY(1.05) scaleX(-0.96); }
+  46%     { transform: translateY(0)    scaleY(0.68) scaleX(-1.1); }
+  58%     { transform: translateY(0)    scaleY(0.68) scaleX(-1.1); }
+}
+.dockbar__item--line:active .dock-baby { transform: translateY(0) scaleY(0.68) scaleX(1.1); }
+.dockbar__item--line:active .dock-baby--right { transform: translateY(0) scaleY(0.68) scaleX(-1.1); }
 @media (prefers-reduced-motion: reduce) {
   .dockbar__item--line { animation: none; }
   .dock-baby { animation: none; }
