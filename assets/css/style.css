@@ -1188,22 +1188,32 @@ p { margin: 0; }
     box-shadow: 0 16px 32px -8px rgba(6,199,85,0.85), inset 0 1px 0 rgba(255,255,255,0.45);
   }
 }
-/* LINE予約ボタンに、微弱電流が流れる心電図（スパイク＋プラトー）ラインを流す */
+/* LINE予約ボタンに、微弱電流が“ピコン”と一瞬走る心電図スパイク（約1秒に1回） */
 .dock-ecg {
   position: absolute; inset: 0; z-index: 1;
   pointer-events: none; border-radius: inherit; overflow: hidden;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 28' preserveAspectRatio='none'%3E%3Cpath d='M0 14 H22 L25 14 L28 4 L30 22 L33 14 H35 L37 10 H48 L50 14 H56' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: repeat-x;
-  background-size: 56px 22px;
-  background-position: 0 center;
-  opacity: 0.62;
-  filter: drop-shadow(0 0 2.5px rgba(255,255,255,0.75));
-  animation: ecgScroll 1.15s linear infinite;
+  /* 薄い水平ベースライン（モニター線） */
+  background-image: linear-gradient(to bottom,
+    transparent calc(50% - 1px), rgba(255,255,255,0.22) calc(50% - 1px),
+    rgba(255,255,255,0.22) calc(50% + 1px), transparent calc(50% + 1px));
 }
-@keyframes ecgScroll { to { background-position-x: -56px; } }
+.dock-ecg::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -14%;
+  width: 42px;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 42 28'%3E%3Cpath d='M0 14 H9 L12 14 L15 3 L18 24 L21 14 L23 9 H34 L36 14 H42' fill='none' stroke='%23ffffff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.95)) drop-shadow(0 0 9px rgba(190,255,220,0.6));
+  animation: ecgDart 1.1s cubic-bezier(0.33,0,0.18,1) infinite;
+}
+/* 左から右へ一瞬だけ走り、あとは消えて待機 */
+@keyframes ecgDart {
+  0%   { left: -14%; opacity: 0; }
+  5%   { opacity: 1; }
+  40%  { left: 100%; opacity: 1; }
+  46%, 100% { left: 100%; opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .dockbar__item--line { animation: none; }
-  .dock-ecg { animation: none; }
+  .dock-ecg::after { animation: none; opacity: 0; }
 }
 .dockbar__item--line .dockbar__app {
   position: relative; z-index: 2;
