@@ -142,6 +142,9 @@
     nav.querySelectorAll("a").forEach(function (a) {
       a.addEventListener("click", closeMenu);
     });
+    nav.querySelectorAll("[data-nav-close]").forEach(function (btn) {
+      btn.addEventListener("click", closeMenu);
+    });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && nav.classList.contains("is-open")) closeMenu();
     });

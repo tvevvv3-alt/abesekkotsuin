@@ -179,6 +179,7 @@ p { margin: 0; }
 .site-nav__link:hover { color: var(--field); }
 .site-nav__link:hover::after { transform: scaleX(1); }
 .site-nav__cta { display: none; }
+.nav-close { display: none; }
 
 /* ハンバーガー */
 .nav-toggle {
@@ -216,6 +217,22 @@ p { margin: 0; }
   }
   body.is-nav-open { overflow: hidden; }
   .site-nav.is-open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+  .nav-close {
+    display: inline-flex; align-items: center; gap: 0.45em;
+    align-self: flex-end; position: sticky; inset-block-start: 0; z-index: 2;
+    margin-block-end: 10px; padding: 0.6em 1.1em;
+    border: 1px solid rgba(20,32,44,0.16); border-radius: 999px;
+    background: #fff; color: var(--ink);
+    font-family: var(--sans); font-size: 0.92rem; font-weight: 700; letter-spacing: 0.06em;
+    cursor: pointer; box-shadow: 0 8px 20px -12px rgba(20,32,44,0.55);
+  }
+  .nav-close__x { position: relative; width: 13px; height: 13px; display: inline-block; }
+  .nav-close__x::before, .nav-close__x::after {
+    content: ""; position: absolute; inset-block-start: 50%; inset-inline-start: 0;
+    width: 100%; height: 2px; background: currentColor; border-radius: 2px;
+  }
+  .nav-close__x::before { transform: translateY(-50%) rotate(45deg); }
+  .nav-close__x::after { transform: translateY(-50%) rotate(-45deg); }
   .site-nav__link {
     color: var(--ink) !important; font-size: 1.04rem;
     padding: 0.95em 0.1em; border-block-end: 1px solid rgba(20,32,44,0.08);
