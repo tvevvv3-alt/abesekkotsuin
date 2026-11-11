@@ -562,6 +562,9 @@ p { margin: 0; }
 
 /* ---------- Section 9 — 体幹教室 ---------- */
 .section--taikan { padding: 0; background: var(--field-2); color: #fff; }
+.taikan__head { padding: clamp(48px, 11vw, 84px) var(--gut) clamp(22px, 5.5vw, 34px); text-align: center; position: relative; z-index: 1; }
+.taikan__eyebrow { margin: 0 0 0.7em; color: var(--gold); font-family: var(--sans); font-weight: 700; font-size: clamp(0.72rem, 2.9vw, 0.82rem); letter-spacing: 0.18em; }
+.taikan__heading { margin: 0; font-family: var(--serif); font-weight: 500; color: #fff; line-height: 1.2; letter-spacing: 0.1em; font-size: clamp(2.3rem, 11vw, 3.6rem); }
 .taikan { display: grid; grid-template-columns: 1fr; }
 .taikan__media { margin: 0; }
 .taikan__media img { width: 100%; height: clamp(280px, 60vw, 560px); object-fit: cover; }
