@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="assets/css/style.css?v=20261111q" />
+  <link rel="stylesheet" href="assets/css/style.css?v=20261111r" />
   <noscript>
     <style>.reveal{opacity:1 !important;transform:none !important;filter:none !important;}</style>
   </noscript>
@@ -334,23 +334,30 @@
     </div>
 
     <div class="container container--narrow">
-      <ul class="assess assess--ico reveal">
-        <li class="assess__item">
+      <div class="fusion reveal">
+        <svg class="fusion__web" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polygon class="fusion__tri" points="50,14 20,84 80,84" />
+          <line class="fusion__spoke" x1="50" y1="14" x2="50" y2="51" />
+          <line class="fusion__spoke" x1="20" y1="84" x2="50" y2="51" />
+          <line class="fusion__spoke" x1="80" y1="84" x2="50" y2="51" />
+        </svg>
+        <div class="fusion__core"><b>融合</b><span>最適に組み合わせ</span></div>
+        <div class="fusion__node fusion__node--top">
           <span class="assess__ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg></span>
-          <h3 class="assess__label">微弱電流</h3>
-          <p class="assess__desc">痛み・炎症・組織修復</p>
-        </li>
-        <li class="assess__item">
+          <p class="fusion__label">微弱電流</p>
+          <p class="fusion__desc">痛み・炎症・組織修復</p>
+        </div>
+        <div class="fusion__node fusion__node--bl">
           <span class="assess__ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6C13 6.67 12.33 6 11.5 6S10 6.67 10 7.5v10.74c-3.6-.76-3.54-.75-3.67-.75-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.92-1.38z"/></svg></span>
-          <h3 class="assess__label">手技療法</h3>
-          <p class="assess__desc">骨格・関節・筋膜</p>
-        </li>
-        <li class="assess__item">
+          <p class="fusion__label">手技療法</p>
+          <p class="fusion__desc">骨格・関節・筋膜</p>
+        </div>
+        <div class="fusion__node fusion__node--br">
           <span class="assess__ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.57 14.86 22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z"/></svg></span>
-          <h3 class="assess__label">運動療法</h3>
-          <p class="assess__desc">DNS・動作改善</p>
-        </li>
-      </ul>
+          <p class="fusion__label">運動療法</p>
+          <p class="fusion__desc">DNS・動作改善</p>
+        </div>
+      </div>
       <div class="assess__explain reveal">
         <p>施術前後で、痛みだけでなく動きの変化も一緒に確認します。競技復帰に必要な動作を見ながら、現在の状態と次に必要な施術を説明します。</p>
         <p>痛みの原因・施術後の変化・今後の方針をご説明するので、納得して続けていただけます。</p>

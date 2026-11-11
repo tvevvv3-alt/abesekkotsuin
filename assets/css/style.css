@@ -2268,6 +2268,34 @@ body.is-modal-open { overflow: hidden; }
   box-shadow: 0 9px 20px -9px rgba(20,32,44,0.55);
 }
 
+/* ===== 施術する：3つを三角形に配置し、中央で「融合」を表現 ===== */
+.fusion {
+  position: relative; width: min(100%, 360px);
+  margin: clamp(26px, 5.5vw, 42px) auto 0; aspect-ratio: 1 / 1.14;
+}
+.fusion__web { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.fusion__tri { fill: rgba(26,79,156,0.045); stroke: rgba(26,79,156,0.3); stroke-width: 0.5; stroke-dasharray: 1.6 1.8; }
+.fusion__spoke { stroke: rgba(26,79,156,0.5); stroke-width: 0.7; stroke-linecap: round; stroke-dasharray: 2.4 3.4; animation: fuseFlow 2.2s linear infinite; }
+@keyframes fuseFlow { to { stroke-dashoffset: -11.6; } }
+.fusion__core {
+  position: absolute; left: 50%; top: 51%; transform: translate(-50%, -50%);
+  width: clamp(74px, 22vw, 94px); aspect-ratio: 1; border-radius: 50%; z-index: 2;
+  display: grid; place-items: center; text-align: center;
+  background: radial-gradient(circle at 50% 36%, #ffffff, #e9eff8);
+  border: 1.5px solid rgba(200,163,78,0.55);
+  box-shadow: 0 12px 28px -12px rgba(20,32,44,0.42), 0 0 0 7px rgba(26,79,156,0.05), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.fusion__core b { font-family: var(--serif); font-weight: 600; color: var(--field); font-size: clamp(1.02rem, 4.4vw, 1.26rem); letter-spacing: 0.1em; line-height: 1; }
+.fusion__core span { display: block; margin-block-start: 0.3em; font-size: clamp(0.56rem, 2.4vw, 0.66rem); color: var(--ink-mute); letter-spacing: 0.06em; }
+.fusion__node { position: absolute; transform: translate(-50%, -50%); width: clamp(110px, 34vw, 134px); text-align: center; z-index: 1; }
+.fusion__node--top { left: 50%; top: 14%; }
+.fusion__node--bl  { left: 20%; top: 84%; }
+.fusion__node--br  { left: 80%; top: 84%; }
+.fusion__node .assess__ico { margin: 0 auto 0.42em; width: clamp(46px, 13.5vw, 56px); }
+.fusion__label { margin: 0; font-family: var(--serif); font-weight: 600; color: var(--field); font-size: clamp(1rem, 4.1vw, 1.14rem); letter-spacing: 0.04em; line-height: 1.3; }
+.fusion__desc { margin: 0.18em 0 0; color: var(--ink-soft); font-weight: 300; font-size: clamp(0.72rem, 2.9vw, 0.8rem); line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { .fusion__spoke { animation: none; } }
+
 /* ===== LP HERO：ひと目で入る タグ＆タグライン ===== */
 .hero__tagline {
   font-family: var(--sans); font-weight: 600;
