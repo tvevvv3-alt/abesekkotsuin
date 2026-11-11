@@ -1188,41 +1188,31 @@ p { margin: 0; }
     box-shadow: 0 16px 32px -8px rgba(6,199,85,0.85), inset 0 1px 0 rgba(255,255,255,0.45);
   }
 }
-/* LINE予約ボタン左側で、DNS（発育運動＝赤ちゃんの動き）モチーフのキャラがスクワット */
-.dock-baby {
-  position: absolute; left: 9px; bottom: 6px;
-  width: auto; height: 40px;
-  pointer-events: none; z-index: 3;
-  transform-origin: center bottom;
-  animation: dnsSquat 1.7s ease-in-out infinite;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.22));
+/* LINE予約ボタンに、微弱電流が流れる心電図（スパイク＋プラトー）ラインを流す */
+.dock-ecg {
+  position: absolute; inset: 0; z-index: 1;
+  pointer-events: none; border-radius: inherit; overflow: hidden;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 28' preserveAspectRatio='none'%3E%3Cpath d='M0 14 H22 L25 14 L28 4 L30 22 L33 14 H35 L37 10 H48 L50 14 H56' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 56px 22px;
+  background-position: 0 center;
+  opacity: 0.62;
+  filter: drop-shadow(0 0 2.5px rgba(255,255,255,0.75));
+  animation: ecgScroll 1.15s linear infinite;
 }
-.dock-baby--right { left: auto; right: 9px; animation-name: dnsSquatR; }
-/* スクワット：立ち上がり→深く沈み込み→ボトムで一息→押し上げ */
-@keyframes dnsSquat {
-  0%,100% { transform: translateY(-4px) scaleY(1.05) scaleX(0.96); }
-  46%     { transform: translateY(0)    scaleY(0.68) scaleX(1.1); }
-  58%     { transform: translateY(0)    scaleY(0.68) scaleX(1.1); }
-}
-/* 右側はミラー（内向き） */
-@keyframes dnsSquatR {
-  0%,100% { transform: translateY(-4px) scaleY(1.05) scaleX(-0.96); }
-  46%     { transform: translateY(0)    scaleY(0.68) scaleX(-1.1); }
-  58%     { transform: translateY(0)    scaleY(0.68) scaleX(-1.1); }
-}
-.dockbar__item--line:active .dock-baby { transform: translateY(0) scaleY(0.68) scaleX(1.1); }
-.dockbar__item--line:active .dock-baby--right { transform: translateY(0) scaleY(0.68) scaleX(-1.1); }
+@keyframes ecgScroll { to { background-position-x: -56px; } }
 @media (prefers-reduced-motion: reduce) {
   .dockbar__item--line { animation: none; }
-  .dock-baby { animation: none; }
+  .dock-ecg { animation: none; }
 }
 .dockbar__item--line .dockbar__app {
+  position: relative; z-index: 2;
   width: 22px; height: 22px; border: 0; border-radius: 0; box-shadow: none;
   background: #fff;
   -webkit-mask: var(--line-icon) center/contain no-repeat;
   mask: var(--line-icon) center/contain no-repeat;
 }
-.dockbar__item--line .dockbar__label { display: inline; font-size: 0.95rem; font-weight: 700; color: #fff; letter-spacing: 0.04em; }
+.dockbar__item--line .dockbar__label { position: relative; z-index: 2; display: inline; font-size: 0.95rem; font-weight: 700; color: #fff; letter-spacing: 0.04em; }
 
 @media (max-width: 860px) {
   .dockbar { display: flex; }
