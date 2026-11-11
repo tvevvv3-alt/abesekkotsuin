@@ -1829,7 +1829,8 @@ p { margin: 0; }
 .kw-menu__note { margin-block-start: 1.3em; color: rgba(255,255,255,0.7); font-size: 0.82rem; font-weight: 300; letter-spacing: 0.04em; line-height: 1.8; }
 
 /* メディア掲載・紹介実績 */
-.media-grid { display: grid; grid-template-columns: 1fr; gap: clamp(16px, 3vw, 22px); }
+.section--media { padding-block: clamp(56px, 9vh, 120px); }
+.media-grid { display: grid; grid-template-columns: 1fr; gap: clamp(12px, 2.6vw, 22px); }
 .media-card {
   background: #fff; border: 1px solid var(--line); border-radius: 18px;
   padding: clamp(24px, 5.5vw, 32px);
@@ -1852,8 +1853,15 @@ p { margin: 0; }
 .media-card--photo {
   position: relative; overflow: hidden;
   display: flex; flex-direction: column;
-  min-height: clamp(240px, 64vw, 300px);
+  min-height: clamp(150px, 40vw, 300px);
+  padding: clamp(18px, 4.6vw, 32px);
 }
+.media-card--photo .media-card__top { margin-block-end: 0.55em; }
+.media-card--photo .media-card__name {
+  font-size: clamp(1.08rem, 4.6vw, 1.5rem); line-height: 1.4; margin-block-end: 0.3em;
+}
+.media-card--photo .media-card__desc { font-size: 0.86rem; line-height: 1.75; }
+.media-card--photo .media-card__link { margin-block-start: 0.55em; }
 .media-card__bg {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: 50% 22%;
