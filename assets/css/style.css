@@ -1202,20 +1202,103 @@ p { margin: 0; }
   14.3% { opacity: 0; transform: scale(0.7); }
   100%  { opacity: 0; }
 }
-/* 各競技のミニモーション（そのポーズが見えている間だけ動いて見える） */
-.swing { transform-box: view-box; transform-origin: 22px 18px; animation: athSwing 1.3s ease-in-out infinite; }
-@keyframes athSwing { 0%, 100% { transform: rotate(-30deg); } 55% { transform: rotate(20deg); } }
-.throw-arm { transform-box: view-box; transform-origin: 23px 16px; animation: athThrow 1.4s ease-in-out infinite; }
-@keyframes athThrow { 0%, 100% { transform: rotate(-26deg); } 50% { transform: rotate(28deg); } }
-.kick-leg { transform-box: view-box; transform-origin: 22px 29px; animation: athKick 1.2s ease-in-out infinite; }
-@keyframes athKick { 0%, 100% { transform: rotate(-22deg); } 50% { transform: rotate(14deg); } }
-.karate-leg { transform-box: view-box; transform-origin: 22px 28px; animation: athKick 0.95s ease-in-out infinite; }
-.swim-arm { transform-box: view-box; transform-origin: 27px 32px; animation: athSwim 0.85s linear infinite; }
-@keyframes athSwim { to { transform: rotate(360deg); } }
-.shot-ball { transform-box: view-box; transform-origin: 24px 30px; animation: athShot 1.4s ease-out infinite; }
-@keyframes athShot { 0% { transform: translateY(6px); } 45%, 100% { transform: translateY(-2px); } }
-.board { transform-box: view-box; transform-origin: 24px 45px; animation: athSkate 1.2s ease-in-out infinite; }
-@keyframes athSkate { 0%, 100% { transform: translateX(-2px) rotate(-3deg); } 50% { transform: translateX(2px) rotate(3deg); } }
+/* 各競技のリアルなモーション（予備動作→実行→フォロースルー） */
+.dock-athlete g[class*="-"] { transform-box: view-box; }
+/* バット：構え→一気に振り抜き→フォロー→戻す */
+.bat-upper { transform-origin: 22px 16px; animation: athBat 1.5s cubic-bezier(0.5,0,0.3,1) infinite; }
+@keyframes athBat {
+  0%,24% { transform: rotate(-60deg); }
+  40%  { transform: rotate(50deg); }
+  54%  { transform: rotate(60deg); }
+  70%  { transform: rotate(50deg); }
+  100% { transform: rotate(-60deg); }
+}
+/* 投げる：ワインドアップ→鞭のように腕を振り、球が飛んでいく */
+.throw-arm { transform-origin: 23px 16px; animation: athThrowArm 1.5s cubic-bezier(0.5,0,0.2,1) infinite; }
+@keyframes athThrowArm {
+  0%,30% { transform: rotate(-62deg); }
+  48%  { transform: rotate(56deg); }
+  60%  { transform: rotate(46deg); }
+  100% { transform: rotate(-62deg); }
+}
+.throw-ball { transform-origin: 33px 10px; animation: athThrowBall 1.5s linear infinite; }
+@keyframes athThrowBall {
+  0%,45%   { opacity: 0; transform: translate(-6px,4px); }
+  49%  { opacity: 1; transform: translate(0,0); }
+  78%  { opacity: 1; transform: translate(13px,-7px); }
+  88%  { opacity: 0; transform: translate(15px,-8px); }
+  100% { opacity: 0; transform: translate(-6px,4px); }
+}
+/* サッカー：脚を後ろに引いて蹴り抜き、ボールが飛ぶ */
+.kick-leg { transform-origin: 22px 29px; animation: athKickLeg 1.5s cubic-bezier(0.5,0,0.25,1) infinite; }
+@keyframes athKickLeg {
+  0%,30% { transform: rotate(-42deg); }
+  47%  { transform: rotate(40deg); }
+  60%  { transform: rotate(30deg); }
+  100% { transform: rotate(-42deg); }
+}
+.kick-ball { transform-origin: 42px 43px; animation: athKickBall 1.5s linear infinite; }
+@keyframes athKickBall {
+  0%,44%  { opacity: 1; transform: translate(0,0); }
+  74%  { opacity: 1; transform: translate(4px,-22px); }
+  84%  { opacity: 0; transform: translate(5px,-26px); }
+  85%,100% { opacity: 0; transform: translate(0,0); }
+}
+/* 空手：引き足→前蹴りをスナップ→引き戻し＋逆突き */
+.karate-leg { transform-origin: 22px 28px; animation: athKarateLeg 1.2s cubic-bezier(0.4,0,0.2,1) infinite; }
+@keyframes athKarateLeg {
+  0%,24% { transform: rotate(-38deg); }
+  42%  { transform: rotate(42deg); }
+  54%  { transform: rotate(42deg); }
+  70%  { transform: rotate(-38deg); }
+  100% { transform: rotate(-38deg); }
+}
+.karate-arm { transform-origin: 20px 18px; animation: athPunch 1.2s ease-in-out infinite; }
+@keyframes athPunch {
+  0%,52% { transform: translateX(0); }
+  62%  { transform: translateX(5px); }
+  76%  { transform: translateX(0); }
+  100% { transform: translateX(0); }
+}
+/* スケボー：沈み込み→オーリーで跳ねて着地＋板のチルト */
+.skate-all { transform-origin: 24px 48px; animation: athSkateHop 1.5s ease-in-out infinite; }
+@keyframes athSkateHop {
+  0%   { transform: translateY(0); }
+  28%  { transform: translateY(1.5px); }
+  44%  { transform: translateY(-6px); }
+  60%  { transform: translateY(0); }
+  100% { transform: translateY(0); }
+}
+.board { transform-origin: 24px 45px; animation: athBoardRock 1.5s ease-in-out infinite; }
+@keyframes athBoardRock {
+  0%,100% { transform: rotate(-5deg); }
+  44%  { transform: rotate(7deg); }
+  60%  { transform: rotate(0deg); }
+}
+/* 水泳：両腕を交互にクロール、脚をバタ足 */
+.swim-armA { transform-origin: 27px 32px; animation: athSwimArm 0.85s linear infinite; }
+.swim-armB { transform-origin: 25px 32px; animation: athSwimArm 0.85s linear infinite; animation-delay: -0.42s; }
+@keyframes athSwimArm { to { transform: rotate(360deg); } }
+.swim-legs { transform-origin: 9px 35px; animation: athFlutter 0.32s ease-in-out infinite alternate; }
+@keyframes athFlutter { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+/* バスケ：沈み込み→ジャンプ→頂点でリリース、ボールが上へ飛ぶ */
+.jumper { transform-origin: 24px 43px; animation: athJump 1.5s cubic-bezier(0.4,0,0.3,1) infinite; }
+@keyframes athJump {
+  0%   { transform: translateY(0); }
+  18%  { transform: translateY(3px); }
+  42%  { transform: translateY(-6px); }
+  56%  { transform: translateY(-6px); }
+  80%  { transform: translateY(0); }
+  100% { transform: translateY(0); }
+}
+.shot-ball { transform-origin: 24px 30px; animation: athShot 1.5s ease-out infinite; }
+@keyframes athShot {
+  0%,28%  { opacity: 1; transform: translateY(7px); }
+  44%  { opacity: 1; transform: translateY(-3px); }
+  70%  { opacity: 1; transform: translateY(-11px); }
+  82%  { opacity: 0; transform: translateY(-14px); }
+  83%,100% { opacity: 0; transform: translateY(7px); }
+}
 @media (prefers-reduced-motion: reduce) {
   .dockbar__item--line { animation: none; }
   .dock-athlete { display: none; }
