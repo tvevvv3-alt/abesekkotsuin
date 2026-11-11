@@ -126,12 +126,14 @@
       nav.classList.add("is-open");
       toggle.classList.add("is-open");
       toggle.setAttribute("aria-expanded", "true");
+      document.body.classList.add("is-nav-open");
       if (header) { header.classList.add("is-solid"); header.classList.remove("is-hidden"); }
     }
     function closeMenu() {
       nav.classList.remove("is-open");
       toggle.classList.remove("is-open");
       toggle.setAttribute("aria-expanded", "false");
+      document.body.classList.remove("is-nav-open");
       if (header && window.scrollY <= 60) header.classList.remove("is-solid");
     }
     toggle.addEventListener("click", function () {
@@ -140,9 +142,6 @@
     nav.querySelectorAll("a").forEach(function (a) {
       a.addEventListener("click", closeMenu);
     });
-    window.addEventListener("scroll", function () {
-      if (nav.classList.contains("is-open")) closeMenu();
-    }, { passive: true });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && nav.classList.contains("is-open")) closeMenu();
     });
