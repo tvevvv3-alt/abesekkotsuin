@@ -2276,23 +2276,20 @@ body.is-modal-open { overflow: hidden; }
 .fusion__web { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 /* 3施術を中央へ曲線でスタイリッシュに接続（点線なし） */
 .fusion__link { fill: none; stroke: rgba(26,79,156,0.2); stroke-width: 0.7; stroke-linecap: round; }
+/* 光の筋は中央と各施術を往復（インプット↔アウトプット） */
 .fusion__flow {
   fill: none; stroke: var(--field); stroke-width: 1.15; stroke-linecap: round;
   stroke-dasharray: 16 84; opacity: 0.85;
   filter: drop-shadow(0 0 1.2px rgba(26,79,156,0.55));
-  animation: fuseFlow 2.8s linear infinite;
+  animation: fuseFlow 2s ease-in-out infinite alternate;
 }
 @keyframes fuseFlow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-/* 中央：施術台にうつ伏せで寝ている人（3施術が集まる対象） */
+/* 中央：横たわる人（DNSの発育姿勢）。3施術が集まる対象 */
 .fusion__core {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: clamp(64px, 19vw, 80px); height: auto; z-index: 2; color: var(--field);
-  filter: drop-shadow(0 0 5px rgba(247,245,240,0.95)) drop-shadow(0 0 5px rgba(247,245,240,0.9));
+  width: clamp(98px, 27vw, 132px); height: auto; z-index: 2; display: block;
+  filter: drop-shadow(0 0 5px rgba(247,245,240,0.95)) drop-shadow(0 0 4px rgba(247,245,240,0.9));
 }
-.fusion__core { display: block; overflow: visible; }
-.fusion__figure { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
-.fusion__figure circle { fill: currentColor; stroke: none; }
-.fusion__table { stroke: rgba(26,79,156,0.4); stroke-width: 1.5; stroke-linecap: round; }
 /* 運動療法：DNSの赤ちゃんマーク（ブランド色に着色） */
 .baby-mark { width: 62%; height: 62%; object-fit: contain; display: block; }
 .fusion .assess__ico {
