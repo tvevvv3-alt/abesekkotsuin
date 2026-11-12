@@ -338,6 +338,39 @@ p { margin: 0; }
   60%,100% { transform: translateY(100%); }
 }
 
+/* ===== PC：ヒーローを2カラムに（左=テキスト濃紺パネル／右=写真を全体表示） ===== */
+@media (min-width: 1000px) {
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(400px, 0.9fr) 1.2fr;
+    min-height: 86vh;
+    overflow: hidden;
+  }
+  .hero__media {
+    position: relative; inset: auto; z-index: 0;
+    grid-column: 2; grid-row: 1; align-self: stretch;
+    background: #0e2744;
+  }
+  .hero__media img {
+    object-fit: contain; object-position: center;
+    transform: none; animation: none;
+  }
+  .hero__scrim { display: none; }
+  .hero__inner {
+    grid-column: 1; grid-row: 1;
+    display: flex; flex-direction: column; justify-content: center;
+    background: linear-gradient(165deg, #0e2744 0%, #15355a 100%);
+    padding-block: clamp(36px, 5vw, 72px);
+    padding-inline: clamp(40px, 5vw, 84px);
+    max-width: none; margin: 0;
+  }
+  .hero__inner .hero__title { font-size: clamp(2.1rem, 2.9vw, 2.95rem); line-height: 1.34; margin-block: 0.45em; }
+  .hero__inner .hero__message { margin-block-start: 1em; }
+  .hero__inner .hero__scope { margin-block-start: 1.1em; }
+  .hero__inner .hero__cta { margin-block-start: 1.3em; }
+  .hero__scroll { display: none; }
+}
+
 /* ---------- Section heads ---------- */
 .section__head { margin-block-end: clamp(40px, 7vw, 72px); }
 .section__index {
