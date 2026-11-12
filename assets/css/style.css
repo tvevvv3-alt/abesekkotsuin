@@ -2535,6 +2535,17 @@ body.is-modal-open { overflow: hidden; }
 /* 症状グリッド：末尾が1枚余る場合は中央寄せ */
 .symptom-card:last-child:nth-child(3n+1) { grid-column: 2; }
 
+/* PC：症状グリッドを5列×2行にして1画面に収める */
+@media (min-width: 1000px) {
+  #s-symptoms { padding-block: clamp(36px, 5vh, 60px); }
+  #s-symptoms .section__head { margin-block-end: clamp(22px, 3.2vh, 36px); }
+  #s-symptoms .symptom-grid {
+    display: flex; flex-wrap: wrap; justify-content: center; align-content: center;
+    gap: 14px; max-width: 1060px; margin-inline: auto;
+  }
+  #s-symptoms .symptom-card { width: calc((100% - 56px) / 5); }
+}
+
 /* ===== LP：メディア掲載（軽量2枚） ===== */
 .media-lite { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 3.5vw, 18px); margin: clamp(22px, 5vw, 32px) 0 0; padding: 0; }
 .media-lite__item { background: #fff; border-radius: 14px; padding: clamp(10px,3vw,14px); border: 1px solid rgba(28,58,94,0.08); box-shadow: 0 14px 30px -24px rgba(20,32,44,0.5); text-align: center; }
