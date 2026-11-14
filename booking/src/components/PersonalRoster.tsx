@@ -453,7 +453,20 @@ export default function PersonalRoster() {
                 const assignedStamps = vs.reduce((n, v) => n + consumeOf(v), 0);
                 const lastDate = vs.reduce((mx, v) => (v.date > mx ? v.date : mx), "");
                 const todayStr = toDateStr(new Date());
-                const canComplete = remain <= 0 || (capacity > 0 && assignedStamps >= capacity && lastDate !== "" && lastDate < todayStr);
+                const cardUsedUp = capacity > 0 && assignedStamps >= capacity && lastDate !== "" && lastDate < todayStr;
+                // 有効期限（「M月末」）が過ぎているか。年は最初の来院から推定（期限＝初回＋Nヶ月）。
+                const expMonth = (() => { const m = /(\d+)\s*月/.exec(r.expiry || ""); return m ? parseInt(m[1], 10) : null; })();
+                let expired = false;
+                if (expMonth && vs.length) {
+                  const fv = new Date(vs[0].date + "T00:00:00");
+                  let yr = fv.getFullYear();
+                  if (expMonth < fv.getMonth() + 1) yr += 1; // 年またぎ（例：初回12月・期限3月末→翌年）
+                  const expDate = new Date(yr, expMonth, 0); // その月の末日
+                  const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+                  expired = expDate < t0;
+                }
+                // 完了ボタン：残0／10回分埋まって最終来院が過去／有効期限切れ、のいずれか
+                const canComplete = remain <= 0 || cardUsedUp || expired;
                 return (
                   <tr key={r.id} className={`border-t ${r.archived ? "bg-emerald-50/50" : ""}`}>
                     <td className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-r bg-white px-1.5 py-1 align-middle">
