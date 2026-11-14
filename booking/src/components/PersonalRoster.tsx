@@ -447,6 +447,13 @@ export default function PersonalRoster() {
                 const quota = r.quota ?? 10;
                 const consumedDone = vs.filter((v) => v.status === "done").reduce((n, v) => n + consumeOf(v), 0);
                 const remain = quota - off - consumedDone;
+                // 「完了」ボタンの表示条件：残0、または「10回分が埋まり最終来院日が過ぎた」とき。
+                // （各回を終了にし忘れても、使い切った券を畳めるように）
+                const capacity = quota - off;
+                const assignedStamps = vs.reduce((n, v) => n + consumeOf(v), 0);
+                const lastDate = vs.reduce((mx, v) => (v.date > mx ? v.date : mx), "");
+                const todayStr = toDateStr(new Date());
+                const canComplete = remain <= 0 || (capacity > 0 && assignedStamps >= capacity && lastDate !== "" && lastDate < todayStr);
                 return (
                   <tr key={r.id} className={`border-t ${r.archived ? "bg-emerald-50/50" : ""}`}>
                     <td className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] border-r bg-white px-1.5 py-1 align-middle">
@@ -571,7 +578,7 @@ export default function PersonalRoster() {
                     <td className="border-l px-1 py-1 text-center align-middle">
                       {r.archived ? (
                         <button onClick={() => savePatch(r.id, { archived: false })} className="mb-1 block w-full whitespace-nowrap text-[11px] font-bold text-amber-600" title="一覧に戻す">↩ 戻す</button>
-                      ) : remain <= 0 ? (
+                      ) : canComplete ? (
                         <button onClick={() => savePatch(r.id, { archived: true })} className="mb-1 block w-full whitespace-nowrap rounded bg-emerald-50 px-1 py-0.5 text-[11px] font-bold text-emerald-600" title="この回数券を完了にして一覧から隠す（データは残ります）">完了</button>
                       ) : null}
                       <button onClick={() => deleteRow(r.id)} className="text-[11px] font-bold text-red-400">削除</button>
