@@ -171,6 +171,56 @@ function menuIcon(s: ServiceWithSteps): string {
   return "💪"; // 通常施術
 }
 
+// 生年月日を「年／月／日」のプルダウンで選ぶ（カレンダーを何度も送る手間をなくす）。
+// 値は "YYYY-MM-DD"（空なら未確定）。外部からの自動入力（患者照合）にも追従する。
+function BirthDateSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const parse = (v: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || "");
+    return m ? { y: m[1], mo: String(+m[2]), d: String(+m[3]) } : { y: "", mo: "", d: "" };
+  };
+  const [st, setSt] = useState(() => parse(value));
+  const lastRef = useRef(value);
+  useEffect(() => {
+    if (value !== lastRef.current) { lastRef.current = value; setSt(parse(value)); }
+  }, [value]);
+  const thisYear = new Date().getFullYear();
+  const years: number[] = [];
+  for (let y = thisYear; y >= 1920; y--) years.push(y);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const dim = (y: number, mo: number) => new Date(y, mo, 0).getDate();
+  const maxDay = st.y && st.mo ? dim(+st.y, +st.mo) : 31;
+  const days = Array.from({ length: maxDay }, (_, i) => i + 1);
+  const update = (patch: Partial<{ y: string; mo: string; d: string }>) => {
+    const next = { ...st, ...patch };
+    if (next.y && next.mo && next.d) {
+      const md = dim(+next.y, +next.mo);
+      if (+next.d > md) next.d = String(md); // 月末を超えたら丸める（例：2/31→2/28）
+    }
+    setSt(next);
+    if (next.y && next.mo && next.d) {
+      const iso = `${next.y}-${next.mo.padStart(2, "0")}-${next.d.padStart(2, "0")}`;
+      lastRef.current = iso; onChange(iso);
+    } else { lastRef.current = ""; onChange(""); }
+  };
+  const cls = "min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-base";
+  return (
+    <div className="flex items-center gap-2">
+      <select value={st.y} onChange={(e) => update({ y: e.target.value })} className={`${cls} flex-[1.4]`} aria-label="年">
+        <option value="">年</option>
+        {years.map((y) => <option key={y} value={String(y)}>{y}年</option>)}
+      </select>
+      <select value={st.mo} onChange={(e) => update({ mo: e.target.value })} className={`${cls} flex-1`} aria-label="月">
+        <option value="">月</option>
+        {months.map((m) => <option key={m} value={String(m)}>{m}月</option>)}
+      </select>
+      <select value={st.d} onChange={(e) => update({ d: e.target.value })} className={`${cls} flex-1`} aria-label="日">
+        <option value="">日</option>
+        {days.map((d) => <option key={d} value={String(d)}>{d}日</option>)}
+      </select>
+    </div>
+  );
+}
+
 export default function BookingWizard() {
   const supabase = useMemo(() => createClient(), []);
   const [step, setStep] = useState<Step>(1);
@@ -1511,12 +1561,7 @@ export default function BookingWizard() {
               />
             </Field>
             <Field label="生年月日" required>
-              <input
-                type="date"
-                value={birth}
-                onChange={(e) => setBirth(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2"
-              />
+              <BirthDateSelect value={birth} onChange={setBirth} />
             </Field>
             <Field label="電話番号" required>
               <input
