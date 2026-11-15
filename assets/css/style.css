@@ -2140,16 +2140,21 @@ body.is-modal-open { overflow: hidden; }
 
 /* 機器バナー：背景写真なしのソリッド版 */
 /* 機器バナー：全機器が必ず入る背景写真（contain で切り取らない） */
-.devbanner--photo { min-height: clamp(340px, 64vw, 500px); background: var(--grad-deep); }
+.devbanner--photo { min-height: clamp(440px, 96vw, 640px); background: radial-gradient(90% 80% at 50% 78%, #0a1c40, #050f2a 70%); }
 .devbanner--photo .devbanner__img {
-  object-fit: contain; object-position: center;
+  inset: auto 0 0 0; height: 76%;
+  object-fit: contain; object-position: bottom center;
   filter: saturate(1.02) contrast(1.02);
+  -webkit-mask: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%), linear-gradient(180deg, transparent 0, #000 16%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%), linear-gradient(180deg, transparent 0, #000 16%, #000 100%);
+  mask-composite: intersect;
 }
 .devbanner--photo .devbanner__overlay {
-  justify-content: flex-end;
-  padding-block: clamp(40px, 10vw, 90px) clamp(44px, 11vw, 96px);
+  justify-content: flex-start;
+  padding-block: clamp(34px, 8vw, 76px) clamp(40px, 10vw, 90px);
   background:
-    linear-gradient(to bottom, rgba(8,16,30,0) 34%, rgba(8,16,30,0.34) 68%, rgba(8,16,30,0.6) 100%);
+    linear-gradient(to bottom, rgba(8,16,30,0.5) 0%, rgba(8,16,30,0.28) 26%, rgba(8,16,30,0) 52%);
 }
 
 /* ドットの余白（カード上に置くため下アキ多め） */
