@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="assets/css/style.css?v=20261111z" />
+  <link rel="stylesheet" href="assets/css/style.css?v=20261115a" />
   <noscript>
     <style>.reveal{opacity:1 !important;transform:none !important;filter:none !important;}</style>
   </noscript>
@@ -377,13 +377,46 @@
         <h2 class="section__title">症例紹介</h2>
         <p class="section__sub">実際の症例をもとに、どのような評価・アプローチを行ったのかをご紹介します。</p>
       </header>
+      <p class="case-cloud__hint reveal">丸をタップすると、症例の詳細が開きます。</p>
+      <div class="case-cloud reveal">
+        <button class="case-dot" type="button" data-case-open="0" style="left:21%;top:15%;--s:1.15" aria-label="野球肩の症例を見る">
+          <span class="case-dot__img"><img src="assets/images/case-yakyu.png?v=2" alt="" loading="lazy" /></span>
+          <span class="case-dot__label">野球肩</span>
+        </button>
+        <button class="case-dot" type="button" data-case-open="1" style="left:57%;top:9%;--s:0.95" aria-label="オスグッド病の症例を見る">
+          <span class="case-dot__img"><img src="assets/images/case-osgood.png?v=2" alt="" loading="lazy" /></span>
+          <span class="case-dot__label">オスグッド病</span>
+        </button>
+        <button class="case-dot" type="button" data-case-open="2" style="left:83%;top:31%;--s:1.08" aria-label="足関節捻挫の症例を見る">
+          <span class="case-dot__img"><img src="assets/images/case-nenza.png?v=2" alt="" loading="lazy" /></span>
+          <span class="case-dot__label">足関節捻挫</span>
+        </button>
+        <button class="case-dot" type="button" data-case-open="3" style="left:39%;top:42%;--s:1.2" aria-label="シーバー病の症例を見る">
+          <span class="case-dot__img"><img src="assets/images/case-sever.png?v=2" alt="" loading="lazy" /></span>
+          <span class="case-dot__label">シーバー病</span>
+        </button>
+        <button class="case-dot" type="button" data-case-open="4" style="left:14%;top:57%;--s:0.9" aria-label="腰椎分離症の症例を見る">
+          <span class="case-dot__img"><img src="assets/images/case-bunri.png?v=2" alt="" loading="lazy" /></span>
+          <span class="case-dot__label">腰椎分離症</span>
+        </button>
+        <button class="case-dot" type="button" data-case-open="5" style="left:70%;top:59%;--s:1.02" aria-label="椎間板ヘルニアの症例を見る">
+          <span class="case-dot__img"><img src="assets/images/case-hernia.png?v=2" alt="" loading="lazy" /></span>
+          <span class="case-dot__label">椎間板ヘルニア</span>
+        </button>
+        <button class="case-dot" type="button" data-case-open="6" style="left:46%;top:83%;--s:1.05" aria-label="ハムストリング肉離れの症例を見る">
+          <span class="case-dot__img"><img src="assets/images/case-nikubanare.png?v=2" alt="" loading="lazy" /></span>
+          <span class="case-dot__label">ハムストリング肉離れ</span>
+        </button>
+      </div>
     </div>
 
-    <p class="hscroll__hint hscroll__hint--top reveal" aria-hidden="true">← よこにスクロール →</p>
-    <div class="hscroll reveal" data-hscroll>
-      <div class="hscroll__track cases-track">
-        <details class="case reveal">
-          <summary class="case__summary">
+    <div class="case-modal" id="caseModal" hidden>
+      <div class="case-modal__scrim" data-case-close></div>
+      <div class="case-modal__sheet" role="dialog" aria-modal="true" aria-label="症例の詳細">
+        <button class="case-modal__close" type="button" data-case-close aria-label="閉じる"><span></span><span></span></button>
+        <div class="case-modal__body">
+          <article class="case-panel" data-case-panel="0" hidden>
+          <div class="case-panel__head">
             <div class="case__head">
               <span class="case__pic"><img src="assets/images/case-yakyu.png?v=2" alt="" loading="lazy" /></span>
               <div class="case__headtext">
@@ -392,12 +425,7 @@
               </div>
             </div>
             <p class="case__lead">半年間リハビリを続けても改善せず、18m程度しか投球できない状態。</p>
-            <span class="case__more">
-              <span class="case__more-open">詳しく見る</span>
-              <span class="case__more-close">閉じる</span>
-              <span class="case__chev" aria-hidden="true"></span>
-            </span>
-          </summary>
+          </div>
           <div class="case__detail">
             <div class="case__block">
               <h4 class="case__h">来院時の状態</h4>
@@ -430,10 +458,9 @@
             </div>
             <p class="case__disc">※ 施術による変化には個人差があります。<br />※ 本症例は一例であり、同様の結果を保証するものではありません。</p>
           </div>
-        </details>
-
-        <details class="case reveal">
-          <summary class="case__summary">
+        </article>
+          <article class="case-panel" data-case-panel="1" hidden>
+          <div class="case-panel__head">
             <div class="case__head">
               <span class="case__pic"><img src="assets/images/case-osgood.png?v=2" alt="" loading="lazy" /></span>
               <div class="case__headtext">
@@ -442,12 +469,7 @@
               </div>
             </div>
             <p class="case__lead">複数の治療院を転々とした後に来院。膝だけでなく、身体全体の回復力に着目した症例。</p>
-            <span class="case__more">
-              <span class="case__more-open">詳しく見る</span>
-              <span class="case__more-close">閉じる</span>
-              <span class="case__chev" aria-hidden="true"></span>
-            </span>
-          </summary>
+          </div>
           <div class="case__detail">
             <div class="case__block">
               <h4 class="case__h">来院時の状態</h4>
@@ -501,10 +523,9 @@
             </div>
             <p class="case__disc">※ 施術による変化には個人差があります。<br />※ 本症例は一例であり、同様の結果を保証するものではありません。</p>
           </div>
-        </details>
-
-        <details class="case reveal">
-          <summary class="case__summary">
+        </article>
+          <article class="case-panel" data-case-panel="2" hidden>
+          <div class="case-panel__head">
             <div class="case__head">
               <span class="case__pic"><img src="assets/images/case-nenza.png?v=2" alt="" loading="lazy" /></span>
               <div class="case__headtext">
@@ -514,12 +535,7 @@
             </div>
             <p class="case__subtitle">（前距腓靭帯・踵腓靭帯損傷）</p>
             <p class="case__lead">試合4日前の捻挫。歩行も困難な状態から試合出場を目指した症例。</p>
-            <span class="case__more">
-              <span class="case__more-open">詳しく見る</span>
-              <span class="case__more-close">閉じる</span>
-              <span class="case__chev" aria-hidden="true"></span>
-            </span>
-          </summary>
+          </div>
           <div class="case__detail">
             <div class="case__block">
               <h4 class="case__h">来院時の状態</h4>
@@ -560,10 +576,9 @@
             </div>
             <p class="case__disc">※ 施術による変化には個人差があります。<br />※ 本症例は一例であり、同様の結果を保証するものではありません。</p>
           </div>
-        </details>
-
-        <details class="case reveal">
-          <summary class="case__summary">
+        </article>
+          <article class="case-panel" data-case-panel="3" hidden>
+          <div class="case-panel__head">
             <div class="case__head">
               <span class="case__pic"><img src="assets/images/case-sever.png?v=2" alt="" loading="lazy" /></span>
               <div class="case__headtext">
@@ -573,12 +588,7 @@
             </div>
             <p class="case__subtitle">（踵骨骨端症）</p>
             <p class="case__lead">走る・ジャンプするたびに踵が痛い。足だけでなく、身体全体の使い方に着目した症例。</p>
-            <span class="case__more">
-              <span class="case__more-open">詳しく見る</span>
-              <span class="case__more-close">閉じる</span>
-              <span class="case__chev" aria-hidden="true"></span>
-            </span>
-          </summary>
+          </div>
           <div class="case__detail">
             <div class="case__block">
               <h4 class="case__h">来院時の状態</h4>
@@ -628,10 +638,9 @@
             </div>
             <p class="case__disc">※ 施術による変化には個人差があります。<br />※ 本症例は一例であり、同様の結果を保証するものではありません。</p>
           </div>
-        </details>
-
-        <details class="case reveal">
-          <summary class="case__summary">
+        </article>
+          <article class="case-panel" data-case-panel="4" hidden>
+          <div class="case-panel__head">
             <div class="case__head">
               <span class="case__pic"><img src="assets/images/case-bunri.png?v=2" alt="" loading="lazy" /></span>
               <div class="case__headtext">
@@ -640,12 +649,7 @@
               </div>
             </div>
             <p class="case__lead">病院で2ヶ月の安静を指示されるも、3週間後の最後の大会出場を目指した症例。</p>
-            <span class="case__more">
-              <span class="case__more-open">詳しく見る</span>
-              <span class="case__more-close">閉じる</span>
-              <span class="case__chev" aria-hidden="true"></span>
-            </span>
-          </summary>
+          </div>
           <div class="case__detail">
             <div class="case__block">
               <h4 class="case__h">来院時の状態</h4>
@@ -696,10 +700,9 @@
             </div>
             <p class="case__disc">※ 施術による変化には個人差があります。<br />※ 本症例は一例であり、同様の結果を保証するものではありません。</p>
           </div>
-        </details>
-
-        <details class="case reveal">
-          <summary class="case__summary">
+        </article>
+          <article class="case-panel" data-case-panel="5" hidden>
+          <div class="case-panel__head">
             <div class="case__head">
               <span class="case__pic"><img src="assets/images/case-hernia.png?v=2" alt="" loading="lazy" /></span>
               <div class="case__headtext">
@@ -709,12 +712,7 @@
             </div>
             <p class="case__subtitle">腰痛・足のしびれ</p>
             <p class="case__lead">ソファから動けない状態から、ヨガやピラティスを楽しめるようになった症例。</p>
-            <span class="case__more">
-              <span class="case__more-open">詳しく見る</span>
-              <span class="case__more-close">閉じる</span>
-              <span class="case__chev" aria-hidden="true"></span>
-            </span>
-          </summary>
+          </div>
           <div class="case__detail">
             <div class="case__block">
               <h4 class="case__h">来院時の状態</h4>
@@ -762,10 +760,9 @@
             </div>
             <p class="case__disc">※ 施術による変化には個人差があります。<br />※ 本症例は一例であり、同様の結果を保証するものではありません。</p>
           </div>
-        </details>
-
-        <details class="case reveal">
-          <summary class="case__summary">
+        </article>
+          <article class="case-panel" data-case-panel="6" hidden>
+          <div class="case-panel__head">
             <div class="case__head">
               <span class="case__pic"><img src="assets/images/case-nikubanare.png?v=2" alt="" loading="lazy" /></span>
               <div class="case__headtext">
@@ -774,12 +771,7 @@
               </div>
             </div>
             <p class="case__lead">病院では全治2ヶ月。最後の大会まで1ヶ月半の中で競技復帰を目指した症例。</p>
-            <span class="case__more">
-              <span class="case__more-open">詳しく見る</span>
-              <span class="case__more-close">閉じる</span>
-              <span class="case__chev" aria-hidden="true"></span>
-            </span>
-          </summary>
+          </div>
           <div class="case__detail">
             <div class="case__block">
               <h4 class="case__h">来院時の状態</h4>
@@ -822,7 +814,8 @@
             </div>
             <p class="case__disc">※ 施術による変化には個人差があります。<br />※ 本症例は一例であり、同様の結果を保証するものではありません。</p>
           </div>
-        </details>
+        </article>
+        </div>
       </div>
     </div>
   </section>
@@ -1024,9 +1017,8 @@
       </header>
     </div>
 
-    <p class="hscroll__hint hscroll__hint--top reveal" aria-hidden="true">← よこにスクロール →</p>
-    <div class="hscroll reveal" data-hscroll>
-      <ul class="hscroll__track staff">
+    <div class="container">
+      <ul class="staff-grid reveal">
         <li class="staff__item reveal">
           <div class="staff__head">
             <figure class="staff__photo"><img src="assets/images/staff-abe.jpg" alt="阿部 皓哉 院長" loading="lazy" style="object-position:50% 32%" /></figure>
@@ -1444,6 +1436,6 @@
     </a>
   </div>
 
-  <script src="assets/js/main.js?v=20261111d" defer></script>
+  <script src="assets/js/main.js?v=20261115a" defer></script>
 </body>
 </html>

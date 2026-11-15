@@ -434,6 +434,35 @@
     });
   })();
 
+  /* ---- 症例ポップアップ（丸アイコンをタップ） ---- */
+  (function () {
+    var modal = document.getElementById("caseModal");
+    if (!modal) return;
+    var panels = modal.querySelectorAll(".case-panel");
+    function show(key) {
+      panels.forEach(function (p) { p.hidden = (p.getAttribute("data-case-panel") !== key); });
+      modal.hidden = false;
+      document.body.classList.add("is-modal-open");
+      var body = modal.querySelector(".case-modal__body");
+      if (body) body.scrollTop = 0;
+      var c = modal.querySelector(".case-modal__close");
+      if (c) c.focus();
+    }
+    function close() {
+      modal.hidden = true;
+      document.body.classList.remove("is-modal-open");
+    }
+    document.querySelectorAll("[data-case-open]").forEach(function (btn) {
+      btn.addEventListener("click", function () { show(btn.getAttribute("data-case-open")); });
+    });
+    modal.querySelectorAll("[data-case-close]").forEach(function (el) {
+      el.addEventListener("click", close);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) close();
+    });
+  })();
+
   /* ---- Smooth anchor offset for fixed header (in-page links) ---- */
   document.querySelectorAll('a[href^="#"]').forEach(function (a) {
     a.addEventListener("click", function (e) {
