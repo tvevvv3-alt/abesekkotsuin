@@ -79,14 +79,17 @@ export default function IntakeAdmin() {
     const rs: Row[] = data.map((r) => {
       const p = (r.patients || {}) as { name?: string; name_kana?: string | null; birth_date?: string | null };
       const qn = r.questionnaire;
+      const qv: QValue = qn && typeof qn === "object" ? (qn as QValue) : {};
+      const qstr = (k: string) => { const v = qv[k]; return typeof v === "string" && v.trim() ? v.trim() : null; };
       return {
         patient_id: r.patient_id as string,
         submitted_at: (r.submitted_at as string) ?? null,
         reviewed_at: (r.reviewed_at as string) ?? null,
-        questionnaire: qn && typeof qn === "object" ? (qn as QValue) : {},
-        name: p.name ?? "（不明）",
-        kana: p.name_kana ?? null,
-        birth: p.birth_date ?? null,
+        questionnaire: qv,
+        // 氏名・ふりがな・生年月日は「問診票の回答」を優先（患者レコードと別人のとき、タイトルと中身が一致するように）
+        name: qstr("name") ?? p.name ?? "（不明）",
+        kana: qstr("kana") ?? p.name_kana ?? null,
+        birth: qstr("birth") ?? p.birth_date ?? null,
       };
     }).filter((r) => r.submitted_at || Object.keys(r.questionnaire).length > 0);
     setRows(rs);
