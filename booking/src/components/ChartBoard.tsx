@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -107,6 +107,41 @@ function normIntake(row: Record<string, unknown> | null): Intake {
   };
 }
 function safeParse(s: unknown): unknown { try { return typeof s === "string" ? JSON.parse(s) : s; } catch { return null; } }
+
+// ペン（手書き変換）での誤字をカーソル位置から1文字ずつ消せるテキスト欄。
+// 「⌫ 1字消す」はカーソル直前の1文字（選択中なら選択範囲）を削除する。
+function PenTextarea({ value, onChange, placeholder, className }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const backspace = () => {
+    const el = ref.current;
+    const hasSel = el && el.selectionStart != null;
+    const start = hasSel ? el!.selectionStart : value.length;
+    const end = hasSel ? el!.selectionEnd : value.length;
+    let next = value;
+    let caret = start;
+    if (start !== end) { next = value.slice(0, start) + value.slice(end); caret = start; }
+    else if (start > 0) { next = value.slice(0, start - 1) + value.slice(start); caret = start - 1; }
+    else return;
+    onChange(next);
+    requestAnimationFrame(() => { const e2 = ref.current; if (e2) { e2.focus(); try { e2.setSelectionRange(caret, caret); } catch { /* noop */ } } });
+  };
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-1 flex justify-end">
+        <button type="button" onClick={backspace} disabled={!value.length}
+          className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40">
+          ⌫ 1字消す
+        </button>
+      </div>
+      <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={className} />
+    </div>
+  );
+}
 
 export default function ChartBoard() {
   const supabase = useMemo(() => createClient(), []);
@@ -732,7 +767,7 @@ export default function ChartBoard() {
                 <div className="flex flex-col">
                   <div className="flex flex-1 flex-col rounded-xl border p-3">
                     <div className="mb-1 text-[11px] font-bold text-teal-600">📊 症状・アプローチ</div>
-                    <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })}
+                    <PenTextarea value={d.progress} onChange={(val) => updateEntry(v.id, { progress: val })}
                       placeholder="症状に対してのアプローチを横に。例）出力四肢低い→脊柱通電"
                       className="min-h-[320px] w-full flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                   </div>
