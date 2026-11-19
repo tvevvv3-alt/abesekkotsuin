@@ -34,17 +34,41 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
   aspect?: string;   // 既定 "1 / 1"。手書きメモは横長に
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [draw, setDraw] = useState<[number, number][] | null>(null);
+  const liveRef = useRef<SVGPolylineElement>(null); // 描画中の線は再描画せず直接更新（ペン追従を軽く）
+  const cur = useRef<[number, number][] | null>(null);
+  const drawPtr = useRef<number | null>(null);
   const [imgOk, setImgOk] = useState(true);
   const pt = (e: { clientX: number; clientY: number }): [number, number] | null => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return null;
     return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
   };
-  const down = (e: RPE) => { const p = pt(e); if (!p) return; try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {} setDraw([p]); };
-  const move = (e: RPE) => { if (!draw) return; const p = pt(e); if (!p) return; setDraw((d) => (d ? [...d, p] : [p])); };
-  const up = () => { if (draw && draw.length) onChange([...strokes, { id: uid(), side: "front", type: penType, pts: draw }]); setDraw(null); };
   const poly = (pts: [number, number][]) => { const s = pts.map(([x, y]) => `${(x * 100).toFixed(2)},${(y * 100).toFixed(2)}`); if (s.length === 1) s.push(s[0]); return s.join(" "); };
+  const paint = () => {
+    const el = liveRef.current;
+    if (!el) return;
+    if (cur.current && cur.current.length) { el.setAttribute("points", poly(cur.current)); el.style.display = ""; }
+    else { el.setAttribute("points", ""); el.style.display = "none"; }
+  };
+  const down = (e: RPE) => {
+    const p = pt(e); if (!p) return;
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    drawPtr.current = e.pointerId; cur.current = [p]; paint();
+  };
+  const move = (e: RPE) => {
+    if (drawPtr.current !== e.pointerId || !cur.current) return;
+    // 速いペンでも間の点を取りこぼさないよう coalesced events を全て拾う
+    const ne = e.nativeEvent as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
+    const evs = ne.getCoalescedEvents ? ne.getCoalescedEvents() : [ne];
+    for (const ev of evs) { const q = pt(ev); if (q) cur.current.push(q); }
+    paint();
+  };
+  const up = (e: RPE) => {
+    if (drawPtr.current !== e.pointerId) return;
+    drawPtr.current = null;
+    const cs = cur.current; cur.current = null; paint();
+    if (cs && cs.length) onChange([...strokes, { id: uid(), side: "front", type: penType, pts: cs }]);
+  };
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
@@ -67,7 +91,7 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
           {strokes.map((s) => (
             <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={penColor ?? markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           ))}
-          {draw && <polyline points={poly(draw)} fill="none" stroke={penColor ?? markColor(penType)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+          <polyline ref={liveRef} points="" fill="none" stroke={penColor ?? markColor(penType)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ display: "none" }} />
         </svg>
       </div>
     </div>
