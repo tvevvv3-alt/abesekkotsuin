@@ -81,6 +81,9 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
   const liveRef = useRef<SVGPolylineElement>(null); // 描画中の線は再描画せず直接更新（ペン追従を軽く）
   const cur = useRef<[number, number][] | null>(null);
   const drawPtr = useRef<number | null>(null);
+  // 連続で素早く書いても再描画前の直前ストロークが消えない（＝字の途切れ防止）よう最新の線配列をrefで保持
+  const allRef = useRef<Stroke[]>(strokes);
+  allRef.current = strokes;
   const [imgOk, setImgOk] = useState(true);
   const pt = (e: { clientX: number; clientY: number }): [number, number] | null => {
     const r = ref.current?.getBoundingClientRect();
@@ -95,6 +98,7 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
     else { el.setAttribute("points", ""); el.style.display = "none"; }
   };
   const down = (e: RPE) => {
+    if (drawPtr.current !== null) return; // 既に描画中（2本目の指・手のひら等）は無視して中断させない
     const p = pt(e); if (!p) return;
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     drawPtr.current = e.pointerId; cur.current = [p]; paint();
@@ -111,7 +115,12 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
     if (drawPtr.current !== e.pointerId) return;
     drawPtr.current = null;
     const cs = cur.current; cur.current = null; paint();
-    if (cs && cs.length) onChange([...strokes, { id: uid(), side: "front", type: penType, pts: cs }]);
+    // allRef を使って直前の線を取りこぼさず追加（高速連続書きでも消えない）
+    if (cs && cs.length) {
+      const next = [...allRef.current, { id: uid(), side: "front" as const, type: penType, pts: cs }];
+      allRef.current = next;
+      onChange(next);
+    }
   };
   return (
     <div>
@@ -129,8 +138,8 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
           <button type="button" onClick={() => onChange([])} className="rounded border border-slate-300 px-1.5 text-[10px] font-bold text-slate-500">消</button>
         </div>
       </div>
-      <div ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
-        className="relative w-full select-none overflow-hidden rounded-lg border bg-white" style={{ aspectRatio: aspect ?? "1 / 1", touchAction: "none", cursor: "crosshair" }}>
+      <div ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up}
+        className="relative w-full touch-none select-none overflow-hidden rounded-lg border bg-white" style={{ aspectRatio: aspect ?? "1 / 1", touchAction: "none", cursor: "crosshair" }}>
         {/* 背景：画像があれば優先、無ければ簡易線画 */}
         {bgImg && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
