@@ -88,11 +88,12 @@ type Intake = {
   onset: string;        // いつから
   history: string;      // 過去の既往
   body_marks: Stroke[]; // 全身図の描き込み
+  memo_marks: Stroke[]; // 手書きメモ（自由記入）
   joint_details: Record<string, JointDrawing>; // 関節ごとの前後左右
   questionnaire: QValue; // 問診票の全回答
   submitted_at: string | null; // 患者がLINEから送信した日時
 };
-const EMPTY_INTAKE: Intake = { sport: "", weekly_freq: "", symptom_area: "", onset: "", history: "", body_marks: [], joint_details: {}, questionnaire: {}, submitted_at: null };
+const EMPTY_INTAKE: Intake = { sport: "", weekly_freq: "", symptom_area: "", onset: "", history: "", body_marks: [], memo_marks: [], joint_details: {}, questionnaire: {}, submitted_at: null };
 const emptyJoint = (): JointDrawing => ({ front: [], back: [], left: [], right: [] });
 // 選択できる関節（全身図から拡大）
 const JOINTS = ["頸部", "右肩", "左肩", "右肘", "左肘", "右手首", "左手首", "腰", "右股関節", "左股関節", "右膝", "左膝", "右足首", "左足首"];
@@ -118,6 +119,7 @@ function normIntake(row: Record<string, unknown> | null): Intake {
     onset: (row.onset as string) ?? "",
     history: (row.history as string) ?? "",
     body_marks: toStrokes(typeof row.body_marks === "string" ? safeParse(row.body_marks) : row.body_marks),
+    memo_marks: toStrokes(typeof row.memo_marks === "string" ? safeParse(row.memo_marks) : row.memo_marks),
     joint_details: jd,
     questionnaire: (q && typeof q === "object" ? (q as QValue) : {}),
     submitted_at: (row.submitted_at as string) ?? null,
@@ -380,6 +382,7 @@ export default function ChartBoard() {
       onset: linked.onset || null,
       history: linked.history || null,
       body_marks: intake.body_marks,
+      memo_marks: intake.memo_marks,
       joint_details: intake.joint_details,
       questionnaire: intake.questionnaire,
       updated_at: new Date().toISOString(),
@@ -387,8 +390,8 @@ export default function ChartBoard() {
     let { error } = await supabase.from("patient_intake").upsert(row, { onConflict: "patient_id" });
     if (error) {
       // questionnaire 列が未マイグレーションでも保存できるようにフォールバック
-      const { questionnaire: _q, ...base } = row;
-      void _q;
+      const { questionnaire: _q, memo_marks: _m, ...base } = row;
+      void _q; void _m;
       ({ error } = await supabase.from("patient_intake").upsert(base, { onConflict: "patient_id" }));
       if (!error) { setIntakeSaving(false); setMsg("保存しました（※問診票は列追加が必要です）"); return; }
     }
@@ -546,18 +549,22 @@ export default function ChartBoard() {
                 })()}
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                  {/* 左：人体図 */}
+                  {/* 左：人体図＋手書きメモ */}
                   <div className="space-y-3">
                     <div className="rounded-xl border p-3">
                       <div className="mb-2 text-sm font-bold text-slate-600">人体図（痛み・損傷部位）</div>
                       <BodyMap value={intake.body_marks} onChange={(bm) => setIntake((it) => ({ ...it, body_marks: bm }))} />
                     </div>
+                    <div className="rounded-xl border p-3">
+                      <div className="mb-2 text-sm font-bold text-slate-600">手書きメモ</div>
+                      <Pad label="指やペンで自由に書き込めます" strokes={intake.memo_marks} onChange={(s) => setIntake((it) => ({ ...it, memo_marks: s }))} penType="treat" penColor="#1f2937" aspect="4 / 3" />
+                    </div>
                   </div>
 
-                  {/* 右：問診票（全項目・編集可） */}
+                  {/* 右：問診票（全項目・編集可。初診時は省スペース2列表示） */}
                   <div>
                     <div className="mb-2 text-sm font-bold text-slate-600">問診票</div>
-                    <QuestionnaireForm value={intake.questionnaire} onChange={(q) => setIntake((it) => ({ ...it, questionnaire: q }))} sections={qSections} />
+                    <QuestionnaireForm value={intake.questionnaire} onChange={(q) => setIntake((it) => ({ ...it, questionnaire: q }))} sections={qSections} compact />
                   </div>
                 </div>
 
@@ -708,13 +715,15 @@ function JointSketch({ view }: { view: JointView }) {
 }
 
 // 汎用の描画パッド（関節詳細の前後左右など）。背景は画像（あれば）→無ければ線画。
-function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
+function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor, aspect }: {
   label?: string;
   strokes: Stroke[];
   onChange: (s: Stroke[]) => void;
   penType: MarkType;
   bgImg?: string;   // /joints/<関節>/<ビュー>.png（あれば優先）
   bgNode?: ReactNode; // 画像が無い時の簡易線画
+  penColor?: string; // 指定時はこの色で描画（手書きメモ用）
+  aspect?: string;   // 既定 "1 / 1"。手書きメモは横長に
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [draw, setDraw] = useState<[number, number][] | null>(null);
@@ -738,7 +747,7 @@ function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
         </div>
       </div>
       <div ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
-        className="relative w-full select-none overflow-hidden rounded-lg border bg-white" style={{ aspectRatio: "1 / 1", touchAction: "none", cursor: "crosshair" }}>
+        className="relative w-full select-none overflow-hidden rounded-lg border bg-white" style={{ aspectRatio: aspect ?? "1 / 1", touchAction: "none", cursor: "crosshair" }}>
         {/* 背景：画像があれば優先、無ければ簡易線画 */}
         {bgImg && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -748,9 +757,9 @@ function Pad({ label, strokes, onChange, penType, bgImg, bgNode }: {
         )}
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
           {strokes.map((s) => (
-            <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={penColor ?? markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           ))}
-          {draw && <polyline points={poly(draw)} fill="none" stroke={markColor(penType)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+          {draw && <polyline points={poly(draw)} fill="none" stroke={penColor ?? markColor(penType)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
         </svg>
       </div>
     </div>

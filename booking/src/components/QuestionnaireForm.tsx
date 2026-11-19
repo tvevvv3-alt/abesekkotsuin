@@ -82,12 +82,13 @@ function WarekiInput({ value, onChange }: { value: string; onChange: (v: string)
 // スキーマ駆動の問診票フォーム。公開ページ・カルテ初診時で共用。
 // sections を渡すと、その質問定義で描画（管理画面で編集した内容を反映）。
 export default function QuestionnaireForm({
-  value, onChange, accent = "#0d9488", sections = Q_SECTIONS,
+  value, onChange, accent = "#0d9488", sections = Q_SECTIONS, compact = false,
 }: {
   value: QValue;
   onChange: (next: QValue) => void;
   accent?: string;
   sections?: QSection[];
+  compact?: boolean; // カルテ初診時など、省スペースで2列に詰めて表示
 }) {
   const set = (k: string, v: string | string[]) => onChange({ ...value, [k]: v });
   const str = (k: string) => (typeof value[k] === "string" ? (value[k] as string) : "");
@@ -98,12 +99,13 @@ export default function QuestionnaireForm({
     set(k, cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt]);
   };
 
-  const inputCls = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none";
+  const inputCls = `w-full rounded-lg border border-slate-300 text-sm focus:outline-none ${compact ? "px-2 py-1.5" : "px-3 py-2"}`;
   const field = (f: QField) => {
     const req = f.required ? <span className="ml-0.5 text-rose-500">*</span> : null;
+    const wide = compact && (f.type === "textarea" || f.type === "radio" || f.type === "checkbox" || f.type === "wareki");
     return (
-      <div key={f.key} className="mb-3">
-        <label className="mb-1 block text-sm font-bold text-slate-700">{f.label}{req}</label>
+      <div key={f.key} className={compact ? (wide ? "sm:col-span-2" : "") : "mb-3"}>
+        <label className="mb-0.5 block text-sm font-bold text-slate-700">{f.label}{req}</label>
         {(f.type === "text" || f.type === "tel" || f.type === "date") && (
           <input
             type={f.type === "tel" ? "tel" : f.type === "date" ? "date" : "text"}
@@ -167,14 +169,16 @@ export default function QuestionnaireForm({
   };
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? "space-y-2" : "space-y-4"}>
       {sections.map((sec, si) => (
-        <section key={si} className="rounded-xl border bg-white p-3">
+        <section key={si} className={`rounded-xl border bg-white ${compact ? "p-2" : "p-3"}`}>
           <h3 className="mb-2 border-b pb-1.5 text-sm font-bold" style={{ color: accent }}>{sec.title}</h3>
           {sec.note && (
-            <pre className="mb-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-600">{sec.note}</pre>
+            <pre className="mb-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-600">{sec.note}</pre>
           )}
-          {sec.fields.map(field)}
+          <div className={compact ? "grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-2" : ""}>
+            {sec.fields.map(field)}
+          </div>
         </section>
       ))}
     </div>
