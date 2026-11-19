@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { createClient } from "@/lib/supabase/client";
 import { minToLabel } from "@/lib/booking";
-import { BodyMap, Pad, toStrokes, type Stroke } from "@/components/chart/marks";
+import { toStrokes, type Stroke } from "@/components/chart/marks";
 
 const PER_COURSE = 8; // 8回で1クール
 const safeParse = (s: unknown): unknown => { try { return typeof s === "string" ? JSON.parse(s) : s; } catch { return null; } };
@@ -277,7 +277,7 @@ export default function ClassChartModal({
       </div>
     </div>
 
-    {/* 1回分の詳細ページ（身体図＋手書きメモ） */}
+    {/* 1回分の詳細ページ（トレーニング内容） */}
     {openVisit && (() => {
       const { v, no } = openVisit;
       return (
@@ -292,22 +292,11 @@ export default function ClassChartModal({
               <button onClick={() => setOpenVisit(null)} className="rounded-lg px-2 py-1 text-slate-400 active:bg-slate-100">✕</button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-500">身体図</label>
-                <BodyMap value={bodyMarks[v.id] ?? []} onChange={(s) => setBodyMarks((m) => ({ ...m, [v.id]: s }))} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-500">手書きメモ</label>
-                <Pad label="指やペンで自由に書き込めます" strokes={memoMarks[v.id] ?? []} onChange={(s) => setMemoMarks((m) => ({ ...m, [v.id]: s }))} penType="treat" penColor="#1f2937" aspect="4 / 3"
-                  onTranscribed={(t) => setNotes((n) => ({ ...n, [v.id]: (n[v.id]?.trim() ? n[v.id].trimEnd() + "\n" : "") + t }))} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-500">この回のメモ</label>
-                <AutoTextarea value={notes[v.id] ?? ""} onChange={(val) => setNotes((n) => ({ ...n, [v.id]: val }))}
-                  placeholder="この回のメモ" withBackspace
-                  className="w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
-              </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <label className="mb-1 block text-xs font-bold text-orange-600">🏋 トレーニング内容</label>
+              <AutoTextarea value={notes[v.id] ?? ""} onChange={(val) => setNotes((n) => ({ ...n, [v.id]: val }))}
+                placeholder="この回のトレーニング内容を記入。例）ベア→ハイベア→フルスクワット" withBackspace
+                className="min-h-[50vh] w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
             </div>
 
             <div className="flex items-center justify-between gap-2 border-t px-4 py-3">
