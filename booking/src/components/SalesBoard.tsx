@@ -109,6 +109,7 @@ export default function SalesBoard() {
   salesRef.current = sales;
   const [targets, setTargets] = useState<Record<string, number>>({});
   const [clinicTarget, setClinicTarget] = useState(4_000_000); // 総売上目標の既定：400万
+  const [focusStaff, setFocusStaff] = useState<string | null>(null); // 担当カードのタップで、その担当だけに絞り込み
   const [loading, setLoading] = useState(true);
   // 自費の自動計算
   const [prices, setPrices] = useState<Record<string, SelfPrices>>({});
@@ -924,6 +925,10 @@ export default function SalesBoard() {
     return items;
   }, [dayRows, dayManual, saleByAppt]);
 
+  // 行の担当（絞り込み用）：予約行は入力中の担当（未設定は既定担当）、物販行はその担当。
+  const itemStaffId = (it: { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }): string | null =>
+    it.kind === "appt" ? (apptVal(it.a).staff_id ?? defStaffId(it.a)) : (it.m.staff_id ?? null);
+
   async function setItemOrder(it: { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }, ord: number) {
     if (it.kind === "manual") {
       setSales((prev) => prev.map((s) => (s.id === it.m.id ? { ...s, sort_order: ord } : s)));
@@ -1333,7 +1338,10 @@ export default function SalesBoard() {
             const target = targets[s.id] ?? 0;
             const pct = target > 0 ? Math.round((tot / target) * 1000) / 10 : 0;
             return (
-              <div key={s.id} className="rounded-lg border px-2 py-1">
+              <div key={s.id} onClick={() => setFocusStaff((f) => (f === s.id ? null : s.id))}
+                title="タップでこの担当だけ表示（もう一度で解除）"
+                className={`cursor-pointer rounded-lg border px-2 py-1 transition active:opacity-80 ${focusStaff === s.id ? "bg-slate-50" : "hover:bg-slate-50"}`}
+                style={focusStaff === s.id ? { boxShadow: `0 0 0 2px ${s.color}` } : undefined}>
                 <div className="flex items-center gap-1">
                   <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
                   <span className="text-[13px] font-bold text-slate-800">{s.name}</span>
@@ -1342,6 +1350,7 @@ export default function SalesBoard() {
                     <span className="ml-auto flex items-center gap-0.5 text-[10px] text-slate-400">
                       目標
                       <input type="number" min={0} value={target ? target / 10000 : ""} placeholder="0"
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) => saveTarget(s.id, parseFloat(e.target.value || "0"))}
                         className="w-8 rounded border border-slate-300 px-1 py-0 text-right text-[10px]" />万
                     </span>
@@ -1584,6 +1593,12 @@ export default function SalesBoard() {
         <div>
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="text-sm font-bold text-slate-700">{d.getMonth() + 1}/{d.getDate()}（{WEEKDAY_LABELS[d.getDay()]}）</span>
+            {focusStaff && (
+              <button onClick={() => setFocusStaff(null)}
+                className="flex items-center gap-1 rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 active:bg-blue-100">
+                {assignees.find((a) => a.id === focusStaff)?.name ?? "担当"} で絞り込み中 <span className="text-blue-400">✕</span>
+              </button>
+            )}
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button onClick={() => setPriceOpen(true)} className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-500 active:bg-slate-100">料金設定</button>
               <button onClick={() => addManual()} className="rounded-md bg-blue-600 px-2 py-1 text-[11px] font-bold text-white active:bg-blue-700">＋ 物販/予約外</button>
@@ -1607,7 +1622,7 @@ export default function SalesBoard() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {dayItems.map((it) =>
+                {dayItems.filter((it) => !focusStaff || itemStaffId(it) === focusStaff).map((it) =>
                   it.kind === "appt" ? (
                     (() => {
                       const a = it.a;
