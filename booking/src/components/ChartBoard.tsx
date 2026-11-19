@@ -502,8 +502,8 @@ export default function ChartBoard() {
       {/* ── 左：患者一覧（スマホは一覧 or カルテのどちらかを全幅表示） ── */}
       <aside className={`${selKey ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col rounded-xl border bg-white md:w-52`}>
         {backSales && (
-          <a href={backSales} className="flex items-center gap-1 border-b bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 active:bg-slate-100">
-            ‹ 担当別の個別売上に戻る
+          <a href={backSales} className="m-2 inline-flex items-center justify-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm active:bg-blue-700">
+            ← 個別売上に戻る
           </a>
         )}
         <div className="flex items-center justify-between gap-2 border-b p-3">
@@ -566,13 +566,13 @@ export default function ChartBoard() {
           <div className="flex h-full items-center justify-center text-sm text-slate-400">左の一覧から患者を選んでください</div>
         ) : (
           <div className="p-4">
-            <div className="mb-2 flex items-center gap-3">
+            <div className="mb-2 flex items-center gap-2">
               <button onClick={() => setSelKey(null)} className="flex items-center gap-1 text-sm font-bold text-teal-700 active:opacity-70 md:hidden">
                 ‹ 患者一覧へ
               </button>
               {backSales && (
-                <a href={backSales} className="flex items-center gap-1 text-sm font-bold text-slate-600 active:opacity-70">
-                  ‹ 担当別の個別売上に戻る
+                <a href={backSales} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm active:bg-blue-700">
+                  ← 個別売上に戻る
                 </a>
               )}
             </div>
@@ -756,8 +756,8 @@ export default function ChartBoard() {
                 <span className="text-sm font-bold text-slate-700">{selected?.name}</span>
                 <span className="text-xs text-slate-500">{v.date.replace(/-/g, "/")}（{WEEKDAY_LABELS[new Date(v.date + "T00:00:00").getDay()]}）{minToLabel(v.start_min)}</span>
                 {backSales && (
-                  <a href={backSales} className="ml-auto rounded-md border border-slate-300 px-2 py-1 text-xs font-bold text-slate-600 active:bg-slate-100">
-                    ‹ 個別売上（担当別）へ
+                  <a href={backSales} className="ml-auto inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm active:bg-blue-700">
+                    ← 個別売上に戻る
                   </a>
                 )}
                 <button onClick={() => setOpenVisit(null)} className={`${backSales ? "" : "ml-auto"} rounded px-2 text-lg text-slate-400 active:bg-slate-100`}>✕</button>
