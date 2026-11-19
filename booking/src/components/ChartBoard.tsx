@@ -140,6 +140,7 @@ export default function ChartBoard() {
   const [filter, setFilter] = useState<"all" | "visiting" | "booked" | "repeat">("all");
   const [selKey, setSelKey] = useState<string | null>(null);
   const [tab, setTab] = useState<"hatsushin" | "keika">("keika");
+  const [keikaView, setKeikaView] = useState<"list" | "cards">("list"); // 経過記録の表示：縦一覧／横並び
 
   // 選択患者の明細
   const [chartMap, setChartMap] = useState<Record<string, ChartFields & { is_draft?: boolean }>>({});
@@ -367,6 +368,30 @@ export default function ChartBoard() {
     setSaving(false);
     setMsg(error ? "保存に失敗しました" : "保存しました");
   }
+  // 経過記録（縦一覧）をまとめて保存：内容のある回だけ upsert
+  async function saveAllEntries() {
+    if (!selected) return;
+    setSaving(true);
+    setMsg(null);
+    let err: unknown = null;
+    for (const v of pastVisits) {
+      const d = getEntry(v.id);
+      const empty = !(d.progress || "").trim() && !(d.treatment || "").trim() && !(d.complaint || "").trim() && !(d.findings || "").trim() && !(d.note || "").trim() && !(d.body_marks?.length);
+      if (empty) continue;
+      const base = {
+        appointment_id: v.id, patient_id: selected.patient_id, staff_id: v.staff_id, date: v.date,
+        complaint: (d.complaint || "").trim() || null, findings: (d.findings || "").trim() || null,
+        progress: (d.progress || "").trim() || null, treatment: (d.treatment || "").trim() || null,
+        note: (d.note || "").trim() || null, updated_at: new Date().toISOString(),
+      };
+      const full = { ...base, body_marks: d.body_marks ?? [] };
+      let { error } = await supabase.from("chart_entries").upsert(full, { onConflict: "appointment_id" });
+      if (error) ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
+      if (error) err = error;
+    }
+    setSaving(false);
+    setMsg(err ? "一部の保存に失敗しました" : "保存しました");
+  }
 
   // 初診時ページ（問診票＋人体図）を保存
   async function saveIntake() {
@@ -577,12 +602,38 @@ export default function ChartBoard() {
             {/* ── 経過記録ページ ── */}
             {tab === "keika" && (
               <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs text-slate-500">来院ごとの記録（横スクロールで見比べ）</span>
-                  <button onClick={() => setTab("hatsushin")} className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 active:bg-teal-100">初診時を見る ›</button>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <div className="inline-flex overflow-hidden rounded-lg border">
+                    <button onClick={() => setKeikaView("list")} className={`px-3 py-1 text-xs font-bold ${keikaView === "list" ? "bg-teal-600 text-white" : "bg-white text-slate-500"}`}>一覧（縦）</button>
+                    <button onClick={() => setKeikaView("cards")} className={`px-3 py-1 text-xs font-bold ${keikaView === "cards" ? "bg-teal-600 text-white" : "bg-white text-slate-500"}`}>横並び</button>
+                  </div>
+                  <span className="text-xs text-slate-400">{keikaView === "list" ? "複数回をまとめて確認・記入" : "横スクロールで見比べ"}</span>
+                  <button onClick={() => setTab("hatsushin")} className="ml-auto rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 active:bg-teal-100">初診時を見る ›</button>
                 </div>
                 {pastVisits.length === 0 ? (
                   <p className="rounded-lg border bg-slate-50 py-6 text-center text-sm text-slate-400">来院記録がありません</p>
+                ) : keikaView === "list" ? (
+                  <div className="space-y-2">
+                    {pastVisits.map((v, i) => {
+                      const d = getEntry(v.id);
+                      return (
+                        <div key={v.id} className="flex gap-3 rounded-xl border p-3">
+                          <div className="w-14 shrink-0 text-center">
+                            <div className="text-sm font-bold text-teal-600">{i === 0 ? "初診" : `${i + 1}回`}</div>
+                            <div className="mt-0.5 text-[11px] font-bold text-slate-500">{v.date.slice(5).replace("-", "/")}</div>
+                            <div className="text-[10px] text-slate-400">（{WEEKDAY_LABELS[new Date(v.date + "T00:00:00").getDay()]}）</div>
+                            <div className="text-[10px] text-slate-400">{minToLabel(v.start_min)}</div>
+                          </div>
+                          <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} onBlur={() => saveEntry(v)} rows={3}
+                            placeholder="症状・アプローチ（例）出力四肢低い→脊柱通電"
+                            className="min-w-0 flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                        </div>
+                      );
+                    })}
+                    <div className="pt-1 text-right">
+                      <button onClick={saveAllEntries} disabled={saving} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{saving ? "保存中…" : "まとめて保存"}</button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex gap-3 overflow-x-auto pb-2">
                     {pastVisits.map((v, i) => {
