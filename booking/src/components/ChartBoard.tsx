@@ -131,6 +131,9 @@ export default function ChartBoard() {
   const [msg, setMsg] = useState<string | null>(null);
   // 初診時ページ
   const [intake, setIntake] = useState<Intake>(EMPTY_INTAKE);
+  // 初診時の補足メモ（問診票JSON内の予約キーに保存＝DB列追加不要）
+  const intakeMemo = typeof intake.questionnaire["__memo"] === "string" ? (intake.questionnaire["__memo"] as string) : "";
+  const setIntakeMemo = (t: string) => setIntake((it) => ({ ...it, questionnaire: { ...it.questionnaire, __memo: t } }));
   const [qSections, setQSections] = useState<QSection[]>(DEFAULT_SECTIONS);
   const [selJoint, setSelJoint] = useState<string | null>(null);
   const [jointPen, setJointPen] = useState<MarkType>("pain");
@@ -584,7 +587,14 @@ export default function ChartBoard() {
                     </div>
                     <div className="rounded-xl border p-3">
                       <div className="mb-2 text-sm font-bold text-slate-600">手書きメモ</div>
-                      <Pad label="指やペンで自由に書き込めます" strokes={intake.memo_marks} onChange={(s) => setIntake((it) => ({ ...it, memo_marks: s }))} penType="treat" penColor="#1f2937" aspect="4 / 3" />
+                      <Pad label="指やペンで自由に書き込めます" strokes={intake.memo_marks} onChange={(s) => setIntake((it) => ({ ...it, memo_marks: s }))} penType="treat" penColor="#1f2937" aspect="4 / 3"
+                        onTranscribed={(t) => setIntakeMemo((intakeMemo.trim() ? intakeMemo.trimEnd() + "\n" : "") + t)} />
+                    </div>
+                    <div className="rounded-xl border p-3">
+                      <div className="mb-2 text-sm font-bold text-slate-600">メモ（補足・申し送り）</div>
+                      <textarea value={intakeMemo} onChange={(e) => setIntakeMemo(e.target.value)} rows={4}
+                        placeholder="手書きメモの「✍️文字起こし」結果もここに入ります"
+                        className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                     </div>
                   </div>
 
