@@ -10,12 +10,14 @@ const safeParse = (s: unknown): unknown => { try { return typeof s === "string" 
 const asStrokes = (v: unknown): Stroke[] => toStrokes(typeof v === "string" ? safeParse(v) : v);
 
 // 内容に合わせて高さが自動で伸びるテキストエリア（内部スクロール無し＝書いた分を全部表示）
-function AutoTextarea({ value, onChange, disabled, placeholder, className }: {
+// withBackspace=true で、ペン変換の誤字をカーソル位置から1文字ずつ消せる「⌫ 1字消す」を表示。
+function AutoTextarea({ value, onChange, disabled, placeholder, className, withBackspace }: {
   value: string;
   onChange?: (v: string) => void;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  withBackspace?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fit = () => {
@@ -25,7 +27,21 @@ function AutoTextarea({ value, onChange, disabled, placeholder, className }: {
     el.style.height = `${el.scrollHeight}px`;
   };
   useLayoutEffect(fit, [value]);
-  return (
+  const backspace = () => {
+    if (!onChange) return;
+    const el = ref.current;
+    const hasSel = el && el.selectionStart != null;
+    const start = hasSel ? el!.selectionStart : value.length;
+    const end = hasSel ? el!.selectionEnd : value.length;
+    let next = value;
+    let caret = start;
+    if (start !== end) { next = value.slice(0, start) + value.slice(end); caret = start; }
+    else if (start > 0) { next = value.slice(0, start - 1) + value.slice(start); caret = start - 1; }
+    else return;
+    onChange(next);
+    requestAnimationFrame(() => { const e2 = ref.current; if (e2) { e2.focus(); try { e2.setSelectionRange(caret, caret); } catch { /* noop */ } } });
+  };
+  const area = (
     <textarea
       ref={ref}
       value={value}
@@ -35,6 +51,18 @@ function AutoTextarea({ value, onChange, disabled, placeholder, className }: {
       rows={2}
       className={className}
     />
+  );
+  if (!withBackspace) return area;
+  return (
+    <div>
+      <div className="mb-1 flex justify-end">
+        <button type="button" onClick={backspace} disabled={disabled || !value.length}
+          className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40">
+          ⌫ 1字消す
+        </button>
+      </div>
+      {area}
+    </div>
   );
 }
 
@@ -191,7 +219,7 @@ export default function ClassChartModal({
               {/* 全体メモ */}
               <div className="mb-3">
                 <label className="mb-1 block text-xs font-bold text-slate-500">メモ（目標・申し送りなど）</label>
-                <AutoTextarea value={memo} onChange={setMemo}
+                <AutoTextarea value={memo} onChange={setMemo} withBackspace
                   className="w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
               </div>
 
@@ -277,7 +305,7 @@ export default function ClassChartModal({
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-500">この回のメモ</label>
                 <AutoTextarea value={notes[v.id] ?? ""} onChange={(val) => setNotes((n) => ({ ...n, [v.id]: val }))}
-                  placeholder="この回のメモ"
+                  placeholder="この回のメモ" withBackspace
                   className="w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
               </div>
             </div>
