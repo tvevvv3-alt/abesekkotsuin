@@ -290,11 +290,14 @@ export default function ChartBoard() {
       }
       rows.forEach((r) => {
         const bm = r.body_marks;
+        // 「症状の変化」と「施術内容」は1つにまとめる。旧データの施術内容は症状欄へ統合（保存で正式に一本化）。
+        const prog = ((r.progress as string) ?? "").trim();
+        const treat = ((r.treatment as string) ?? "").trim();
         cm[r.appointment_id as string] = {
           complaint: (r.complaint as string) ?? "",
           findings: (r.findings as string) ?? "",
-          progress: (r.progress as string) ?? "",
-          treatment: (r.treatment as string) ?? "",
+          progress: [prog, treat].filter(Boolean).join("\n"),
+          treatment: "",
           note: (r.note as string) ?? "",
           body_marks: toStrokes(Array.isArray(bm) ? bm : (typeof bm === "string" && bm ? JSON.parse(bm) : [])),
           is_draft: (r.is_draft as boolean) ?? false,
@@ -590,12 +593,8 @@ export default function ChartBoard() {
                               </div>
                             </div>
                             <div>
-                              <div className="mb-0.5 text-[11px] font-bold text-teal-600">📊 症状の変化</div>
-                              <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} rows={4} className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
-                            </div>
-                            <div>
-                              <div className="mb-0.5 text-[11px] font-bold text-teal-600">⚙️ 施術内容</div>
-                              <textarea value={d.treatment} onChange={(e) => updateEntry(v.id, { treatment: e.target.value })} rows={4} className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                              <div className="mb-0.5 text-[11px] font-bold text-teal-600">📊 症状・アプローチ</div>
+                              <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} rows={9} placeholder="症状に対してのアプローチを横に。例）出力四肢低い→脊柱通電" className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                             </div>
                           </div>
                           <div className="border-t p-2 text-right">
@@ -637,8 +636,7 @@ function VisitTable({
         <thead>
           <tr className="border-b text-left text-xs text-slate-400">
             <th className="py-1.5 pr-2 font-bold">日付</th>
-            <th className="py-1.5 pr-2 font-bold">施術内容（抜粋）</th>
-            <th className="py-1.5 pr-2 font-bold">施術後の変化</th>
+            <th className="py-1.5 pr-2 font-bold">症状・アプローチ（抜粋）</th>
             <th className="py-1.5 pr-2 font-bold">担当</th>
           </tr>
         </thead>
@@ -658,9 +656,8 @@ function VisitTable({
                   {future && <span className="ml-1 rounded bg-blue-100 px-1 text-[10px] font-bold text-blue-600">予約</span>}
                 </td>
                 <td className="py-2 pr-2 text-slate-600">
-                  <span className="line-clamp-2">{(c?.treatment || "").trim() || v.service_name || "—"}</span>
+                  <span className="line-clamp-2">{[(c?.progress || "").trim(), (c?.treatment || "").trim()].filter(Boolean).join(" / ") || v.service_name || "—"}</span>
                 </td>
-                <td className="py-2 pr-2 text-slate-600"><span className="line-clamp-2">{(c?.progress || "").trim() || "—"}</span></td>
                 <td className="whitespace-nowrap py-2 pr-2 text-slate-500">{staffName(v.staff_id) || "—"}</td>
               </tr>
             );
