@@ -1254,15 +1254,21 @@ export default function SalesBoard() {
     onPick: (m: "cash" | "cashless") => void
   ) => {
     const need = hasAmount && payment == null; // 金額ありなのに未選択
-    const base = "whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-bold";
+    const base = "flex items-center justify-center rounded-md border p-0.5";
     return (
-      <div className="flex items-center justify-center gap-0.5">
+      <div className="flex items-center justify-center gap-1">
         <button onClick={() => onPick("cash")}
-          className={`${base} ${payment === "cash" ? "border-emerald-400 bg-emerald-500 text-white" : need ? "border-red-400 bg-red-50 text-red-500" : "border-slate-300 bg-white text-slate-400"}`}
-          title="現金で確定">💴</button>
+          className={`${base} ${payment === "cash" ? "border-emerald-400 bg-emerald-50" : need ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}
+          title="現金で確定">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cash.png" alt="現金" className={`h-6 w-auto ${payment === "cash" ? "" : "opacity-40 grayscale"}`} />
+        </button>
         <button onClick={() => onPick("cashless")}
-          className={`${base} ${payment === "cashless" ? "border-indigo-400 bg-indigo-500 text-white" : need ? "border-red-400 bg-red-50 text-red-500" : "border-slate-300 bg-white text-slate-400"}`}
-          title="キャッシュレスで確定">💳</button>
+          className={`${base} ${payment === "cashless" ? "border-indigo-400 bg-indigo-50" : need ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}
+          title="キャッシュレスで確定">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cashless.png" alt="キャッシュレス" className={`h-6 w-auto ${payment === "cashless" ? "" : "opacity-40 grayscale"}`} />
+        </button>
       </div>
     );
   };
