@@ -75,8 +75,9 @@ type ChartFields = {
   progress: string;
   note: string;
   body_marks: Stroke[];
+  memo_marks: Stroke[]; // その回の手書きメモ
 };
-const EMPTY: ChartFields = { complaint: "", findings: "", treatment: "", progress: "", note: "", body_marks: [] };
+const EMPTY: ChartFields = { complaint: "", findings: "", treatment: "", progress: "", note: "", body_marks: [], memo_marks: [] };
 
 // 初診時ページ（問診票の内容＋人体図）。患者ごとに1件保存。
 type JointView = "front" | "back" | "left" | "right";
@@ -141,6 +142,7 @@ export default function ChartBoard() {
   const [selKey, setSelKey] = useState<string | null>(null);
   const [tab, setTab] = useState<"hatsushin" | "keika">("keika");
   const [keikaView, setKeikaView] = useState<"list" | "cards">("list"); // 経過記録の表示：縦一覧／横並び
+  const [openVisit, setOpenVisit] = useState<{ v: ApptRow; idx: number } | null>(null); // その回の詳細ページ（身体図＋手書きメモ）
 
   // 選択患者の明細
   const [chartMap, setChartMap] = useState<Record<string, ChartFields & { is_draft?: boolean }>>({});
@@ -280,19 +282,29 @@ export default function ChartBoard() {
       let rows: Record<string, unknown>[] | null = null;
       const full = await supabase
         .from("chart_entries")
-        .select("appointment_id, complaint, findings, progress, treatment, note, body_marks, is_draft")
+        .select("appointment_id, complaint, findings, progress, treatment, note, body_marks, memo_marks, is_draft")
         .in("appointment_id", apptIds);
       if (full.error) {
-        const base = await supabase
+        // memo_marks 未マイグレーションでも body_marks は残す
+        const mid = await supabase
           .from("chart_entries")
-          .select("appointment_id, complaint, findings, progress, treatment, note")
+          .select("appointment_id, complaint, findings, progress, treatment, note, body_marks, is_draft")
           .in("appointment_id", apptIds);
-        rows = (base.data as Record<string, unknown>[] | null) ?? [];
+        if (mid.error) {
+          const base = await supabase
+            .from("chart_entries")
+            .select("appointment_id, complaint, findings, progress, treatment, note")
+            .in("appointment_id", apptIds);
+          rows = (base.data as Record<string, unknown>[] | null) ?? [];
+        } else {
+          rows = (mid.data as Record<string, unknown>[] | null) ?? [];
+        }
       } else {
         rows = (full.data as Record<string, unknown>[] | null) ?? [];
       }
       rows.forEach((r) => {
         const bm = r.body_marks;
+        const mm = r.memo_marks;
         // 「症状の変化」と「施術内容」は1つにまとめる。旧データの施術内容は症状欄へ統合（保存で正式に一本化）。
         const prog = ((r.progress as string) ?? "").trim();
         const treat = ((r.treatment as string) ?? "").trim();
@@ -303,6 +315,7 @@ export default function ChartBoard() {
           treatment: "",
           note: (r.note as string) ?? "",
           body_marks: toStrokes(Array.isArray(bm) ? bm : (typeof bm === "string" && bm ? JSON.parse(bm) : [])),
+          memo_marks: toStrokes(Array.isArray(mm) ? mm : (typeof mm === "string" && mm ? JSON.parse(mm) : [])),
           is_draft: (r.is_draft as boolean) ?? false,
         };
       });
@@ -362,9 +375,14 @@ export default function ChartBoard() {
       note: (d.note || "").trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const full = { ...base, body_marks: d.body_marks ?? [] };
+    const full = { ...base, body_marks: d.body_marks ?? [], memo_marks: d.memo_marks ?? [] };
     let { error } = await supabase.from("chart_entries").upsert(full, { onConflict: "appointment_id" });
-    if (error) ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
+    if (error) {
+      // memo_marks 未マイグレーションなら body_marks だけで再試行、さらに失敗なら最小列で
+      const mid = { ...base, body_marks: d.body_marks ?? [] };
+      ({ error } = await supabase.from("chart_entries").upsert(mid, { onConflict: "appointment_id" }));
+      if (error) ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
+    }
     setSaving(false);
     setMsg(error ? "保存に失敗しました" : "保存しました");
   }
@@ -384,9 +402,13 @@ export default function ChartBoard() {
         progress: (d.progress || "").trim() || null, treatment: (d.treatment || "").trim() || null,
         note: (d.note || "").trim() || null, updated_at: new Date().toISOString(),
       };
-      const full = { ...base, body_marks: d.body_marks ?? [] };
+      const full = { ...base, body_marks: d.body_marks ?? [], memo_marks: d.memo_marks ?? [] };
       let { error } = await supabase.from("chart_entries").upsert(full, { onConflict: "appointment_id" });
-      if (error) ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
+      if (error) {
+        const mid = { ...base, body_marks: d.body_marks ?? [] };
+        ({ error } = await supabase.from("chart_entries").upsert(mid, { onConflict: "appointment_id" }));
+        if (error) ({ error } = await supabase.from("chart_entries").upsert(base, { onConflict: "appointment_id" }));
+      }
       if (error) err = error;
     }
     setSaving(false);
@@ -618,12 +640,13 @@ export default function ChartBoard() {
                       const d = getEntry(v.id);
                       return (
                         <div key={v.id} className="flex gap-3 rounded-xl border p-3">
-                          <div className="w-14 shrink-0 text-center">
-                            <div className="text-sm font-bold text-teal-600">{i === 0 ? "初診" : `${i + 1}回`}</div>
+                          <button onClick={() => setOpenVisit({ v, idx: i })} title="この回のページを開く（身体図・手書きメモ）"
+                            className="w-14 shrink-0 rounded-lg px-1 py-1 text-center hover:bg-teal-50 active:bg-teal-100">
+                            <div className="text-sm font-bold text-teal-600 underline decoration-teal-300 underline-offset-2">{i === 0 ? "初診" : `${i + 1}回`}</div>
                             <div className="mt-0.5 text-[11px] font-bold text-slate-500">{v.date.slice(5).replace("-", "/")}</div>
                             <div className="text-[10px] text-slate-400">（{WEEKDAY_LABELS[new Date(v.date + "T00:00:00").getDay()]}）</div>
                             <div className="text-[10px] text-slate-400">{minToLabel(v.start_min)}</div>
-                          </div>
+                          </button>
                           <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} onBlur={() => saveEntry(v)} rows={3}
                             placeholder="症状・アプローチ（例）出力四肢低い→脊柱通電"
                             className="min-w-0 flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
@@ -670,6 +693,55 @@ export default function ChartBoard() {
       </main>
 
       {addOpen && <AddPatientModal supabase={supabase} onClose={() => setAddOpen(false)} onAdded={async (id) => { setAddOpen(false); await load(); setSelKey(id); }} />}
+
+      {/* その回の詳細ページ（身体図＋手書きメモ＋症状・アプローチ） */}
+      {openVisit && (() => {
+        const v = openVisit.v;
+        const i = openVisit.idx;
+        const d = getEntry(v.id);
+        const title = i === 0 ? "初診（1回目）" : `${i + 1}回目`;
+        return (
+          <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6" onClick={() => setOpenVisit(null)}>
+            <div className="w-full max-w-4xl rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-teal-50 px-2 py-0.5 text-sm font-bold text-teal-700">{title}</span>
+                <span className="text-sm font-bold text-slate-700">{selected?.name}</span>
+                <span className="text-xs text-slate-500">{v.date.replace(/-/g, "/")}（{WEEKDAY_LABELS[new Date(v.date + "T00:00:00").getDay()]}）{minToLabel(v.start_min)}</span>
+                <button onClick={() => setOpenVisit(null)} className="ml-auto rounded px-2 text-lg text-slate-400 active:bg-slate-100">✕</button>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="rounded-xl border p-3">
+                    <div className="mb-2 text-sm font-bold text-slate-600">人体図（痛み・損傷部位）</div>
+                    <BodyMap value={d.body_marks} onChange={(bm) => updateEntry(v.id, { body_marks: bm })} />
+                  </div>
+                  <div className="rounded-xl border p-3">
+                    <div className="mb-2 text-sm font-bold text-slate-600">手書きメモ</div>
+                    <Pad label="指やペンで自由に書き込めます" strokes={d.memo_marks} onChange={(s) => updateEntry(v.id, { memo_marks: s })} penType="treat" penColor="#1f2937" aspect="4 / 3" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="rounded-xl border p-3">
+                    <div className="mb-1 text-[11px] font-bold text-teal-600">📊 症状・アプローチ</div>
+                    <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} rows={8}
+                      placeholder="症状に対してのアプローチを横に。例）出力四肢低い→脊柱通電"
+                      className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                  </div>
+                  <div className="rounded-xl border p-3">
+                    <div className="mb-1 text-[11px] font-bold text-slate-500">メモ（補足・申し送り）</div>
+                    <textarea value={d.note} onChange={(e) => updateEntry(v.id, { note: e.target.value })} rows={4}
+                      className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <button onClick={() => setOpenVisit(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
+                <button onClick={() => saveEntry(v)} disabled={saving} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{saving ? "保存中…" : "保存"}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
