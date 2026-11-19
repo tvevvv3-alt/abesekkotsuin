@@ -755,7 +755,12 @@ export default function ChartBoard() {
                 <span className="rounded-md bg-teal-50 px-2 py-0.5 text-sm font-bold text-teal-700">{title}</span>
                 <span className="text-sm font-bold text-slate-700">{selected?.name}</span>
                 <span className="text-xs text-slate-500">{v.date.replace(/-/g, "/")}（{WEEKDAY_LABELS[new Date(v.date + "T00:00:00").getDay()]}）{minToLabel(v.start_min)}</span>
-                <button onClick={() => setOpenVisit(null)} className="ml-auto rounded px-2 text-lg text-slate-400 active:bg-slate-100">✕</button>
+                {backSales && (
+                  <a href={backSales} className="ml-auto rounded-md border border-slate-300 px-2 py-1 text-xs font-bold text-slate-600 active:bg-slate-100">
+                    ‹ 個別売上（担当別）へ
+                  </a>
+                )}
+                <button onClick={() => setOpenVisit(null)} className={`${backSales ? "" : "ml-auto"} rounded px-2 text-lg text-slate-400 active:bg-slate-100`}>✕</button>
               </div>
               <div className="grid items-stretch gap-4 lg:grid-cols-2">
                 <div className="flex flex-col">
