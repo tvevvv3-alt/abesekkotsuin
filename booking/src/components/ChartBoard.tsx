@@ -705,22 +705,12 @@ export default function ChartBoard() {
                     <div className="mb-2 text-sm font-bold text-slate-600">人体図（痛み・損傷部位）</div>
                     <BodyMap value={d.body_marks} onChange={(bm) => updateEntry(v.id, { body_marks: bm })} />
                   </div>
-                  <div className="rounded-xl border p-3">
-                    <div className="mb-2 text-sm font-bold text-slate-600">手書きメモ</div>
-                    <Pad label="指やペンで自由に書き込めます" strokes={d.memo_marks} onChange={(s) => updateEntry(v.id, { memo_marks: s })} penType="treat" penColor="#1f2937" aspect="4 / 3"
-                      onTranscribed={(t) => updateEntry(v.id, { note: (d.note?.trim() ? d.note.trimEnd() + "\n" : "") + t })} />
-                  </div>
                 </div>
                 <div className="space-y-3">
                   <div className="rounded-xl border p-3">
                     <div className="mb-1 text-[11px] font-bold text-teal-600">📊 症状・アプローチ</div>
-                    <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} rows={8}
+                    <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} rows={12}
                       placeholder="症状に対してのアプローチを横に。例）出力四肢低い→脊柱通電"
-                      className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
-                  </div>
-                  <div className="rounded-xl border p-3">
-                    <div className="mb-1 text-[11px] font-bold text-slate-500">メモ（補足・申し送り）</div>
-                    <textarea value={d.note} onChange={(e) => updateEntry(v.id, { note: e.target.value })} rows={4}
                       className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                   </div>
                 </div>
