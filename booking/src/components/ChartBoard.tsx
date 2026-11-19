@@ -629,7 +629,7 @@ export default function ChartBoard() {
                             className="min-w-0 flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                         </div>
                       );
-                    })}
+                    }).reverse()}
                     <div className="pt-1 text-right">
                       <button onClick={saveAllEntries} disabled={saving} className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-bold text-white active:bg-teal-700 disabled:opacity-50">{saving ? "保存中…" : "まとめて保存"}</button>
                     </div>
