@@ -715,26 +715,26 @@ export default function ChartBoard() {
         const title = i === 0 ? "初診（1回目）" : `${i + 1}回目`;
         return (
           <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6" onClick={() => setOpenVisit(null)}>
-            <div className="w-full max-w-4xl rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-5xl rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="rounded-md bg-teal-50 px-2 py-0.5 text-sm font-bold text-teal-700">{title}</span>
                 <span className="text-sm font-bold text-slate-700">{selected?.name}</span>
                 <span className="text-xs text-slate-500">{v.date.replace(/-/g, "/")}（{WEEKDAY_LABELS[new Date(v.date + "T00:00:00").getDay()]}）{minToLabel(v.start_min)}</span>
                 <button onClick={() => setOpenVisit(null)} className="ml-auto rounded px-2 text-lg text-slate-400 active:bg-slate-100">✕</button>
               </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-3">
-                  <div className="rounded-xl border p-3">
+              <div className="grid items-stretch gap-4 lg:grid-cols-2">
+                <div className="flex flex-col">
+                  <div className="flex flex-1 flex-col rounded-xl border p-3">
                     <div className="mb-2 text-sm font-bold text-slate-600">人体図（痛み・損傷部位）</div>
                     <BodyMap value={d.body_marks} onChange={(bm) => updateEntry(v.id, { body_marks: bm })} />
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <div className="rounded-xl border p-3">
+                <div className="flex flex-col">
+                  <div className="flex flex-1 flex-col rounded-xl border p-3">
                     <div className="mb-1 text-[11px] font-bold text-teal-600">📊 症状・アプローチ</div>
-                    <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })} rows={12}
+                    <textarea value={d.progress} onChange={(e) => updateEntry(v.id, { progress: e.target.value })}
                       placeholder="症状に対してのアプローチを横に。例）出力四肢低い→脊柱通電"
-                      className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                      className="min-h-[320px] w-full flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                   </div>
                 </div>
               </div>
