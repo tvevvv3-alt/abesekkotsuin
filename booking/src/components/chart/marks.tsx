@@ -23,7 +23,7 @@ export function toStrokes(arr: unknown): Stroke[] {
   });
 }
 
-export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor, aspect }: {
+export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor, aspect, onTranscribed }: {
   label?: string;
   strokes: Stroke[];
   onChange: (s: Stroke[]) => void;
@@ -32,8 +32,52 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
   bgNode?: ReactNode; // 画像が無い時の簡易線画
   penColor?: string; // 指定時はこの色で描画（手書きメモ用）
   aspect?: string;   // 既定 "1 / 1"。手書きメモは横長に
+  onTranscribed?: (text: string) => void; // 指定時「文字起こし」ボタンを表示し、結果テキストを渡す
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [txErr, setTxErr] = useState<string | null>(null);
+
+  // 現在の手書き線を白背景のPNGに描き出す（文字起こし用）
+  const toPng = (): string | null => {
+    const [wR, hR] = (aspect ?? "1 / 1").split("/").map((n) => parseFloat(n.trim()) || 1);
+    const W = 1600;
+    const H = Math.round(W * (hR / wR));
+    const cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const g = cv.getContext("2d");
+    if (!g) return null;
+    g.fillStyle = "#ffffff"; g.fillRect(0, 0, W, H);
+    g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = Math.max(3, Math.round(W / 320));
+    for (const s of strokes) {
+      if (!s.pts.length) continue;
+      g.strokeStyle = penColor ?? markColor(s.type);
+      g.beginPath();
+      s.pts.forEach(([x, y], i) => { const px = x * W, py = y * H; if (i === 0) g.moveTo(px, py); else g.lineTo(px, py); });
+      if (s.pts.length === 1) { const [x, y] = s.pts[0]; g.lineTo(x * W + 0.1, y * H + 0.1); }
+      g.stroke();
+    }
+    return cv.toDataURL("image/png");
+  };
+
+  const transcribe = async () => {
+    if (!onTranscribed || !strokes.length || busy) return;
+    setBusy(true); setTxErr(null);
+    try {
+      const image = toPng();
+      if (!image) { setTxErr("画像化に失敗"); return; }
+      const res = await fetch("/api/chart/transcribe", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image }),
+      });
+      const json = (await res.json()) as { ok?: boolean; text?: string; reason?: string };
+      if (json.ok && json.text) onTranscribed(json.text);
+      else setTxErr(json.reason === "nokey" ? "APIキー未設定" : "読み取れませんでした");
+    } catch {
+      setTxErr("通信エラー");
+    } finally {
+      setBusy(false);
+    }
+  };
   const liveRef = useRef<SVGPolylineElement>(null); // 描画中の線は再描画せず直接更新（ペン追従を軽く）
   const cur = useRef<[number, number][] | null>(null);
   const drawPtr = useRef<number | null>(null);
@@ -71,9 +115,16 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
   };
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between gap-2">
         {label ? <span className="text-[11px] font-bold text-slate-500">{label}</span> : <span />}
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          {txErr && <span className="text-[10px] font-bold text-rose-500">{txErr}</span>}
+          {onTranscribed && (
+            <button type="button" onClick={transcribe} disabled={!strokes.length || busy}
+              className="rounded border border-teal-500 bg-teal-50 px-2 text-[10px] font-bold text-teal-700 disabled:opacity-40">
+              {busy ? "読取中…" : "✍️文字起こし"}
+            </button>
+          )}
           <button type="button" onClick={() => onChange(strokes.slice(0, -1))} disabled={!strokes.length} className="rounded border border-slate-300 px-1.5 text-[10px] font-bold text-slate-500 disabled:opacity-40">戻す</button>
           <button type="button" onClick={() => onChange([])} className="rounded border border-slate-300 px-1.5 text-[10px] font-bold text-slate-500">消</button>
         </div>

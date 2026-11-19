@@ -697,7 +697,8 @@ export default function ChartBoard() {
                   </div>
                   <div className="rounded-xl border p-3">
                     <div className="mb-2 text-sm font-bold text-slate-600">手書きメモ</div>
-                    <Pad label="指やペンで自由に書き込めます" strokes={d.memo_marks} onChange={(s) => updateEntry(v.id, { memo_marks: s })} penType="treat" penColor="#1f2937" aspect="4 / 3" />
+                    <Pad label="指やペンで自由に書き込めます" strokes={d.memo_marks} onChange={(s) => updateEntry(v.id, { memo_marks: s })} penType="treat" penColor="#1f2937" aspect="4 / 3"
+                      onTranscribed={(t) => updateEntry(v.id, { note: (d.note?.trim() ? d.note.trimEnd() + "\n" : "") + t })} />
                   </div>
                 </div>
                 <div className="space-y-3">

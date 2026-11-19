@@ -271,7 +271,8 @@ export default function ClassChartModal({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-500">手書きメモ</label>
-                <Pad label="指やペンで自由に書き込めます" strokes={memoMarks[v.id] ?? []} onChange={(s) => setMemoMarks((m) => ({ ...m, [v.id]: s }))} penType="treat" penColor="#1f2937" aspect="4 / 3" />
+                <Pad label="指やペンで自由に書き込めます" strokes={memoMarks[v.id] ?? []} onChange={(s) => setMemoMarks((m) => ({ ...m, [v.id]: s }))} penType="treat" penColor="#1f2937" aspect="4 / 3"
+                  onTranscribed={(t) => setNotes((n) => ({ ...n, [v.id]: (n[v.id]?.trim() ? n[v.id].trimEnd() + "\n" : "") + t }))} />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-500">この回のメモ</label>
