@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { createClient } from "@/lib/supabase/client";
 import { minToLabel } from "@/lib/booking";
+import { BodyMap, Pad, toStrokes, type Stroke } from "@/components/chart/marks";
 
 const PER_COURSE = 8; // 8回で1クール
+const safeParse = (s: unknown): unknown => { try { return typeof s === "string" ? JSON.parse(s) : s; } catch { return null; } };
+const asStrokes = (v: unknown): Stroke[] => toStrokes(typeof v === "string" ? safeParse(v) : v);
 
 // 内容に合わせて高さが自動で伸びるテキストエリア（内部スクロール無し＝書いた分を全部表示）
 function AutoTextarea({ value, onChange, disabled, placeholder, className }: {
@@ -48,6 +51,9 @@ export default function ClassChartModal({
 }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [bodyMarks, setBodyMarks] = useState<Record<string, Stroke[]>>({});
+  const [memoMarks, setMemoMarks] = useState<Record<string, Stroke[]>>({});
+  const [openVisit, setOpenVisit] = useState<{ v: Visit; no: number } | null>(null);
   const [memo, setMemo] = useState("");
   const [sport, setSport] = useState("");
   const [grade, setGrade] = useState("");
@@ -69,14 +75,26 @@ export default function ClassChartModal({
       .order("start_min");
     const vs = (ap as Visit[]) ?? [];
     setVisits(vs);
-    // 各回メモ（テーブル未作成でも落ちない）
+    // 各回メモ＋身体図＋手書きメモ（テーブル・列が未作成でも落ちない）
     const nm: Record<string, string> = {};
+    const bm: Record<string, Stroke[]> = {};
+    const mm: Record<string, Stroke[]> = {};
     const ids = vs.map((v) => v.id);
     if (ids.length) {
-      const { data: cn, error } = await supabase.from("class_notes").select("appointment_id, note").in("appointment_id", ids);
-      if (!error) ((cn as { appointment_id: string; note: string | null }[] | null) ?? []).forEach((r) => { nm[r.appointment_id] = r.note ?? ""; });
+      const full = await supabase.from("class_notes").select("appointment_id, note, body_marks, memo_marks").in("appointment_id", ids);
+      const rows = full.error
+        ? ((await supabase.from("class_notes").select("appointment_id, note").in("appointment_id", ids)).data as Record<string, unknown>[] | null)
+        : (full.data as Record<string, unknown>[] | null);
+      (rows ?? []).forEach((r) => {
+        const id = r.appointment_id as string;
+        nm[id] = (r.note as string | null) ?? "";
+        bm[id] = asStrokes(r.body_marks);
+        mm[id] = asStrokes(r.memo_marks);
+      });
     }
     setNotes(nm);
+    setBodyMarks(bm);
+    setMemoMarks(mm);
     // 全体メモ＋競技/学年/チーム（列が無くても落ちない）
     type Mem = { note?: string | null; sport?: string | null; grade?: string | null; team?: string | null };
     let mem: Mem | null = null;
@@ -103,18 +121,33 @@ export default function ClassChartModal({
     return Array.from({ length: PER_COURSE }, (_, i) => visits[course * PER_COURSE + i] ?? null);
   }, [visits, course]);
 
+  // 各回のレコードを保存（身体図・手書きメモ列が無くてもメモだけは残す）
+  async function persistNotes(ids: string[]): Promise<string | null> {
+    if (!ids.length) return null;
+    const base = ids.map((id) => ({ appointment_id: id, note: (notes[id] ?? "").trim() || null, updated_at: new Date().toISOString() }));
+    const full = base.map((b) => ({ ...b, body_marks: bodyMarks[b.appointment_id] ?? [], memo_marks: memoMarks[b.appointment_id] ?? [] }));
+    const { error } = await supabase.from("class_notes").upsert(full, { onConflict: "appointment_id" });
+    if (!error) return null;
+    const { error: e2 } = await supabase.from("class_notes").upsert(base, { onConflict: "appointment_id" });
+    return e2 ? "各回メモの保存に失敗（class_notes の作成が必要です）" : "身体図・手書きは列追加が必要です（メモは保存）";
+  }
+
+  // 詳細ページ（1回分）の保存
+  async function saveVisit(id: string) {
+    setSaving(true);
+    setMsg(null);
+    const err = await persistNotes([id]);
+    setSaving(false);
+    setMsg(err ?? "保存しました");
+  }
+
   async function save() {
     setSaving(true);
     setMsg(null);
-    let err: string | null = null;
-    // 各回メモ（予約に紐づくものだけ）
-    const rows = Object.entries(notes)
-      .filter(([, v]) => v !== undefined)
-      .map(([appointment_id, note]) => ({ appointment_id, note: note.trim() || null, updated_at: new Date().toISOString() }));
-    if (rows.length) {
-      const { error } = await supabase.from("class_notes").upsert(rows, { onConflict: "appointment_id" });
-      if (error) err = "各回メモの保存に失敗（class_notes の作成が必要です）";
-    }
+    // 各回メモ・身体図（記入のある予約だけ）
+    const ids = [...new Set([...Object.keys(notes), ...Object.keys(bodyMarks), ...Object.keys(memoMarks)])]
+      .filter((id) => (notes[id] ?? "").trim() || (bodyMarks[id]?.length) || (memoMarks[id]?.length));
+    let err = await persistNotes(ids);
     // 全体メモ＋競技/学年/チーム（会員台帳）
     const full = { name, note: memo.trim() || null, sport: sport.trim() || null, grade: grade.trim() || null, team: team.trim() || null };
     const { error: e2 } = await supabase.from("class_members").upsert(full, { onConflict: "name" });
@@ -128,6 +161,7 @@ export default function ClassChartModal({
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-3">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
@@ -176,13 +210,19 @@ export default function ClassChartModal({
                   const no = course * PER_COURSE + i + 1;
                   return (
                     <div key={i} className="flex items-start gap-2 p-2">
-                      <div className="w-10 shrink-0 pt-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => { if (v) setOpenVisit({ v, no }); }}
+                        disabled={!v}
+                        className="w-12 shrink-0 rounded-lg py-1 text-center active:bg-orange-50 disabled:cursor-default"
+                      >
                         <div className="text-[10px] font-bold text-orange-500">{no}回</div>
-                        <div className="mt-0.5 whitespace-nowrap text-[10px] text-slate-500">
+                        <div className="mt-0.5 whitespace-nowrap text-[10px] text-slate-600">
                           {v ? `${v.date.slice(5).replace("-", "/")}` : "—"}
                         </div>
                         {v && <div className="text-[9px] text-slate-400">{minToLabel(v.start_min)}</div>}
-                      </div>
+                        {v && <div className="mt-0.5 text-[9px] font-bold text-sky-500">詳細 ›</div>}
+                      </button>
                       <AutoTextarea
                         value={v ? (notes[v.id] ?? "") : ""}
                         onChange={(val) => { if (v) setNotes((n) => ({ ...n, [v.id]: val })); }}
@@ -208,5 +248,50 @@ export default function ClassChartModal({
         </div>
       </div>
     </div>
+
+    {/* 1回分の詳細ページ（身体図＋手書きメモ） */}
+    {openVisit && (() => {
+      const { v, no } = openVisit;
+      return (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-3">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setOpenVisit(null)} />
+          <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h2 className="text-base font-bold text-slate-800">
+                {name} <span className="text-sm font-bold text-orange-600">{no}回</span>
+                <span className="ml-2 text-xs font-normal text-slate-400">{v.date.replace(/-/g, "/")}・{minToLabel(v.start_min)}</span>
+              </h2>
+              <button onClick={() => setOpenVisit(null)} className="rounded-lg px-2 py-1 text-slate-400 active:bg-slate-100">✕</button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-500">身体図</label>
+                <BodyMap value={bodyMarks[v.id] ?? []} onChange={(s) => setBodyMarks((m) => ({ ...m, [v.id]: s }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-500">手書きメモ</label>
+                <Pad label="指やペンで自由に書き込めます" strokes={memoMarks[v.id] ?? []} onChange={(s) => setMemoMarks((m) => ({ ...m, [v.id]: s }))} penType="treat" penColor="#1f2937" aspect="4 / 3" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-500">この回のメモ</label>
+                <AutoTextarea value={notes[v.id] ?? ""} onChange={(val) => setNotes((n) => ({ ...n, [v.id]: val }))}
+                  placeholder="この回のメモ"
+                  className="w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t px-4 py-3">
+              <span className={`text-sm font-bold ${msg === "保存しました" ? "text-emerald-600" : "text-rose-600"}`}>{msg}</span>
+              <div className="flex gap-2">
+                <button onClick={() => setOpenVisit(null)} className="rounded-lg border px-4 py-2 text-sm font-bold text-slate-600 active:bg-slate-100">閉じる</button>
+                <button onClick={() => saveVisit(v.id)} disabled={saving} className="rounded-lg bg-orange-600 px-6 py-2 text-sm font-bold text-white active:bg-orange-700 disabled:opacity-50">{saving ? "保存中…" : "保存"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+    </>
   );
 }
