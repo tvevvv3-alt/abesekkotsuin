@@ -1,10 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { createClient } from "@/lib/supabase/client";
 import { minToLabel } from "@/lib/booking";
 
 const PER_COURSE = 8; // 8回で1クール
+
+// 内容に合わせて高さが自動で伸びるテキストエリア（内部スクロール無し＝書いた分を全部表示）
+function AutoTextarea({ value, onChange, disabled, placeholder, className }: {
+  value: string;
+  onChange?: (v: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useLayoutEffect(fit, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => { onChange?.(e.target.value); fit(); }}
+      disabled={disabled}
+      placeholder={placeholder}
+      rows={2}
+      className={className}
+    />
+  );
+}
 
 type Visit = { id: string; date: string; start_min: number; status: string };
 
@@ -128,8 +157,8 @@ export default function ClassChartModal({
               {/* 全体メモ */}
               <div className="mb-3">
                 <label className="mb-1 block text-xs font-bold text-slate-500">メモ（目標・申し送りなど）</label>
-                <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2}
-                  className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
+                <AutoTextarea value={memo} onChange={setMemo}
+                  className="w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none" />
               </div>
 
               {/* クール切替 */}
@@ -141,7 +170,7 @@ export default function ClassChartModal({
                 </div>
               )}
 
-              {/* 8回枠 */}
+              {/* 8回枠（直近を上に） */}
               <div className="divide-y rounded-xl border">
                 {slots.map((v, i) => {
                   const no = course * PER_COURSE + i + 1;
@@ -154,17 +183,16 @@ export default function ClassChartModal({
                         </div>
                         {v && <div className="text-[9px] text-slate-400">{minToLabel(v.start_min)}</div>}
                       </div>
-                      <textarea
+                      <AutoTextarea
                         value={v ? (notes[v.id] ?? "") : ""}
-                        onChange={(e) => { if (v) setNotes((n) => ({ ...n, [v.id]: e.target.value })); }}
+                        onChange={(val) => { if (v) setNotes((n) => ({ ...n, [v.id]: val })); }}
                         disabled={!v}
                         placeholder={v ? "この回のメモ" : "未実施"}
-                        rows={2}
-                        className="min-h-0 w-full resize-y rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-300"
+                        className="min-h-0 w-full resize-none overflow-hidden rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-300"
                       />
                     </div>
                   );
-                })}
+                }).reverse()}
               </div>
               <p className="mt-2 text-[11px] text-slate-400">日付は体幹教室の予約から自動。各回に自由にメモできます。</p>
             </>
