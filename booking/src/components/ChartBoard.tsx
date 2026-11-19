@@ -141,6 +141,17 @@ export default function ChartBoard() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [autoSelDone, setAutoSelDone] = useState(false);
+  // 個別売上の担当別一覧から来た場合の戻り先（?from=sales&staff=&date=）
+  const [backSales, setBackSales] = useState<string | null>(null);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("from") !== "sales") return;
+    const qs = new URLSearchParams();
+    const staffId = sp.get("staff"); const d = sp.get("date");
+    if (staffId) qs.set("staff", staffId);
+    if (d) qs.set("date", d);
+    setBackSales(`/admin/sales${qs.toString() ? `?${qs.toString()}` : ""}`);
+  }, []);
 
   const staffName = useCallback((id: string | null) => staff.find((s) => s.id === id)?.name ?? "", [staff]);
 
@@ -455,6 +466,11 @@ export default function ChartBoard() {
     <div className="flex h-[calc(100dvh-110px)] gap-3">
       {/* ── 左：患者一覧（スマホは一覧 or カルテのどちらかを全幅表示） ── */}
       <aside className={`${selKey ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col rounded-xl border bg-white md:w-52`}>
+        {backSales && (
+          <a href={backSales} className="flex items-center gap-1 border-b bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 active:bg-slate-100">
+            ‹ 担当別の個別売上に戻る
+          </a>
+        )}
         <div className="flex items-center justify-between gap-2 border-b p-3">
           <h2 className="text-base font-bold text-slate-800">患者一覧</h2>
           <button onClick={() => setAddOpen(true)} className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-bold text-white active:bg-teal-700">＋ 新規登録</button>
@@ -515,9 +531,16 @@ export default function ChartBoard() {
           <div className="flex h-full items-center justify-center text-sm text-slate-400">左の一覧から患者を選んでください</div>
         ) : (
           <div className="p-4">
-            <button onClick={() => setSelKey(null)} className="mb-2 flex items-center gap-1 text-sm font-bold text-teal-700 active:opacity-70 md:hidden">
-              ‹ 患者一覧へ
-            </button>
+            <div className="mb-2 flex items-center gap-3">
+              <button onClick={() => setSelKey(null)} className="flex items-center gap-1 text-sm font-bold text-teal-700 active:opacity-70 md:hidden">
+                ‹ 患者一覧へ
+              </button>
+              {backSales && (
+                <a href={backSales} className="flex items-center gap-1 text-sm font-bold text-slate-600 active:opacity-70">
+                  ‹ 担当別の個別売上に戻る
+                </a>
+              )}
+            </div>
             {/* 患者ヘッダー */}
             <div className="mb-3 flex flex-wrap items-center gap-2 border-b pb-3">
               <h1 className="text-xl font-bold text-slate-800">{selected.name}</h1>

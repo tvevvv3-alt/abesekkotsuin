@@ -98,6 +98,14 @@ export default function SalesBoard() {
   const supabase = useMemo(() => createClient(), []);
   const [view, setView] = useState<"day" | "month" | "year">("day");
   const [date, setDate] = useState(() => toDateStr(new Date()));
+  // カルテから「担当別の個別売上に戻る」で来たら、担当の絞り込みと日付を復元
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const staffId = sp.get("staff");
+    const d = sp.get("date");
+    if (d) setDate(d);
+    if (staffId) { setView("day"); setFocusStaff(staffId); }
+  }, []);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [kawa, setKawa] = useState<{ id: string; name: string; color: string } | null>(null);
   const [taikan, setTaikan] = useState<{ id: string; name: string; color: string } | null>(null);
@@ -1633,6 +1641,7 @@ export default function SalesBoard() {
                     (() => {
                       const a = it.a;
                       const s = apptVal(a);
+                      const sid = itemStaffId(it) ?? focusStaff; // カルテから戻る担当
                       return (
                         <tr key={a.id} ref={(el) => { rowRefs.current[a.id] = el; }} {...dragHandlers(a.id)}
                           className={rowClass(a.id, "cursor-grab select-none active:cursor-grabbing")} style={rowStyle(a.id)}>
@@ -1655,7 +1664,7 @@ export default function SalesBoard() {
                                 </button>
                               ) : (
                                 <Link
-                                  href={a.patient_id ? `/admin/chart?p=${a.patient_id}` : `/admin/chart?n=${encodeURIComponent(a.patient_name || "")}`}
+                                  href={(a.patient_id ? `/admin/chart?p=${a.patient_id}` : `/admin/chart?n=${encodeURIComponent(a.patient_name || "")}`) + `&from=sales&date=${date}` + (sid ? `&staff=${sid}` : "")}
                                   className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600"
                                   title="自費カルテを開く"
                                 >
