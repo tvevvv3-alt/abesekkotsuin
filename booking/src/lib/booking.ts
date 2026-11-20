@@ -149,6 +149,30 @@ export interface AvailabilityResult {
 }
 
 /**
+ * [startMin, endMin] が勤務/開放枠の「連続した」範囲で覆われているか。
+ * 30分刻みで個別に開けた開放枠（隣接）をまたぐ長さのメニューも予約可にする。
+ * 間に空き（勤務していない時間）がある場合は覆われていないと判定＝従来どおり不可。
+ */
+export function coversSpan(
+  windows: { start_min: number; end_min: number }[],
+  startMin: number,
+  endMin: number
+): boolean {
+  if (startMin >= endMin) return true;
+  const segs = windows
+    .filter((w) => w.end_min > w.start_min)
+    .map((w) => [w.start_min, w.end_min] as [number, number])
+    .sort((a, b) => a[0] - b[0]);
+  let cur = startMin;
+  for (const [s, e] of segs) {
+    if (s > cur) break; // cur の前に空き（ギャップ）がある → 覆えていない
+    if (e > cur) cur = e; // 連続（隣接・重なり）している枠で伸ばす
+    if (cur >= endMin) return true;
+  }
+  return cur >= endMin;
+}
+
+/**
  * ★ 予約可否判定（1つの候補時刻に対して）
  *   条件: ①担当者の空き ②機器の空き ③勤務時間内 ④非休診 ⑤重複なし
  *   excludeAppointmentId: 予約変更時に自分自身を除外
@@ -174,10 +198,10 @@ export function checkAvailability(
   // ③ 勤務時間内（予約全体が1つの勤務枠に収まること）
   //    時間外予約は勤務時間に縛られない固定の夜枠なので、このチェックはしない。
   if (!afterHours) {
-    const inShift = ctx.schedules.some(
-      (s) => s.start_min <= startMin && s.end_min >= endMin
-    );
-    if (!inShift) return { ok: false, reason: "勤務時間外" };
+    // 勤務/開放枠の連続範囲で予約全体が覆われていればOK（30分刻みで開けた隣接枠もまたげる）
+    if (!coversSpan(ctx.schedules, startMin, endMin)) {
+      return { ok: false, reason: "勤務時間外" };
+    }
   }
 
   // ④ 院全体休診（終日/時間帯）は予約全体をブロック。
