@@ -1398,8 +1398,8 @@ export default function BookingWizard() {
                       ).map(([label, ippan, gakusei]) => (
                         <div key={label} className="rounded-lg border px-2 py-1.5 text-center" style={{ borderColor: GOLD, background: "#fffdf5" }}>
                           <div className="text-[10px] font-bold" style={{ color: GOLD }}>{label}（時間外）</div>
-                          <div className="text-sm font-bold text-slate-800">一般 ¥{(ippan + AH_EXTRA_IPPAN).toLocaleString()}</div>
-                          <div className="text-[11px] font-bold text-slate-600">学生 ¥{(gakusei + AH_EXTRA_GAKUSEI).toLocaleString()}</div>
+                          <div className="text-sm font-bold text-slate-800">学生 ¥{(gakusei + AH_EXTRA_GAKUSEI).toLocaleString()}</div>
+                          <div className="text-[11px] font-bold text-slate-600">一般 ¥{(ippan + AH_EXTRA_IPPAN).toLocaleString()}</div>
                         </div>
                       ))}
                     </div>
