@@ -1371,9 +1371,14 @@ export default function BookingWizard() {
                   <div className="mb-1 px-1 text-xs font-bold text-slate-600">
                     時間外予約（20:30以降）
                   </div>
-                  <div className="mb-2 px-1 text-[11px] text-slate-500">
+                  <div className="mb-1 px-1 text-[11px] text-slate-500">
                     「{service.patient_name || service.name}」を20:30以降の枠で予約できます。
                   </div>
+                  {(service.price_note?.trim() || menuPriceLabel(service.id)) && (
+                    <div className="mb-2 px-1 text-xs font-bold" style={{ color: GOLD }}>
+                      料金：{service.price_note?.trim() || menuPriceLabel(service.id)}
+                    </div>
+                  )}
                   {/* メニューは切り替えず、最初に選んだ通常メニューのまま時間外の枠を表示・予約する */}
                   <WeekCalendar
                     serviceId={service.id}
