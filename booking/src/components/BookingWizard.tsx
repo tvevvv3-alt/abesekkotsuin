@@ -1374,11 +1374,27 @@ export default function BookingWizard() {
                   <div className="mb-1 px-1 text-[11px] text-slate-500">
                     「{service.patient_name || service.name}」を20:30以降の枠で予約できます。
                   </div>
-                  {(service.price_note?.trim() || menuPriceLabel(service.id)) && (
+                  {/* 時間外の料金（学生／一般・初診/再診）＝選択メニューの料金 */}
+                  {!isClass && !isPersonal && selectedStaff && staffMenuPrice ? (
+                    <div className="mb-2 grid grid-cols-1 gap-1.5 px-1 sm:grid-cols-2">
+                      {(initialOnly
+                        ? ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei]] as const)
+                        : ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const)
+                      ).map(([label, ippan, gakusei]) => (
+                        <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5 text-center">
+                          <div className="text-[10px] text-slate-400">{label}</div>
+                          <div className="text-sm font-bold text-slate-800">一般 ¥{ippan.toLocaleString()}</div>
+                          {staffMenuPrice.studentDiffers && (
+                            <div className="text-[11px] font-bold" style={{ color: GOLD }}>学生 ¥{gakusei.toLocaleString()}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (service.price_note?.trim() || menuPriceLabel(service.id)) ? (
                     <div className="mb-2 px-1 text-xs font-bold" style={{ color: GOLD }}>
                       料金：{service.price_note?.trim() || menuPriceLabel(service.id)}
                     </div>
-                  )}
+                  ) : null}
                   {/* メニューは切り替えず、最初に選んだ通常メニューのまま時間外の枠を表示・予約する */}
                   <WeekCalendar
                     serviceId={service.id}
