@@ -926,10 +926,12 @@ export default function SalesBoard() {
   // 並び順（sort_orderで手動入れ替え可。既定は予約=時刻順、物販=末尾）
   const dayItems = useMemo(() => {
     const items = [
-      ...dayRows.map((a, i) => ({ kind: "appt" as const, a, ord: saleByAppt[a.id]?.sort_order ?? a.start_min * 1000 + i })),
-      ...dayManual.map((m, i) => ({ kind: "manual" as const, m, ord: m.sort_order ?? 9_000_000 + i })),
+      // 予約は開始時刻 t を主キー、物販は末尾（t 大）。同時刻内のみ従来の並び順(ord)。
+      ...dayRows.map((a, i) => ({ kind: "appt" as const, a, t: a.start_min, ord: saleByAppt[a.id]?.sort_order ?? a.start_min * 1000 + i })),
+      ...dayManual.map((m, i) => ({ kind: "manual" as const, m, t: 24 * 60 + 1, ord: m.sort_order ?? 9_000_000 + i })),
     ];
-    items.sort((x, y) => x.ord - y.ord);
+    // 上から予約時間順。同じ時刻のときだけ ord（ドラッグ並び替え）で整える。
+    items.sort((x, y) => (x.t - y.t) || (x.ord - y.ord));
     return items;
   }, [dayRows, dayManual, saleByAppt]);
 
