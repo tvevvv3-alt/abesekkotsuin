@@ -377,13 +377,15 @@ export default function BookingWizard() {
         : s.category !== "川西整体院"
     );
   }, [publicServices, clinic]);
+  // 通常メニュー（時間外予約は除外＝最初のメニュー一覧には出さず、🌙時間外フローでのみ選ばせる）
+  const mainServices = useMemo(() => clinicServices.filter((s) => !s.after_hours), [clinicServices]);
   const categories = useMemo(() => {
     const set: string[] = [];
-    clinicServices.forEach((s) => {
+    mainServices.forEach((s) => {
       if (!set.includes(s.category)) set.push(s.category);
     });
     return set;
-  }, [clinicServices]);
+  }, [mainServices]);
   // 川西整体院メニューが開放されている日＝担当（阿部）が川西へ行くため茨木は休診。
   // 茨木側カレンダーの列見出しに「川西院」と出して、休診理由が分かるようにする。
   const kawanishiOpenDates = useMemo(() => {
@@ -402,14 +404,14 @@ export default function BookingWizard() {
   const shownServices = useMemo(() => {
     const base =
       category === "all"
-        ? clinicServices
-        : clinicServices.filter((s) => s.category === category);
+        ? mainServices
+        : mainServices.filter((s) => s.category === category);
     // 主役（イチオシ・受付中）を先頭へ。それ以外は元の並び（sort_order）を維持。
     return [...base].sort(
       (a, b) =>
         (a.recommended && a.new_booking ? 0 : 1) - (b.recommended && b.new_booking ? 0 : 1)
     );
-  }, [clinicServices, category]);
+  }, [mainServices, category]);
   // 時間外予約メニュー（この院で受付中の after_hours サービス。複数可＝患者が選ぶ）
   const afterHoursServices = useMemo(
     () =>
