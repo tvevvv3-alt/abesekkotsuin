@@ -1400,9 +1400,11 @@ export default function BookingWizard() {
                         : ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const)
                       ).map(([label, ippan, gakusei]) => (
                         <div key={label} className="rounded-lg border px-2 py-1.5 text-center" style={{ borderColor: GOLD, background: "#fffdf5" }}>
-                          <div className="text-[10px] font-bold" style={{ color: GOLD }}>{label}（時間外）</div>
-                          <div className="text-sm font-bold text-slate-800">学生 ¥{(gakusei + jikangai.gakusei).toLocaleString()}</div>
-                          <div className="text-[11px] font-bold text-slate-600">一般 ¥{(ippan + jikangai.ippan).toLocaleString()}</div>
+                          <div className="mb-0.5 text-[10px] font-bold" style={{ color: GOLD }}>{label}（時間外）</div>
+                          <div className="flex items-baseline justify-center gap-3">
+                            <div className="text-sm font-bold text-slate-800">学生 ¥{(gakusei + jikangai.gakusei).toLocaleString()}</div>
+                            <div className="text-sm font-bold text-slate-600">一般 ¥{(ippan + jikangai.ippan).toLocaleString()}</div>
+                          </div>
                         </div>
                       ))}
                     </div>
