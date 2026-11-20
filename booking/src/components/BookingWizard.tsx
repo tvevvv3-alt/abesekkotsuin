@@ -94,6 +94,9 @@ const CLINICS: { id: Exclude<ClinicId, "">; name: string; sub: string; icon: str
 // ブランドカラー
 const NAVY = "#0f1f40";
 const GOLD = "#c9a24b";
+// 時間外（20:30以降）の割増料金（通常料金に加算）
+const AH_EXTRA_IPPAN = 2750; // 一般
+const AH_EXTRA_GAKUSEI = 550; // 学生
 
 // TRA 円形ロゴバッジ（公式ロゴ準拠のSVG再現）
 // スタッフのアバター（顔写真 or 頭文字）
@@ -1374,26 +1377,25 @@ export default function BookingWizard() {
                   <div className="mb-1 px-1 text-[11px] text-slate-500">
                     「{service.patient_name || service.name}」を20:30以降の枠で予約できます。
                   </div>
-                  {/* 時間外の料金（学生／一般・初診/再診）＝選択メニューの料金 */}
+                  {/* 時間外の料金＝通常料金＋割増（一般＋2,750円／学生＋550円）。学生/一般・初診/再診で表示 */}
                   {!isClass && !isPersonal && selectedStaff && staffMenuPrice ? (
-                    <div className="mb-2 grid grid-cols-1 gap-1.5 px-1 sm:grid-cols-2">
-                      {(initialOnly
-                        ? ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei]] as const)
-                        : ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const)
-                      ).map(([label, ippan, gakusei]) => (
-                        <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5 text-center">
-                          <div className="text-[10px] text-slate-400">{label}</div>
-                          <div className="text-sm font-bold text-slate-800">一般 ¥{ippan.toLocaleString()}</div>
-                          {staffMenuPrice.studentDiffers && (
-                            <div className="text-[11px] font-bold" style={{ color: GOLD }}>学生 ¥{gakusei.toLocaleString()}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (service.price_note?.trim() || menuPriceLabel(service.id)) ? (
-                    <div className="mb-2 px-1 text-xs font-bold" style={{ color: GOLD }}>
-                      料金：{service.price_note?.trim() || menuPriceLabel(service.id)}
-                    </div>
+                    <>
+                      <div className="mb-2 grid grid-cols-1 gap-1.5 px-1 sm:grid-cols-2">
+                        {(initialOnly
+                          ? ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei]] as const)
+                          : ([["初診", staffMenuPrice.initialIppan, staffMenuPrice.initialGakusei], ["再診", staffMenuPrice.repeatIppan, staffMenuPrice.repeatGakusei]] as const)
+                        ).map(([label, ippan, gakusei]) => (
+                          <div key={label} className="rounded-lg border px-2 py-1.5 text-center" style={{ borderColor: GOLD, background: "#fffdf5" }}>
+                            <div className="text-[10px] font-bold" style={{ color: GOLD }}>{label}（時間外）</div>
+                            <div className="text-sm font-bold text-slate-800">一般 ¥{(ippan + AH_EXTRA_IPPAN).toLocaleString()}</div>
+                            <div className="text-[11px] font-bold text-slate-600">学生 ¥{(gakusei + AH_EXTRA_GAKUSEI).toLocaleString()}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mb-2 px-1 text-[10px]" style={{ color: GOLD }}>
+                        ※時間外料金は通常料金＋割増（一般＋¥{AH_EXTRA_IPPAN.toLocaleString()}／学生＋¥{AH_EXTRA_GAKUSEI.toLocaleString()}）です。
+                      </p>
+                    </>
                   ) : null}
                   {/* メニューは切り替えず、最初に選んだ通常メニューのまま時間外の枠を表示・予約する */}
                   <WeekCalendar
