@@ -32,7 +32,7 @@ export default function AdminSchedule() {
 
   return (
     <div>
-      <div className="mb-2 flex items-center gap-1">
+      <div className="mb-2 flex flex-wrap items-center gap-x-1 gap-y-1">
         <div className="inline-flex shrink-0 rounded-md border border-slate-300 bg-white p-0.5">
           <button
             onClick={() => choose("board")}
