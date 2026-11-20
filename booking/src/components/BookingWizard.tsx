@@ -16,7 +16,7 @@ import {
   loadSettings,
   loadStaffServices,
 } from "@/lib/data";
-import { DEFAULT_OPTIONS, defaultPrices, menuPrices, type SelfPrices, type SelfOptions } from "@/lib/pricing";
+import { DEFAULT_OPTIONS, defaultPrices, menuPrices, menuHasTsuden, type SelfPrices, type SelfOptions } from "@/lib/pricing";
 import MyStatusBanner from "@/components/MyStatusBanner";
 import { TraBadge, TraLoading } from "@/components/TraLogo";
 import type {
@@ -94,9 +94,6 @@ const CLINICS: { id: Exclude<ClinicId, "">; name: string; sub: string; icon: str
 // ブランドカラー
 const NAVY = "#0f1f40";
 const GOLD = "#c9a24b";
-// 時間外（20:30以降）の割増料金（通常料金に加算）
-const AH_EXTRA_IPPAN = 2750; // 一般
-const AH_EXTRA_GAKUSEI = 550; // 学生
 
 // TRA 円形ロゴバッジ（公式ロゴ準拠のSVG再現）
 // スタッフのアバター（顔写真 or 頭文字）
@@ -485,31 +482,37 @@ export default function BookingWizard() {
   const selectedStaff = allStaff.find((s) => s.id === staffId) || null;
 
   // 担当×メニューの自費料金（担当プロフィール下に表示）。料金設定(self_prices)から算出。
+  // 時間外割増（設定値。既定：一般2,750／学生550）
+  const jikangai = useMemo(() => {
+    const opt: SelfOptions = { ...DEFAULT_OPTIONS, ...((settings as unknown as { self_options?: Partial<SelfOptions> })?.self_options || {}) };
+    return { ippan: opt.jikangai_ippan, gakusei: opt.jikangai_gakusei };
+  }, [settings]);
+
   const staffMenuPrice = useMemo(() => {
     if (!service || isClass || !selectedStaff) return null;
+    const opt: SelfOptions = { ...DEFAULT_OPTIONS, ...((settings as unknown as { self_options?: Partial<SelfOptions> })?.self_options || {}) };
     // 川西整体院は独立料金（30/60・通電・学生の計算はしない）。
-    // メニュー料金(service_prices)を優先し、未設定なら既定 12000/10000。
     if (service.category === "川西整体院") {
       const ini = selectedPrice?.initial_price ?? 12000;
       const rep = selectedPrice?.repeat_price ?? 10000;
-      return {
-        initialIppan: ini,
-        initialGakusei: ini,
-        repeatIppan: rep,
-        repeatGakusei: rep,
-        studentDiffers: false,
-      };
+      return { initialIppan: ini, initialGakusei: ini, repeatIppan: rep, repeatGakusei: rep, studentDiffers: false };
     }
-    // メニュー料金(service_prices)がスタッフ別に設定されていればそれを最優先。
-    // （初診専用50分など、30/60・通電の自動計算に当てはまらないメニュー向け）
+    // メニュー料金(service_prices)がスタッフ別に設定されていればそれを優先（＝一般料金）。
+    // ただし通電メニューは、設定額(一般)から通電の学生割引分を引いて学生料金を算出する。
     if (selectedPrice && (selectedPrice.initial_price != null || selectedPrice.repeat_price != null)) {
       const ini = selectedPrice.initial_price ?? selectedPrice.repeat_price ?? 0;
       const rep = selectedPrice.repeat_price ?? selectedPrice.initial_price ?? 0;
-      return { initialIppan: ini, initialGakusei: ini, repeatIppan: rep, repeatGakusei: rep, studentDiffers: false };
+      const tsudenDiff = menuHasTsuden(service.name) ? Math.max(0, opt.tsuden_ippan - opt.tsuden_gakusei) : 0;
+      return {
+        initialIppan: ini,
+        initialGakusei: ini - tsudenDiff,
+        repeatIppan: rep,
+        repeatGakusei: rep - tsudenDiff,
+        studentDiffers: tsudenDiff > 0,
+      };
     }
     const sp = (selectedStaff as unknown as { self_prices?: Partial<SelfPrices> }).self_prices;
     const p: SelfPrices = { ...defaultPrices(selectedStaff.name), ...(sp || {}) };
-    const opt: SelfOptions = { ...DEFAULT_OPTIONS, ...((settings as unknown as { self_options?: Partial<SelfOptions> })?.self_options || {}) };
     return menuPrices(service.name, p, opt);
   }, [service, isClass, selectedStaff, settings, selectedPrice]);
 
@@ -1076,7 +1079,7 @@ export default function BookingWizard() {
           {/* 時間外予約の案内 */}
           {afterHoursService && (
             <div className="mb-4 rounded-xl border px-3 py-2 text-[11px] font-bold leading-relaxed" style={{ borderColor: GOLD, background: "#fffdf5", color: GOLD }}>
-              🌙 20:30以降は時間外予約も可能です（時間外料金：通常料金＋一般¥{AH_EXTRA_IPPAN.toLocaleString()}・学生¥{AH_EXTRA_GAKUSEI.toLocaleString()}）。<br />
+              🌙 20:30以降は時間外予約も可能です（時間外料金：通常料金＋一般¥{jikangai.ippan.toLocaleString()}・学生¥{jikangai.gakusei.toLocaleString()}）。<br />
               メニューを選び、日時選択のカレンダー下にある「時間外予約」からお進みください。
             </div>
           )}
@@ -1387,7 +1390,7 @@ export default function BookingWizard() {
                   {/* 時間外料金の案内 */}
                   <div className="mb-2 rounded-lg border px-2.5 py-2 text-[12px] font-bold leading-relaxed" style={{ borderColor: GOLD, background: "#fffdf5", color: GOLD }}>
                     🌙 20:30以降は「時間外料金」になります。<br />
-                    通常料金に ＋一般 ¥{AH_EXTRA_IPPAN.toLocaleString()}／学生 ¥{AH_EXTRA_GAKUSEI.toLocaleString()} が加算されます。
+                    通常料金に ＋一般 ¥{jikangai.ippan.toLocaleString()}／学生 ¥{jikangai.gakusei.toLocaleString()} が加算されます。
                   </div>
                   {/* 時間外の料金＝通常料金＋割増（一般＋2,750円／学生＋550円）。学生/一般・初診/再診で表示 */}
                   {!isClass && !isPersonal && selectedStaff && staffMenuPrice ? (
@@ -1398,8 +1401,8 @@ export default function BookingWizard() {
                       ).map(([label, ippan, gakusei]) => (
                         <div key={label} className="rounded-lg border px-2 py-1.5 text-center" style={{ borderColor: GOLD, background: "#fffdf5" }}>
                           <div className="text-[10px] font-bold" style={{ color: GOLD }}>{label}（時間外）</div>
-                          <div className="text-sm font-bold text-slate-800">学生 ¥{(gakusei + AH_EXTRA_GAKUSEI).toLocaleString()}</div>
-                          <div className="text-[11px] font-bold text-slate-600">一般 ¥{(ippan + AH_EXTRA_IPPAN).toLocaleString()}</div>
+                          <div className="text-sm font-bold text-slate-800">学生 ¥{(gakusei + jikangai.gakusei).toLocaleString()}</div>
+                          <div className="text-[11px] font-bold text-slate-600">一般 ¥{(ippan + jikangai.ippan).toLocaleString()}</div>
                         </div>
                       ))}
                     </div>
