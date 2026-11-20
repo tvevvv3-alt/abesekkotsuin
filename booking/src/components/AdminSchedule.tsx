@@ -72,7 +72,7 @@ export default function AdminSchedule() {
 
         <Link
           href="/admin/sales"
-          className="ml-auto flex shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white active:bg-emerald-700"
+          className="ml-auto flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-bold text-white active:bg-emerald-700"
         >
           💰 個別売上
         </Link>
