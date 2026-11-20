@@ -138,11 +138,11 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={className} />
-      {/* 操作ボタン（テキスト枠から離して誤反応を防ぐ） */}
+      {/* 操作ボタン（テキスト枠から離す＋押してもフォーカスを外さずScribble誤反応を防ぐ） */}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => insert(" ")} className={btn}>␣ スペース</button>
-        <button type="button" onClick={() => insert("\n")} className={btn}>↵ 改行</button>
-        <button type="button" onClick={backspace} disabled={!value.length} className={btn}>⌫ 1字消す</button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(" ")} className={btn}>␣ スペース</button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert("\n")} className={btn}>↵ 改行</button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={backspace} disabled={!value.length} className={btn}>⌫ 1字消す</button>
       </div>
     </div>
   );

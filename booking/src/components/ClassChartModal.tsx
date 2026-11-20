@@ -60,11 +60,11 @@ function AutoTextarea({ value, onChange, disabled, placeholder, className, withB
   return (
     <div>
       {area}
-      {/* 操作ボタン（テキスト枠から離して誤反応を防ぐ） */}
+      {/* 操作ボタン（テキスト枠から離す＋押してもフォーカスを外さずScribble誤反応を防ぐ） */}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => insert(" ")} disabled={disabled} className={btn}>␣ スペース</button>
-        <button type="button" onClick={() => insert("\n")} disabled={disabled} className={btn}>↵ 改行</button>
-        <button type="button" onClick={backspace} disabled={disabled || !value.length} className={btn}>⌫ 1字消す</button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(" ")} disabled={disabled} className={btn}>␣ スペース</button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert("\n")} disabled={disabled} className={btn}>↵ 改行</button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={backspace} disabled={disabled || !value.length} className={btn}>⌫ 1字消す</button>
       </div>
     </div>
   );
