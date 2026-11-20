@@ -128,8 +128,14 @@ export default function WeekCalendar({
   const rows = useMemo(() => {
     // 時間外予約は勤務時間ではなく、固定の夜枠だけを行にする
     if (afterHours) return [...(afterHoursStarts ?? [])].sort((a, b) => a - b);
-    return timeRows(schedules, slotUnit);
-  }, [afterHours, afterHoursStarts, schedules, slotUnit]);
+    // 臨時開放枠(openings)が通常シフトの範囲外（例：9:00に開けた）でも行を出せるよう範囲に含める
+    const opens = openings.filter((o) => (isClass ? o.service_id === serviceId : o.staff_id === staffId));
+    const combined = [
+      ...schedules.map((s) => ({ start_min: s.start_min, end_min: s.end_min })),
+      ...opens.map((o) => ({ start_min: o.start_min, end_min: o.end_min })),
+    ];
+    return timeRows(combined, slotUnit);
+  }, [afterHours, afterHoursStarts, schedules, openings, slotUnit, isClass, serviceId, staffId]);
 
   const grid = useMemo(() => {
     const now = new Date();

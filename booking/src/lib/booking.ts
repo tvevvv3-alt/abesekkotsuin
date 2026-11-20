@@ -342,7 +342,7 @@ export function candidateStarts(
  * 週表示のための「時間行」を、勤務枠の最小開始〜最大終了から生成（30分刻み）。
  */
 export function timeRows(
-  allSchedules: StaffSchedule[],
+  allSchedules: { start_min: number; end_min: number }[],
   stepMin = 30
 ): number[] {
   if (allSchedules.length === 0) return [];
