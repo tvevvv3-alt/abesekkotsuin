@@ -251,6 +251,7 @@ export default function BookingWizard() {
   // 選択
   const [serviceId, setServiceId] = useState<string>("");
   const [fromServiceId, setFromServiceId] = useState<string | null>(null); // 時間外導線の戻り先
+  const [ahBooking, setAhBooking] = useState(false); // 時間外枠から選んだ予約（通常メニューのまま20:30以降で確定）
   const [showAfterHours, setShowAfterHours] = useState(false); // 時間外枠のインライン表示
   const [staffId, setStaffId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
@@ -741,23 +742,19 @@ export default function BookingWizard() {
   }
 
   function onSelectSlot(date: string, startMin: number) {
+    setAhBooking(false);
     setSelected({ date, startMin });
   }
 
-  // 確認モーダルを閉じる。時間外をインラインから選んでいた場合は元のメニューへ戻す。
+  // 確認モーダルを閉じる
   function closeConfirm() {
     setSelected(null);
-    if (fromServiceId) {
-      setServiceId(fromServiceId);
-      setFromServiceId(null);
-    }
+    setAhBooking(false);
   }
 
-  // インラインの時間外枠を選択（元メニューを記録して時間外へ切替＋確認モーダル）
+  // 時間外枠を選択：メニューは切り替えず、最初に選んだ通常メニューのまま20:30以降で予約する。
   function selectAfterHours(date: string, startMin: number) {
-    if (!afterHoursService) return;
-    setFromServiceId(service?.id ?? null);
-    setServiceId(afterHoursService.id);
+    setAhBooking(true);
     setSelected({ date, startMin });
   }
 
@@ -770,7 +767,8 @@ export default function BookingWizard() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const { data, error } = await supabase.rpc("book_appointment", {
+      // 通常予約は p_after_hours を送らない（旧DB関数とも互換）。時間外枠のときだけ付与。
+      const params: Record<string, unknown> = {
         p_service_id: service.id,
         // クラスは担当者に紐づかない
         p_staff_id: isClass ? null : selectedStaff!.id,
@@ -784,7 +782,10 @@ export default function BookingWizard() {
         p_source: "patient",
         // 冪等キー（同じキーの再送信は既存予約を返す＝重複しない）
         p_idempotency_key: idemKey,
-      });
+      };
+      // 時間外枠（20:30以降）＝勤務時間チェックのみ免除（休診・重複は従来どおり）
+      if (ahBooking) params.p_after_hours = true;
+      const { data, error } = await supabase.rpc("book_appointment", params);
       if (error) throw new Error(error.message);
       const res = data as { ok: boolean; reason?: string; appointment_id?: string; duplicate?: boolean };
       if (!res.ok) {
@@ -1370,36 +1371,14 @@ export default function BookingWizard() {
                   <div className="mb-1 px-1 text-xs font-bold text-slate-600">
                     時間外予約（20:30以降）
                   </div>
-                  {/* 時間外メニューが複数あれば患者が選ぶ（例：施術30分／施術30分＋全身通電20分） */}
-                  {afterHoursServices.length > 1 && (
-                    <div className="mb-2 flex flex-wrap gap-1.5 px-1">
-                      {afterHoursServices.map((s) => {
-                        const on = s.id === afterHoursService.id;
-                        return (
-                          <button
-                            key={s.id}
-                            onClick={() => setAhServiceId(s.id)}
-                            className={`rounded-full border px-3 py-1 text-xs font-bold ${
-                              on
-                                ? "border-blue-600 bg-blue-600 text-white"
-                                : "border-slate-300 bg-white text-slate-600 active:bg-slate-50"
-                            }`}
-                          >
-                            {s.patient_name || s.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {afterHoursService.price_note && (
-                    <div className="mb-2 px-1 text-[11px] font-bold" style={{ color: GOLD }}>
-                      {afterHoursService.price_note}
-                    </div>
-                  )}
+                  <div className="mb-2 px-1 text-[11px] text-slate-500">
+                    「{service.patient_name || service.name}」を20:30以降の枠で予約できます。
+                  </div>
+                  {/* メニューは切り替えず、最初に選んだ通常メニューのまま時間外の枠を表示・予約する */}
                   <WeekCalendar
-                    serviceId={afterHoursService.id}
-                    serviceSteps={afterHoursService.steps}
-                    capacity={afterHoursService.capacity}
+                    serviceId={service.id}
+                    serviceSteps={service.steps}
+                    capacity={service.capacity}
                     classStarts={ahStarts}
                     afterHours={true}
                     afterHoursStarts={ahStarts}
