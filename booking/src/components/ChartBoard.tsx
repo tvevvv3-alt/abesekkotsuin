@@ -108,8 +108,9 @@ function normIntake(row: Record<string, unknown> | null): Intake {
 }
 function safeParse(s: unknown): unknown { try { return typeof s === "string" ? JSON.parse(s) : s; } catch { return null; } }
 
-// ペン（手書き変換）での誤字をカーソル位置から1文字ずつ消せるテキスト欄。
-// 「⌫ 1字消す」はカーソル直前の1文字（選択中なら選択範囲）を削除する。
+// ペン（手書き変換）向けのテキスト欄。カーソル位置に スペース/改行 を挿入、
+// カーソル直前の1文字（選択中なら選択範囲）を削除できる。
+// 操作ボタンはテキスト枠から離して下に置く（ペンのScribble誤反応を防ぐ）。
 function PenTextarea({ value, onChange, placeholder, className }: {
   value: string;
   onChange: (v: string) => void;
@@ -117,28 +118,32 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const backspace = () => {
+  const applyAt = (make: (start: number, end: number) => { next: string; caret: number } | null) => {
     const el = ref.current;
     const hasSel = el && el.selectionStart != null;
     const start = hasSel ? el!.selectionStart : value.length;
     const end = hasSel ? el!.selectionEnd : value.length;
-    let next = value;
-    let caret = start;
-    if (start !== end) { next = value.slice(0, start) + value.slice(end); caret = start; }
-    else if (start > 0) { next = value.slice(0, start - 1) + value.slice(start); caret = start - 1; }
-    else return;
-    onChange(next);
-    requestAnimationFrame(() => { const e2 = ref.current; if (e2) { e2.focus(); try { e2.setSelectionRange(caret, caret); } catch { /* noop */ } } });
+    const r = make(start, end);
+    if (!r) return;
+    onChange(r.next);
+    requestAnimationFrame(() => { const e2 = ref.current; if (e2) { e2.focus(); try { e2.setSelectionRange(r.caret, r.caret); } catch { /* noop */ } } });
   };
+  const insert = (s: string) => applyAt((start, end) => ({ next: value.slice(0, start) + s + value.slice(end), caret: start + s.length }));
+  const backspace = () => applyAt((start, end) => {
+    if (start !== end) return { next: value.slice(0, start) + value.slice(end), caret: start };
+    if (start > 0) return { next: value.slice(0, start - 1) + value.slice(start), caret: start - 1 };
+    return null;
+  });
+  const btn = "rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40";
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-1 flex justify-end">
-        <button type="button" onClick={backspace} disabled={!value.length}
-          className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40">
-          ⌫ 1字消す
-        </button>
-      </div>
       <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={className} />
+      {/* 操作ボタン（テキスト枠から離して誤反応を防ぐ） */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => insert(" ")} className={btn}>␣ スペース</button>
+        <button type="button" onClick={() => insert("\n")} className={btn}>↵ 改行</button>
+        <button type="button" onClick={backspace} disabled={!value.length} className={btn}>⌫ 1字消す</button>
+      </div>
     </div>
   );
 }

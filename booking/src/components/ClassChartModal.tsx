@@ -27,20 +27,23 @@ function AutoTextarea({ value, onChange, disabled, placeholder, className, withB
     el.style.height = `${el.scrollHeight}px`;
   };
   useLayoutEffect(fit, [value]);
-  const backspace = () => {
+  const applyAt = (make: (start: number, end: number) => { next: string; caret: number } | null) => {
     if (!onChange) return;
     const el = ref.current;
     const hasSel = el && el.selectionStart != null;
     const start = hasSel ? el!.selectionStart : value.length;
     const end = hasSel ? el!.selectionEnd : value.length;
-    let next = value;
-    let caret = start;
-    if (start !== end) { next = value.slice(0, start) + value.slice(end); caret = start; }
-    else if (start > 0) { next = value.slice(0, start - 1) + value.slice(start); caret = start - 1; }
-    else return;
-    onChange(next);
-    requestAnimationFrame(() => { const e2 = ref.current; if (e2) { e2.focus(); try { e2.setSelectionRange(caret, caret); } catch { /* noop */ } } });
+    const r = make(start, end);
+    if (!r) return;
+    onChange(r.next);
+    requestAnimationFrame(() => { const e2 = ref.current; if (e2) { e2.focus(); try { e2.setSelectionRange(r.caret, r.caret); } catch { /* noop */ } } });
   };
+  const insert = (s: string) => applyAt((start, end) => ({ next: value.slice(0, start) + s + value.slice(end), caret: start + s.length }));
+  const backspace = () => applyAt((start, end) => {
+    if (start !== end) return { next: value.slice(0, start) + value.slice(end), caret: start };
+    if (start > 0) return { next: value.slice(0, start - 1) + value.slice(start), caret: start - 1 };
+    return null;
+  });
   const area = (
     <textarea
       ref={ref}
@@ -53,15 +56,16 @@ function AutoTextarea({ value, onChange, disabled, placeholder, className, withB
     />
   );
   if (!withBackspace) return area;
+  const btn = "rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40";
   return (
     <div>
-      <div className="mb-1 flex justify-end">
-        <button type="button" onClick={backspace} disabled={disabled || !value.length}
-          className="rounded-md border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40">
-          ⌫ 1字消す
-        </button>
-      </div>
       {area}
+      {/* 操作ボタン（テキスト枠から離して誤反応を防ぐ） */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => insert(" ")} disabled={disabled} className={btn}>␣ スペース</button>
+        <button type="button" onClick={() => insert("\n")} disabled={disabled} className={btn}>↵ 改行</button>
+        <button type="button" onClick={backspace} disabled={disabled || !value.length} className={btn}>⌫ 1字消す</button>
+      </div>
     </div>
   );
 }
