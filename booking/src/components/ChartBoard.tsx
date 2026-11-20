@@ -498,84 +498,70 @@ export default function ChartBoard() {
   );
 
   return (
-    <div className="flex h-[calc(100dvh-110px)] gap-3">
-      {/* ── 左：患者一覧（スマホは一覧 or カルテのどちらかを全幅表示） ── */}
-      <aside className={`${selKey ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col rounded-xl border bg-white md:w-52`}>
+    <div className="flex h-[calc(100dvh-110px)] flex-col gap-2">
+      {/* ── 上部バー：戻る＋検索（結果はドロップダウン）＋新規登録 ── */}
+      <div className="flex flex-wrap items-center gap-2">
         {backSales && (
-          <a href={backSales} className="m-2 inline-flex items-center justify-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm active:bg-blue-700">
+          <a href={backSales} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm active:bg-blue-700">
             ← 個別売上に戻る
           </a>
         )}
-        <div className="flex items-center justify-between gap-2 border-b p-3">
-          <h2 className="text-base font-bold text-slate-800">患者一覧</h2>
-          <button onClick={() => setAddOpen(true)} className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-bold text-white active:bg-teal-700">＋ 新規登録</button>
-        </div>
-        <div className="p-2">
+        <div className="relative w-full max-w-xs">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="患者名・かな・電話番号で検索"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
           />
-        </div>
-        <div className="flex gap-1 px-2 pb-2 text-xs font-bold">
-          {([["all", "すべて"], ["visiting", "来院中"], ["booked", "予約あり"], ["repeat", "再来"]] as const).map(([k, l]) => (
-            <button
-              key={k}
-              onClick={() => setFilter(k)}
-              className={`flex-1 whitespace-nowrap rounded-md px-0.5 py-1.5 text-[11px] ${filter === k ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500"}`}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {loading ? (
-            <p className="py-10 text-center text-sm text-slate-400">読み込み中…</p>
-          ) : shown.length === 0 ? (
-            <p className="py-10 text-center text-sm text-slate-400">該当なし</p>
-          ) : (
-            shown.map((p) => {
-              const b = statusBadge(p);
-              const age = ageAt(p.birth_date, today);
-              const active = p.key === selKey;
-              return (
-                <button
-                  key={p.key}
-                  onClick={() => openPerson(p)}
-                  className={`flex w-full items-center gap-2 border-b px-3 py-2.5 text-left ${active ? "bg-teal-50" : "active:bg-slate-50"}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-slate-800">{p.name}</span>
-                      {age != null && <span className="shrink-0 text-xs text-slate-400">{age}歳</span>}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-slate-400">最終来院 {p.lastVisit ? p.lastVisit.replace(/-/g, "/") : "—"}</div>
-                  </div>
-                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${b.c}`}>{b.t}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
-
-      {/* ── 右：カルテ本体 ── */}
-      <main className={`${selKey ? "block" : "hidden md:block"} min-w-0 flex-1 overflow-y-auto rounded-xl border bg-white`}>
-        {!selected ? (
-          <div className="flex h-full items-center justify-center text-sm text-slate-400">左の一覧から患者を選んでください</div>
-        ) : (
-          <div className="p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <button onClick={() => setSelKey(null)} className="flex items-center gap-1 text-sm font-bold text-teal-700 active:opacity-70 md:hidden">
-                ‹ 患者一覧へ
-              </button>
-              {backSales && (
-                <a href={backSales} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm active:bg-blue-700">
-                  ← 個別売上に戻る
-                </a>
+          {q.trim() && (
+            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-[65vh] overflow-y-auto rounded-xl border bg-white shadow-lg">
+              <div className="sticky top-0 flex gap-1 border-b bg-white p-2 text-xs font-bold">
+                {([["all", "すべて"], ["visiting", "来院中"], ["booked", "予約あり"], ["repeat", "再来"]] as const).map(([k, l]) => (
+                  <button key={k} onClick={() => setFilter(k)}
+                    className={`flex-1 whitespace-nowrap rounded-md px-0.5 py-1 text-[11px] ${filter === k ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {loading ? (
+                <p className="py-8 text-center text-sm text-slate-400">読み込み中…</p>
+              ) : shown.length === 0 ? (
+                <p className="py-8 text-center text-sm text-slate-400">該当なし</p>
+              ) : (
+                shown.map((p) => {
+                  const b = statusBadge(p);
+                  const age = ageAt(p.birth_date, today);
+                  const active = p.key === selKey;
+                  return (
+                    <button
+                      key={p.key}
+                      onClick={() => { openPerson(p); setQ(""); }}
+                      className={`flex w-full items-center gap-2 border-b px-3 py-2.5 text-left ${active ? "bg-teal-50" : "active:bg-slate-50"}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-sm font-bold text-slate-800">{p.name}</span>
+                          {age != null && <span className="shrink-0 text-xs text-slate-400">{age}歳</span>}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-slate-400">最終来院 {p.lastVisit ? p.lastVisit.replace(/-/g, "/") : "—"}</div>
+                      </div>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${b.c}`}>{b.t}</span>
+                    </button>
+                  );
+                })
               )}
             </div>
+          )}
+        </div>
+        <button onClick={() => setAddOpen(true)} className="rounded-lg bg-teal-600 px-2.5 py-2 text-xs font-bold text-white active:bg-teal-700">＋ 新規登録</button>
+      </div>
+
+      {/* ── カルテ本体（全幅） ── */}
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl border bg-white">
+        {!selected ? (
+          <div className="flex h-full items-center justify-center text-sm text-slate-400">上の検索から患者を選んでください</div>
+        ) : (
+          <div className="p-4">
             {/* 患者ヘッダー */}
             <div className="mb-3 flex flex-wrap items-center gap-2 border-b pb-3">
               <h1 className="text-xl font-bold text-slate-800">{selected.name}</h1>
