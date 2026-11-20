@@ -1073,6 +1073,13 @@ export default function BookingWizard() {
             setCategory("all");
           }}
         >
+          {/* 時間外予約の案内 */}
+          {afterHoursService && (
+            <div className="mb-4 rounded-xl border px-3 py-2 text-[11px] font-bold leading-relaxed" style={{ borderColor: GOLD, background: "#fffdf5", color: GOLD }}>
+              🌙 20:30以降は時間外予約も可能です（時間外料金：通常料金＋一般¥{AH_EXTRA_IPPAN.toLocaleString()}・学生¥{AH_EXTRA_GAKUSEI.toLocaleString()}）。<br />
+              メニューを選び、日時選択のカレンダー下にある「時間外予約」からお進みください。
+            </div>
+          )}
           {/* カテゴリー絞り込み */}
           {categories.length > 1 && (
             <div className="scroll-x mb-4 flex gap-1.5 overflow-x-auto pb-1">
