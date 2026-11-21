@@ -18,7 +18,7 @@ import {
 } from "@/lib/data";
 import { DEFAULT_OPTIONS, defaultPrices, menuPrices, menuHasTsuden, type SelfPrices, type SelfOptions } from "@/lib/pricing";
 import MyStatusBanner from "@/components/MyStatusBanner";
-import { TraLoading } from "@/components/TraLogo";
+import { TraBadge, TraLoading } from "@/components/TraLogo";
 import type {
   AppointmentStep,
   BookingWindow,
@@ -963,17 +963,22 @@ export default function BookingWizard() {
     return (
       <div className="mx-auto min-h-screen max-w-md bg-slate-50 pb-16 shadow-sm">
         <div
-          className="pb-2 pt-2 text-center"
-          style={{ background: "#000b3a" }}
+          className="px-6 pb-6 pt-7 text-center"
+          style={{ background: `linear-gradient(180deg, ${NAVY} 0%, #172c56 100%)` }}
         >
-          {/* 横長ロゴ：高さを抑えた細めの帯（バナー）。地色が同じ #000b3a なので継ぎ目なく馴染む */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/tra-banner.png"
-            alt="Total Recoverytation Abe 阿部接骨院"
-            className="mx-auto h-16 w-auto object-contain"
-          />
-          <p className="mt-0.5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
+          <div className="flex justify-center">
+            {settings?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={settings.logo_url}
+                alt="Total Recoverytation Abe"
+                className="h-28 w-28 rounded-full object-cover"
+              />
+            ) : (
+              <TraBadge size={112} />
+            )}
+          </div>
+          <p className="mt-3 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>
         <div className="px-5 py-7">
           {(settings?.notice_ibaraki?.trim() || settings?.notice_kawanishi?.trim()) && (
