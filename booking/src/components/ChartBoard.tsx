@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
 import { minToLabel, toDateStr, WEEKDAY_LABELS } from "@/lib/booking";
@@ -186,6 +187,9 @@ function PenTextarea({ value, onChange, placeholder, className }: {
 export default function ChartBoard() {
   const supabase = useMemo(() => createClient(), []);
   const today = toDateStr(new Date());
+  // URLの検索条件（?appt=&p=&n=&date=&staff=&from=）。個別売上/予約一覧から開く度に変わる＝その都度最新化の起点。
+  const searchParams = useSearchParams();
+  const navKey = searchParams.toString();
 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [appts, setAppts] = useState<ApptRow[]>([]);
@@ -226,7 +230,7 @@ export default function ChartBoard() {
   const [salesSeqIds, setSalesSeqIds] = useState<string[] | null>(null);
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
-    if (sp.get("from") !== "sales") return;
+    if (sp.get("from") !== "sales") { setBackSales(null); setSalesDate(null); setSalesStaff(null); setSalesSeqIds(null); return; }
     const qs = new URLSearchParams();
     const staffId = sp.get("staff"); const d = sp.get("date");
     if (staffId) qs.set("staff", staffId);
@@ -241,10 +245,14 @@ export default function ChartBoard() {
         const parsed = JSON.parse(raw) as { date?: string; ids?: string[] };
         if (parsed && Array.isArray(parsed.ids) && (!d || !parsed.date || parsed.date === d)) {
           setSalesSeqIds(parsed.ids);
+        } else {
+          setSalesSeqIds(null);
         }
+      } else {
+        setSalesSeqIds(null);
       }
     } catch { /* noop */ }
-  }, []);
+  }, [navKey]);
 
   const staffName = useCallback((id: string | null) => staff.find((s) => s.id === id)?.name ?? "", [staff]);
 
@@ -279,7 +287,13 @@ export default function ChartBoard() {
     setLoading(false);
   }, [supabase, fetchAllAppts]);
 
-  useEffect(() => { load(); }, [load]);
+  // マウント時＋個別売上/予約一覧から別の人を開く度（URLが変わる度）に最新取得し、自動選択をやり直す。
+  // （Next.jsのルーターキャッシュで再マウントされなくても、URL変化で確実に最新化＝古い予約名の取り違えを防ぐ）
+  useEffect(() => {
+    setAutoSelDone(false);
+    salesReloadedRef.current = false;
+    load();
+  }, [navKey, load]);
 
   // 予約一覧など別画面で名前を直したら、カルテ画面に戻った時に最新を反映（スピナーなしで静かに再取得）。
   useEffect(() => {
