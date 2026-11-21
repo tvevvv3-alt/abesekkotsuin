@@ -633,29 +633,27 @@ export default function ChartBoard() {
             {/* 患者ヘッダー */}
             <div className="mb-3 flex flex-wrap items-center gap-2 border-b pb-3">
               <h1 className="text-xl font-bold text-slate-800">{selected.name}</h1>
+              {/* 個別売上から来たとき：名前の右で、その日の個別売上順に前後の患者へ移動 */}
+              {dayNav && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => dayNav.prev && openPerson(dayNav.prev)}
+                    disabled={!dayNav.prev}
+                    title={dayNav.prev ? `← ${dayNav.prev.name}` : "最初の人です"}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-bold text-slate-600 shadow-sm active:bg-slate-50 disabled:opacity-40"
+                  >←</button>
+                  <span className="min-w-[2.5rem] text-center text-[11px] font-bold text-slate-400">{dayNav.idx + 1}/{dayNav.total}</span>
+                  <button
+                    onClick={() => dayNav.next && openPerson(dayNav.next)}
+                    disabled={!dayNav.next}
+                    title={dayNav.next ? `${dayNav.next.name} →` : "最後の人です"}
+                    className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-bold text-white shadow-sm active:bg-teal-700 disabled:opacity-40"
+                  >次の人 →</button>
+                </div>
+              )}
               {ageAt(selected.birth_date, today) != null && <span className="text-sm text-slate-500">{ageAt(selected.birth_date, today)}歳</span>}
               {(() => { const b = statusBadge(selected); return <span className={`rounded px-2 py-0.5 text-xs font-bold ${b.c}`}>{b.t}</span>; })()}
-              <div className="ml-auto flex items-center gap-2">
-                {selected.phone && <span className="text-xs text-slate-400">{selected.phone}</span>}
-                {/* 個別売上から来たとき：その日の個別売上順に前後の患者へ移動 */}
-                {dayNav && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => dayNav.prev && openPerson(dayNav.prev)}
-                      disabled={!dayNav.prev}
-                      title={dayNav.prev ? `← ${dayNav.prev.name}` : "最初の人です"}
-                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-bold text-slate-600 shadow-sm active:bg-slate-50 disabled:opacity-40"
-                    >←</button>
-                    <span className="min-w-[2.5rem] text-center text-[11px] font-bold text-slate-400">{dayNav.idx + 1}/{dayNav.total}</span>
-                    <button
-                      onClick={() => dayNav.next && openPerson(dayNav.next)}
-                      disabled={!dayNav.next}
-                      title={dayNav.next ? `${dayNav.next.name} →` : "最後の人です"}
-                      className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-bold text-white shadow-sm active:bg-teal-700 disabled:opacity-40"
-                    >次の人 →</button>
-                  </div>
-                )}
-              </div>
+              {selected.phone && <span className="ml-auto text-xs text-slate-400">{selected.phone}</span>}
             </div>
 
             {/* サマリ */}
