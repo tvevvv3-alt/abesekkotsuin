@@ -963,7 +963,7 @@ export default function BookingWizard() {
     return (
       <div className="mx-auto min-h-screen max-w-md bg-slate-50 pb-16 shadow-sm">
         <div
-          className="px-6 pb-6 pt-7 text-center"
+          className="px-6 pb-4 pt-5 text-center"
           style={{ background: `linear-gradient(180deg, ${NAVY} 0%, #172c56 100%)` }}
         >
           <div className="flex justify-center">
@@ -972,17 +972,17 @@ export default function BookingWizard() {
               <img
                 src={settings.logo_url}
                 alt="Total Recoverytation Abe"
-                className="h-28 w-28 rounded-full object-cover"
+                className="h-20 w-20 rounded-full object-cover"
               />
             ) : (
-              <TraBadge size={112} />
+              <TraBadge size={80} />
             )}
           </div>
-          <p className="mt-3 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
+          <p className="mt-1.5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>
-        <div className="px-5 py-7">
+        <div className="px-5 pb-6 pt-4">
           {(settings?.notice_ibaraki?.trim() || settings?.notice_kawanishi?.trim()) && (
-            <div className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
+            <div className="mb-3 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
               <div className="flex items-center gap-1.5 border-b border-amber-200 bg-amber-100/70 px-3 py-1.5 text-[12px] font-bold text-amber-800">
                 <span>📢</span>お知らせ
               </div>
@@ -1003,7 +1003,7 @@ export default function BookingWizard() {
             </div>
           )}
           <MyStatusBanner />
-          <h2 className="mb-4 text-center text-sm font-bold text-slate-700">
+          <h2 className="mb-3 text-center text-sm font-bold text-slate-700">
             ご予約の院をお選びください
           </h2>
           <div className="grid grid-cols-2 gap-3">
@@ -1045,7 +1045,7 @@ export default function BookingWizard() {
               </button>
             ))}
           </div>
-          <p className="mt-6 text-center text-[11px] text-slate-400">
+          <p className="mt-4 text-center text-[11px] text-slate-400">
             Total Recoverytation Abe ／ 阿部接骨院
           </p>
         </div>
