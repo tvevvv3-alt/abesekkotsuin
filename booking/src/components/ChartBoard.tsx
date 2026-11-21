@@ -498,6 +498,8 @@ export default function ChartBoard() {
       if (a) {
         const patById = new Map(pats.map((pp) => [pp.id, pp]));
         target = persons.find((x) => x.key === apptPersonKey(a, patById)) ?? null;
+        // 解決した人物の名前が、クリック元の名前(n)と食い違う＝一覧が古い → 破棄して③の読み直しへ
+        if (target && n && normName(target.name) !== normName(n)) target = null;
       }
     }
     // ② 名前が分かっていれば「名前一致」を最優先（別名の別カルテ＝沖田壽朗/沖田直美を取り違えない）
