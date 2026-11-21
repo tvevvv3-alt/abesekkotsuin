@@ -1071,7 +1071,7 @@ export default function BookingWizard() {
           </span>
           <h1 className="text-sm font-bold text-white">Total Recoverytation Abe</h1>
         </div>
-        <div className="border-b px-4 pt-2">
+        <div className="border-b px-4 pb-1 pt-1.5">
           <p className="text-center text-[11px]" style={{ color: GOLD }}>
             {clinicName} ／ WEB予約
           </p>
@@ -1177,13 +1177,13 @@ export default function BookingWizard() {
           }}
         >
           {/* メニュー名＋担当チップは、スクロールしても見えるようヘッダー直下に固定 */}
-          <div className="sticky z-10 -mx-4 border-b border-slate-100 bg-white px-4 pb-2 pt-1 shadow-sm" style={{ top: headerH }}>
+          <div className="sticky z-10 -mx-4 border-b border-slate-100 bg-white px-4 pb-1.5 pt-1 shadow-sm" style={{ top: headerH }}>
             {/* メニュー名：タップでその場にメニュー一覧を表示→選ぶと切替（戻る不要） */}
-            <div className="relative mb-2">
+            <div className="relative mb-1.5">
               <button
                 type="button"
                 onClick={() => setMenuPickerOpen((o) => !o)}
-                className="flex w-full items-center justify-between gap-2 rounded-xl border-2 px-3 py-2.5 text-left active:opacity-90"
+                className="flex w-full items-center justify-between gap-2 rounded-xl border-2 px-3 py-1.5 text-left active:opacity-90"
                 style={{ borderColor: NAVY, background: "#eef2ff" }}
               >
                 <span className="min-w-0">
@@ -1238,7 +1238,7 @@ export default function BookingWizard() {
                     <button
                       key={s.id}
                       onClick={() => pickStaff(s.id)}
-                      className="rounded-lg py-2 text-sm font-bold transition"
+                      className="rounded-lg py-1.5 text-sm font-bold transition"
                       style={
                         active
                           ? { backgroundColor: col, color: "#fff", border: `1.5px solid ${col}` }
@@ -1256,11 +1256,11 @@ export default function BookingWizard() {
             {!isClass && selectedStaff && (
             <div
               onClick={() => { if (selectedStaff.bio) setProfileOpen((o) => !o); }}
-              className={`mt-2 rounded-xl border-2 p-3 ${selectedStaff.bio ? "cursor-pointer select-none" : ""}`}
+              className={`mt-1.5 rounded-xl border-2 p-2 ${selectedStaff.bio ? "cursor-pointer select-none" : ""}`}
               style={{ borderColor: selectedStaff.color || "#334155", background: hexToRgba(selectedStaff.color || "#334155", 0.07) }}
             >
-              <div className="flex items-center gap-3">
-                <StaffAvatar staff={selectedStaff} size={46} />
+              <div className="flex items-center gap-2.5">
+                <StaffAvatar staff={selectedStaff} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="leading-snug text-slate-800">
                     <span className="font-bold">
@@ -1886,7 +1886,7 @@ function fullDate(sel: { date: string; startMin: number }): string {
 function StepBar({ step }: { step: Step }) {
   const labels = ["メニュー", "日時", "情報", "確認", "完了"];
   return (
-    <div className="mt-2 flex items-center justify-center gap-1">
+    <div className="mt-1.5 flex items-center justify-center gap-1">
       {labels.map((l, i) => {
         const n = (i + 1) as Step;
         const done = step >= n;
