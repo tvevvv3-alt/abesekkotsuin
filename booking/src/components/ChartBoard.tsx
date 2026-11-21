@@ -268,6 +268,22 @@ export default function ChartBoard() {
 
   useEffect(() => { load(); }, [load]);
 
+  // 予約一覧など別画面で名前を直したら、カルテ画面に戻った時に最新を反映（スピナーなしで静かに再取得）。
+  useEffect(() => {
+    const refresh = async () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      const [ap, { data: pd }] = await Promise.all([
+        fetchAllAppts(),
+        supabase.from("patients").select("id, name, name_kana, birth_date, phone, chart_note").order("name"),
+      ]);
+      setAppts(ap);
+      setPats((pd as PatRow[]) ?? []);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [fetchAllAppts, supabase]);
+
   // 問診票の質問定義（管理画面で編集した内容）を読み込み
   useEffect(() => {
     (async () => {
@@ -315,13 +331,17 @@ export default function ChartBoard() {
       p.todayStart = todayVs.length ? Math.min(...todayVs.map((v) => v.start_min)) : Infinity;
       arr.push(p);
     }
+    // 家族で名前を分けた時の“空ダブり”除去：
+    // 台帳由来（key===patient_id）で来院0の人は、同じ患者IDに来院のある別名の人がいれば重複なので隠す。
+    const pidWithVisits = new Set(arr.filter((p) => p.visits.length > 0 && p.patient_id).map((p) => p.patient_id));
+    const cleaned = arr.filter((p) => !(p.visits.length === 0 && p.patient_id && p.key === p.patient_id && pidWithVisits.has(p.patient_id)));
     // 当日の来院者を最上部（来院時刻の早い順）→ その他は最終来院が新しい順
-    arr.sort((a, b) =>
+    cleaned.sort((a, b) =>
       (Number(b.hasToday) - Number(a.hasToday)) ||
       (a.hasToday ? a.todayStart - b.todayStart : (b.lastVisit || "").localeCompare(a.lastVisit || "")) ||
       a.name.localeCompare(b.name, "ja")
     );
-    return arr;
+    return cleaned;
   }, [appts, pats, today]);
 
   // 個別売上から来たとき：その日（＋担当）の来院を個別売上と同じ並び（来院時刻順）で並べ、
