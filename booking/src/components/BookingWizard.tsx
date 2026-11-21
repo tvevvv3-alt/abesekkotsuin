@@ -1228,7 +1228,8 @@ export default function BookingWizard() {
             {!isClass && selectedStaff && (
             <div
               onClick={() => { if (selectedStaff.bio) setProfileOpen((o) => !o); }}
-              className={`mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 ${selectedStaff.bio ? "cursor-pointer select-none active:bg-slate-100" : ""}`}
+              className={`mt-2 rounded-xl border-2 p-3 ${selectedStaff.bio ? "cursor-pointer select-none" : ""}`}
+              style={{ borderColor: selectedStaff.color || "#334155", background: hexToRgba(selectedStaff.color || "#334155", 0.07) }}
             >
               <div className="flex items-center gap-3">
                 <StaffAvatar staff={selectedStaff} size={46} />
