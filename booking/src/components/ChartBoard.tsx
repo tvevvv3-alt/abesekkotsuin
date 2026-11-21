@@ -706,6 +706,9 @@ export default function ChartBoard() {
           )}
         </div>
         <button onClick={() => setAddOpen(true)} className="rounded-lg bg-teal-600 px-2.5 py-2 text-xs font-bold text-white active:bg-teal-700">＋ 新規登録</button>
+        {/* 一時的な診断リンク（ログイン済みの状態で予約名の保存先を確認する用） */}
+        <a href={`/api/admin/debug-appts?date=${salesDate || today}`} target="_blank" rel="noreferrer"
+          className="rounded-lg border border-slate-300 px-2 py-2 text-[11px] font-bold text-slate-500 active:bg-slate-100">🔧診断</a>
       </div>
 
       {/* ── カルテ本体（全幅） ── */}
