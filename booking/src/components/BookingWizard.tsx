@@ -963,15 +963,15 @@ export default function BookingWizard() {
     return (
       <div className="mx-auto min-h-screen max-w-md bg-slate-50 pb-16 shadow-sm">
         <div
-          className="pb-2.5 pt-2 text-center"
+          className="pb-2 pt-2 text-center"
           style={{ background: "#000b3a" }}
         >
-          {/* 横長ロゴ：横いっぱいの帯（バナー）。地色が同じ #000b3a なので継ぎ目なく馴染む */}
+          {/* 横長ロゴ：高さを抑えた細めの帯（バナー）。地色が同じ #000b3a なので継ぎ目なく馴染む */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/tra-banner.png"
             alt="Total Recoverytation Abe 阿部接骨院"
-            className="block w-full object-contain"
+            className="mx-auto h-16 w-auto object-contain"
           />
           <p className="mt-0.5 text-xs font-medium tracking-widest text-white/70">WEB予約</p>
         </div>
