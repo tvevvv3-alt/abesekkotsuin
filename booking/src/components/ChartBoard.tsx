@@ -8,7 +8,7 @@ import { ageAt } from "@/lib/pricing";
 import type { Staff } from "@/lib/types";
 import QuestionnaireForm from "@/components/QuestionnaireForm";
 import { DEFAULT_SECTIONS, parseSections, toIntakeLinked, type QSection, type QValue } from "@/lib/questionnaire";
-import { BodyMap, toStrokes, type MarkType, type Stroke } from "@/components/chart/marks";
+import { BodyMap, Pad, toStrokes, type MarkType, type Stroke } from "@/components/chart/marks";
 
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 const TEAL = "#0d9488";
@@ -130,6 +130,8 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [penOpen, setPenOpen] = useState(false);
+  const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
   const applyAt = (make: (start: number, end: number) => { next: string; caret: number } | null) => {
     const el = ref.current;
     const hasSel = el && el.selectionStart != null;
@@ -146,17 +148,37 @@ function PenTextarea({ value, onChange, placeholder, className }: {
     if (start > 0) return { next: value.slice(0, start - 1) + value.slice(start), caret: start - 1 };
     return null;
   });
+  // 手書き→文字起こし：認識テキストを末尾に追記して手書きはクリア
+  const appendTranscribed = (t: string) => {
+    const sep = value && !value.endsWith("\n") ? "\n" : "";
+    onChange(value + sep + t.trim());
+    setPenStrokes([]);
+  };
   const btn = "rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40";
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={className} />
       {/* 操作ボタン（テキスト枠から離す＋押してもフォーカスを外さずScribble誤反応を防ぐ） */}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* ペン（Apple Pencil）でも確実に反応するよう、押下(pointerdown)で直接実行（Scribbleへ渡さない） */}
         <button type="button" onPointerDown={(e) => { e.preventDefault(); insert(" "); }} className={btn}>␣ スペース</button>
         <button type="button" onPointerDown={(e) => { e.preventDefault(); insert("\n"); }} className={btn}>↵ 改行</button>
         <button type="button" onPointerDown={(e) => { e.preventDefault(); backspace(); }} disabled={!value.length} className={btn}>⌫ 1字消す</button>
+        {/* 手書きで文字起こしする／しないを選べる（既定は閉じる＝キーボード/Scribble入力） */}
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); setPenOpen((o) => !o); }}
+          className={`rounded-md px-3 py-1.5 text-xs font-bold ${penOpen ? "bg-teal-600 text-white" : "border border-teal-300 text-teal-700"}`}>
+          {penOpen ? "✍️ 手書きを閉じる" : "✍️ 手書きで文字起こし"}
+        </button>
       </div>
+      {penOpen && (
+        <div className="mt-2 rounded-lg border border-slate-200 p-2">
+          <Pad strokes={penStrokes} onChange={setPenStrokes} penType="treat" penColor="#0f172a" aspect="3 / 1" onTranscribed={appendTranscribed} />
+          <div className="mt-1 flex items-center justify-between">
+            <p className="text-[11px] text-slate-400">手書きして「✍️文字起こし」を押すと、上のメモに文章が追加されます。</p>
+            <button type="button" onPointerDown={(e) => { e.preventDefault(); setPenStrokes([]); }} disabled={!penStrokes.length} className={btn}>消す</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
