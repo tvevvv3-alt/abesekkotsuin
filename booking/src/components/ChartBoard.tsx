@@ -48,6 +48,18 @@ type Person = {
   hasFuture: boolean;
   todayStart: number; // 当日来院の最早時刻（分）。当日なしは Infinity
 };
+
+// 予約1件がどの「人（カルテ）」に属するかのキー。
+// 予約名が患者台帳名と違う＝家族・友人などが同じ端末で予約名だけ変えたケースは、名前ごとに別カルテ。
+const apptPersonKey = (a: ApptRow, patById: Map<string, PatRow>) => {
+  if (a.patient_id) {
+    const rec = patById.get(a.patient_id);
+    const an = normName(a.patient_name);
+    return rec && an && an !== normName(rec.name) ? a.patient_id + "|" + an : a.patient_id;
+  }
+  return "name:" + normName(a.patient_name);
+};
+
 type ChartFields = {
   complaint: string;
   findings: string;
@@ -256,15 +268,7 @@ export default function ChartBoard() {
     // 家族・友人など「同じ端末（患者ID）で名前を変えずに予約」したケース：
     // 予約一覧で名前を変更したら、その名前ごとに別カルテとして扱う（端末所有者名に埋もれない）。
     for (const a of appts) {
-      let key: string;
-      if (a.patient_id) {
-        const rec = patById.get(a.patient_id);
-        const an = normName(a.patient_name);
-        // 予約名が台帳名と違う＝別人（予約一覧で付け替えた）→ 患者ID＋名前で別カルテ
-        key = rec && an && an !== normName(rec.name) ? a.patient_id + "|" + an : a.patient_id;
-      } else {
-        key = "name:" + normName(a.patient_name);
-      }
+      const key = apptPersonKey(a, patById);
       let person = map.get(key);
       if (!person) {
         person = {
@@ -302,21 +306,13 @@ export default function ChartBoard() {
   const daySeqKeys = useMemo<string[]>(() => {
     if (!salesDate) return [];
     const patById = new Map(pats.map((p) => [p.id, p]));
-    const keyForAppt = (a: ApptRow) => {
-      if (a.patient_id) {
-        const rec = patById.get(a.patient_id);
-        const an = normName(a.patient_name);
-        return rec && an && an !== normName(rec.name) ? a.patient_id + "|" + an : a.patient_id;
-      }
-      return "name:" + normName(a.patient_name);
-    };
     const rows = appts
       .filter((a) => a.date === salesDate && (!salesStaff || a.staff_id === salesStaff))
       .sort((x, y) => x.start_min - y.start_min);
     const seen = new Set<string>();
     const keys: string[] = [];
     for (const a of rows) {
-      const k = keyForAppt(a);
+      const k = apptPersonKey(a, patById);
       if (!seen.has(k)) { seen.add(k); keys.push(k); }
     }
     return keys;
@@ -427,21 +423,31 @@ export default function ChartBoard() {
     } catch { setReferrer(null); }
   }, [supabase]);
 
-  // 個別売上などから ?p=<patient_id> / ?n=<氏名> で開かれたら、その患者を自動で選択
+  // 個別売上などから ?appt=<予約ID> / ?p=<patient_id> / ?n=<氏名> で開かれたら、その患者を自動で選択
   useEffect(() => {
     if (autoSelDone || loading || persons.length === 0) return;
     const sp = new URLSearchParams(window.location.search);
+    const apptId = sp.get("appt");
     const p = sp.get("p");
     const n = sp.get("n");
-    if (p || n) {
-      // 患者IDと名前の両方で一致する人を優先（同じ端末の家族を取り違えない）。
-      const target = p
-        ? (persons.find((x) => x.patient_id === p && (!n || normName(x.name) === normName(n))) ?? persons.find((x) => x.patient_id === p))
-        : persons.find((x) => normName(x.name) === normName(n));
-      if (target) openPerson(target);
+    let target: Person | null = null;
+    // ① クリックした予約そのもの（appt id）で本人を特定＝予約一覧で直した名前を確実に表示
+    if (apptId) {
+      const a = appts.find((x) => x.id === apptId);
+      if (a) {
+        const patById = new Map(pats.map((pp) => [pp.id, pp]));
+        target = persons.find((x) => x.key === apptPersonKey(a, patById)) ?? null;
+      }
     }
+    // ② 予約IDで見つからなければ、患者ID＋名前（同じ端末の家族を取り違えない）→ 名前
+    if (!target && (p || n)) {
+      target = p
+        ? (persons.find((x) => x.patient_id === p && (!n || normName(x.name) === normName(n))) ?? persons.find((x) => x.patient_id === p) ?? null)
+        : (persons.find((x) => normName(x.name) === normName(n)) ?? null);
+    }
+    if (target) openPerson(target);
     setAutoSelDone(true);
-  }, [autoSelDone, loading, persons, openPerson]);
+  }, [autoSelDone, loading, persons, appts, pats, openPerson]);
 
   // 経過記録カードの編集（その場でchartMapを更新）
   const getEntry = (id: string): ChartFields & { is_draft?: boolean } => chartMap[id] ?? EMPTY;
