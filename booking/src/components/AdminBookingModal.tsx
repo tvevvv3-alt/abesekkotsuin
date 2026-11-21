@@ -159,6 +159,8 @@ export default function AdminBookingModal({
         // 氏名の変更を反映（同姓同名/兄弟の付け替え）
         if (name.trim() && name.trim() !== (appt.patient_name ?? "")) {
           await supabase.from("appointments").update({ patient_name: name.trim() }).eq("id", appt.id);
+          // 個別売上（sales）側の氏名も揃える＝予約名と売上名の食い違いを防ぐ
+          await supabase.from("sales").update({ patient_name: name.trim() }).eq("appointment_id", appt.id);
         }
       }
       onDone();
