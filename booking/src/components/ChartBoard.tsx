@@ -221,6 +221,8 @@ export default function ChartBoard() {
   // その日の個別売上順に「次の人」へ移動するための日付・担当フィルタ
   const [salesDate, setSalesDate] = useState<string | null>(null);
   const [salesStaff, setSalesStaff] = useState<string | null>(null);
+  // 個別売上の“表示順そのまま”の予約IDリスト（あれば時刻再構成より優先）
+  const [salesSeqIds, setSalesSeqIds] = useState<string[] | null>(null);
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get("from") !== "sales") return;
@@ -231,6 +233,16 @@ export default function ChartBoard() {
     setBackSales(`/admin/sales${qs.toString() ? `?${qs.toString()}` : ""}`);
     setSalesDate(d || null);
     setSalesStaff(staffId || null);
+    // 個別売上が保存した「表示順の予約ID」を読む（同じ日付のときのみ採用）
+    try {
+      const raw = sessionStorage.getItem("chartDaySeq");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { date?: string; ids?: string[] };
+        if (parsed && Array.isArray(parsed.ids) && (!d || !parsed.date || parsed.date === d)) {
+          setSalesSeqIds(parsed.ids);
+        }
+      }
+    } catch { /* noop */ }
   }, []);
 
   const staffName = useCallback((id: string | null) => staff.find((s) => s.id === id)?.name ?? "", [staff]);
@@ -349,9 +361,14 @@ export default function ChartBoard() {
   const daySeqKeys = useMemo<string[]>(() => {
     if (!salesDate) return [];
     const patById = new Map(pats.map((p) => [p.id, p]));
-    const rows = appts
-      .filter((a) => a.date === salesDate && (!salesStaff || a.staff_id === salesStaff))
-      .sort((x, y) => x.start_min - y.start_min);
+    const apptById = new Map(appts.map((a) => [a.id, a]));
+    // 個別売上が渡した「表示順の予約ID」を最優先（個別売上の並び・絞り込みと完全一致）。
+    // 無い場合のみ、その日（＋担当）の予約を時刻順に再構成する。
+    const rows = (salesSeqIds && salesSeqIds.length)
+      ? salesSeqIds.map((id) => apptById.get(id)).filter((a): a is ApptRow => !!a)
+      : appts
+          .filter((a) => a.date === salesDate && (!salesStaff || a.staff_id === salesStaff))
+          .sort((x, y) => x.start_min - y.start_min);
     const seen = new Set<string>();
     const keys: string[] = [];
     for (const a of rows) {
@@ -359,7 +376,7 @@ export default function ChartBoard() {
       if (!seen.has(k)) { seen.add(k); keys.push(k); }
     }
     return keys;
-  }, [salesDate, salesStaff, appts, pats]);
+  }, [salesDate, salesStaff, salesSeqIds, appts, pats]);
 
   const shown = useMemo(() => {
     const key = normName(q);

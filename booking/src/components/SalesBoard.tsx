@@ -939,6 +939,11 @@ export default function SalesBoard() {
   const itemStaffId = (it: { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }): string | null =>
     it.kind === "appt" ? (apptVal(it.a).staff_id ?? defStaffId(it.a)) : (it.m.staff_id ?? null);
 
+  // カルテの「次の人」を、個別売上の“表示順そのまま”で辿れるよう、現在の絞り込み後の予約IDを順番に保持。
+  const chartSeqIds = dayItems
+    .filter((it) => it.kind === "appt" && (!focusStaff || itemStaffId(it) === focusStaff))
+    .map((it) => (it as { kind: "appt"; a: Appt }).a.id);
+
   async function setItemOrder(it: { kind: "appt"; a: Appt } | { kind: "manual"; m: Sale }, ord: number) {
     if (it.kind === "manual") {
       setSales((prev) => prev.map((s) => (s.id === it.m.id ? { ...s, sort_order: ord } : s)));
@@ -1667,6 +1672,7 @@ export default function SalesBoard() {
                               ) : (
                                 <Link
                                   href={`/admin/chart?` + (a.patient_id ? `p=${a.patient_id}&` : ``) + `n=${encodeURIComponent(a.patient_name || "")}&appt=${a.id}&from=sales&date=${date}` + (sid ? `&staff=${sid}` : "")}
+                                  onClick={() => { try { sessionStorage.setItem("chartDaySeq", JSON.stringify({ date, ids: chartSeqIds })); } catch { /* noop */ } }}
                                   className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600"
                                   title="自費カルテを開く"
                                 >
