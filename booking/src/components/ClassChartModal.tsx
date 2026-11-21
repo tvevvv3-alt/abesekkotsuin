@@ -62,9 +62,10 @@ function AutoTextarea({ value, onChange, disabled, placeholder, className, withB
       {area}
       {/* 操作ボタン（テキスト枠から離す＋押してもフォーカスを外さずScribble誤反応を防ぐ） */}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(" ")} disabled={disabled} className={btn}>␣ スペース</button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert("\n")} disabled={disabled} className={btn}>↵ 改行</button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={backspace} disabled={disabled || !value.length} className={btn}>⌫ 1字消す</button>
+        {/* ペン（Apple Pencil）でも確実に反応するよう、押下(pointerdown)で直接実行（Scribbleへ渡さない） */}
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); insert(" "); }} disabled={disabled} className={btn}>␣ スペース</button>
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); insert("\n"); }} disabled={disabled} className={btn}>↵ 改行</button>
+        <button type="button" onPointerDown={(e) => { e.preventDefault(); backspace(); }} disabled={disabled || !value.length} className={btn}>⌫ 1字消す</button>
       </div>
     </div>
   );
