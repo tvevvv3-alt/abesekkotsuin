@@ -216,6 +216,7 @@ export default function ChartBoard() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [autoSelDone, setAutoSelDone] = useState(false);
+  const salesReloadedRef = useRef(false); // 自動選択で本人が見つからない時、最新を1回だけ読み直す
   // 個別売上の担当別一覧から来た場合の戻り先（?from=sales&staff=&date=）
   const [backSales, setBackSales] = useState<string | null>(null);
   // その日の個別売上順に「次の人」へ移動するための日付・担当フィルタ
@@ -499,15 +500,22 @@ export default function ChartBoard() {
         target = persons.find((x) => x.key === apptPersonKey(a, patById)) ?? null;
       }
     }
-    // ② 予約IDで見つからなければ、患者ID＋名前（同じ端末の家族を取り違えない）→ 名前
-    if (!target && (p || n)) {
-      target = p
-        ? (persons.find((x) => x.patient_id === p && (!n || normName(x.name) === normName(n))) ?? persons.find((x) => x.patient_id === p) ?? null)
-        : (persons.find((x) => normName(x.name) === normName(n)) ?? null);
+    // ② 名前が分かっていれば「名前一致」を最優先（別名の別カルテ＝沖田壽朗/沖田直美を取り違えない）
+    if (!target && n) {
+      target = persons.find((x) => normName(x.name) === normName(n) && (!p || x.patient_id === p))
+        ?? persons.find((x) => normName(x.name) === normName(n)) ?? null;
     }
+    // ③ 本人がまだ見つからない＝一覧が古い可能性 → 最新を1回だけ読み直して再解決（autoSelDoneは立てない）
+    if (!target && (apptId || n) && !salesReloadedRef.current) {
+      salesReloadedRef.current = true;
+      load();
+      return;
+    }
+    // ④ 最後の手段：患者ID一致（名前が無い古いリンク対策。なるべくここには来ない）
+    if (!target && p) target = persons.find((x) => x.patient_id === p) ?? null;
     if (target) openPerson(target);
     setAutoSelDone(true);
-  }, [autoSelDone, loading, persons, appts, pats, openPerson]);
+  }, [autoSelDone, loading, persons, appts, pats, openPerson, load]);
 
   // 経過記録カードの編集（その場でchartMapを更新）
   const getEntry = (id: string): ChartFields & { is_draft?: boolean } => chartMap[id] ?? EMPTY;
