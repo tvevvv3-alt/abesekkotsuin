@@ -183,6 +183,9 @@ export default function ChartBoard() {
   const [autoSelDone, setAutoSelDone] = useState(false);
   // 個別売上の担当別一覧から来た場合の戻り先（?from=sales&staff=&date=）
   const [backSales, setBackSales] = useState<string | null>(null);
+  // その日の個別売上順に「次の人」へ移動するための日付・担当フィルタ
+  const [salesDate, setSalesDate] = useState<string | null>(null);
+  const [salesStaff, setSalesStaff] = useState<string | null>(null);
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get("from") !== "sales") return;
@@ -191,6 +194,8 @@ export default function ChartBoard() {
     if (staffId) qs.set("staff", staffId);
     if (d) qs.set("date", d);
     setBackSales(`/admin/sales${qs.toString() ? `?${qs.toString()}` : ""}`);
+    setSalesDate(d || null);
+    setSalesStaff(staffId || null);
   }, []);
 
   const staffName = useCallback((id: string | null) => staff.find((s) => s.id === id)?.name ?? "", [staff]);
@@ -292,6 +297,31 @@ export default function ChartBoard() {
     return arr;
   }, [appts, pats, today]);
 
+  // 個別売上から来たとき：その日（＋担当）の来院を個別売上と同じ並び（来院時刻順）で並べ、
+  // 「前の人／次の人」へワンタップで移動できるようにする。
+  const daySeqKeys = useMemo<string[]>(() => {
+    if (!salesDate) return [];
+    const patById = new Map(pats.map((p) => [p.id, p]));
+    const keyForAppt = (a: ApptRow) => {
+      if (a.patient_id) {
+        const rec = patById.get(a.patient_id);
+        const an = normName(a.patient_name);
+        return rec && an && an !== normName(rec.name) ? a.patient_id + "|" + an : a.patient_id;
+      }
+      return "name:" + normName(a.patient_name);
+    };
+    const rows = appts
+      .filter((a) => a.date === salesDate && (!salesStaff || a.staff_id === salesStaff))
+      .sort((x, y) => x.start_min - y.start_min);
+    const seen = new Set<string>();
+    const keys: string[] = [];
+    for (const a of rows) {
+      const k = keyForAppt(a);
+      if (!seen.has(k)) { seen.add(k); keys.push(k); }
+    }
+    return keys;
+  }, [salesDate, salesStaff, appts, pats]);
+
   const shown = useMemo(() => {
     const key = normName(q);
     return persons.filter((p) => {
@@ -308,6 +338,20 @@ export default function ChartBoard() {
   }, [persons, q, filter]);
 
   const selected = useMemo(() => persons.find((p) => p.key === selKey) ?? null, [persons, selKey]);
+
+  // 個別売上順の前後ナビ（selected 確定後に算出）
+  const dayNav = useMemo(() => {
+    if (!selected || daySeqKeys.length === 0) return null;
+    const idx = daySeqKeys.indexOf(selected.key);
+    if (idx === -1) return null;
+    const byKey = (k: string | null) => (k ? persons.find((p) => p.key === k) ?? null : null);
+    return {
+      idx,
+      total: daySeqKeys.length,
+      prev: byKey(idx > 0 ? daySeqKeys[idx - 1] : null),
+      next: byKey(idx < daySeqKeys.length - 1 ? daySeqKeys[idx + 1] : null),
+    };
+  }, [selected, daySeqKeys, persons]);
 
   // 患者を選んだら：経過記録（カルテ）＋初診時（問診票・人体図）＋紹介元を読み込み
   const openPerson = useCallback(async (p: Person) => {
@@ -585,7 +629,27 @@ export default function ChartBoard() {
               <h1 className="text-xl font-bold text-slate-800">{selected.name}</h1>
               {ageAt(selected.birth_date, today) != null && <span className="text-sm text-slate-500">{ageAt(selected.birth_date, today)}歳</span>}
               {(() => { const b = statusBadge(selected); return <span className={`rounded px-2 py-0.5 text-xs font-bold ${b.c}`}>{b.t}</span>; })()}
-              {selected.phone && <span className="ml-auto text-xs text-slate-400">{selected.phone}</span>}
+              <div className="ml-auto flex items-center gap-2">
+                {selected.phone && <span className="text-xs text-slate-400">{selected.phone}</span>}
+                {/* 個別売上から来たとき：その日の個別売上順に前後の患者へ移動 */}
+                {dayNav && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => dayNav.prev && openPerson(dayNav.prev)}
+                      disabled={!dayNav.prev}
+                      title={dayNav.prev ? `← ${dayNav.prev.name}` : "最初の人です"}
+                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-bold text-slate-600 shadow-sm active:bg-slate-50 disabled:opacity-40"
+                    >←</button>
+                    <span className="min-w-[2.5rem] text-center text-[11px] font-bold text-slate-400">{dayNav.idx + 1}/{dayNav.total}</span>
+                    <button
+                      onClick={() => dayNav.next && openPerson(dayNav.next)}
+                      disabled={!dayNav.next}
+                      title={dayNav.next ? `${dayNav.next.name} →` : "最後の人です"}
+                      className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-bold text-white shadow-sm active:bg-teal-700 disabled:opacity-40"
+                    >次の人 →</button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* サマリ */}
