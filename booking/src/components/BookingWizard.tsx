@@ -234,6 +234,16 @@ export default function BookingWizard() {
   const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [profileOpen, setProfileOpen] = useState(false); // 担当プロフィールの詳細開閉
+  // 固定ヘッダーの高さ（担当チップをその真下に固定するため測定）
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerH, setHeaderH] = useState(0);
+  useEffect(() => {
+    const measure = () => setHeaderH(headerRef.current?.getBoundingClientRect().height ?? 0);
+    measure();
+    const t = setTimeout(measure, 300); // フォント/レイアウト確定後にもう一度
+    window.addEventListener("resize", measure);
+    return () => { clearTimeout(t); window.removeEventListener("resize", measure); };
+  }, []);
   const [rescheduleId, setRescheduleId] = useState<string | null>(null); // 変更元の予約ID（成功後にキャンセル）
   const [preApplied, setPreApplied] = useState(false); // URLパラメータ（変更導線）の初期反映済みか
   const [windows, setWindows] = useState<BookingWindow[]>([]);
@@ -1046,7 +1056,7 @@ export default function BookingWizard() {
   return (
     <div className="mx-auto min-h-screen max-w-md bg-white pb-24 shadow-sm">
       {/* ヘッダ */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur">
+      <header ref={headerRef} className="sticky top-0 z-20 bg-white/95 backdrop-blur">
         <div
           className="flex items-center justify-center gap-2 px-4 py-2"
           style={{ background: NAVY }}
@@ -1164,50 +1174,52 @@ export default function BookingWizard() {
             }
           }}
         >
-          <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            {service.patient_name || service.name}（所要 約{totalDuration(service.steps)}分）
-            {isClass && `・定員${service.capacity}名`}
+          {/* メニュー名＋担当チップは、スクロールしても見えるようヘッダー直下に固定 */}
+          <div className="sticky z-10 -mx-4 border-b border-slate-100 bg-white px-4 pb-2 pt-1 shadow-sm" style={{ top: headerH }}>
+            <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {service.patient_name || service.name}（所要 約{totalDuration(service.steps)}分）
+              {isClass && `・定員${service.capacity}名`}
+            </div>
+
+            {/* 担当者ボタン：押しても画面遷移せずカレンダーだけ切替。
+                このメニューに対応できるスタッフのみ表示。
+                定員制クラス（体幹教室）は担当者を選ばない。 */}
+            {isClass ? (
+              <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                定員{service.capacity}名のグループレッスンです。空いている時間を選んでください（残り人数を表示）。
+              </div>
+            ) : capableStaff.length === 0 ? (
+              <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                このメニューに対応できる担当者が現在いません。お手数ですがお電話ください。
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {capableStaff.map((s) => {
+                  const active = s.id === staffId;
+                  const col = s.color || "#334155";
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => pickStaff(s.id)}
+                      className="rounded-lg py-2 text-sm font-bold transition"
+                      style={
+                        active
+                          ? { backgroundColor: col, color: "#fff", border: `1.5px solid ${col}` }
+                          : { backgroundColor: hexToRgba(col, 0.14), color: col, border: `1.5px solid ${hexToRgba(col, 0.45)}` }
+                      }
+                    >
+                      {s.display_name || s.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* 新規受付停止メニュー（体幹教室など）：既存の方のみ案内 */}
           {!service.new_booking && (
-            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div className="mb-3 mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               こちらは<b>新規受付を停止中</b>のメニューです。<b>すでに通われている方のみ</b>ご予約いただけます。はじめての方は受付できませんのでご了承ください。
-            </div>
-          )}
-
-          {/* 担当者ボタン：押しても画面遷移せずカレンダーだけ切替。
-              このメニューに対応できるスタッフのみ表示。
-              定員制クラス（体幹教室）は担当者を選ばない。 */}
-          {isClass ? (
-            <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              定員{service.capacity}名のグループレッスンです。空いている時間を選んでください（残り人数を表示）。
-            </div>
-          ) : capableStaff.length === 0 ? (
-            <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              このメニューに対応できる担当者が現在いません。お手数ですがお電話ください。
-            </div>
-          ) : (
-            <div className="mb-3 grid grid-cols-4 gap-2">
-              {capableStaff.map((s) => {
-                const active = s.id === staffId;
-                const col = s.color || "#334155";
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => pickStaff(s.id)}
-                    className="rounded-lg py-2 text-sm font-bold transition"
-                    // 選択＝従来の濃い色＋白文字。未選択＝薄く色付け（グレーで不在に見えないように）
-                    style={
-                      active
-                        ? { backgroundColor: col, color: "#fff", border: `1.5px solid ${col}` }
-                        : { backgroundColor: hexToRgba(col, 0.14), color: col, border: `1.5px solid ${hexToRgba(col, 0.45)}` }
-                    }
-                  >
-                    {s.display_name || s.name}
-                  </button>
-                );
-              })}
             </div>
           )}
 
@@ -1215,7 +1227,7 @@ export default function BookingWizard() {
           {!isClass && selectedStaff && (
             <div
               onClick={() => { if (selectedStaff.bio) setProfileOpen((o) => !o); }}
-              className={`mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 ${selectedStaff.bio ? "cursor-pointer select-none active:bg-slate-100" : ""}`}
+              className={`mb-3 mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 ${selectedStaff.bio ? "cursor-pointer select-none active:bg-slate-100" : ""}`}
             >
               <div className="flex items-center gap-3">
                 <StaffAvatar staff={selectedStaff} size={46} />
