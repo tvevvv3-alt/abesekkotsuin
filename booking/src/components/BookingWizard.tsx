@@ -234,6 +234,7 @@ export default function BookingWizard() {
   const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [profileOpen, setProfileOpen] = useState(false); // 担当プロフィールの詳細開閉
+  const [menuPickerOpen, setMenuPickerOpen] = useState(false); // メニュー名タップでその場にメニュー一覧を表示
   // 固定ヘッダーの高さ（担当チップをその真下に固定するため測定）
   const headerRef = useRef<HTMLElement>(null);
   const [headerH, setHeaderH] = useState(0);
@@ -1176,19 +1177,45 @@ export default function BookingWizard() {
         >
           {/* メニュー名＋担当チップは、スクロールしても見えるようヘッダー直下に固定 */}
           <div className="sticky z-10 -mx-4 border-b border-slate-100 bg-white px-4 pb-2 pt-1 shadow-sm" style={{ top: headerH }}>
-            {/* メニュー名：タップでメニュー変更（ステップ1へ）。戻る不要 */}
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="mb-2 flex w-full items-center justify-between gap-2 rounded-xl border-2 px-3 py-2.5 text-left active:opacity-90"
-              style={{ borderColor: NAVY, background: "#eef2ff" }}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-slate-900">{service.patient_name || service.name}</span>
-                <span className="text-[11px] text-slate-500">所要 約{totalDuration(service.steps)}分{isClass ? `・定員${service.capacity}名` : ""}</span>
-              </span>
-              <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-white" style={{ background: NAVY }}>メニュー変更 ›</span>
-            </button>
+            {/* メニュー名：タップでその場にメニュー一覧を表示→選ぶと切替（戻る不要） */}
+            <div className="relative mb-2">
+              <button
+                type="button"
+                onClick={() => setMenuPickerOpen((o) => !o)}
+                className="flex w-full items-center justify-between gap-2 rounded-xl border-2 px-3 py-2.5 text-left active:opacity-90"
+                style={{ borderColor: NAVY, background: "#eef2ff" }}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-slate-900">{service.patient_name || service.name}</span>
+                  <span className="text-[11px] text-slate-500">所要 約{totalDuration(service.steps)}分{isClass ? `・定員${service.capacity}名` : ""}</span>
+                </span>
+                <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-white" style={{ background: NAVY }}>メニュー変更 {menuPickerOpen ? "▲" : "▼"}</span>
+              </button>
+              {menuPickerOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setMenuPickerOpen(false)} />
+                  <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-[55vh] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                    {shownServices.map((s) => {
+                      const on = s.id === service.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => { pickService(s.id); setMenuPickerOpen(false); }}
+                          className={`flex w-full items-center justify-between gap-2 border-b px-3 py-2.5 text-left ${on ? "bg-blue-50" : "active:bg-slate-50"}`}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-bold text-slate-800">{s.patient_name || s.name}</span>
+                            <span className="text-[11px] text-slate-500">所要 約{totalDuration(s.steps)}分</span>
+                          </span>
+                          {on && <span className="shrink-0 text-[11px] font-bold text-blue-600">選択中</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* 担当者ボタン：押しても画面遷移せずカレンダーだけ切替。
                 このメニューに対応できるスタッフのみ表示。
