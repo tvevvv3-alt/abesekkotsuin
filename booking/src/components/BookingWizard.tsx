@@ -1214,20 +1214,12 @@ export default function BookingWizard() {
                 })}
               </div>
             )}
-          </div>
 
-          {/* 新規受付停止メニュー（体幹教室など）：既存の方のみ案内 */}
-          {!service.new_booking && (
-            <div className="mb-3 mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              こちらは<b>新規受付を停止中</b>のメニューです。<b>すでに通われている方のみ</b>ご予約いただけます。はじめての方は受付できませんのでご了承ください。
-            </div>
-          )}
-
-          {/* スタッフ紹介（既定は閉じる。「詳細」で紹介文を開く） */}
-          {!isClass && selectedStaff && (
+            {/* スタッフ紹介も固定領域に含める（既定は閉じる。「詳細」で紹介文を開く） */}
+            {!isClass && selectedStaff && (
             <div
               onClick={() => { if (selectedStaff.bio) setProfileOpen((o) => !o); }}
-              className={`mb-3 mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 ${selectedStaff.bio ? "cursor-pointer select-none active:bg-slate-100" : ""}`}
+              className={`mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 ${selectedStaff.bio ? "cursor-pointer select-none active:bg-slate-100" : ""}`}
             >
               <div className="flex items-center gap-3">
                 <StaffAvatar staff={selectedStaff} size={46} />
@@ -1259,6 +1251,14 @@ export default function BookingWizard() {
                   {selectedStaff.bio}
                 </p>
               )}
+            </div>
+            )}
+          </div>
+
+          {/* 新規受付停止メニュー（体幹教室など）：既存の方のみ案内 */}
+          {!service.new_booking && (
+            <div className="mb-3 mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              こちらは<b>新規受付を停止中</b>のメニューです。<b>すでに通われている方のみ</b>ご予約いただけます。はじめての方は受付できませんのでご了承ください。
             </div>
           )}
 
