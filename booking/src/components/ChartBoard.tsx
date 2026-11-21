@@ -241,15 +241,25 @@ export default function ChartBoard() {
   // 患者（予約の氏名＋患者台帳）を1人にまとめる
   const persons = useMemo<Person[]>(() => {
     const map = new Map<string, Person>();
-    const keyFor = (pid: string | null, name: string | null) => pid || "name:" + normName(name);
+    const patById = new Map(pats.map((p) => [p.id, p]));
     for (const p of pats) {
       map.set(p.id, {
         key: p.id, patient_id: p.id, name: p.name, name_kana: p.name_kana, birth_date: p.birth_date,
         phone: p.phone, chart_note: p.chart_note, visits: [], lastVisit: null, visitCount: 0, hasToday: false, hasFuture: false, todayStart: Infinity,
       });
     }
+    // 家族・友人など「同じ端末（患者ID）で名前を変えずに予約」したケース：
+    // 予約一覧で名前を変更したら、その名前ごとに別カルテとして扱う（端末所有者名に埋もれない）。
     for (const a of appts) {
-      const key = keyFor(a.patient_id, a.patient_name);
+      let key: string;
+      if (a.patient_id) {
+        const rec = patById.get(a.patient_id);
+        const an = normName(a.patient_name);
+        // 予約名が台帳名と違う＝別人（予約一覧で付け替えた）→ 患者ID＋名前で別カルテ
+        key = rec && an && an !== normName(rec.name) ? a.patient_id + "|" + an : a.patient_id;
+      } else {
+        key = "name:" + normName(a.patient_name);
+      }
       let person = map.get(key);
       if (!person) {
         person = {
@@ -380,7 +390,10 @@ export default function ChartBoard() {
     const p = sp.get("p");
     const n = sp.get("n");
     if (p || n) {
-      const target = p ? persons.find((x) => x.patient_id === p) : persons.find((x) => normName(x.name) === normName(n));
+      // 患者IDと名前の両方で一致する人を優先（同じ端末の家族を取り違えない）。
+      const target = p
+        ? (persons.find((x) => x.patient_id === p && (!n || normName(x.name) === normName(n))) ?? persons.find((x) => x.patient_id === p))
+        : persons.find((x) => normName(x.name) === normName(n));
       if (target) openPerson(target);
     }
     setAutoSelDone(true);

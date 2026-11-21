@@ -1666,7 +1666,7 @@ export default function SalesBoard() {
                                 </button>
                               ) : (
                                 <Link
-                                  href={(a.patient_id ? `/admin/chart?p=${a.patient_id}` : `/admin/chart?n=${encodeURIComponent(a.patient_name || "")}`) + `&from=sales&date=${date}` + (sid ? `&staff=${sid}` : "")}
+                                  href={`/admin/chart?` + (a.patient_id ? `p=${a.patient_id}&` : ``) + `n=${encodeURIComponent(a.patient_name || "")}&from=sales&date=${date}` + (sid ? `&staff=${sid}` : "")}
                                   className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 active:text-blue-600"
                                   title="自費カルテを開く"
                                 >
