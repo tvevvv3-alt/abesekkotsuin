@@ -223,21 +223,19 @@ export default function ChartBoard() {
   const salesReloadedRef = useRef(false); // 自動選択で本人が見つからない時、最新を1回だけ読み直す
   // 個別売上の担当別一覧から来た場合の戻り先（?from=sales&staff=&date=）
   const [backSales, setBackSales] = useState<string | null>(null);
-  // その日の個別売上順に「次の人」へ移動するための日付・担当フィルタ
+  // その日の個別売上順に「次の人」へ移動するための日付
   const [salesDate, setSalesDate] = useState<string | null>(null);
-  const [salesStaff, setSalesStaff] = useState<string | null>(null);
   // 個別売上の“表示順そのまま”の予約IDリスト（あれば時刻再構成より優先）
   const [salesSeqIds, setSalesSeqIds] = useState<string[] | null>(null);
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
-    if (sp.get("from") !== "sales") { setBackSales(null); setSalesDate(null); setSalesStaff(null); setSalesSeqIds(null); return; }
+    if (sp.get("from") !== "sales") { setBackSales(null); setSalesDate(null); setSalesSeqIds(null); return; }
     const qs = new URLSearchParams();
     const staffId = sp.get("staff"); const d = sp.get("date");
     if (staffId) qs.set("staff", staffId);
     if (d) qs.set("date", d);
     setBackSales(`/admin/sales${qs.toString() ? `?${qs.toString()}` : ""}`);
     setSalesDate(d || null);
-    setSalesStaff(staffId || null);
     // 個別売上が保存した「表示順の予約ID」を読む（同じ日付のときのみ採用）
     try {
       const raw = sessionStorage.getItem("chartDaySeq");
@@ -377,21 +375,30 @@ export default function ChartBoard() {
     if (!salesDate) return [];
     const patById = new Map(pats.map((p) => [p.id, p]));
     const apptById = new Map(appts.map((a) => [a.id, a]));
-    // 個別売上が渡した「表示順の予約ID」を最優先（個別売上の並び・絞り込みと完全一致）。
-    // 無い場合のみ、その日（＋担当）の予約を時刻順に再構成する。
-    const rows = (salesSeqIds && salesSeqIds.length)
-      ? salesSeqIds.map((id) => apptById.get(id)).filter((a): a is ApptRow => !!a)
-      : appts
-          .filter((a) => a.date === salesDate && (!salesStaff || a.staff_id === salesStaff))
-          .sort((x, y) => x.start_min - y.start_min);
+    // その日の全来院（時刻順）。誰も取りこぼさない“土台”。
+    const dayAppts = appts
+      .filter((a) => a.date === salesDate)
+      .sort((x, y) => x.start_min - y.start_min);
+    // 個別売上が渡した「表示順の予約ID」を先頭に、残りの当日予約を時刻順で補う（＝並びは個別売上準拠、取りこぼしゼロ）。
+    const ordered: ApptRow[] = [];
+    const usedIds = new Set<string>();
+    if (salesSeqIds && salesSeqIds.length) {
+      for (const id of salesSeqIds) {
+        const a = apptById.get(id);
+        if (a && !usedIds.has(a.id)) { ordered.push(a); usedIds.add(a.id); }
+      }
+    }
+    for (const a of dayAppts) {
+      if (!usedIds.has(a.id)) { ordered.push(a); usedIds.add(a.id); }
+    }
     const seen = new Set<string>();
     const keys: string[] = [];
-    for (const a of rows) {
+    for (const a of ordered) {
       const k = apptPersonKey(a, patById);
       if (!seen.has(k)) { seen.add(k); keys.push(k); }
     }
     return keys;
-  }, [salesDate, salesStaff, salesSeqIds, appts, pats]);
+  }, [salesDate, salesSeqIds, appts, pats]);
 
   const shown = useMemo(() => {
     const key = normName(q);
