@@ -274,12 +274,24 @@ export default function ChartBoard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [st, ap, { data: pd }] = await Promise.all([
-      loadAllStaff(supabase),
+    const st = await loadAllStaff(supabase);
+    setStaff(st);
+    // 予約＋患者台帳は「サーバー経由で常に最新」取得（ブラウザのキャッシュで古い予約名を読まないため）。
+    // 失敗時のみ従来のクライアント直読みにフォールバック。
+    try {
+      const res = await fetch("/api/admin/chart-data", { cache: "no-store" });
+      const j = (await res.json()) as { ok?: boolean; appts?: ApptRow[]; patients?: PatRow[] };
+      if (j.ok && Array.isArray(j.appts) && Array.isArray(j.patients)) {
+        setAppts(j.appts);
+        setPats(j.patients);
+        setLoading(false);
+        return;
+      }
+    } catch { /* フォールバックへ */ }
+    const [ap, { data: pd }] = await Promise.all([
       fetchAllAppts(),
       supabase.from("patients").select("id, name, name_kana, birth_date, phone, chart_note").order("name"),
     ]);
-    setStaff(st);
     setAppts(ap);
     setPats((pd as PatRow[]) ?? []);
     setLoading(false);
@@ -297,6 +309,13 @@ export default function ChartBoard() {
   useEffect(() => {
     const refresh = async () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/admin/chart-data", { cache: "no-store" });
+        const j = (await res.json()) as { ok?: boolean; appts?: ApptRow[]; patients?: PatRow[] };
+        if (j.ok && Array.isArray(j.appts) && Array.isArray(j.patients)) {
+          setAppts(j.appts); setPats(j.patients); return;
+        }
+      } catch { /* フォールバックへ */ }
       const [ap, { data: pd }] = await Promise.all([
         fetchAllAppts(),
         supabase.from("patients").select("id, name, name_kana, birth_date, phone, chart_note").order("name"),
