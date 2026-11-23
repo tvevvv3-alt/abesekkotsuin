@@ -193,7 +193,21 @@ export default function ChartBoard() {
 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [appts, setAppts] = useState<ApptRow[]>([]);
+  const [freshAppt, setFreshAppt] = useState<ApptRow | null>(null); // クリックした予約の最新1件（全件取得に上書きされないよう別保持）
+  const [freshDay, setFreshDay] = useState<ApptRow[]>([]); // 個別売上の対象日(salesDate)の予約を丸ごと最新化（「次の人」の並び用）
   const [pats, setPats] = useState<PatRow[]>([]);
+  // 全件(appts)に「対象日の最新(freshDay)」と「クリックした最新1件(freshAppt)」を必ず優先合成した配列。
+  // グループ化・並び・選択はこれを使う＝全件取得(load)が古くても、対象日とクリック予約は常に最新になる。
+  const effAppts = useMemo<ApptRow[]>(() => {
+    const override = new Map<string, ApptRow>();
+    for (const a of freshDay) override.set(a.id, a);
+    if (freshAppt) override.set(freshAppt.id, freshAppt);
+    if (override.size === 0) return appts;
+    const seen = new Set<string>();
+    const merged = appts.map((a) => { seen.add(a.id); return override.get(a.id) ?? a; });
+    for (const [id, a] of override) if (!seen.has(id)) merged.push(a);
+    return merged;
+  }, [appts, freshDay, freshAppt]);
   const [loading, setLoading] = useState(true);
 
   const [q, setQ] = useState("");
@@ -293,6 +307,24 @@ export default function ChartBoard() {
     load();
   }, [navKey, load]);
 
+  // 個別売上の対象日(salesDate)の予約を丸ごとサーバー経由(常に最新)で取得（軽量＝その日だけ）。
+  // ＝「次の人」の並びが、その日の最新の予約名で正しく作られる（古い名前で別人に統合→抜けるのを防ぐ）。
+  useEffect(() => {
+    if (!salesDate) { setFreshDay([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/appts-day?date=${encodeURIComponent(salesDate)}`, { cache: "no-store" });
+        const j = (await res.json()) as { ok?: boolean; appts?: ApptRow[] };
+        if (cancelled || !j.ok || !Array.isArray(j.appts)) return;
+        setFreshDay(j.appts);
+        setAutoSelDone(false);
+        salesReloadedRef.current = false;
+      } catch { /* 取得失敗時は従来データのまま */ }
+    })();
+    return () => { cancelled = true; };
+  }, [salesDate, navKey]);
+
   // クリックした予約1件だけ「サーバー経由で常に最新」照合し、古ければその1件を差し替える（表示全体は壊さない）。
   // ＝ブラウザのキャッシュで古い予約名を読み、別人のカルテを開く／「次の人」から漏れる問題を軽量に防ぐ。
   useEffect(() => {
@@ -304,15 +336,8 @@ export default function ChartBoard() {
         const res = await fetch(`/api/admin/appt?id=${encodeURIComponent(apptId)}`, { cache: "no-store" });
         const j = (await res.json()) as { ok?: boolean; appt?: ApptRow | null };
         if (cancelled || !j.ok || !j.appt) return;
-        const fresh = j.appt;
-        setAppts((prev) => {
-          const i = prev.findIndex((x) => x.id === fresh.id);
-          if (i === -1) return [fresh, ...prev];
-          const cur = prev[i];
-          if (cur.patient_name === fresh.patient_name && cur.patient_id === fresh.patient_id) return prev;
-          const next = prev.slice(); next[i] = fresh; return next;
-        });
-        // 差し替えたら本人選択をやり直す（正しい人を開き、「次の人」にも並ぶ）。
+        // 最新1件は別状態で保持（全件取得(load)に上書きされないよう、グループ化時に必ず優先合成する）。
+        setFreshAppt(j.appt);
         setAutoSelDone(false);
         salesReloadedRef.current = false;
       } catch { /* 取得失敗時は従来データのまま */ }
@@ -358,7 +383,7 @@ export default function ChartBoard() {
     }
     // 家族・友人など「同じ端末（患者ID）で名前を変えずに予約」したケース：
     // 予約一覧で名前を変更したら、その名前ごとに別カルテとして扱う（端末所有者名に埋もれない）。
-    for (const a of appts) {
+    for (const a of effAppts) {
       const key = apptPersonKey(a, patById);
       let person = map.get(key);
       if (!person) {
@@ -394,16 +419,16 @@ export default function ChartBoard() {
       a.name.localeCompare(b.name, "ja")
     );
     return cleaned;
-  }, [appts, pats, today]);
+  }, [effAppts, pats, today]);
 
   // 個別売上から来たとき：その日（＋担当）の来院を個別売上と同じ並び（来院時刻順）で並べ、
   // 「前の人／次の人」へワンタップで移動できるようにする。
   const daySeqKeys = useMemo<string[]>(() => {
     if (!salesDate) return [];
     const patById = new Map(pats.map((p) => [p.id, p]));
-    const apptById = new Map(appts.map((a) => [a.id, a]));
+    const apptById = new Map(effAppts.map((a) => [a.id, a]));
     // その日の全来院（時刻順）。誰も取りこぼさない“土台”。
-    const dayAppts = appts
+    const dayAppts = effAppts
       .filter((a) => a.date === salesDate)
       .sort((x, y) => x.start_min - y.start_min);
     // 個別売上が渡した「表示順の予約ID」を先頭に、残りの当日予約を時刻順で補う（＝並びは個別売上準拠、取りこぼしゼロ）。
@@ -425,7 +450,7 @@ export default function ChartBoard() {
       if (!seen.has(k)) { seen.add(k); keys.push(k); }
     }
     return keys;
-  }, [salesDate, salesSeqIds, appts, pats]);
+  }, [salesDate, salesSeqIds, effAppts, pats]);
 
   const shown = useMemo(() => {
     const key = normName(q);
@@ -542,7 +567,7 @@ export default function ChartBoard() {
     let target: Person | null = null;
     // ① クリックした予約そのもの（appt id）で本人を特定＝予約一覧で直した名前を確実に表示
     if (apptId) {
-      const a = appts.find((x) => x.id === apptId);
+      const a = effAppts.find((x) => x.id === apptId);
       if (a) {
         const patById = new Map(pats.map((pp) => [pp.id, pp]));
         target = persons.find((x) => x.key === apptPersonKey(a, patById)) ?? null;
@@ -565,7 +590,7 @@ export default function ChartBoard() {
     if (!target && p) target = persons.find((x) => x.patient_id === p) ?? null;
     if (target) openPerson(target);
     setAutoSelDone(true);
-  }, [autoSelDone, loading, persons, appts, pats, openPerson, load]);
+  }, [autoSelDone, loading, persons, effAppts, pats, openPerson, load]);
 
   // 経過記録カードの編集（その場でchartMapを更新）
   const getEntry = (id: string): ChartFields & { is_draft?: boolean } => chartMap[id] ?? EMPTY;
