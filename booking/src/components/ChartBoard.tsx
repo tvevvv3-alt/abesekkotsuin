@@ -293,6 +293,33 @@ export default function ChartBoard() {
     load();
   }, [navKey, load]);
 
+  // クリックした予約1件だけ「サーバー経由で常に最新」照合し、古ければその1件を差し替える（表示全体は壊さない）。
+  // ＝ブラウザのキャッシュで古い予約名を読み、別人のカルテを開く／「次の人」から漏れる問題を軽量に防ぐ。
+  useEffect(() => {
+    const apptId = searchParams.get("appt");
+    if (!apptId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/appt?id=${encodeURIComponent(apptId)}`, { cache: "no-store" });
+        const j = (await res.json()) as { ok?: boolean; appt?: ApptRow | null };
+        if (cancelled || !j.ok || !j.appt) return;
+        const fresh = j.appt;
+        setAppts((prev) => {
+          const i = prev.findIndex((x) => x.id === fresh.id);
+          if (i === -1) return [fresh, ...prev];
+          const cur = prev[i];
+          if (cur.patient_name === fresh.patient_name && cur.patient_id === fresh.patient_id) return prev;
+          const next = prev.slice(); next[i] = fresh; return next;
+        });
+        // 差し替えたら本人選択をやり直す（正しい人を開き、「次の人」にも並ぶ）。
+        setAutoSelDone(false);
+        salesReloadedRef.current = false;
+      } catch { /* 取得失敗時は従来データのまま */ }
+    })();
+    return () => { cancelled = true; };
+  }, [navKey, searchParams]);
+
   // 予約一覧など別画面で名前を直したら、カルテ画面に戻った時に最新を反映（スピナーなしで静かに再取得）。
   useEffect(() => {
     const refresh = async () => {
