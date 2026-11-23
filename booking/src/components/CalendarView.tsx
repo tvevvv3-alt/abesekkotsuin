@@ -1090,13 +1090,16 @@ export default function CalendarView({
                 onPointerUp={cancelHeaderPress}
                 onPointerLeave={cancelHeaderPress}
                 onPointerMove={cancelHeaderPress}
+                onContextMenu={(e) => e.preventDefault()}
                 onClick={() => {
                   if (lpLong.current) { lpLong.current = false; return; } // 長押しだった＝日数メニューを出したのでタップ動作はしない
                   onStartChange(ds);
                   if (days > 1) onDaysChange?.(1);
                 }}
                 title={days > 1 ? (hol ? `${hol}・この日だけを表示（長押しで表示日数）` : "この日だけを表示（長押しで表示日数）") : (hol ? `${hol}（長押しで表示日数）` : "長押しで表示日数")}
-                className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold active:bg-slate-100 ${
+                // iOSの長押しで文字選択・コピーのメニューが出ないよう無効化
+                style={{ WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+                className={`min-w-0 flex-1 select-none border-l py-1 text-center text-xs font-bold active:bg-slate-100 ${
                   isToday ? "text-blue-600" : hol ? "text-rose-500" : "text-slate-600"
                 }`}
               >
