@@ -208,16 +208,8 @@ export default function CalendarView({
   const latestXYRef = useRef<{ x: number; y: number } | null>(null);
 
   const gridRef = useRef<HTMLDivElement>(null);
-  // 日付見出しの長押しで表示日数（1/3/4/7日）を選べるメニュー
+  // 表示日数（1/3/4/7日）を選ぶメニュー（左上コーナーのボタンから開く）
   const [daysMenuOpen, setDaysMenuOpen] = useState(false);
-  const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lpLong = useRef(false);
-  const startHeaderPress = () => {
-    lpLong.current = false;
-    if (lpTimer.current) clearTimeout(lpTimer.current);
-    lpTimer.current = setTimeout(() => { lpLong.current = true; setDaysMenuOpen(true); }, 500);
-  };
-  const cancelHeaderPress = () => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } };
   const [boxH, setBoxH] = useState(600);
   // 現在時刻バー（Googleカレンダー風）。1分ごとに更新。
   const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
@@ -1086,20 +1078,12 @@ export default function CalendarView({
             return (
               <button
                 key={ds}
-                onPointerDown={startHeaderPress}
-                onPointerUp={cancelHeaderPress}
-                onPointerLeave={cancelHeaderPress}
-                onPointerMove={cancelHeaderPress}
-                onContextMenu={(e) => e.preventDefault()}
                 onClick={() => {
-                  if (lpLong.current) { lpLong.current = false; return; } // 長押しだった＝日数メニューを出したのでタップ動作はしない
                   onStartChange(ds);
                   if (days > 1) onDaysChange?.(1);
                 }}
-                title={days > 1 ? (hol ? `${hol}・この日だけを表示（長押しで表示日数）` : "この日だけを表示（長押しで表示日数）") : (hol ? `${hol}（長押しで表示日数）` : "長押しで表示日数")}
-                // iOSの長押しで文字選択・コピーのメニューが出ないよう無効化
-                style={{ WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
-                className={`min-w-0 flex-1 select-none border-l py-1 text-center text-xs font-bold active:bg-slate-100 ${
+                title={days > 1 ? (hol ? `${hol}・この日だけを表示` : "この日だけを表示") : hol || undefined}
+                className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold active:bg-slate-100 ${
                   isToday ? "text-blue-600" : hol ? "text-rose-500" : "text-slate-600"
                 }`}
               >
@@ -1216,7 +1200,16 @@ export default function CalendarView({
       <div className="overflow-hidden rounded-xl border bg-white">
         {/* 固定ヘッダー（横スライド） */}
         <div className="flex border-b">
-          <div className="shrink-0 bg-white" style={{ width: GUTTER }} />
+          {/* 左上コーナー：表示日数の切替（タップでメニュー） */}
+          <div className="flex shrink-0 items-center justify-center bg-white" style={{ width: GUTTER }}>
+            <button
+              onClick={() => setDaysMenuOpen(true)}
+              className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-600 active:bg-slate-100"
+              title="表示する日数を選ぶ"
+            >
+              {days}日▾
+            </button>
+          </div>
           <div className="relative min-w-0 flex-1 overflow-hidden">
             <div ref={headerTrackRef} className="flex" style={{ width: "300%" }}>
               {lists.map((list, i) => (
