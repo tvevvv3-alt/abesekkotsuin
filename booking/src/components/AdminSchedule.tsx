@@ -32,7 +32,7 @@ export default function AdminSchedule() {
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center gap-x-1 gap-y-1">
+      <div className="mb-1.5 flex flex-wrap items-center gap-x-1 gap-y-1">
         <div className="inline-flex shrink-0 rounded-md border border-slate-300 bg-white p-0.5">
           <button
             onClick={() => choose("board")}
@@ -72,7 +72,7 @@ export default function AdminSchedule() {
 
         <Link
           href="/admin/sales"
-          className="ml-auto flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-bold text-white active:bg-emerald-700"
+          className="ml-auto flex h-7 shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-2.5 text-[11px] font-bold text-white active:bg-emerald-700"
         >
           💰 個別売上
         </Link>

@@ -806,22 +806,18 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
 
   return (
     <div>
-      {/* 日付（中央）＋ヒント（左）＋予約追加（右）を1段に（前後・今日は上部の共通ツールバー） */}
-      <div className="mb-2 grid grid-cols-3 items-center gap-2">
-        <span />
-
-        <span className={`text-center text-sm font-bold ${holidayName(date) ? "text-rose-500" : "text-slate-700"}`}>
+      {/* 日付（左）＋予約追加（右）を1段にコンパクトに（前後・今日・個別売上は上部の共通ツールバー） */}
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className={`truncate text-sm font-bold ${holidayName(date) ? "text-rose-500" : "text-slate-700"}`}>
           {dObj.getMonth() + 1}/{dObj.getDate()}（{WEEKDAY_LABELS[dObj.getDay()]}）
           {holidayName(date) && <span className="ml-1 text-[11px] font-bold text-rose-500">{holidayName(date)}</span>}
         </span>
-        <div className="flex justify-end">
-          <button
-            onClick={() => setModal({ mode: "add" })}
-            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white active:bg-blue-700"
-          >
-            ＋ 予約追加
-          </button>
-        </div>
+        <button
+          onClick={() => setModal({ mode: "add" })}
+          className="shrink-0 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white active:bg-blue-700"
+        >
+          ＋ 予約追加
+        </button>
       </div>
 
       {loading ? (
