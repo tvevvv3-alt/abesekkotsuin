@@ -208,6 +208,16 @@ export default function CalendarView({
   const latestXYRef = useRef<{ x: number; y: number } | null>(null);
 
   const gridRef = useRef<HTMLDivElement>(null);
+  // 日付見出しの長押しで表示日数（1/3/4/7日）を選べるメニュー
+  const [daysMenuOpen, setDaysMenuOpen] = useState(false);
+  const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lpLong = useRef(false);
+  const startHeaderPress = () => {
+    lpLong.current = false;
+    if (lpTimer.current) clearTimeout(lpTimer.current);
+    lpTimer.current = setTimeout(() => { lpLong.current = true; setDaysMenuOpen(true); }, 500);
+  };
+  const cancelHeaderPress = () => { if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; } };
   const [boxH, setBoxH] = useState(600);
   // 現在時刻バー（Googleカレンダー風）。1分ごとに更新。
   const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
@@ -1076,11 +1086,16 @@ export default function CalendarView({
             return (
               <button
                 key={ds}
+                onPointerDown={startHeaderPress}
+                onPointerUp={cancelHeaderPress}
+                onPointerLeave={cancelHeaderPress}
+                onPointerMove={cancelHeaderPress}
                 onClick={() => {
+                  if (lpLong.current) { lpLong.current = false; return; } // 長押しだった＝日数メニューを出したのでタップ動作はしない
                   onStartChange(ds);
                   if (days > 1) onDaysChange?.(1);
                 }}
-                title={days > 1 ? (hol ? `${hol}・この日だけを表示` : "この日だけを表示") : hol || undefined}
+                title={days > 1 ? (hol ? `${hol}・この日だけを表示（長押しで表示日数）` : "この日だけを表示（長押しで表示日数）") : (hol ? `${hol}（長押しで表示日数）` : "長押しで表示日数")}
                 className={`min-w-0 flex-1 border-l py-1 text-center text-xs font-bold active:bg-slate-100 ${
                   isToday ? "text-blue-600" : hol ? "text-rose-500" : "text-slate-600"
                 }`}
@@ -1174,6 +1189,25 @@ export default function CalendarView({
           </span>
         )}
       </div>
+
+      {/* 日付見出しの長押しで出る「表示日数」メニュー */}
+      {daysMenuOpen && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setDaysMenuOpen(false)} />
+          <div className="fixed left-1/2 top-1/3 z-[61] w-44 -translate-x-1/2 overflow-hidden rounded-xl border bg-white shadow-xl">
+            <div className="border-b bg-slate-50 px-3 py-2 text-center text-xs font-bold text-slate-500">表示する日数</div>
+            {[1, 3, 4, 7].map((n) => (
+              <button
+                key={n}
+                onClick={() => { onDaysChange?.(n); setDaysMenuOpen(false); }}
+                className={`block w-full px-3 py-2.5 text-center text-sm ${days === n ? "bg-blue-600 font-bold text-white" : "text-slate-700 active:bg-slate-100"}`}
+              >
+                {n}日
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* カレンダー本体（ツールバーは親のAdminScheduleに統合） */}
       <div className="overflow-hidden rounded-xl border bg-white">
