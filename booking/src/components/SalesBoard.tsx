@@ -921,6 +921,41 @@ export default function SalesBoard() {
     })();
     return () => { alive = false; };
   }, [dayRows, date, supabase]);
+
+  // その日の予約について「自費カルテ記入済み」かを読み込む（名前の横に📝✅を出す用）。
+  const [chartDoneIds, setChartDoneIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const ids = dayRows.map((a) => a.id);
+      if (!ids.length) { setChartDoneIds(new Set()); return; }
+      // body_marks（人体図）列が未作成の環境でも落ちないよう、失敗時はテキスト列だけで再取得。
+      let rows: Record<string, unknown>[] | null = null;
+      const full = await supabase
+        .from("chart_entries")
+        .select("appointment_id, complaint, findings, progress, treatment, note, body_marks")
+        .in("appointment_id", ids);
+      if (full.error) {
+        const base = await supabase
+          .from("chart_entries")
+          .select("appointment_id, complaint, findings, progress, treatment, note")
+          .in("appointment_id", ids);
+        rows = (base.data as Record<string, unknown>[] | null) ?? [];
+      } else {
+        rows = (full.data as Record<string, unknown>[] | null) ?? [];
+      }
+      if (!alive) return;
+      const hasMarks = (v: unknown) => Array.isArray(v) ? v.length > 0 : (typeof v === "string" && v.trim() !== "" && v.trim() !== "[]");
+      const done = new Set<string>();
+      rows.forEach((r) => {
+        const texts = [r.complaint, r.findings, r.progress, r.treatment, r.note].some((t) => (typeof t === "string" && t.trim()));
+        if (texts || hasMarks(r.body_marks)) done.add(r.appointment_id as string);
+      });
+      setChartDoneIds(done);
+    })();
+    return () => { alive = false; };
+  }, [dayRows, supabase]);
+
   // 予約に同名がいる“はぐれ売上”は日別入力に出さない（予約行に集約）。物販・予約外はそのまま。
   const dayManual = useMemo(() => manualSales.filter((s) => s.date === date && !isOrphanDup(s)), [manualSales, date, isOrphanDup]);
   // 並び順（sort_orderで手動入れ替え可。既定は予約=時刻順、物販=末尾）
@@ -1678,6 +1713,9 @@ export default function SalesBoard() {
                                 >
                                   {a.patient_name || "（未登録）"}
                                 </Link>
+                              )}
+                              {chartDoneIds.has(a.id) && (
+                                <span title="カルテ記入済み" className="shrink-0 text-[12px] leading-none">📝✅</span>
                               )}
                               <span className="text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
                               {!(kawa && a.service_id === kawa.id) && (
