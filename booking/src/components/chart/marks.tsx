@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as RPE, type ReactNode, type WheelEvent as RWheel } from "react";
+import { loadVocab, learnLexicon } from "@/lib/lexicon";
 
 export type MarkType = "pain" | "stiff" | "numb" | "treat";
 // 身体図の1筆（ペンの線）。pts は図内の相対座標 [x,y]（0〜1）の配列。
@@ -68,10 +69,11 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
       const image = toPng();
       if (!image) { setTxErr("画像化に失敗"); return; }
       const res = await fetch("/api/chart/transcribe", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image }),
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image, vocab: loadVocab(200) }), // 過去に書いた語を候補として渡す
       });
       const json = (await res.json()) as { ok?: boolean; text?: string; reason?: string };
-      if (json.ok && json.text) onTranscribed(json.text);
+      if (json.ok && json.text) { onTranscribed(json.text); learnLexicon(json.text); } // 読み取れた語を辞書に記憶
       else setTxErr(json.reason === "nokey" ? "APIキー未設定" : "読み取れませんでした");
     } catch {
       setTxErr("通信エラー");

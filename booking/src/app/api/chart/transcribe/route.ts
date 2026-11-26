@@ -45,9 +45,13 @@ export async function POST(req: NextRequest) {
   }
 
   let dataUrl = "";
+  let vocab: string[] = [];
   try {
-    const body = (await req.json()) as { image?: string };
+    const body = (await req.json()) as { image?: string; vocab?: unknown };
     dataUrl = body.image || "";
+    if (Array.isArray(body.vocab)) {
+      vocab = body.vocab.filter((v): v is string => typeof v === "string" && v.length > 0).slice(0, 300);
+    }
   } catch {
     /* noop */
   }
@@ -59,6 +63,15 @@ export async function POST(req: NextRequest) {
   const base64 = m[2];
 
   const model = process.env.SALES_OCR_MODEL || "claude-sonnet-5";
+
+  // 過去に書かれた語彙（端末から送られてくる）を候補語としてプロンプトに差し込む。
+  // 似た内容が多いので、紛らわしい手書きはまずこの語彙から当てはめると精度が上がる。
+  const vocabBlock = vocab.length
+    ? `よく使う語彙（この端末で過去に書かれた語。手書きが紛らわしいときは、まずこの中から最も近い語を優先して当てはめ、表記も揃える。該当しなければ無視してよい。無い語を無理に当てはめない）:\n${vocab.join(" / ")}\n\n`
+    : "";
+  const fullPrompt = vocabBlock
+    ? PROMPT.replace("出力は補完後の本文テキストのみ", vocabBlock + "出力は補完後の本文テキストのみ")
+    : PROMPT;
 
   let text = "";
   try {
@@ -78,7 +91,7 @@ export async function POST(req: NextRequest) {
             role: "user",
             content: [
               { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-              { type: "text", text: PROMPT },
+              { type: "text", text: fullPrompt },
             ],
           },
         ],

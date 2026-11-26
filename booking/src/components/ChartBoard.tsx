@@ -10,6 +10,7 @@ import type { Staff } from "@/lib/types";
 import QuestionnaireForm from "@/components/QuestionnaireForm";
 import { DEFAULT_SECTIONS, parseSections, toIntakeLinked, type QSection, type QValue } from "@/lib/questionnaire";
 import { BodyMap, toStrokes, type MarkType, type Stroke } from "@/components/chart/marks";
+import { learnLexicon } from "@/lib/lexicon";
 
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 const TEAL = "#0d9488";
@@ -619,6 +620,8 @@ export default function ChartBoard() {
       note: (d.note || "").trim() || null,
       updated_at: new Date().toISOString(),
     };
+    // 入力した語を辞書に記憶（次回以降の手書き読み取りの候補にする）
+    learnLexicon([d.complaint, d.findings, d.progress, d.treatment, d.note].filter(Boolean).join(" "));
     const full = { ...base, body_marks: d.body_marks ?? [], memo_marks: d.memo_marks ?? [] };
     let { error } = await supabase.from("chart_entries").upsert(full, { onConflict: "appointment_id" });
     if (error) {
