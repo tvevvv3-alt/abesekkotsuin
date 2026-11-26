@@ -155,19 +155,21 @@ function PenTextarea({ value, onChange, placeholder, className }: {
     onChange(value + sep + t.trim());
     setPenStrokes([]);
   };
-  const btn = "rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40";
+  // touch-none＝Apple PencilのScribbleにペンを渡さない（ボタン上で点が書かれるのを防ぐ）
+  const noScribble = { touchAction: "none" as const, WebkitUserSelect: "none" as const, userSelect: "none" as const, WebkitTouchCallout: "none" as const };
+  const btn = "touch-none select-none rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40";
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={className} />
-      {/* 操作ボタン（テキスト枠から離す＋押してもフォーカスを外さずScribble誤反応を防ぐ） */}
+      {/* 操作ボタン（テキスト枠から離す＋Scribbleに渡さずペンのタップで直接実行） */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {/* ペン（Apple Pencil）でも確実に反応するよう、押下(pointerdown)で直接実行（Scribbleへ渡さない） */}
-        <button type="button" onPointerDown={(e) => { e.preventDefault(); insert(" "); }} className={btn}>␣ スペース</button>
-        <button type="button" onPointerDown={(e) => { e.preventDefault(); insert("\n"); }} className={btn}>↵ 改行</button>
-        <button type="button" onPointerDown={(e) => { e.preventDefault(); backspace(); }} disabled={!value.length} className={btn}>⌫ 1字消す</button>
+        {/* ペン（Apple Pencil）でも確実に反応：touch-noneでScribbleを無効化し、押下(pointerdown)で直接実行 */}
+        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); insert(" "); }} className={btn}>␣ スペース</button>
+        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); insert("\n"); }} className={btn}>↵ 改行</button>
+        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); backspace(); }} disabled={!value.length} className={btn}>⌫ 1字消す</button>
         {/* 手書きで文字起こしする／しないを選べる（既定は閉じる＝キーボード/Scribble入力） */}
-        <button type="button" onPointerDown={(e) => { e.preventDefault(); setPenOpen((o) => !o); }}
-          className={`rounded-md px-3 py-1.5 text-xs font-bold ${penOpen ? "bg-teal-600 text-white" : "border border-teal-300 text-teal-700"}`}>
+        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); setPenOpen((o) => !o); }}
+          className={`touch-none select-none rounded-md px-3 py-1.5 text-xs font-bold ${penOpen ? "bg-teal-600 text-white" : "border border-teal-300 text-teal-700"}`}>
           {penOpen ? "✍️ 手書きを閉じる" : "✍️ 手書きで文字起こし"}
         </button>
       </div>
@@ -176,7 +178,7 @@ function PenTextarea({ value, onChange, placeholder, className }: {
           <Pad strokes={penStrokes} onChange={setPenStrokes} penType="treat" penColor="#0f172a" aspect="3 / 1" onTranscribed={appendTranscribed} />
           <div className="mt-1 flex items-center justify-between">
             <p className="text-[11px] text-slate-400">手書きして「✍️文字起こし」を押すと、上のメモに文章が追加されます。</p>
-            <button type="button" onPointerDown={(e) => { e.preventDefault(); setPenStrokes([]); }} disabled={!penStrokes.length} className={btn}>消す</button>
+            <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); setPenStrokes([]); }} disabled={!penStrokes.length} className={btn}>消す</button>
           </div>
         </div>
       )}
