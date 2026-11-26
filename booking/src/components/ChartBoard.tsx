@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
@@ -9,7 +9,7 @@ import { ageAt } from "@/lib/pricing";
 import type { Staff } from "@/lib/types";
 import QuestionnaireForm from "@/components/QuestionnaireForm";
 import { DEFAULT_SECTIONS, parseSections, toIntakeLinked, type QSection, type QValue } from "@/lib/questionnaire";
-import { BodyMap, Pad, toStrokes, type MarkType, type Stroke } from "@/components/chart/marks";
+import { BodyMap, toStrokes, type MarkType, type Stroke } from "@/components/chart/marks";
 
 const normName = (s: string | null | undefined) => (s || "").replace(/[\s　]/g, "").trim();
 const TEAL = "#0d9488";
@@ -131,7 +131,6 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
   const applyAt = (make: (start: number, end: number) => { next: string; caret: number } | null) => {
     const el = ref.current;
     const hasSel = el && el.selectionStart != null;
@@ -148,14 +147,13 @@ function PenTextarea({ value, onChange, placeholder, className }: {
     if (start > 0) return { next: value.slice(0, start - 1) + value.slice(start), caret: start - 1 };
     return null;
   });
-  // 手書き→文字起こし：認識テキストを末尾に追記して手書きはクリア
-  const appendTranscribed = (t: string) => {
-    const sep = value && !value.endsWith("\n") ? "\n" : "";
-    onChange(value + sep + t.trim());
-    setPenStrokes([]);
-  };
   // touch-none＝Apple PencilのScribbleにペンを渡さない（ボタン上で点が書かれるのを防ぐ）
   const noScribble = { touchAction: "none" as const, WebkitUserSelect: "none" as const, userSelect: "none" as const, WebkitTouchCallout: "none" as const };
+  // ボタンをペンで押しても手書き（Scribble）にならないよう、touchstart/pointerdownを止めてから実行する
+  const penBtn = (fn: () => void) => ({
+    onTouchStart: (e: ReactTouchEvent) => { e.preventDefault(); },
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => { e.preventDefault(); e.stopPropagation(); fn(); },
+  });
   const btn = "touch-none select-none rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40";
   // ペンでタップした位置にカーソルを置く（Scribbleで書かずにカーソル指定）。指・マウスは従来どおり。
   const penCaret = (e: ReactPointerEvent<HTMLTextAreaElement>) => {
@@ -178,18 +176,13 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   };
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* 上半分：テキスト。ペンでタップするとその位置にカーソル。指・キーボードは通常入力 */}
+      {/* 症状・アプローチ：全面テキスト。ペンでタップするとその位置にカーソル。指・キーボードは通常入力 */}
       <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} onPointerDown={penCaret} placeholder={placeholder} className={className} />
-      {/* 文字編集ボタン（Scribbleに渡さずペンのタップで直接実行） */}
+      {/* 文字編集ボタン（ペンで押しても手書きにならない） */}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {/* ペン（Apple Pencil）でも確実に反応：touch-noneでScribbleを無効化し、押下(pointerdown)で直接実行 */}
-        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); insert(" "); }} className={btn}>␣ スペース</button>
-        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); insert("\n"); }} className={btn}>↵ 改行</button>
-        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); backspace(); }} disabled={!value.length} className={btn}>⌫ 1字消す</button>
-      </div>
-      {/* 下半分：手書きスペース（常時表示）。書いて「✍️文字起こし」を押すと上のメモへ追加 */}
-      <div className="mt-2 rounded-lg border border-slate-200 p-2">
-        <Pad label="✍️ 手書きスペース（書いてペンを止めると自動で上のメモに反映）" strokes={penStrokes} onChange={setPenStrokes} penType="treat" penColor="#0f172a" aspect="2 / 1" onTranscribed={appendTranscribed} />
+        <button type="button" style={noScribble} {...penBtn(() => insert(" "))} className={btn}>␣ スペース</button>
+        <button type="button" style={noScribble} {...penBtn(() => insert("\n"))} className={btn}>↵ 改行</button>
+        <button type="button" style={noScribble} {...penBtn(backspace)} disabled={!value.length} className={btn}>⌫ 1字消す</button>
       </div>
     </div>
   );
@@ -873,7 +866,7 @@ export default function ChartBoard() {
                       <div className="mb-1 text-sm font-bold text-slate-600">メモ（補足・申し送り）</div>
                       <PenTextarea value={intakeMemo} onChange={setIntakeMemo}
                         placeholder="施術内容・申し送りなど"
-                        className="min-h-[150px] w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                        className="min-h-[320px] w-full flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                     </div>
                   </div>
 
@@ -995,7 +988,7 @@ export default function ChartBoard() {
                     <div className="mb-1 text-[11px] font-bold text-teal-600">📊 症状・アプローチ</div>
                     <PenTextarea value={d.progress} onChange={(val) => updateEntry(v.id, { progress: val })}
                       placeholder="症状に対してのアプローチを横に。例）出力四肢低い→脊柱通電"
-                      className="min-h-[150px] w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                      className="min-h-[320px] w-full flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                   </div>
                 </div>
               </div>
