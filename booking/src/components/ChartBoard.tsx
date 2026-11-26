@@ -131,7 +131,6 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [penOpen, setPenOpen] = useState(false);
   const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
   const applyAt = (make: (start: number, end: number) => { next: string; caret: number } | null) => {
     const el = ref.current;
@@ -179,28 +178,19 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   };
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* 上半分：テキスト。ペンでタップするとその位置にカーソル。指・キーボードは通常入力 */}
       <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} onPointerDown={penCaret} placeholder={placeholder} className={className} />
-      {/* 操作ボタン（テキスト枠から離す＋Scribbleに渡さずペンのタップで直接実行） */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      {/* 文字編集ボタン（Scribbleに渡さずペンのタップで直接実行） */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         {/* ペン（Apple Pencil）でも確実に反応：touch-noneでScribbleを無効化し、押下(pointerdown)で直接実行 */}
         <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); insert(" "); }} className={btn}>␣ スペース</button>
         <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); insert("\n"); }} className={btn}>↵ 改行</button>
         <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); backspace(); }} disabled={!value.length} className={btn}>⌫ 1字消す</button>
-        {/* 手書きで文字起こしする／しないを選べる（既定は閉じる＝キーボード/Scribble入力） */}
-        <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); setPenOpen((o) => !o); }}
-          className={`touch-none select-none rounded-md px-3 py-1.5 text-xs font-bold ${penOpen ? "bg-teal-600 text-white" : "border border-teal-300 text-teal-700"}`}>
-          {penOpen ? "✍️ 手書きを閉じる" : "✍️ 手書きで文字起こし"}
-        </button>
       </div>
-      {penOpen && (
-        <div className="mt-2 rounded-lg border border-slate-200 p-2">
-          <Pad strokes={penStrokes} onChange={setPenStrokes} penType="treat" penColor="#0f172a" aspect="3 / 1" onTranscribed={appendTranscribed} />
-          <div className="mt-1 flex items-center justify-between">
-            <p className="text-[11px] text-slate-400">手書きして「✍️文字起こし」を押すと、上のメモに文章が追加されます。</p>
-            <button type="button" style={noScribble} onPointerDown={(e) => { e.preventDefault(); setPenStrokes([]); }} disabled={!penStrokes.length} className={btn}>消す</button>
-          </div>
-        </div>
-      )}
+      {/* 下半分：手書きスペース（常時表示）。書いて「✍️文字起こし」を押すと上のメモへ追加 */}
+      <div className="mt-2 rounded-lg border border-slate-200 p-2">
+        <Pad label="✍️ 手書きスペース（書いて「文字起こし」で上のメモに追加）" strokes={penStrokes} onChange={setPenStrokes} penType="treat" penColor="#0f172a" aspect="2 / 1" onTranscribed={appendTranscribed} />
+      </div>
     </div>
   );
 }
@@ -883,7 +873,7 @@ export default function ChartBoard() {
                       <div className="mb-1 text-sm font-bold text-slate-600">メモ（補足・申し送り）</div>
                       <PenTextarea value={intakeMemo} onChange={setIntakeMemo}
                         placeholder="施術内容・申し送りなど"
-                        className="min-h-[320px] w-full flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                        className="min-h-[150px] w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                     </div>
                   </div>
 
@@ -1005,7 +995,7 @@ export default function ChartBoard() {
                     <div className="mb-1 text-[11px] font-bold text-teal-600">📊 症状・アプローチ</div>
                     <PenTextarea value={d.progress} onChange={(val) => updateEntry(v.id, { progress: val })}
                       placeholder="症状に対してのアプローチを横に。例）出力四肢低い→脊柱通電"
-                      className="min-h-[320px] w-full flex-1 resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
+                      className="min-h-[150px] w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-teal-500 focus:outline-none" />
                   </div>
                 </div>
               </div>
