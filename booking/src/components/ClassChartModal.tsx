@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import type { createClient } from "@/lib/supabase/client";
 import { minToLabel } from "@/lib/booking";
 import { Pad, toStrokes, type Stroke } from "@/components/chart/marks";
@@ -44,11 +44,31 @@ function AutoTextarea({ value, onChange, disabled, placeholder, className, withB
     if (start > 0) return { next: value.slice(0, start - 1) + value.slice(start), caret: start - 1 };
     return null;
   });
+  // ペンでタップした位置にカーソルを置く（Scribbleで書かずにカーソル指定）。指・マウスは従来どおり。
+  const penCaret = (e: ReactPointerEvent<HTMLTextAreaElement>) => {
+    if (e.pointerType !== "pen") return;
+    e.preventDefault();
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const d = document as Document & {
+      caretPositionFromPoint?: (x: number, y: number) => { offset: number } | null;
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    let pos: number | null = null;
+    try {
+      if (typeof d.caretPositionFromPoint === "function") { const cp = d.caretPositionFromPoint(e.clientX, e.clientY); if (cp) pos = cp.offset; }
+      else if (typeof d.caretRangeFromPoint === "function") { const r = d.caretRangeFromPoint(e.clientX, e.clientY); if (r) pos = r.startOffset; }
+    } catch { /* noop */ }
+    if (pos == null) pos = value.length;
+    try { el.setSelectionRange(pos, pos); } catch { /* noop */ }
+  };
   const area = (
     <textarea
       ref={ref}
       value={value}
       onChange={(e) => { onChange?.(e.target.value); fit(); }}
+      onPointerDown={penCaret}
       disabled={disabled}
       placeholder={placeholder}
       rows={2}

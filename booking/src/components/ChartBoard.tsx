@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loadAllStaff } from "@/lib/data";
@@ -158,9 +158,28 @@ function PenTextarea({ value, onChange, placeholder, className }: {
   // touch-none＝Apple PencilのScribbleにペンを渡さない（ボタン上で点が書かれるのを防ぐ）
   const noScribble = { touchAction: "none" as const, WebkitUserSelect: "none" as const, userSelect: "none" as const, WebkitTouchCallout: "none" as const };
   const btn = "touch-none select-none rounded-md border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-600 active:bg-slate-100 disabled:opacity-40";
+  // ペンでタップした位置にカーソルを置く（Scribbleで書かずにカーソル指定）。指・マウスは従来どおり。
+  const penCaret = (e: ReactPointerEvent<HTMLTextAreaElement>) => {
+    if (e.pointerType !== "pen") return;
+    e.preventDefault();
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const d = document as Document & {
+      caretPositionFromPoint?: (x: number, y: number) => { offset: number } | null;
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    let pos: number | null = null;
+    try {
+      if (typeof d.caretPositionFromPoint === "function") { const cp = d.caretPositionFromPoint(e.clientX, e.clientY); if (cp) pos = cp.offset; }
+      else if (typeof d.caretRangeFromPoint === "function") { const r = d.caretRangeFromPoint(e.clientX, e.clientY); if (r) pos = r.startOffset; }
+    } catch { /* noop */ }
+    if (pos == null) pos = value.length;
+    try { el.setSelectionRange(pos, pos); } catch { /* noop */ }
+  };
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={className} />
+      <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} onPointerDown={penCaret} placeholder={placeholder} className={className} />
       {/* 操作ボタン（テキスト枠から離す＋Scribbleに渡さずペンのタップで直接実行） */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {/* ペン（Apple Pencil）でも確実に反応：touch-noneでScribbleを無効化し、押下(pointerdown)で直接実行 */}
