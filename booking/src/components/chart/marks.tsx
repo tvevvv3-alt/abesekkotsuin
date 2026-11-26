@@ -41,17 +41,23 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
   // 現在の手書き線を白背景のPNGに描き出す（文字起こし用）
   const toPng = (): string | null => {
     const [wR, hR] = (aspect ?? "1 / 1").split("/").map((n) => parseFloat(n.trim()) || 1);
-    const W = 1600;
+    const W = 2200; // 文字起こし精度のため高解像度で描き出す
     const H = Math.round(W * (hR / wR));
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const g = cv.getContext("2d");
     if (!g) return null;
     g.fillStyle = "#ffffff"; g.fillRect(0, 0, W, H);
-    g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = Math.max(3, Math.round(W / 320));
+    // 大文字小文字の高さ比較用に基準線（上=大文字の高さ目安 / 下=ベースライン / 中=小文字の高さ目安）を薄く描く
+    if (onTranscribed) {
+      g.strokeStyle = "#e2e8f0"; g.lineWidth = 2;
+      for (const fy of [0.18, 0.5, 0.82]) { g.beginPath(); g.moveTo(0, H * fy); g.lineTo(W, H * fy); g.stroke(); }
+    }
+    g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = Math.max(4, Math.round(W / 300));
     for (const s of strokes) {
       if (!s.pts.length) continue;
-      g.strokeStyle = penColor ?? markColor(s.type);
+      // 文字起こし用途（onTranscribed）は認識精度優先で真っ黒・太めに描く
+      g.strokeStyle = onTranscribed ? "#000000" : (penColor ?? markColor(s.type));
       g.beginPath();
       s.pts.forEach(([x, y], i) => { const px = x * W, py = y * H; if (i === 0) g.moveTo(px, py); else g.lineTo(px, py); });
       if (s.pts.length === 1) { const [x, y] = s.pts[0]; g.lineTo(x * W + 0.1, y * H + 0.1); }
@@ -148,6 +154,10 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
           bgNode && <div className="pointer-events-none absolute inset-0">{bgNode}</div>
         )}
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
+          {/* 文字起こし用の罫線：大文字は上線まで届く／小文字は中線まで。ベースライン(下線)に字を揃えて書く */}
+          {onTranscribed && [18, 50, 82].map((y) => (
+            <line key={`g${y}`} x1="0" y1={y} x2="100" y2={y} stroke="#cbd5e1" strokeWidth={y === 82 ? 0.7 : 0.5} strokeDasharray={y === 82 ? undefined : "1.5 1.5"} vectorEffect="non-scaling-stroke" />
+          ))}
           {strokes.map((s) => (
             <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={penColor ?? markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           ))}
