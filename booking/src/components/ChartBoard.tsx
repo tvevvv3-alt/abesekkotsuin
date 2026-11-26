@@ -189,7 +189,7 @@ function PenTextarea({ value, onChange, placeholder, className }: {
       </div>
       {/* 下半分：手書きスペース（常時表示）。書いて「✍️文字起こし」を押すと上のメモへ追加 */}
       <div className="mt-2 rounded-lg border border-slate-200 p-2">
-        <Pad label="✍️ 手書きスペース（書いて「文字起こし」で上のメモに追加）" strokes={penStrokes} onChange={setPenStrokes} penType="treat" penColor="#0f172a" aspect="2 / 1" onTranscribed={appendTranscribed} />
+        <Pad label="✍️ 手書きスペース（書いてペンを止めると自動で上のメモに反映）" strokes={penStrokes} onChange={setPenStrokes} penType="treat" penColor="#0f172a" aspect="2 / 1" onTranscribed={appendTranscribed} />
       </div>
     </div>
   );

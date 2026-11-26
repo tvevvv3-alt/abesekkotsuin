@@ -41,22 +41,17 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
   // 現在の手書き線を白背景のPNGに描き出す（文字起こし用）
   const toPng = (): string | null => {
     const [wR, hR] = (aspect ?? "1 / 1").split("/").map((n) => parseFloat(n.trim()) || 1);
-    const W = 2200; // 文字起こし精度のため高解像度で描き出す
+    const W = 1600;
     const H = Math.round(W * (hR / wR));
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const g = cv.getContext("2d");
     if (!g) return null;
     g.fillStyle = "#ffffff"; g.fillRect(0, 0, W, H);
-    // 大文字小文字の高さ比較用に基準線（上=大文字の高さ目安 / 下=ベースライン / 中=小文字の高さ目安）を薄く描く
-    if (onTranscribed) {
-      g.strokeStyle = "#e2e8f0"; g.lineWidth = 2;
-      for (const fy of [0.18, 0.5, 0.82]) { g.beginPath(); g.moveTo(0, H * fy); g.lineTo(W, H * fy); g.stroke(); }
-    }
-    g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = Math.max(4, Math.round(W / 300));
+    g.lineCap = "round"; g.lineJoin = "round"; g.lineWidth = Math.max(3, Math.round(W / 320));
     for (const s of strokes) {
       if (!s.pts.length) continue;
-      // 文字起こし用途（onTranscribed）は認識精度優先で真っ黒・太めに描く
+      // 文字起こし用途は認識精度優先で真っ黒で描く（線の太さは画面と同じ＝書き味は変えない）
       g.strokeStyle = onTranscribed ? "#000000" : (penColor ?? markColor(s.type));
       g.beginPath();
       s.pts.forEach(([x, y], i) => { const px = x * W, py = y * H; if (i === 0) g.moveTo(px, py); else g.lineTo(px, py); });
@@ -84,6 +79,17 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
       setBusy(false);
     }
   };
+  // ペンが止まったら自動で文字起こし：直近のストロークから一定時間(1.2秒)書き足しがなければ実行。
+  // 成功すると上のメモに追記され手書きはクリアされる。失敗時は同じ内容で連打しない（書き足したら再試行）。
+  const txRef = useRef(transcribe); txRef.current = transcribe;
+  const triedLenRef = useRef(0);
+  useEffect(() => {
+    if (!onTranscribed) return;
+    if (!strokes.length) { triedLenRef.current = 0; return; }
+    if (busy || strokes.length === triedLenRef.current) return;
+    const t = setTimeout(() => { triedLenRef.current = strokes.length; txRef.current(); }, 1200);
+    return () => clearTimeout(t);
+  }, [strokes, busy, onTranscribed]);
   const liveRef = useRef<SVGPolylineElement>(null); // 描画中の線は再描画せず直接更新（ペン追従を軽く）
   const cur = useRef<[number, number][] | null>(null);
   const drawPtr = useRef<number | null>(null);
@@ -154,10 +160,6 @@ export function Pad({ label, strokes, onChange, penType, bgImg, bgNode, penColor
           bgNode && <div className="pointer-events-none absolute inset-0">{bgNode}</div>
         )}
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
-          {/* 文字起こし用の罫線：大文字は上線まで届く／小文字は中線まで。ベースライン(下線)に字を揃えて書く */}
-          {onTranscribed && [18, 50, 82].map((y) => (
-            <line key={`g${y}`} x1="0" y1={y} x2="100" y2={y} stroke="#cbd5e1" strokeWidth={y === 82 ? 0.7 : 0.5} strokeDasharray={y === 82 ? undefined : "1.5 1.5"} vectorEffect="non-scaling-stroke" />
-          ))}
           {strokes.map((s) => (
             <polyline key={s.id} points={poly(s.pts)} fill="none" stroke={penColor ?? markColor(s.type)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           ))}
