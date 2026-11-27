@@ -1360,27 +1360,6 @@ export default function BookingWizard() {
             </div>
           )}
 
-          {/* 親御さん限定・全身通電20分オプション（施術30分／30分＋全身通電／60分／体幹教室で表示） */}
-          {parentTsudenEligible && (
-            <label className="mb-3 flex cursor-pointer gap-3 rounded-xl border p-3 transition active:opacity-90" style={{ borderColor: parentTsuden ? GOLD : "#e2e8f0", background: parentTsuden ? "#fffdf5" : "#fff" }}>
-              <input
-                type="checkbox"
-                checked={parentTsuden}
-                onChange={(e) => setParentTsuden(e.target.checked)}
-                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-500"
-              />
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <span className="text-sm font-bold text-slate-800">学生のお子さまの保護者限定｜全身通電20分</span>
-                  <span className="rounded-md px-1.5 py-0.5 text-xs font-bold text-white" style={{ background: GOLD }}>＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}</span>
-                </div>
-                <p className="mt-1 text-[12px] leading-snug text-slate-500">
-                  お子さまの施術中に、親御さんも全身ケア。ミトコンドリアの働きをサポートし、睡眠の質や疲労回復、免疫機能を整える効果が期待できます。
-                </p>
-                <p className="mt-1 text-[10px] text-slate-400">お子さまと同時進行のため、予約時間は延長しません。</p>
-              </div>
-            </label>
-          )}
 
           {/* 週切替（今週より前へは戻れない） */}
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -1567,12 +1546,30 @@ export default function BookingWizard() {
                     <div className="font-bold text-slate-800">
                       {service.patient_name || service.name}
                     </div>
-                    {parentAddOn > 0 && (
-                      <div className="mt-0.5 text-[12px] font-bold" style={{ color: GOLD }}>
-                        ＋ 全身通電20分（保護者）（＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}）
-                      </div>
-                    )}
                   </div>
+                  {/* 学生のお子さまの保護者限定・全身通電オプション（この確認ポップアップで選択） */}
+                  {parentTsudenEligible && (
+                    <div>
+                      <div className="mb-1 text-[11px] text-slate-400">オプション</div>
+                      <label className="flex cursor-pointer gap-2.5 rounded-xl border p-2.5 transition active:opacity-90" style={{ borderColor: parentTsuden ? GOLD : "#e2e8f0", background: parentTsuden ? "#fffdf5" : "#fff" }}>
+                        <input
+                          type="checkbox"
+                          checked={parentTsuden}
+                          onChange={(e) => setParentTsuden(e.target.checked)}
+                          className="mt-0.5 h-5 w-5 shrink-0 accent-amber-500"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                            <span className="text-[13px] font-bold text-slate-800">学生のお子さまの保護者限定｜全身通電20分</span>
+                            <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white" style={{ background: GOLD }}>＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}</span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                            お子さまの施術中に、保護者さまも全身ケア。予約時間は延長しません。
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-5 space-y-2">
