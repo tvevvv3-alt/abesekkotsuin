@@ -35,6 +35,7 @@ interface Appt {
   service_name: string | null;
   patient_id: string | null;
   patient_name: string | null;
+  note: string | null; // 予約メモ（親御さん全身通電などのオプション記録）
 }
 interface Sale {
   id: string;
@@ -209,7 +210,7 @@ export default function SalesBoard() {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("appointments")
-        .select("id, date, start_min, staff_id, service_id, service_name, patient_id, patient_name")
+        .select("id, date, start_min, staff_id, service_id, service_name, patient_id, patient_name, note")
         .neq("status", "cancelled")
         .gte("date", monthStart)
         .lt("date", monthEnd)
@@ -1716,6 +1717,9 @@ export default function SalesBoard() {
                               )}
                               {chartDoneIds.has(a.id) && (
                                 <span title="カルテ記入済み" className="shrink-0 text-[12px] leading-none">📝✅</span>
+                              )}
+                              {a.note && a.note.includes("全身通電") && (
+                                <span title={a.note} className="shrink-0 rounded bg-amber-500 px-1 py-0.5 text-[9px] font-bold leading-none text-white">親+通電 ¥1,500</span>
                               )}
                               <span className="text-[10px] text-slate-400">{minToLabel(a.start_min)}</span>
                               {!(kawa && a.service_id === kawa.id) && (
