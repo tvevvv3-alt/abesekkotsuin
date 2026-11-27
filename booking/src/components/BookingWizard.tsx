@@ -807,7 +807,7 @@ export default function BookingWizard() {
         p_birth_date: birth || null,
         p_phone: phone.trim() || null,
         // 親御さん全身通電オプションは予約メモに記録（スタッフが売上で+1,500円を計上）
-        p_note: parentAddOn > 0 ? `親御さん全身通電20分 +¥${PARENT_TSUDEN_PRICE.toLocaleString()}` : null,
+        p_note: parentAddOn > 0 ? `全身通電20分（保護者）+¥${PARENT_TSUDEN_PRICE.toLocaleString()}` : null,
         p_source: "patient",
         // 冪等キー（同じキーの再送信は既存予約を返す＝重複しない）
         p_idempotency_key: idemKey,
@@ -1371,7 +1371,7 @@ export default function BookingWizard() {
               />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <span className="text-sm font-bold text-slate-800">親御さん限定｜全身通電20分</span>
+                  <span className="text-sm font-bold text-slate-800">学生のお子さまの保護者限定｜全身通電20分</span>
                   <span className="rounded-md px-1.5 py-0.5 text-xs font-bold text-white" style={{ background: GOLD }}>＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}</span>
                 </div>
                 <p className="mt-1 text-[12px] leading-snug text-slate-500">
@@ -1569,7 +1569,7 @@ export default function BookingWizard() {
                     </div>
                     {parentAddOn > 0 && (
                       <div className="mt-0.5 text-[12px] font-bold" style={{ color: GOLD }}>
-                        ＋ 親御さん全身通電20分（＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}）
+                        ＋ 全身通電20分（保護者）（＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}）
                       </div>
                     )}
                   </div>
