@@ -938,16 +938,23 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
                               className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
                               style={{ textShadow: TEXT_SHADOW }}
                             >
-                              {prevInsured.has(normName(appt.patient_name)) && (
-                                <span
-                                  className="mr-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full border-2 border-white bg-rose-500 align-middle"
-                                  title="前回保険あり：手書きカルテの準備を"
-                                />
+                              {/* 通電(薄)の帯は名前を繰り返さず「全身通電」と表示。名前・バッジは施術(濃)側のみ */}
+                              {sg.tone === "light" && !kawanishi ? (
+                                "全身通電"
+                              ) : (
+                                <>
+                                  {prevInsured.has(normName(appt.patient_name)) && (
+                                    <span
+                                      className="mr-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full border-2 border-white bg-rose-500 align-middle"
+                                      title="前回保険あり：手書きカルテの準備を"
+                                    />
+                                  )}
+                                  {personalIds.has(appt.service_id ?? "") && (
+                                    <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
+                                  )}
+                                  {appt.patient_name || "（未登録）"}
+                                </>
                               )}
-                              {personalIds.has(appt.service_id ?? "") && (
-                                <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
-                              )}
-                              {appt.patient_name || "（未登録）"}
                             </span>
                           </div>
                         ))}
