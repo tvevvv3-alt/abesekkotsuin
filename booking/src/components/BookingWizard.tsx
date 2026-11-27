@@ -1566,7 +1566,7 @@ export default function BookingWizard() {
                             <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white" style={{ background: GOLD }}>＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}</span>
                           </div>
                           <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                            お子さまの施術中に、保護者さまも全身ケア。
+                            お子さまの施術中に、保護者さまも全身ケア。ミトコンドリアの働きをサポートし、代謝向上・睡眠の質・疲労回復・免疫機能を整える効果が期待できます。
                           </p>
                         </div>
                       </label>
