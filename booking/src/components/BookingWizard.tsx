@@ -815,15 +815,19 @@ export default function BookingWizard() {
       };
       // 時間外枠（20:30以降）＝勤務時間チェックのみ免除（休診・重複は従来どおり）
       if (ahBooking) params.p_after_hours = true;
+      // 保護者・全身通電オプション選択時のみ送る（未適用環境でも通常予約は従来の関数で動く）
+      if (parentAddOn > 0) params.p_parent_tsuden = true;
       const { data, error } = await supabase.rpc("book_appointment", params);
       if (error) throw new Error(error.message);
       const res = data as { ok: boolean; reason?: string; appointment_id?: string; duplicate?: boolean };
       if (!res.ok) {
-        // 枠が埋まった（同時に他の人が取った）／その他の予約不可
+        // 枠が埋まった（同時に他の人が取った）／全身通電が満員／その他の予約不可
         setSubmitError(
           res.reason === "slot_taken"
             ? "申し訳ありません、その枠は先ほど埋まりました。別のお時間をお選びください。"
-            : res.reason || "予約できませんでした。別の時間をお選びください。"
+            : res.reason === "denden_full"
+              ? "申し訳ありません、その時間は全身通電（保護者オプション）の枠が満員です。オプションを外すか、別のお時間をお選びください。"
+              : res.reason || "予約できませんでした。別の時間をお選びください。"
         );
         await reloadWeek();
         setStep(2);
