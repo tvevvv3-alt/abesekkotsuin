@@ -939,10 +939,8 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
                               className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
                               style={{ textShadow: TEXT_SHADOW }}
                             >
-                              {/* 通電(薄)の帯は「全身通電」。保護者オプションは帯自体を出さない（⚡️で分かる）。名前・バッジは施術(濃)側のみ */}
-                              {sg.tone === "light" && !kawanishi ? (
-                                "全身通電"
-                              ) : (
+                              {/* 保護者オプションの通電帯は出さない（⚡️で分かる）。通電(薄)・施術(濃)とも患者名を表示。バッジは施術側のみ */}
+                              {sg.tone !== "light" && (
                                 <>
                                   {prevInsured.has(normName(appt.patient_name)) && (
                                     <span
@@ -953,9 +951,9 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
                                   {personalIds.has(appt.service_id ?? "") && (
                                     <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
                                   )}
-                                  {appt.patient_name || "（未登録）"}
                                 </>
                               )}
+                              {appt.patient_name || "（未登録）"}
                             </span>
                           </div>
                         ))}

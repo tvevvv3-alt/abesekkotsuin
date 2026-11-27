@@ -1060,17 +1060,11 @@ export default function CalendarView({
                       className={`${ml ? "overflow-hidden text-[13px] leading-[1.25]" : "w-full overflow-hidden whitespace-nowrap text-[12.5px] leading-[1.2]"} font-semibold text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
-                      {/* 通電(薄)の帯は「全身通電」。施術(濃)は患者名 */}
-                      {sg.tone === "light" ? (
-                        "全身通電"
-                      ) : (
-                        <>
-                          {personalIds.has(a.service_id ?? "") && (
-                            <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
-                          )}
-                          {a.patient_name || "（未登録）"}
-                        </>
+                      {/* 保護者オプションの通電帯は出さない（⚡️で分かる）。通電(薄)・施術(濃)とも患者名を表示 */}
+                      {sg.tone !== "light" && personalIds.has(a.service_id ?? "") && (
+                        <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
                       )}
+                      {a.patient_name || "（未登録）"}
                     </span>
                   </div>
                 );
