@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
   for (const job of jobs) {
     const { data: appts } = await admin
       .from("appointments")
-      .select("id, service_id, staff_id, date, start_min, service_name, line_user_id")
+      .select("id, service_id, staff_id, date, start_min, service_name, note, line_user_id")
       .eq("date", job.date)
       .eq("status", "booked")
       .not("line_user_id", "is", null)

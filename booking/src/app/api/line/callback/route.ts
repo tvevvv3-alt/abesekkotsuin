@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
 
   const { data: appt } = await admin
     .from("appointments")
-    .select("id, service_id, staff_id, date, start_min, service_name, patient_id, patient_name, confirm_sent_at")
+    .select("id, service_id, staff_id, date, start_min, service_name, note, patient_id, patient_name, confirm_sent_at")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return done("?error=noappt");

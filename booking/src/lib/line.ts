@@ -48,6 +48,7 @@ export interface ApptInfo {
   serviceName: string;
   dateTime: string; // fmtDateTime 済み
   staffName?: string | null;
+  option?: string | null; // 追加オプション（例：全身通電20分（保護者）＋¥1,500）
   visitTime: string; // "10:00"
 }
 
@@ -180,13 +181,24 @@ export function renderLinkMessage(tpl: string, url: string): string {
 
 // テンプレートに予約情報を差し込む。値が空の「ラベル：」行は自動で消す。
 export function renderMessage(tpl: string, i: ApptInfo): string {
-  const out = tpl
+  let out = tpl
     .split("{院}").join(i.clinicName)
     .split("{メニュー}").join(i.serviceName)
     .split("{日時}").join(i.dateTime)
     .split("{担当}").join(i.staffName || "")
     .split("{来院時刻}").join(i.visitTime);
-  // 「■担当　：」のように値が空になったラベル行を削除
+  // オプション行：{オプション}があればそこ、無ければ「■メニュー：」行の直後に挿入
+  const optLine = i.option && i.option.trim() ? `■オプション：${i.option.trim()}` : "";
+  if (out.includes("{オプション}")) {
+    out = out.split("{オプション}").join(optLine);
+  } else if (optLine) {
+    const lines = out.split("\n");
+    const mi = lines.findIndex((l) => l.includes("メニュー"));
+    if (mi >= 0) lines.splice(mi + 1, 0, optLine);
+    else lines.push(optLine);
+    out = lines.join("\n");
+  }
+  // 「■担当　：」のように値が空になったラベル行・空の{オプション}行を削除
   return out
     .split("\n")
     .filter((line) => !/^[^：\n]*：\s*$/.test(line))
@@ -214,6 +226,15 @@ export interface ApptRow {
   date: string;
   start_min: number;
   service_name: string | null;
+  note?: string | null;
+}
+
+// 予約メモから患者向けのオプション表記を作る（保護者・全身通電など）
+function optionFromNote(note: string | null | undefined): string | null {
+  const n = (note || "").trim();
+  if (!n) return null;
+  if (/全身通電/.test(n) && /保護者/.test(n)) return "全身通電20分（保護者）＋¥1,500";
+  return null;
 }
 type ClinicsMap =
   | { ibaraki?: { name?: string }; kawanishi?: { name?: string } }
@@ -267,6 +288,7 @@ export async function buildApptInfo(
     serviceName,
     dateTime: fmtDateTime(a.date, a.start_min),
     staffName,
+    option: optionFromNote(a.note),
     visitTime: `${hh}:${String(mm).padStart(2, "0")}`,
   };
 }
