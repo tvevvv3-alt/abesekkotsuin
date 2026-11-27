@@ -138,6 +138,12 @@ function stepTone(st: AppointmentStep): "light" | "dark" {
 // 30分グリッドで区切る：通電20分→30分枠(薄)、施術30分(濃)。60分施術のみ→60分ひとつながり。
 // left/width は横位置（0〜1）。通常は全幅(0〜1)。保護者の全身通電オプションのように
 // 施術と「同時進行」する通電は、施術の横に並べて表示する（conc=true）。
+// 保護者・全身通電オプション付きの予約か（工程名「全身通電(保護者)」またはメモで判定）
+function hasParentTsuden(a: ApptWithSteps): boolean {
+  if ((a.steps ?? []).some((st) => /保護者/.test(st.name || ""))) return true;
+  return /全身通電[（(]保護者|保護者[）)]/.test((a as { note?: string | null }).note || "");
+}
+
 type Seg = { s: number; e: number; tone: "light" | "dark"; left: number; width: number; conc?: boolean };
 function apptSegments(a: ApptWithSteps): Seg[] {
   const blockStart = snap(a.start_min);
@@ -1035,6 +1041,11 @@ export default function CalendarView({
               {done && (
                 <span className="absolute right-0.5 top-0.5 z-10 rounded bg-white/90 px-1 text-[9px] font-bold text-slate-600">
                   済
+                </span>
+              )}
+              {hasParentTsuden(a) && (
+                <span title="保護者・全身通電オプション" className="absolute left-0.5 top-0.5 z-10 rounded bg-white/90 px-0.5 text-[10px] leading-none">
+                  ⚡️
                 </span>
               )}
               {drg && drg.kind === "move" && (

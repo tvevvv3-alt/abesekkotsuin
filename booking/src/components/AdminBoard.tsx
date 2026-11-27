@@ -99,6 +99,12 @@ function stepTone(st: AppointmentStep): "light" | "dark" {
   return st.uses_staff ? "dark" : "light";
 }
 
+// 保護者・全身通電オプション付きの予約か（工程名「全身通電(保護者)」またはメモで判定）
+function hasParentTsuden(a: ApptWithSteps): boolean {
+  if ((a.steps ?? []).some((st) => /保護者/.test(st.name || ""))) return true;
+  return /全身通電[（(]保護者|保護者[）)]/.test((a as { note?: string | null }).note || "");
+}
+
 // 予約を「薄い通電 / 濃い施術」のセグメントへ分解（30分グリッドで区切る＝カレンダーと同じ）
 function apptSegments(
   a: ApptWithSteps,
@@ -913,6 +919,9 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
                           <span className="absolute right-0.5 top-0.5 z-30 rounded bg-white/90 px-1 text-[9px] font-bold text-slate-600">
                             済
                           </span>
+                        )}
+                        {hasParentTsuden(appt) && (
+                          <span title="保護者・全身通電オプション" className="absolute left-0.5 top-0.5 z-30 rounded bg-white/90 px-0.5 text-[10px] leading-none">⚡️</span>
                         )}
                         {segs.map((sg, i) => (
                           <div
