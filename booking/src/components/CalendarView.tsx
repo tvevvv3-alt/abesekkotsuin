@@ -144,27 +144,17 @@ function hasParentTsuden(a: ApptWithSteps): boolean {
   return /全身通電[（(]保護者|保護者[）)]/.test((a as { note?: string | null }).note || "");
 }
 
-type Seg = { s: number; e: number; tone: "light" | "dark"; left: number; width: number; conc?: boolean };
+type Seg = { s: number; e: number; tone: "light" | "dark" };
 function apptSegments(a: ApptWithSteps): Seg[] {
   const blockStart = snap(a.start_min);
   const blockEnd = Math.max(snap(a.end_min), blockStart + SNAP);
+  // 保護者オプションの全身通電工程は帯を作らない（⚡️マークだけで表す）。
   const steps = (a.steps ?? [])
-    .filter((st) => st.start_min != null && st.end_min != null)
+    .filter((st) => st.start_min != null && st.end_min != null && !/保護者/.test(st.name || ""))
     .sort((x, y) => x.start_min - y.start_min);
-  if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark", left: 0, width: 1 }];
-  // 施術(濃)と時間が重なる通電(薄)＝同時進行のオプション（保護者の全身通電など）。横並びにする。
-  const darks = steps.filter((st) => stepTone(st) === "dark");
-  const conc = steps.filter(
-    (st) => stepTone(st) === "light" && darks.some((d) => st.start_min < d.end_min && d.start_min < st.end_min)
-  );
-  const concIds = new Set(conc.map((st) => st.id));
-  const seqSteps = steps.filter((st) => !concIds.has(st.id));
-  const hasConc = conc.length > 0;
-  const mainW = hasConc ? 0.56 : 1; // 横並び時は施術側を少し狭めて右に通電を置く
-
-  // 縦方向（従来どおり）：同時進行でない工程をトーンでまとめて順に積む
-  const merged: { s: number; e: number; tone: "light" | "dark" }[] = [];
-  for (const st of seqSteps) {
+  if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark" }];
+  const merged: Seg[] = [];
+  for (const st of steps) {
     const tone = stepTone(st);
     const last = merged[merged.length - 1];
     if (last && last.tone === tone && st.start_min <= last.e) last.e = Math.max(last.e, st.end_min);
@@ -175,15 +165,8 @@ function apptSegments(a: ApptWithSteps): Seg[] {
   for (const seg of merged) {
     let end = snap(seg.e);
     if (end <= cursor) end = cursor + SNAP;
-    out.push({ s: cursor, e: end, tone: seg.tone, left: 0, width: mainW });
+    out.push({ s: cursor, e: end, tone: seg.tone });
     cursor = end;
-  }
-  // 横並びの通電（右側）。保護者オプションは施術と同じ濃い色で表示（薄くしない）。
-  for (const st of conc) {
-    const s = snap(st.start_min);
-    let e = snap(st.end_min);
-    if (e <= s) e = s + SNAP;
-    out.push({ s, e, tone: "dark", left: mainW, width: 1 - mainW, conc: true });
   }
   return out;
 }
@@ -1056,21 +1039,18 @@ export default function CalendarView({
               {segs.map((sg, i) => {
                 const segTop = yFor(sg.s) - top;
                 const segH = yFor(sg.e) - yFor(sg.s);
-                const ml = it.full && sg.width >= 0.999 && segH >= 44;
-                // 同時進行(conc)の通電は順番入れ替え(denden)対象にしない（時間が固定のため）
-                const isDenden = hasBoth && sg.tone === "light" && !sg.conc;
+                const ml = it.full && segH >= 44;
+                const isDenden = hasBoth && sg.tone === "light";
                 const dendenTf = drg && drg.kind === "denden" && isDenden ? { transform: `translateY(${drg.dyPx}px)`, zIndex: 30, boxShadow: "0 8px 18px rgba(0,0,0,.28)" } : {};
-                // 各30分枠を白枠で囲い、通電・施術それぞれに名前を入れる
+                // 各30分枠を白枠で囲い、施術は名前、通電は「全身通電」と表示
                 return (
                   <div
                     key={i}
                     data-denden={isDenden ? "1" : undefined}
-                    className="absolute flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
+                    className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                     style={{
                       top: segTop,
                       height: segH,
-                      left: `${sg.left * 100}%`,
-                      width: `${sg.width * 100}%`,
                       backgroundColor: segColor(col, sg.tone),
                       border: HAIRLINE,
                       ...dendenTf,
@@ -1080,8 +1060,10 @@ export default function CalendarView({
                       className={`${ml ? "overflow-hidden text-[13px] leading-[1.25]" : "w-full overflow-hidden whitespace-nowrap text-[12.5px] leading-[1.2]"} font-semibold text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
-                      {/* 通電の帯（薄い通電 or 同時進行の保護者通電）は名前を出さない（⚡️で分かる） */}
-                      {sg.tone === "light" || sg.conc ? null : (
+                      {/* 通電(薄)の帯は「全身通電」。施術(濃)は患者名 */}
+                      {sg.tone === "light" ? (
+                        "全身通電"
+                      ) : (
                         <>
                           {personalIds.has(a.service_id ?? "") && (
                             <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>

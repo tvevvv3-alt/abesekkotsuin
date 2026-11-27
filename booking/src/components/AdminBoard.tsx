@@ -115,7 +115,8 @@ function apptSegments(
   const blockStart = snap30(s);
   const blockEnd = Math.max(snap30(e), blockStart + 30);
   const steps = (a.steps ?? [])
-    .filter((st) => st.start_min != null && st.end_min != null)
+    // 保護者オプションの全身通電工程は帯を作らない（⚡️マークだけで表す）
+    .filter((st) => st.start_min != null && st.end_min != null && !/保護者/.test(st.name || ""))
     .sort((x, y) => x.start_min - y.start_min);
   if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark" }];
   const merged: { s: number; e: number; tone: "light" | "dark" }[] = [];
@@ -938,8 +939,10 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
                               className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
                               style={{ textShadow: TEXT_SHADOW }}
                             >
-                              {/* 通電(薄)の帯は名前も表記も出さない（⚡️で分かる）。名前・バッジは施術(濃)側のみ */}
-                              {sg.tone === "light" && !kawanishi ? null : (
+                              {/* 通電(薄)の帯は「全身通電」。保護者オプションは帯自体を出さない（⚡️で分かる）。名前・バッジは施術(濃)側のみ */}
+                              {sg.tone === "light" && !kawanishi ? (
+                                "全身通電"
+                              ) : (
                                 <>
                                   {prevInsured.has(normName(appt.patient_name)) && (
                                     <span
