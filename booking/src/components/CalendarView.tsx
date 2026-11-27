@@ -178,12 +178,12 @@ function apptSegments(a: ApptWithSteps): Seg[] {
     out.push({ s: cursor, e: end, tone: seg.tone, left: 0, width: mainW });
     cursor = end;
   }
-  // 横並びの通電（右側）
+  // 横並びの通電（右側）。保護者オプションは施術と同じ濃い色で表示（薄くしない）。
   for (const st of conc) {
     const s = snap(st.start_min);
     let e = snap(st.end_min);
     if (e <= s) e = s + SNAP;
-    out.push({ s, e, tone: "light", left: mainW, width: 1 - mainW, conc: true });
+    out.push({ s, e, tone: "dark", left: mainW, width: 1 - mainW, conc: true });
   }
   return out;
 }
