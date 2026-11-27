@@ -52,14 +52,14 @@ type Person = {
 };
 
 // 予約1件がどの「人（カルテ）」に属するかのキー。
-// 予約名が患者台帳名と違う＝家族・友人などが同じ端末で予約名だけ変えたケースは、名前ごとに別カルテ。
-const apptPersonKey = (a: ApptRow, patById: Map<string, PatRow>) => {
-  if (a.patient_id) {
-    const rec = patById.get(a.patient_id);
-    const an = normName(a.patient_name);
-    return rec && an && an !== normName(rec.name) ? a.patient_id + "|" + an : a.patient_id;
-  }
-  return "name:" + normName(a.patient_name);
+// ★同じ端末（＝同じ電話番号で1つの患者台帳に相乗り）で、母が兄弟・友人を別々の名前で予約するケースが多い。
+//   台帳名は予約のたびに最新の予約者名へ更新されてしまい当てにならないので、
+//   「患者ID＋予約名」で常に名前ごとに別カルテとして扱う（台帳名との一致で畳まない）。
+//   予約名が空のときだけ患者ID（台帳の1人）に寄せる。
+const apptPersonKey = (a: ApptRow) => {
+  const an = normName(a.patient_name);
+  if (a.patient_id) return an ? a.patient_id + "|" + an : a.patient_id;
+  return "name:" + an;
 };
 
 type ChartFields = {
@@ -389,12 +389,16 @@ export default function ChartBoard() {
     // 家族・友人など「同じ端末（患者ID）で名前を変えずに予約」したケース：
     // 予約一覧で名前を変更したら、その名前ごとに別カルテとして扱う（端末所有者名に埋もれない）。
     for (const a of effAppts) {
-      const key = apptPersonKey(a, patById);
+      const key = apptPersonKey(a);
       let person = map.get(key);
       if (!person) {
+        // 台帳（患者ID）があれば かな・生年月日・電話・メモ は引き継ぐ（名前は予約名を使う）
+        const rec = a.patient_id ? patById.get(a.patient_id) : undefined;
         person = {
-          key, patient_id: a.patient_id, name: a.patient_name || "（未登録）", name_kana: null, birth_date: null,
-          phone: null, chart_note: null, visits: [], lastVisit: null, visitCount: 0, hasToday: false, hasFuture: false, todayStart: Infinity,
+          key, patient_id: a.patient_id, name: a.patient_name || rec?.name || "（未登録）",
+          name_kana: rec?.name_kana ?? null, birth_date: rec?.birth_date ?? null,
+          phone: rec?.phone ?? null, chart_note: rec?.chart_note ?? null,
+          visits: [], lastVisit: null, visitCount: 0, hasToday: false, hasFuture: false, todayStart: Infinity,
         };
         map.set(key, person);
       }
@@ -430,7 +434,6 @@ export default function ChartBoard() {
   // 「前の人／次の人」へワンタップで移動できるようにする。
   const daySeqKeys = useMemo<string[]>(() => {
     if (!salesDate) return [];
-    const patById = new Map(pats.map((p) => [p.id, p]));
     const apptById = new Map(effAppts.map((a) => [a.id, a]));
     // その日の全来院（時刻順）。誰も取りこぼさない“土台”。
     const dayAppts = effAppts
@@ -451,7 +454,7 @@ export default function ChartBoard() {
     const seen = new Set<string>();
     const keys: string[] = [];
     for (const a of ordered) {
-      const k = apptPersonKey(a, patById);
+      const k = apptPersonKey(a);
       if (!seen.has(k)) { seen.add(k); keys.push(k); }
     }
     return keys;
@@ -583,12 +586,12 @@ export default function ChartBoard() {
         if (!salesReloadedRef.current) { salesReloadedRef.current = true; load(); }
         return;
       }
-      const key = apptPersonKey(a, patById);
+      const key = apptPersonKey(a);
       target = persons.find((x) => x.key === key) ?? null;
       if (!target) {
         // 一覧(persons)にまだ無い場合は、その予約の人物を合成して必ず表示する。
         const visits = effAppts
-          .filter((x) => apptPersonKey(x, patById) === key)
+          .filter((x) => apptPersonKey(x) === key)
           .sort((x, y) => y.date.localeCompare(x.date) || y.start_min - x.start_min);
         const rec = a.patient_id ? patById.get(a.patient_id) : undefined;
         const past = visits.filter((v) => v.date <= today);
