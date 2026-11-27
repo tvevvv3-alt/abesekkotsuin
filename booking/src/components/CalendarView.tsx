@@ -1080,10 +1080,15 @@ export default function CalendarView({
                       className={`${ml ? "overflow-hidden text-[13px] leading-[1.25]" : "w-full overflow-hidden whitespace-nowrap text-[12.5px] leading-[1.2]"} font-semibold text-white`}
                       style={{ textShadow: TEXT_SHADOW, wordBreak: ml ? "break-word" : undefined }}
                     >
-                      {personalIds.has(a.service_id ?? "") && (
-                        <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
+                      {/* 通電の帯（薄い通電 or 同時進行の保護者通電）は名前を出さない（⚡️で分かる） */}
+                      {sg.tone === "light" || sg.conc ? null : (
+                        <>
+                          {personalIds.has(a.service_id ?? "") && (
+                            <span className="mr-0.5 rounded-[3px] bg-white px-0.5 text-[9px] font-black text-indigo-700 align-middle">P</span>
+                          )}
+                          {a.patient_name || "（未登録）"}
+                        </>
                       )}
-                      {a.patient_name || "（未登録）"}
                     </span>
                   </div>
                 );

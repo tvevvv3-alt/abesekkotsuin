@@ -938,10 +938,8 @@ export default function AdminBoard({ date, onShiftDay }: { date: string; onShift
                               className="w-full overflow-hidden whitespace-nowrap text-[11.5px] font-medium leading-[1.15] text-white"
                               style={{ textShadow: TEXT_SHADOW }}
                             >
-                              {/* 通電(薄)の帯は名前を繰り返さず「全身通電」と表示。名前・バッジは施術(濃)側のみ */}
-                              {sg.tone === "light" && !kawanishi ? (
-                                "全身通電"
-                              ) : (
+                              {/* 通電(薄)の帯は名前も表記も出さない（⚡️で分かる）。名前・バッジは施術(濃)側のみ */}
+                              {sg.tone === "light" && !kawanishi ? null : (
                                 <>
                                   {prevInsured.has(normName(appt.patient_name)) && (
                                     <span
