@@ -136,31 +136,48 @@ function stepTone(st: AppointmentStep): "light" | "dark" {
 
 // 予約を「薄い通電 / 濃い施術」のセグメントへ分解。
 // 30分グリッドで区切る：通電20分→30分枠(薄)、施術30分(濃)。60分施術のみ→60分ひとつながり。
-type Seg = { s: number; e: number; tone: "light" | "dark" };
+// left/width は横位置（0〜1）。通常は全幅(0〜1)。保護者の全身通電オプションのように
+// 施術と「同時進行」する通電は、施術の横に並べて表示する（conc=true）。
+type Seg = { s: number; e: number; tone: "light" | "dark"; left: number; width: number; conc?: boolean };
 function apptSegments(a: ApptWithSteps): Seg[] {
   const blockStart = snap(a.start_min);
   const blockEnd = Math.max(snap(a.end_min), blockStart + SNAP);
   const steps = (a.steps ?? [])
     .filter((st) => st.start_min != null && st.end_min != null)
     .sort((x, y) => x.start_min - y.start_min);
-  if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark" }];
-  const merged: Seg[] = [];
-  for (const st of steps) {
+  if (steps.length === 0) return [{ s: blockStart, e: blockEnd, tone: "dark", left: 0, width: 1 }];
+  // 施術(濃)と時間が重なる通電(薄)＝同時進行のオプション（保護者の全身通電など）。横並びにする。
+  const darks = steps.filter((st) => stepTone(st) === "dark");
+  const conc = steps.filter(
+    (st) => stepTone(st) === "light" && darks.some((d) => st.start_min < d.end_min && d.start_min < st.end_min)
+  );
+  const concIds = new Set(conc.map((st) => st.id));
+  const seqSteps = steps.filter((st) => !concIds.has(st.id));
+  const hasConc = conc.length > 0;
+  const mainW = hasConc ? 0.56 : 1; // 横並び時は施術側を少し狭めて右に通電を置く
+
+  // 縦方向（従来どおり）：同時進行でない工程をトーンでまとめて順に積む
+  const merged: { s: number; e: number; tone: "light" | "dark" }[] = [];
+  for (const st of seqSteps) {
     const tone = stepTone(st);
     const last = merged[merged.length - 1];
-    if (last && last.tone === tone && st.start_min <= last.e) {
-      last.e = Math.max(last.e, st.end_min);
-    } else {
-      merged.push({ s: st.start_min, e: st.end_min, tone });
-    }
+    if (last && last.tone === tone && st.start_min <= last.e) last.e = Math.max(last.e, st.end_min);
+    else merged.push({ s: st.start_min, e: st.end_min, tone });
   }
   let cursor = blockStart;
   const out: Seg[] = [];
   for (const seg of merged) {
     let end = snap(seg.e);
     if (end <= cursor) end = cursor + SNAP;
-    out.push({ s: cursor, e: end, tone: seg.tone });
+    out.push({ s: cursor, e: end, tone: seg.tone, left: 0, width: mainW });
     cursor = end;
+  }
+  // 横並びの通電（右側）
+  for (const st of conc) {
+    const s = snap(st.start_min);
+    let e = snap(st.end_min);
+    if (e <= s) e = s + SNAP;
+    out.push({ s, e, tone: "light", left: mainW, width: 1 - mainW, conc: true });
   }
   return out;
 }
@@ -818,11 +835,11 @@ export default function CalendarView({
         .map((a): Item => {
           const rk = staff.findIndex((s) => s.id === a.staff_id);
           const segs = apptSegments(a);
-          return { kind: "appt", s: segs[0].s, e: segs[segs.length - 1].e, rank: rk === -1 ? 900 : rk, appt: a };
+          return { kind: "appt", s: segs[0].s, e: Math.max(...segs.map((x) => x.e)), rank: rk === -1 ? 900 : rk, appt: a };
         }),
       ...Array.from(classGroups.entries()).map(([s, list]): Item => {
         const segs = apptSegments(list[0]);
-        return { kind: "class", s, e: segs[segs.length - 1].e, rank: 900, appts: list };
+        return { kind: "class", s, e: Math.max(...segs.map((x) => x.e)), rank: 900, appts: list };
       }),
       ...notes
         .filter((n) => n.date === ds && n.start_min != null)
@@ -1028,18 +1045,21 @@ export default function CalendarView({
               {segs.map((sg, i) => {
                 const segTop = yFor(sg.s) - top;
                 const segH = yFor(sg.e) - yFor(sg.s);
-                const ml = it.full && segH >= 44;
-                const isDenden = hasBoth && sg.tone === "light";
+                const ml = it.full && sg.width >= 0.999 && segH >= 44;
+                // 同時進行(conc)の通電は順番入れ替え(denden)対象にしない（時間が固定のため）
+                const isDenden = hasBoth && sg.tone === "light" && !sg.conc;
                 const dendenTf = drg && drg.kind === "denden" && isDenden ? { transform: `translateY(${drg.dyPx}px)`, zIndex: 30, boxShadow: "0 8px 18px rgba(0,0,0,.28)" } : {};
                 // 各30分枠を白枠で囲い、通電・施術それぞれに名前を入れる
                 return (
                   <div
                     key={i}
                     data-denden={isDenden ? "1" : undefined}
-                    className="absolute inset-x-0 flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
+                    className="absolute flex items-center justify-start overflow-hidden rounded-[4px] px-1 text-left"
                     style={{
                       top: segTop,
                       height: segH,
+                      left: `${sg.left * 100}%`,
+                      width: `${sg.width * 100}%`,
                       backgroundColor: segColor(col, sg.tone),
                       border: HAIRLINE,
                       ...dendenTf,
