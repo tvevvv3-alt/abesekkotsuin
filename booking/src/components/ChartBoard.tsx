@@ -569,33 +569,57 @@ export default function ChartBoard() {
     const apptId = sp.get("appt");
     const p = sp.get("p");
     const n = sp.get("n");
+    const patById = new Map(pats.map((pp) => [pp.id, pp]));
     let target: Person | null = null;
-    // ① クリックした予約そのもの（appt id）で本人を特定＝予約一覧で直した名前を確実に表示
+
+    // ① クリックした予約そのもの（appt id）を最優先で解決する。
+    //    クリック予約は freshAppt（サーバー直取得＝常に最新）を使い、同じ端末(患者ID)で
+    //    名前だけ違う家族・友人でも、必ず「その予約の人」を表示する（端末所有者に化けない）。
     if (apptId) {
-      const a = effAppts.find((x) => x.id === apptId);
-      if (a) {
-        const patById = new Map(pats.map((pp) => [pp.id, pp]));
-        target = persons.find((x) => x.key === apptPersonKey(a, patById)) ?? null;
-        // 解決した人物の名前が、クリック元の名前(n)と食い違う＝一覧が古い → 破棄して③の読み直しへ
-        if (target && n && normName(target.name) !== normName(n)) target = null;
+      const a = (freshAppt && freshAppt.id === apptId ? freshAppt : effAppts.find((x) => x.id === apptId)) || null;
+      if (!a) {
+        // 予約データがまだ無い＝最新待ち。1回だけ読み直し、autoSelDoneは立てずに再試行する
+        // （ここで患者IDへ落とすと端末所有者のカルテが出てしまうので、絶対に落とさない）。
+        if (!salesReloadedRef.current) { salesReloadedRef.current = true; load(); }
+        return;
       }
+      const key = apptPersonKey(a, patById);
+      target = persons.find((x) => x.key === key) ?? null;
+      if (!target) {
+        // 一覧(persons)にまだ無い場合は、その予約の人物を合成して必ず表示する。
+        const visits = effAppts
+          .filter((x) => apptPersonKey(x, patById) === key)
+          .sort((x, y) => y.date.localeCompare(x.date) || y.start_min - x.start_min);
+        const rec = a.patient_id ? patById.get(a.patient_id) : undefined;
+        const past = visits.filter((v) => v.date <= today);
+        target = {
+          key, patient_id: a.patient_id, name: a.patient_name || rec?.name || "（未登録）",
+          name_kana: rec?.name_kana ?? null, birth_date: rec?.birth_date ?? null, phone: rec?.phone ?? null,
+          chart_note: rec?.chart_note ?? null, visits, lastVisit: past[0]?.date ?? null, visitCount: past.length,
+          hasToday: visits.some((v) => v.date === today), hasFuture: visits.some((v) => v.date > today), todayStart: Infinity,
+        };
+      }
+      openPerson(target);
+      setAutoSelDone(true);
+      return;
     }
+
     // ② 名前が分かっていれば「名前一致」を最優先（別名の別カルテ＝沖田壽朗/沖田直美を取り違えない）
-    if (!target && n) {
+    if (n) {
       target = persons.find((x) => normName(x.name) === normName(n) && (!p || x.patient_id === p))
         ?? persons.find((x) => normName(x.name) === normName(n)) ?? null;
     }
     // ③ 本人がまだ見つからない＝一覧が古い可能性 → 最新を1回だけ読み直して再解決（autoSelDoneは立てない）
-    if (!target && (apptId || n) && !salesReloadedRef.current) {
+    if (!target && n && !salesReloadedRef.current) {
       salesReloadedRef.current = true;
       load();
       return;
     }
-    // ④ 最後の手段：患者ID一致（名前が無い古いリンク対策。なるべくここには来ない）
+    // ④ 最後の手段：患者ID一致（apptId の無い古いリンク対策のみ）
     if (!target && p) target = persons.find((x) => x.patient_id === p) ?? null;
     if (target) openPerson(target);
     setAutoSelDone(true);
-  }, [autoSelDone, loading, persons, effAppts, pats, openPerson, load]);
+  }, [autoSelDone, loading, persons, effAppts, freshAppt, pats, openPerson, load, today]);
 
   // 経過記録カードの編集（その場でchartMapを更新）
   const getEntry = (id: string): ChartFields & { is_draft?: boolean } => chartMap[id] ?? EMPTY;
