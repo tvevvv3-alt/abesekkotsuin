@@ -267,6 +267,8 @@ export default function BookingWizard() {
   const [staffId, setStaffId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState<{ date: string; startMin: number } | null>(null);
+  const [parentTsuden, setParentTsuden] = useState(false); // 親御さん限定・全身通電20分オプション（+1,500円・時間延長なし）
+  const PARENT_TSUDEN_PRICE = 1500;
 
   // 週データ
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
@@ -302,6 +304,14 @@ export default function BookingWizard() {
   const service = services.find((s) => s.id === serviceId) || null;
   const isClass = !!service && service.capacity > 1; // 体幹教室など定員制クラス
   const isPersonal = !!service?.personal; // パーソナル（1回／10回分の料金体系）
+  // 親御さん向け「全身通電20分」オプションを表示するメニュー：
+  // 施術30分／施術30分＋全身通電20分／施術60分／体幹教室
+  const parentMenuName = `${service?.name ?? ""} ${service?.patient_name ?? ""}`;
+  const parentTsudenEligible = !!service && (
+    /体幹/.test(parentMenuName) ||
+    (/施術/.test(parentMenuName) && /(30|60|３０|６０)\s*分/.test(parentMenuName))
+  );
+  const parentAddOn = parentTsuden && parentTsudenEligible ? PARENT_TSUDEN_PRICE : 0; // 表示料金に加算する額
   const afterHours = !!service?.after_hours; // 時間外予約（固定の夜枠のみ）
   // 初診専用メニュー（「はじめて方／初めて方／初診専用」など）は再診料金を表示しない
   const initialOnly = /はじめて|初めて|初診専用/.test(`${service?.name ?? ""}${service?.patient_name ?? ""}`);
@@ -745,6 +755,7 @@ export default function BookingWizard() {
     setFromServiceId(from);
     setServiceId(id);
     setSelected(null);
+    setParentTsuden(false); // メニューを変えたらオプションは外す
     // 初期選択：前回担当した人が対応可能ならその人、いなければ対応できる先頭（クラスは担当者不使用）
     const ids = new Set(links.filter((l) => l.service_id === id).map((l) => l.staff_id));
     const capable = allStaff.filter(
@@ -795,7 +806,8 @@ export default function BookingWizard() {
         p_name_kana: kana.trim() || null,
         p_birth_date: birth || null,
         p_phone: phone.trim() || null,
-        p_note: null,
+        // 親御さん全身通電オプションは予約メモに記録（スタッフが売上で+1,500円を計上）
+        p_note: parentAddOn > 0 ? `親御さん全身通電20分 +¥${PARENT_TSUDEN_PRICE.toLocaleString()}` : null,
         p_source: "patient",
         // 冪等キー（同じキーの再送信は既存予約を返す＝重複しない）
         p_idempotency_key: idemKey,
@@ -1334,9 +1346,9 @@ export default function BookingWizard() {
                 ).map(([label, ippan, gakusei]) => (
                   <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-2 text-center">
                     <div className="text-[10px] text-slate-400">{label}</div>
-                    <div className="text-base font-bold text-slate-800">¥{ippan.toLocaleString()}</div>
+                    <div className="text-base font-bold text-slate-800">¥{(ippan + parentAddOn).toLocaleString()}</div>
                     {staffMenuPrice.studentDiffers && (
-                      <div className="text-[10px] text-slate-500">学生 ¥{gakusei.toLocaleString()}</div>
+                      <div className="text-[10px] text-slate-500">学生 ¥{(gakusei + parentAddOn).toLocaleString()}</div>
                     )}
                   </div>
                 ))}
@@ -1346,6 +1358,28 @@ export default function BookingWizard() {
                 {service?.category !== "川西整体院" && "怪我の内容により健康保険適用の場合は窓口負担が多少軽減されます。"}
               </p>
             </div>
+          )}
+
+          {/* 親御さん限定・全身通電20分オプション（施術30分／30分＋全身通電／60分／体幹教室で表示） */}
+          {parentTsudenEligible && (
+            <label className="mb-3 flex cursor-pointer gap-3 rounded-xl border p-3 transition active:opacity-90" style={{ borderColor: parentTsuden ? GOLD : "#e2e8f0", background: parentTsuden ? "#fffdf5" : "#fff" }}>
+              <input
+                type="checkbox"
+                checked={parentTsuden}
+                onChange={(e) => setParentTsuden(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-500"
+              />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="text-sm font-bold text-slate-800">親御さん限定｜全身通電20分</span>
+                  <span className="rounded-md px-1.5 py-0.5 text-xs font-bold text-white" style={{ background: GOLD }}>＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}</span>
+                </div>
+                <p className="mt-1 text-[12px] leading-snug text-slate-500">
+                  お子さまの施術中に、親御さんも全身ケア。ミトコンドリアの働きをサポートし、睡眠の質や疲労回復、免疫機能を整える効果が期待できます。
+                </p>
+                <p className="mt-1 text-[10px] text-slate-400">お子さまと同時進行のため、予約時間は延長しません。</p>
+              </div>
+            </label>
           )}
 
           {/* 週切替（今週より前へは戻れない） */}
@@ -1452,9 +1486,9 @@ export default function BookingWizard() {
                         <div key={label} className="rounded-lg border px-2 py-1.5 text-center" style={{ borderColor: GOLD, background: "#fffdf5" }}>
                           <div className="mb-0.5 text-[10px] font-bold" style={{ color: GOLD }}>{label}（時間外）</div>
                           <div className="flex items-baseline justify-center gap-1.5">
-                            <span className="text-sm font-bold text-slate-800">学生 ¥{(gakusei + jikangai.gakusei).toLocaleString()}</span>
+                            <span className="text-sm font-bold text-slate-800">学生 ¥{(gakusei + jikangai.gakusei + parentAddOn).toLocaleString()}</span>
                             <span className="text-sm font-bold text-slate-400">〜</span>
-                            <span className="text-sm font-bold text-slate-600">一般 ¥{(ippan + jikangai.ippan).toLocaleString()}</span>
+                            <span className="text-sm font-bold text-slate-600">一般 ¥{(ippan + jikangai.ippan + parentAddOn).toLocaleString()}</span>
                           </div>
                         </div>
                       ))}
@@ -1533,6 +1567,11 @@ export default function BookingWizard() {
                     <div className="font-bold text-slate-800">
                       {service.patient_name || service.name}
                     </div>
+                    {parentAddOn > 0 && (
+                      <div className="mt-0.5 text-[12px] font-bold" style={{ color: GOLD }}>
+                        ＋ 親御さん全身通電20分（＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}）
+                      </div>
+                    )}
                   </div>
                 </div>
 
