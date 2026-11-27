@@ -268,7 +268,8 @@ export default function BookingWizard() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [selected, setSelected] = useState<{ date: string; startMin: number } | null>(null);
   const [parentTsuden, setParentTsuden] = useState(false); // 親御さん限定・全身通電20分オプション（+1,500円・時間延長なし）
-  const PARENT_TSUDEN_PRICE = 1500;
+  const PARENT_TSUDEN_PRICE = 1500; // 保護者限定の特別価格
+  const PARENT_TSUDEN_LIST = 3300; // 通常の全身通電20分の料金（取り消し線で表示）
 
   // 週データ
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
@@ -1561,10 +1562,11 @@ export default function BookingWizard() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                             <span className="text-[13px] font-bold text-slate-800">学生のお子さまの保護者限定｜全身通電20分</span>
+                            <span className="text-[11px] font-bold text-slate-400 line-through">¥{PARENT_TSUDEN_LIST.toLocaleString()}</span>
                             <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white" style={{ background: GOLD }}>＋¥{PARENT_TSUDEN_PRICE.toLocaleString()}</span>
                           </div>
                           <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                            お子さまの施術中に、保護者さまも全身ケア。予約時間は延長しません。
+                            お子さまの施術中に、保護者さまも全身ケア。
                           </p>
                         </div>
                       </label>
